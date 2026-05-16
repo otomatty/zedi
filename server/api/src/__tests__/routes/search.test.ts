@@ -414,6 +414,100 @@ describe("GET /api/search", () => {
     expect(serialised).not.toContain("pdf_highlights");
   });
 
+  it("does not leak content_text into the API response (PR #873 review: CodeRabbit)", async () => {
+    // SQL から `pc.content_text` を引っ張る場合でも、レスポンスには含めない。
+    // Even when the SQL row carries `content_text`, it must not appear in the
+    // outbound JSON.
+    const pageId = "55555555-5555-5555-5555-555555555555";
+    const { app } = createSearchApp([
+      {
+        rows: [
+          {
+            id: pageId,
+            title: "Page",
+            content_preview: "snippet",
+            updated_at: new Date("2026-04-01T00:00:00Z").toISOString(),
+            note_id: "default-note-search-mock",
+            // 仮に過去の SELECT が content_text を含んでいた場合のシミュレーション。
+            // Simulate a row that still carries full body text.
+            content_text: "FULL PAGE BODY MUST NOT LEAK",
+          },
+        ],
+      },
+      { rows: [] },
+    ]);
+
+    const res = await app.request("/api/search?q=hello&scope=own", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<Record<string, unknown>> };
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0]).not.toHaveProperty("content_text");
+    expect(JSON.stringify(body)).not.toContain("FULL PAGE BODY");
+  });
+
+  it("page-query SELECT no longer pulls pc.content_text into the outbound payload", async () => {
+    // WHERE には残るが、SELECT 列から content_text が消えている。
+    // The WHERE clause still references `content_text`, but the SELECT list
+    // doesn't carry it anymore (PR #873 review: CodeRabbit).
+    const { app, chains } = createSearchApp(emptyDbResults());
+
+    await app.request("/api/search?q=hello&scope=own", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    const executeChains = chains.filter((chain) => chain.startMethod === "execute");
+    const pagesChain = executeChains[0];
+    const serialised = JSON.stringify(pagesChain?.startArgs);
+    // WHERE 句では content_text 比較が残っている必要がある (検索可能性は維持)。
+    // The WHERE branch still uses `content_text` (search reach preserved).
+    expect(serialised).toContain("pc.content_text ILIKE");
+    // SELECT 句には `pc.content_text` リストアップが残らない。
+    // The SELECT list no longer references `pc.content_text`.
+    expect(serialised).not.toContain("pc.content_text,");
+    expect(serialised).not.toMatch(/SELECT[\s\S]*pc\.content_text\b[\s\S]*FROM/);
+  });
+
+  it("caps the merged result list at `limit` so page+highlight never exceed the hard bound (PR #873 review: codex)", async () => {
+    // 各クエリが LIMIT を持つので、極端な場合 page+highlight = 2*limit になる。
+    // 結合後に再度クリップしてレスポンス契約 `limit` をハード上限として維持する。
+    //
+    // Each query carries `LIMIT`, so naïve concat could return 2*limit rows.
+    // The merge clip enforces `limit` as a hard cap on the API response.
+    const pageRows = Array.from({ length: 20 }, (_, i) => ({
+      id: `p-${i}`,
+      title: `Page ${i}`,
+      content_preview: null,
+      updated_at: new Date(2026, 3, 1, 0, i).toISOString(),
+      note_id: "default-note-search-mock",
+    }));
+    const highlightRows = Array.from({ length: 20 }, (_, i) => ({
+      highlight_id: `h-${i}`,
+      source_id: `s-${i}`,
+      owner_id: TEST_USER_ID,
+      pdf_page: i + 1,
+      text: "hit",
+      derived_page_id: null,
+      updated_at: new Date(2026, 3, 2, 0, i).toISOString(),
+      source_display_name: "doc.pdf",
+      source_title: null,
+    }));
+    const { app } = createSearchApp([{ rows: pageRows }, { rows: highlightRows }]);
+
+    const res = await app.request("/api/search?q=hit&scope=own&limit=20", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<Record<string, unknown>> };
+    expect(body.results.length).toBeLessThanOrEqual(20);
+  });
+
   it("merges page rows (kind='page') and highlight rows (kind='pdf_highlight') in one response", async () => {
     const pageId = "33333333-3333-3333-3333-333333333333";
     const { app } = createSearchApp([

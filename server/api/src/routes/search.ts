@@ -79,8 +79,14 @@ app.get("/", authRequired, async (c) => {
   const limit = clampLimit(c.req.query("limit"));
   const pattern = `%${escapeLike(query)}%`;
 
-  const searchColumns = sql`p.id, p.title, p.content_preview, p.updated_at, p.note_id,
-             pc.content_text`;
+  // 検索条件用にだけ `content_text` を WHERE に登場させるが、SELECT には含めない。
+  // SELECT に流すと API 経由でページ本文が丸ごと露出し得る（PR #873 review:
+  // CodeRabbit）。クライアントが消費するのは `content_preview` のみ。
+  //
+  // `content_text` is used in the WHERE clause for matching but is NOT in the
+  // SELECT list — otherwise the API would leak full page bodies (PR #873 review:
+  // CodeRabbit). Clients only consume `content_preview`.
+  const searchColumns = sql`p.id, p.title, p.content_preview, p.updated_at, p.note_id`;
 
   const normalizedEmail = typeof userEmailRaw === "string" ? userEmailRaw.trim().toLowerCase() : "";
   const emailDomain = extractEmailDomain(normalizedEmail);
@@ -157,16 +163,54 @@ app.get("/", authRequired, async (c) => {
     pageRows = ownResults.rows;
   }
 
-  // 既存ページ行に kind="page" の識別子を付与してから、ハイライト結果と結合する。
-  // Tag every page row with `kind: "page"` before merging with highlight rows.
-  const taggedPageRows = pageRows.map((row) => ({
-    ...(row as Record<string, unknown>),
-    kind: "page" as const,
-  }));
+  // 契約フィールドのみを明示マップして response に流す。SQL の SELECT に直接含まれない
+  // カラム (owner_id / thumbnail_url / source_url) は明示的に null/undefined で埋めて
+  // 型 (`SearchPageResultRow`) との整合を取る。raw row を spread で流すと将来 SELECT
+  // を増やしたとき静かに API が漏れるので、PR #873 review (CodeRabbit) で明示化した。
+  //
+  // Map only the contracted fields explicitly. We do not spread raw SQL rows
+  // because any future SELECT addition would silently widen the API payload
+  // (PR #873 review: CodeRabbit). Columns not in the current SELECT are
+  // emitted as `null`/`undefined` to stay aligned with `SearchPageResultRow`.
+  const taggedPageRows = pageRows.map((row) => {
+    const r = row as {
+      id: string;
+      note_id: string;
+      title: string | null;
+      content_preview: string | null;
+      updated_at: string;
+    };
+    return {
+      kind: "page" as const,
+      id: r.id,
+      note_id: r.note_id,
+      // `owner_id` / `thumbnail_url` / `source_url` は将来 SELECT に追加する想定の
+      // プレースホルダ。現状の SQL では返らないので明示的に null/undefined を入れる。
+      // Placeholders for columns not yet in SELECT; emitted explicitly so the
+      // payload shape stays stable for the discriminated union.
+      owner_id: null,
+      title: r.title,
+      content_preview: r.content_preview,
+      thumbnail_url: null,
+      source_url: null,
+      updated_at: r.updated_at,
+    };
+  });
 
   const highlightRows = await runPdfHighlightSearch(db, userId, pattern, limit);
 
-  return c.json({ results: [...taggedPageRows, ...highlightRows] });
+  // ページ検索とハイライト検索のそれぞれが `LIMIT ${limit}` を持つので、無加工に連結
+  // すると endpoint は最大 2*limit 行返してしまう (PR #873 review: codex)。クライアント
+  // 契約上 `limit` はハード上限なので、結合後に再度クリップする。元の DESC 順は
+  // 種別ごとに維持されるが、種別を跨いだ並び替えはクライアント側のスコアリングに任せる。
+  //
+  // The page query and the highlight query each apply `LIMIT ${limit}`, so a
+  // naïve concat would return up to 2*limit rows (PR #873 review: codex).
+  // We re-clip to `limit` after the merge to keep the contract a hard cap;
+  // cross-kind ordering is left to the client-side scoring layer.
+  const merged = [...taggedPageRows, ...highlightRows].slice(0, limit);
+
+  return c.json({ results: merged });
 });
 
 /**

@@ -4,6 +4,7 @@ import {
   buildGlobalSearchResults,
   buildPdfHighlightItem,
   dedupSharedRowsAgainstPersonal,
+  formatPdfHighlightDisplay,
   PDF_HIGHLIGHT_BASE_SCORE,
   type GlobalSearchResultItem,
 } from "./useGlobalSearch";
@@ -412,7 +413,7 @@ describe("buildGlobalSearchResults", () => {
     });
   });
 
-  // ── Issue #864: PDF ハイライト統合 ─────────────────────────────────────────
+  // ── Issue #864: PDF ハイライト統合 / PDF highlight integration ──────────────
   describe("Issue #864: PDF highlight integration", () => {
     it("includes pdf_highlight rows as kind='pdf_highlight' items with deep-link fields", () => {
       const query = "alpha";
@@ -527,6 +528,73 @@ describe("buildPdfHighlightItem", () => {
     });
     const item = buildPdfHighlightItem(row, ["body"]);
     expect(item.sourceDisplayName).toBe("From PDF Metadata");
+  });
+});
+
+/**
+ * PR #873 review (Gemini): ヘッダードロップダウン (`buildPdfHighlightItem`) と
+ * フル検索画面 (`SearchResults.tsx`) で同じ i18n / snippet 整形ロジックを共有することを
+ * 単独でテストする。Translator 関数を差し替えられるので、デフォルト値の fallback と
+ * snippet 長の上書きを直接アサートできる。
+ *
+ * PR #873 review (Gemini): exercises the shared formatter used by both the
+ * header dropdown (`buildPdfHighlightItem`) and the full search page
+ * (`SearchResults.tsx`). The translator is injected, so the fallback path and
+ * the snippet-length override can be asserted without spinning up i18next.
+ */
+describe("formatPdfHighlightDisplay", () => {
+  const passthroughTranslator = (key: string, options?: Record<string, unknown>) => {
+    if (key === "common.pdfHighlightFallbackName")
+      return (options?.defaultValue as string) ?? "PDF";
+    if (key === "common.pdfHighlightResultTitle") {
+      const file = options?.file as string;
+      const page = options?.page as number;
+      return `${file} (p.${page})`;
+    }
+    return key;
+  };
+
+  it("returns a title combining display name and page number", () => {
+    const row = createHighlightRow({
+      highlight_id: "h-1",
+      source_display_name: "paper.pdf",
+      pdf_page: 9,
+      text: "alpha keyword text",
+    });
+
+    const result = formatPdfHighlightDisplay(row, ["alpha"], passthroughTranslator);
+
+    expect(result.title).toBe("paper.pdf (p.9)");
+    expect(result.displayName).toBe("paper.pdf");
+    expect(result.highlightedText).toContain("【alpha】");
+  });
+
+  it("falls back to the i18n placeholder when both display name and PDF title are missing", () => {
+    const row = createHighlightRow({
+      highlight_id: "h-2",
+      source_display_name: null,
+      source_title: null,
+    });
+
+    const result = formatPdfHighlightDisplay(row, ["body"], passthroughTranslator);
+
+    expect(result.displayName).toBe("PDF");
+    expect(result.title).toBe("PDF (p.1)");
+  });
+
+  it("forwards the snippet length override to extractSmartSnippet (used by the full search page)", () => {
+    // キーワードが見つからない長文では `maxLength` がそのまま境界として効くので、
+    // 短尺 / 長尺の指定で snippet 長が変わることを観察できる。
+    // When the keyword is absent, `extractSmartSnippet` truncates at `maxLength`
+    // directly, so the override is observable as a snippet-length change.
+    const longText = "padding ".repeat(60).trim();
+    const row = createHighlightRow({ highlight_id: "h-3", text: longText });
+
+    const short = formatPdfHighlightDisplay(row, ["nomatch"], passthroughTranslator, 50);
+    const long = formatPdfHighlightDisplay(row, ["nomatch"], passthroughTranslator, 200);
+
+    expect(short.snippet.length).toBeLessThan(long.snippet.length);
+    expect(long.snippet.length).toBeGreaterThan(50);
   });
 });
 

@@ -24,6 +24,16 @@ interface SearchResultCardBase {
   updatedAt: number;
 }
 
+/**
+ * ページ系（個人 / 共有ノート）検索結果用のカード項目。
+ *
+ * Card item for a page-kind search result (personal page or shared note page).
+ *
+ * @property pageId - 対象ページ ID。Target page id.
+ * @property noteId - 共有ノート所属ページの場合に設定されるノート ID。
+ *   Owning note id when the page is note-native (used for /notes/:noteId/:pageId routing).
+ * @property sourceUrl - クリップ系ページに紐づく出典 URL。Source URL for clipped pages.
+ */
 export interface SearchResultCardPageItem extends SearchResultCardBase {
   kind: "page";
   pageId: string;
@@ -31,6 +41,20 @@ export interface SearchResultCardPageItem extends SearchResultCardBase {
   sourceUrl?: string;
 }
 
+/**
+ * Issue #864: PDF ハイライト本文ヒット用のカード項目。
+ * クリック時は派生 Zedi ページがあればそちらへ、なければ PDF ビューアへ deep-link。
+ *
+ * Issue #864: card item for a `pdf_highlights.text` match. Clicking routes to
+ * the derived Zedi page when one exists, otherwise deep-links to the PDF
+ * viewer at `/sources/:sourceId/pdf#page=N`.
+ *
+ * @property highlightId - ハイライトの一意 ID。Highlight UUID.
+ * @property sourceId - 元 PDF ソース ID。Owning PDF source id (`sources.id`).
+ * @property pdfPage - 1 始まりの PDF ページ番号。1-indexed PDF page number.
+ * @property derivedPageId - 派生 Zedi ページがあれば ID、なければ null。
+ *   Derived Zedi page id when one exists, otherwise null.
+ */
 export interface SearchResultCardPdfHighlightItem extends SearchResultCardBase {
   kind: "pdf_highlight";
   highlightId: string;

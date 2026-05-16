@@ -185,29 +185,68 @@ export function searchPages(pages: Page[], query: string): SearchResult[] {
 }
 
 /**
+ * PR #873 review (Gemini): PDF ハイライト行の i18n タイトル / snippet 抽出 /
+ * ハイライト本文整形ロジックを単一の helper に集約する。`buildPdfHighlightItem`
+ * とフル検索画面 (`SearchResults.tsx`) の両方がこれを共有する。i18n 関数を
+ * 引数化することで、ヘッダードロップダウン側 (i18next の `i18n.t`) と
+ * フル検索画面側 (react-i18next の `useTranslation` の `t`) の両方で使える。
+ *
+ * PR #873 review (Gemini): centralize the i18n title / snippet extraction /
+ * highlight formatting so the header dropdown (`buildPdfHighlightItem`) and
+ * the full search page (`SearchResults.tsx`) share one implementation. The
+ * translator function is injected so callers can pass either i18next's global
+ * `i18n.t` or the `t` from `useTranslation`.
+ *
+ * @param row - サーバから返ってきた PDF ハイライト行。Highlight row from the API.
+ * @param keywords - 検索キーワード配列。Parsed search keywords.
+ * @param translate - i18n キー解決関数。Translator function.
+ * @param snippetLength - スニペット最大長（既定 120）。Snippet max length (default 120).
+ */
+export function formatPdfHighlightDisplay(
+  row: SearchPdfHighlightResultRow,
+  keywords: string[],
+  translate: (key: string, options?: Record<string, unknown>) => string,
+  snippetLength = 120,
+): {
+  displayName: string;
+  title: string;
+  snippet: string;
+  highlightedText: string;
+} {
+  const snippet = extractSmartSnippet(row.text, keywords, snippetLength);
+  const highlightedText = highlightKeywords(snippet, keywords);
+  const displayName =
+    (row.source_display_name?.trim() || row.source_title?.trim() || null) ??
+    translate("common.pdfHighlightFallbackName", { defaultValue: "PDF" });
+
+  // 表示用タイトル: `<file> (p.<page>)`。i18n リソースが無い環境では英語フォールバック。
+  // Display title: `<file> (p.<page>)`; falls back to English when i18n missing.
+  const title = translate("common.pdfHighlightResultTitle", {
+    defaultValue: "{{file}} (p.{{page}})",
+    file: displayName,
+    page: row.pdf_page,
+  });
+
+  return { displayName, title, snippet, highlightedText };
+}
+
+/**
  * Issue #864: PDF ハイライト行を表示用の `GlobalSearchPdfHighlightResultItem` に変換する。
  *
  * Converts a server `kind="pdf_highlight"` row into the discriminated UI shape.
  * Exported so the snippet / title build-out is easy to unit-test without a
- * React Query harness.
+ * React Query harness. Shared formatting lives in
+ * {@link formatPdfHighlightDisplay} (PR #873 review: Gemini).
  */
 export function buildPdfHighlightItem(
   row: SearchPdfHighlightResultRow,
   keywords: string[],
 ): GlobalSearchPdfHighlightResultItem & { score: number } {
-  const snippet = extractSmartSnippet(row.text, keywords);
-  const highlightedText = highlightKeywords(snippet, keywords);
-  const displayName =
-    (row.source_display_name?.trim() || row.source_title?.trim() || null) ??
-    i18n.t("common.pdfHighlightFallbackName", { defaultValue: "PDF" });
-
-  // 表示用タイトル: `<file> (p.<page>)`。i18n リソースが無い環境では英語フォールバック。
-  // Display title: `<file> (p.<page>)`; falls back to English when i18n missing.
-  const title = i18n.t("common.pdfHighlightResultTitle", {
-    defaultValue: "{{file}} (p.{{page}})",
-    file: displayName,
-    page: row.pdf_page,
-  });
+  const { displayName, title, highlightedText } = formatPdfHighlightDisplay(
+    row,
+    keywords,
+    (key, options) => i18n.t(key, options),
+  );
 
   return {
     kind: "pdf_highlight",

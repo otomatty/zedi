@@ -20,7 +20,11 @@ import {
   calculateEnhancedScore,
 } from "@/lib/searchUtils";
 import { resolveSearchResultUrl, useGlobalSearchContext } from "@/contexts/GlobalSearchContext";
-import { PDF_HIGHLIGHT_BASE_SCORE, dedupSharedRowsAgainstPersonal } from "@/hooks/useGlobalSearch";
+import {
+  PDF_HIGHLIGHT_BASE_SCORE,
+  dedupSharedRowsAgainstPersonal,
+  formatPdfHighlightDisplay,
+} from "@/hooks/useGlobalSearch";
 import type { SearchPageResultRow, SearchPdfHighlightResultRow } from "@/lib/api/types";
 
 type PageSearchResultItem = SearchResultCardPageItem & {
@@ -136,24 +140,24 @@ export default function SearchResults() {
     const sharedHighlights: PdfHighlightSearchResultItem[] = dedupedShared
       .filter((r): r is SearchPdfHighlightResultRow => r.kind === "pdf_highlight")
       .map((r) => {
-        const snippet = extractSmartSnippet(r.text, keywords, 200);
-        const highlightedSnippet = highlightKeywords(snippet, keywords);
-        const file =
-          (r.source_display_name?.trim() || r.source_title?.trim() || null) ??
-          t("common.pdfHighlightFallbackName", { defaultValue: "PDF" });
+        // PR #873 review (Gemini): タイトル / snippet / 表示名は `formatPdfHighlightDisplay`
+        // に集約され、ヘッダードロップダウンと同じ整形ロジックを共有する。
+        // 検索結果ページではカード幅が広いので snippet を 200 字に延ばす。
+        //
+        // Title / snippet / display name are produced by the shared
+        // `formatPdfHighlightDisplay` helper so the dropdown and this page
+        // stay in lockstep. The card is wider here, so we widen the snippet
+        // to 200 chars.
+        const display = formatPdfHighlightDisplay(r, keywords, t, 200);
         return {
           kind: "pdf_highlight",
           highlightId: r.highlight_id,
           sourceId: r.source_id,
           pdfPage: r.pdf_page,
           derivedPageId: r.derived_page_id,
-          title: t("common.pdfHighlightResultTitle", {
-            defaultValue: "{{file}} (p.{{page}})",
-            file,
-            page: r.pdf_page,
-          }),
-          snippet,
-          highlightedSnippet,
+          title: display.title,
+          snippet: display.snippet,
+          highlightedSnippet: display.highlightedText,
           matchType: "content" as MatchType,
           thumbnailUrl: undefined,
           updatedAt: new Date(r.updated_at).getTime(),
