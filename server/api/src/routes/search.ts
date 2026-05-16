@@ -199,18 +199,43 @@ app.get("/", authRequired, async (c) => {
 
   const highlightRows = await runPdfHighlightSearch(db, userId, pattern, limit);
 
-  // ページ検索とハイライト検索のそれぞれが `LIMIT ${limit}` を持つので、無加工に連結
-  // すると endpoint は最大 2*limit 行返してしまう (PR #873 review: codex)。クライアント
-  // 契約上 `limit` はハード上限なので、結合後に再度クリップする。元の DESC 順は
-  // 種別ごとに維持されるが、種別を跨いだ並び替えはクライアント側のスコアリングに任せる。
+  // PR #873 review (codex, CodeRabbit): 両 review の指摘を両立させるため予約枠方式を採る。
   //
-  // The page query and the highlight query each apply `LIMIT ${limit}`, so a
-  // naïve concat would return up to 2*limit rows (PR #873 review: codex).
-  // We re-clip to `limit` after the merge to keep the contract a hard cap;
-  // cross-kind ordering is left to the client-side scoring layer.
-  const merged = [...taggedPageRows, ...highlightRows].slice(0, limit);
+  // - codex: 各クエリが `LIMIT ${limit}` を持ち、連結すると最大 2*limit 行返り得る。
+  //   `limit` をハード上限として尊重する必要がある。
+  // - CodeRabbit: 単純な `.slice(0, limit)` だとページが `limit` 件以上ある状況で
+  //   ハイライトが全て削られ、Issue #864 の目的（ハイライトを検索結果に乗せる）が壊れる。
+  //
+  // 解決策: ハイライトに最低 `ceil(limit / HIGHLIGHT_RESERVED_RATIO)` 件の予約枠を
+  // 確保し、残りをページで埋める。ハイライトが予約枠より少なければ余りはページに
+  // 戻す。結果として `総数 ≤ limit` を守りつつ、ハイライトが必ず一定数は載る。
+  // 種別を跨いだ最終ランキングはクライアント側のスコアリング層に任せる。
+  //
+  // PR #873 review (codex, CodeRabbit): reserved-budget merge that satisfies
+  // both concerns simultaneously.
+  //
+  // - codex: each branch applies `LIMIT ${limit}`, so a naïve concat could
+  //   return up to 2*limit rows and break the contract.
+  // - CodeRabbit: a naïve `.slice(0, limit)` lets pages crowd out highlights
+  //   entirely once there are >= `limit` pages, defeating Issue #864.
+  //
+  // The fix reserves a minimum of `ceil(limit / HIGHLIGHT_RESERVED_RATIO)`
+  // slots for highlights and gives the remainder to pages; the reserved
+  // budget shrinks if there aren't that many highlights so pages can spill
+  // back into it. Total is always <= `limit`, and highlights are never
+  // starved when they exist. Cross-kind ranking still happens on the client.
+  const HIGHLIGHT_RESERVED_RATIO = 4;
+  const highlightReserved = Math.min(
+    highlightRows.length,
+    Math.max(1, Math.ceil(limit / HIGHLIGHT_RESERVED_RATIO)),
+  );
+  const pageQuota = limit - highlightReserved;
+  const cappedPages = taggedPageRows.slice(0, pageQuota);
+  // ページが quota より少なかった場合、余り枠をハイライトに回す。
+  // Spill leftover capacity to highlights when there are fewer pages than the quota.
+  const cappedHighlights = highlightRows.slice(0, limit - cappedPages.length);
 
-  return c.json({ results: merged });
+  return c.json({ results: [...cappedPages, ...cappedHighlights] });
 });
 
 /**

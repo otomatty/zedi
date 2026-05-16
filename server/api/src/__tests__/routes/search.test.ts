@@ -508,6 +508,97 @@ describe("GET /api/search", () => {
     expect(body.results.length).toBeLessThanOrEqual(20);
   });
 
+  it("reserves slots for pdf_highlights so pages never starve them out (PR #873 review: CodeRabbit)", async () => {
+    // ページが limit を埋め切る場合でも、ハイライトに最低限の枠
+    // (ceil(limit / 4) = 5 件) が確保される。
+    //
+    // Even when pages would fill `limit` on their own, the merge reserves
+    // a minimum slot count (`ceil(limit / 4)` = 5) for highlights so the
+    // feature stays visible (PR #873 review: CodeRabbit).
+    const pageRows = Array.from({ length: 20 }, (_, i) => ({
+      id: `p-${i}`,
+      title: `Page ${i}`,
+      content_preview: null,
+      updated_at: new Date(2026, 3, 1, 0, i).toISOString(),
+      note_id: "default-note-search-mock",
+    }));
+    const highlightRows = Array.from({ length: 20 }, (_, i) => ({
+      highlight_id: `h-${i}`,
+      source_id: `s-${i}`,
+      owner_id: TEST_USER_ID,
+      pdf_page: i + 1,
+      text: "hit",
+      derived_page_id: null,
+      updated_at: new Date(2026, 3, 2, 0, i).toISOString(),
+      source_display_name: "doc.pdf",
+      source_title: null,
+    }));
+    const { app } = createSearchApp([{ rows: pageRows }, { rows: highlightRows }]);
+
+    const res = await app.request("/api/search?q=hit&scope=own&limit=20", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<Record<string, unknown>> };
+    const highlights = body.results.filter((r) => r.kind === "pdf_highlight");
+    const pages = body.results.filter((r) => r.kind === "page");
+    expect(highlights.length).toBe(5);
+    expect(pages.length).toBe(15);
+    expect(body.results.length).toBe(20);
+  });
+
+  it("spills the highlight reserve back to pages when there are no highlights", async () => {
+    // ハイライトが 0 件のケースではページが limit までフルに載る。
+    // When there are no highlights, pages get the full `limit` budget.
+    const pageRows = Array.from({ length: 20 }, (_, i) => ({
+      id: `p-${i}`,
+      title: `Page ${i}`,
+      content_preview: null,
+      updated_at: new Date(2026, 3, 1, 0, i).toISOString(),
+      note_id: "default-note-search-mock",
+    }));
+    const { app } = createSearchApp([{ rows: pageRows }, { rows: [] }]);
+
+    const res = await app.request("/api/search?q=hit&scope=own&limit=20", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<Record<string, unknown>> };
+    expect(body.results.length).toBe(20);
+    expect(body.results.every((r) => r.kind === "page")).toBe(true);
+  });
+
+  it("fills the merge with highlights when there are no pages", async () => {
+    // ページが 0 件のケースではハイライトが limit までフルに載る。
+    // When there are no pages, highlights take the full `limit` budget.
+    const highlightRows = Array.from({ length: 20 }, (_, i) => ({
+      highlight_id: `h-${i}`,
+      source_id: `s-${i}`,
+      owner_id: TEST_USER_ID,
+      pdf_page: i + 1,
+      text: "hit",
+      derived_page_id: null,
+      updated_at: new Date(2026, 3, 2, 0, i).toISOString(),
+      source_display_name: "doc.pdf",
+      source_title: null,
+    }));
+    const { app } = createSearchApp([{ rows: [] }, { rows: highlightRows }]);
+
+    const res = await app.request("/api/search?q=hit&scope=own&limit=20", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<Record<string, unknown>> };
+    expect(body.results.length).toBe(20);
+    expect(body.results.every((r) => r.kind === "pdf_highlight")).toBe(true);
+  });
+
   it("merges page rows (kind='page') and highlight rows (kind='pdf_highlight') in one response", async () => {
     const pageId = "33333333-3333-3333-3333-333333333333";
     const { app } = createSearchApp([
