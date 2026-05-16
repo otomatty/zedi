@@ -9,6 +9,9 @@ import type {
   PostSyncPagesResponse,
   PageContentResponse,
   PutPageContentBody,
+  PagePublicContentResponse,
+  UpdatePageMetadataBody,
+  UpdatePageMetadataResponse,
   CreatePageBody,
   CreatePageResponse,
   CopyPersonalPageToNoteResponse,
@@ -324,6 +327,41 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return req<{ version: number }>("PUT", `/api/pages/${encodeURIComponent(pageId)}/content`, {
         body,
       });
+    },
+
+    /**
+     * `PUT /api/pages/:id` — タイトル等のメタデータだけを更新する。
+     * `local` モード廃止に伴い、Y.Doc を扱わない純粋な REST メタデータ更新経路として
+     * 追加された。サインインユーザーの編集権限が前提。
+     *
+     * `PUT /api/pages/:id` updates page metadata only (title,
+     * content_preview). Introduced when the `local` collaboration mode was
+     * retired so callers that rename via REST have a stable endpoint.
+     */
+    async updatePageMetadata(
+      pageId: string,
+      body: UpdatePageMetadataBody,
+    ): Promise<UpdatePageMetadataResponse> {
+      return req<UpdatePageMetadataResponse>("PUT", `/api/pages/${encodeURIComponent(pageId)}`, {
+        body,
+      });
+    },
+
+    /**
+     * `GET /api/pages/:id/public-content` — 読み取り専用のページ本文を取得する。
+     * `Y.Doc` バイト列は返さず、`content_text` と派生情報だけを返す。ゲスト
+     * （public / unlisted ノートの未認証読者）や viewer ロールの読み取り
+     * 専用 UI から使う。
+     *
+     * `GET /api/pages/:id/public-content` returns the rendered plain text of a
+     * page. Use this from read-only views (guests on public/unlisted notes or
+     * signed-in viewer-role members) instead of opening a Hocuspocus session.
+     */
+    async getPagePublicContent(pageId: string): Promise<PagePublicContentResponse> {
+      return reqOptionalAuth<PagePublicContentResponse>(
+        "GET",
+        `/api/pages/${encodeURIComponent(pageId)}/public-content`,
+      );
     },
 
     /** POST /api/pages — create page. Returns created page (snake_case). */

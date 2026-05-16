@@ -712,3 +712,331 @@ describe("PUT /api/pages/:id/content", () => {
     expect(hasWikiLink).toBe(true);
   });
 });
+
+// ── PUT /api/pages/:id (metadata only, post-`local` cleanup) ────────────────
+//
+// `local` モード廃止後、タイトル等のメタデータ更新は Y.Doc 経路 (`PUT /content`)
+// を介さず、この新エンドポイントで行う。`applyPagesMetadataUpdate` を再利用する
+// ため SSE 通知・タイトル伝播のゲーティングは PUT /content と同等に動作する。
+//
+// After retiring the `local` collaboration mode, page metadata updates flow
+// through this new endpoint instead of riding on the Y.Doc payload. The
+// helpers (`applyPagesMetadataUpdate`, `tryPropagateTitleRename`,
+// `emitPageUpdatedIfChanged`) are reused so the SSE-emit and title-propagation
+// invariants match the legacy `PUT /:id/content` path.
+describe("PUT /api/pages/:id (metadata only)", () => {
+  it("returns 200 and updates the title when body.title differs from current", async () => {
+    const { app, chains } = createPagesAppWithChains([
+      ...pageAccessPrefix(),
+      // applyPagesMetadataUpdate: SELECT current title + preview
+      [{ title: "Old Title", contentPreview: null }],
+      // applyPagesMetadataUpdate: UPDATE pages.returning()
+      [
+        {
+          id: PAGE_ID,
+          ownerId: TEST_USER_ID,
+          noteId: NOTE_ID,
+          title: "New Title",
+          contentPreview: null,
+          updatedAt: new Date("2026-05-16T10:00:00Z"),
+          isDeleted: false,
+        },
+      ],
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "New Title" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      id: PAGE_ID,
+      title: "New Title",
+      content_preview: null,
+      updated_at: "2026-05-16T10:00:00.000Z",
+    });
+    const updateChains = chains.filter((c) => c.startMethod === "update");
+    expect(updateChains.length).toBe(1);
+  });
+
+  // 同じ値を round-trip した場合は `applyPagesMetadataUpdate` が UPDATE を skip し、
+  // `metadataChanged: false` で返す。SSE 通知も走らない。さらに、レスポンスは
+  // 現在値 (DB に保存された値) を必ず含み、`null` で返してクライアントの
+  // キャッシュを壊さないこと (PR #888 レビューフィードバック)。
+  //
+  // Round-tripping the current values must be a no-op: the helper skips the
+  // UPDATE and returns `metadataChanged: false`, so no SSE broadcast fires.
+  // The response must echo the current persisted values rather than nulls so
+  // clients trusting the response do not clobber valid cache entries
+  // (PR #888 review feedback from gemini-code-assist, codex, coderabbitai).
+  it("skips the UPDATE but echoes current metadata when title matches (PR #888 review)", async () => {
+    const sameUpdatedAt = new Date("2026-05-16T11:00:00Z");
+    const { app, chains } = createPagesAppWithChains([
+      ...pageAccessPrefix(),
+      // applyPagesMetadataUpdate の現在値取得 SELECT
+      [{ title: "Same Title", contentPreview: "Same Preview" }],
+      // no-op 経路の現在値再取得 SELECT (`updated_at` を含む)
+      [
+        {
+          title: "Same Title",
+          contentPreview: "Same Preview",
+          updatedAt: sameUpdatedAt,
+        },
+      ],
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "Same Title", content_preview: "Same Preview" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      id: PAGE_ID,
+      title: "Same Title",
+      content_preview: "Same Preview",
+      updated_at: sameUpdatedAt.toISOString(),
+    });
+    const updateChains = chains.filter((c) => c.startMethod === "update");
+    expect(updateChains.length).toBe(0);
+  });
+
+  it("returns 400 when body has neither title nor content_preview", async () => {
+    const app = createPagesApp([]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  // 非文字列が混ざった場合に `applyPagesMetadataUpdate` の `.trim()` で 500 に
+  // 落ちないこと (PR #888 review by coderabbitai)。境界で 400 に倒す。
+  //
+  // Malformed payloads with non-string fields must be rejected at the route
+  // boundary (400) instead of crashing inside the metadata helper's
+  // `.trim()` call (PR #888 review by coderabbitai).
+  it("returns 400 when title is not a string", async () => {
+    const app = createPagesApp([]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: 123 }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when content_preview is not a string", async () => {
+    const app = createPagesApp([]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ content_preview: 42 }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 401 without auth header", async () => {
+    const app = createPagesApp([]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "x" }),
+    });
+
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when the page does not exist (via assertPageEditAccess)", async () => {
+    // assertPageEditAccess → getPageOwnership → SELECT pages: empty
+    const app = createPagesApp([[]]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({ title: "x" }),
+    });
+
+    expect(res.status).toBe(404);
+  });
+});
+
+// ── GET /api/pages/:id/public-content (read-only for guests / viewers) ─────
+//
+// `local` モード廃止後、編集者は Hocuspocus 経由で Y.Doc を扱うが、未ログインの
+// ゲスト（public / unlisted ノートの読者）や viewer ロールの閲覧者は WebSocket を
+// 張らずに `content_text` だけを REST で取得する。本ルートは Y.Doc バイト列を
+// 返さないことで、誤って編集セッションを開始できないようにする。
+//
+// After retiring the `local` mode, editors flow through Hocuspocus while
+// guests (public/unlisted readers) and viewer-role members fetch
+// `content_text` via REST without spinning up a WebSocket. The endpoint
+// deliberately omits Y.Doc bytes so a read-only consumer cannot start an
+// editing session by accident.
+describe("GET /api/pages/:id/public-content", () => {
+  it("returns the rendered text and version for the owner", async () => {
+    const app = createPagesApp([
+      // page row (SELECT pages)
+      [
+        {
+          id: PAGE_ID,
+          noteId: NOTE_ID,
+          title: "Hello",
+          contentPreview: "preview body",
+          updatedAt: new Date("2026-05-16T09:00:00Z"),
+        },
+      ],
+      // getNoteRole → findActiveNoteById (owner short-circuit)
+      [mockNoteRow()],
+      // page_contents SELECT
+      [
+        {
+          contentText: "Hello world",
+          version: 7,
+          updatedAt: new Date("2026-05-16T10:00:00Z"),
+        },
+      ],
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/public-content`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      id: PAGE_ID,
+      title: "Hello",
+      content_text: "Hello world",
+      content_preview: "preview body",
+      version: 7,
+      updated_at: "2026-05-16T10:00:00.000Z",
+    });
+    expect(res.headers.get("cache-control")).toBe("private, must-revalidate");
+  });
+
+  it("returns content_text=null and version=0 when page_contents row is missing", async () => {
+    const app = createPagesApp([
+      [
+        {
+          id: PAGE_ID,
+          noteId: NOTE_ID,
+          title: "Blank",
+          contentPreview: null,
+          updatedAt: new Date("2026-05-16T11:00:00Z"),
+        },
+      ],
+      [mockNoteRow()],
+      [], // page_contents not yet inserted
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/public-content`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      id: PAGE_ID,
+      content_text: null,
+      version: 0,
+      // falls back to pages.updated_at when page_contents is missing
+      updated_at: "2026-05-16T11:00:00.000Z",
+    });
+  });
+
+  it("returns 404 when the page row is missing or already soft-deleted", async () => {
+    const app = createPagesApp([[]]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/public-content`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 when caller has no role on the owning private note", async () => {
+    const privateNote = { ...mockNoteRow(), ownerId: "other-user", visibility: "private" as const };
+    const app = createPagesApp([
+      [
+        {
+          id: PAGE_ID,
+          noteId: NOTE_ID,
+          title: "Secret",
+          contentPreview: null,
+          updatedAt: new Date(),
+        },
+      ],
+      [privateNote], // note row
+      [], // member SELECT empty
+      [], // domain SELECT empty
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/public-content`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  // 未ログインゲストでも public ノート配下のページは閲覧できる。
+  // `getNoteRole` は visibility=public に対して role=guest を返す。
+  // エッジでの短期キャッシュを許す Cache-Control を確認する。
+  //
+  // Unauthenticated guests can read pages on public notes. `getNoteRole`
+  // resolves them as `guest` via the visibility branch. The route returns a
+  // short edge-cacheable `Cache-Control` for that case.
+  it("allows guest access to a public-note page with edge-cacheable Cache-Control", async () => {
+    const publicNote = { ...mockNoteRow(), ownerId: "other-user", visibility: "public" as const };
+    const app = createPagesApp([
+      [
+        {
+          id: PAGE_ID,
+          noteId: NOTE_ID,
+          title: "Public",
+          contentPreview: "edge ok",
+          updatedAt: new Date("2026-05-16T08:00:00Z"),
+        },
+      ],
+      [publicNote],
+      [
+        {
+          contentText: "Public body",
+          version: 2,
+          updatedAt: new Date("2026-05-16T09:00:00Z"),
+        },
+      ],
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/public-content`, {
+      method: "GET",
+      // no auth header → guest path
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      id: PAGE_ID,
+      content_text: "Public body",
+      version: 2,
+    });
+    expect(res.headers.get("cache-control")).toBe("public, max-age=60, must-revalidate");
+  });
+});

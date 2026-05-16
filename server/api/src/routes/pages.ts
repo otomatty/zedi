@@ -1,15 +1,18 @@
 /**
  * /api/pages — ページ CRUD + コンテンツ管理
  *
- * GET    /api/pages                — 後方互換のページ一覧（Issue #823 以降は `Deprecation: true`）。
+ * GET    /api/pages                       — 後方互換のページ一覧（Issue #823 以降は `Deprecation: true`）。
  *        新規実装は `GET /api/notes/me` → `GET /api/notes/:noteId/pages` を推奨。
  *        — Legacy page listing (sends `Deprecation: true` after issue #823).
  *        Prefer `GET /api/notes/me` then `GET /api/notes/:noteId/pages` for new clients.
- * GET    /api/pages/:id/content — Y.Doc コンテンツ取得（`page_contents` 行が未作成の空ページは 200 + 空 ydoc）
+ * GET    /api/pages/:id/content        — Y.Doc コンテンツ取得（`page_contents` 行が未作成の空ページは 200 + 空 ydoc）
  *        — Retrieve Y.Doc content (200 + empty `ydoc_state` when no `page_contents` row).
- * PUT    /api/pages/:id/content — Y.Doc コンテンツ更新 (楽観的ロック) / Update with optimistic locking
- * POST   /api/pages             — 新規ページ作成 / Create page
- * DELETE /api/pages/:id         — ページ論理削除 / Soft-delete page
+ * GET    /api/pages/:id/public-content — 読み取り専用のページ本文（ゲスト・viewer 用 / Y.Doc を返さない）
+ *        — Read-only page text for guests / viewer-only callers (no Y.Doc bytes).
+ * PUT    /api/pages/:id/content        — Y.Doc コンテンツ更新 (楽観的ロック) / Update with optimistic locking
+ * PUT    /api/pages/:id                — ページメタデータ（タイトル等）更新 / Update page metadata (title, preview)
+ * POST   /api/pages                    — 新規ページ作成 / Create page
+ * DELETE /api/pages/:id                — ページ論理削除 / Soft-delete page
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -872,6 +875,201 @@ app.delete("/:id", authRequired, async (c) => {
   }
 
   return c.json({ id: pageId, deleted: true });
+});
+
+// ── PUT /pages/:id (metadata only) ──────────────────────────────────────────
+/**
+ * `PUT /api/pages/:pageId` — ページのメタデータ（タイトル / `content_preview`）だけを
+ * 更新する。Y.Doc 本体は Hocuspocus WebSocket 経由で更新されるため、本ルートで
+ * バイト列を受け付けることはない。
+ *
+ * `local` コラボレーションモード廃止（REST 経由で Y.Doc を同期する経路の削除）に
+ * 伴い、タイトル変更を REST から行いたいクライアント向けに独立した経路として
+ * 用意した。既存の `applyPagesMetadataUpdate` / `tryPropagateTitleRename` /
+ * `emitPageUpdatedIfChanged` を再利用するため、`PUT /:id/content` 経路と同じ整合性
+ * （タイトル伝播・SSE 通知のゲーティング）が保たれる。
+ *
+ * `PUT /api/pages/:pageId` updates page metadata only (title and
+ * content_preview). The Y.Doc payload is owned by Hocuspocus and is never
+ * accepted here.
+ *
+ * Introduced when the `local` collaboration mode was retired so callers that
+ * need to rename a page via REST have a stable endpoint. Reuses
+ * `applyPagesMetadataUpdate`, `tryPropagateTitleRename`, and
+ * `emitPageUpdatedIfChanged` so the title-propagation and SSE-emit invariants
+ * stay identical to the legacy `PUT /:id/content` path.
+ *
+ * @returns 200 + `{ id, title, content_preview, updated_at }` on success.
+ *          400 when the body is empty (neither `title` nor `content_preview`).
+ *          403 / 404 from `assertPageEditAccess` when the caller cannot edit.
+ */
+app.put("/:id", authRequired, async (c) => {
+  const pageId = c.req.param("id");
+  const userId = c.get("userId");
+  const db = c.get("db");
+
+  const body = await c.req.json<{
+    title?: string;
+    content_preview?: string;
+  }>();
+
+  // 型バリデーション: ヘルパー (`applyPagesMetadataUpdate`) は `body.title.trim()`
+  // を呼ぶので、文字列以外が混ざると runtime 500 になる。境界で 400 に倒す。
+  // Validate field types so malformed payloads (e.g. `{ "title": 123 }`)
+  // are surfaced as 400 instead of crashing inside `applyPagesMetadataUpdate`'s
+  // `.trim()` call.
+  if (body.title !== undefined && typeof body.title !== "string") {
+    throw new HTTPException(400, { message: "`title` must be a string" });
+  }
+  if (body.content_preview !== undefined && typeof body.content_preview !== "string") {
+    throw new HTTPException(400, { message: "`content_preview` must be a string" });
+  }
+
+  if (body.title === undefined && body.content_preview === undefined) {
+    throw new HTTPException(400, {
+      message: "At least one of `title` or `content_preview` is required",
+    });
+  }
+
+  await assertPageEditAccess(db, pageId, userId);
+
+  const { renamed, metadataChanged, updatedRow } = await applyPagesMetadataUpdate(db, pageId, body);
+
+  if (renamed) {
+    tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
+  }
+  emitPageUpdatedIfChanged(metadataChanged, updatedRow);
+
+  // no-op (現在値と同値を送信) のときは UPDATE がスキップされて `updatedRow` が
+  // null になる。クライアントのキャッシュを null で上書きしないよう、現在値を
+  // SELECT して返す。追加 SELECT は no-op パスのみ発生する。
+  // No-op saves (request body echoes the current values) skip the UPDATE and
+  // leave `updatedRow` null. To avoid responding with null fields that would
+  // clobber a client cache, fall back to fetching the current row. The extra
+  // SELECT only fires on the no-op path.
+  let title: string | null;
+  let contentPreview: string | null;
+  let updatedAt: Date;
+  if (updatedRow) {
+    title = updatedRow.title;
+    contentPreview = updatedRow.contentPreview;
+    updatedAt = updatedRow.updatedAt;
+  } else {
+    const current = await db
+      .select({
+        title: pages.title,
+        contentPreview: pages.contentPreview,
+        updatedAt: pages.updatedAt,
+      })
+      .from(pages)
+      .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
+      .limit(1);
+    const row = current[0];
+    if (!row) {
+      // `assertPageEditAccess` の直後に同じ id が論理削除される競合は通常
+      // 起きないが、起きた場合はクライアントが再同期できるよう 404 を返す。
+      // `assertPageEditAccess` already proved the row exists; reaching here
+      // means a concurrent delete raced us. Surface 404 so the client
+      // resyncs cleanly instead of seeing a half-formed response.
+      throw new HTTPException(404, { message: "Page not found" });
+    }
+    title = row.title;
+    contentPreview = row.contentPreview;
+    updatedAt = row.updatedAt;
+  }
+
+  return c.json({
+    id: pageId,
+    title,
+    content_preview: contentPreview,
+    updated_at: updatedAt.toISOString(),
+  });
+});
+
+// ── GET /pages/:id/public-content (read-only for guests / viewers) ──────────
+/**
+ * `GET /api/pages/:pageId/public-content` — 読み取り専用のページ本文 API。
+ * `page_contents.content_text` と派生情報のみ返し、Y.Doc バイト列は返さない。
+ *
+ * `local` モード廃止後、編集者は Hocuspocus WebSocket 経由でページを開くが、
+ * 未ログインの guest（public / unlisted ノートを覗いている読者）や viewer ロールの
+ * メンバーは WebSocket 接続を張らずに REST で本文だけ読みたい。本ルートはその
+ * 経路を提供する。Y.Doc バイト列を返さないため、編集セッションは絶対に始まらない。
+ *
+ * 認証は `authOptional`。所属ノートに対する `getNoteRole` で role を解決し、
+ * `null`（private / restricted ノートを未認可で要求した等）の場合は 403 を返す。
+ *
+ * `GET /api/pages/:pageId/public-content` returns the rendered plain text of
+ * a page without exposing the underlying Y.Doc bytes. Used by read-only
+ * viewers — anonymous guests on public/unlisted notes and signed-in viewer
+ * members — who do not need to participate in the realtime editing session.
+ *
+ * `authOptional` so guests on public/unlisted notes can hit it. `getNoteRole`
+ * gates private/restricted notes by returning 403 when no role is resolved.
+ *
+ * @returns 200 + `{ id, title, content_text, content_preview, version, updated_at }`.
+ *          404 when the page row is missing or already soft-deleted.
+ *          403 when no role is resolved on the owning note.
+ */
+app.get("/:id/public-content", authOptional, async (c) => {
+  const pageId = c.req.param("id");
+  const userId = c.get("userId");
+  const userEmail = c.get("userEmail");
+  const db = c.get("db");
+
+  const rows = await db
+    .select({
+      id: pages.id,
+      noteId: pages.noteId,
+      title: pages.title,
+      contentPreview: pages.contentPreview,
+      updatedAt: pages.updatedAt,
+    })
+    .from(pages)
+    .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) throw new HTTPException(404, { message: "Page not found" });
+
+  // 所属ノートに対する role が解決しない呼び出し元はアクセス不可。owner /
+  // editor / viewer / guest のいずれかが付けば 200 で返す（`GET /api/pages/:id`
+  // と同じ判定）。
+  // The caller must hold some role on the owning note. The visibility check
+  // inside `getNoteRole` already gates anonymous access to private notes
+  // correctly (mirrors `GET /api/pages/:id`).
+  const { role } = await getNoteRole(row.noteId, userId, userEmail, db);
+  if (!role) throw new HTTPException(403, { message: "Forbidden" });
+
+  const contentRows = await db
+    .select({
+      contentText: pageContents.contentText,
+      version: pageContents.version,
+      updatedAt: pageContents.updatedAt,
+    })
+    .from(pageContents)
+    .where(eq(pageContents.pageId, pageId))
+    .limit(1);
+
+  const content = contentRows[0];
+
+  // 未ログインゲストはエッジで短期キャッシュ可能（同じ public ノートを多数が
+  // 開く想定）、ログイン済みは個人スコープに留める。
+  // Guests can be cached briefly at the edge (many readers on the same public
+  // note); logged-in viewers stay private.
+  c.header(
+    "Cache-Control",
+    userId ? "private, must-revalidate" : "public, max-age=60, must-revalidate",
+  );
+
+  return c.json({
+    id: pageId,
+    title: row.title ?? null,
+    content_text: content?.contentText ?? null,
+    content_preview: row.contentPreview ?? null,
+    version: content?.version ?? 0,
+    updated_at: (content?.updatedAt ?? row.updatedAt).toISOString(),
+  });
 });
 
 export default app;

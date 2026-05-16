@@ -121,6 +121,51 @@ export interface PutPageContentBody {
   expected_version?: number;
 }
 
+/**
+ * `PUT /api/pages/:id` ボディ。タイトル等のメタデータだけを更新する。
+ * Y.Doc バイト列は Hocuspocus 経由で扱うため含めない。
+ *
+ * `PUT /api/pages/:id` request body. Updates page metadata only (title and
+ * content_preview). Y.Doc payloads flow through Hocuspocus, not this route.
+ */
+export interface UpdatePageMetadataBody {
+  title?: string;
+  content_preview?: string;
+}
+
+/**
+ * `PUT /api/pages/:id` レスポンス。`title` / `content_preview` はスキーマ上 nullable
+ * のままだが、`updated_at` は `pages.updated_at` (`notNull`) を反映するため必ず
+ * 文字列。
+ *
+ * `PUT /api/pages/:id` response. `title` / `content_preview` stay nullable to
+ * mirror the schema, while `updated_at` is always present because
+ * `pages.updated_at` is `notNull` in the DB.
+ */
+export interface UpdatePageMetadataResponse {
+  id: string;
+  title: string | null;
+  content_preview: string | null;
+  updated_at: string;
+}
+
+/**
+ * `GET /api/pages/:id/public-content` レスポンス。
+ * 読み取り専用ビュー（ゲスト / viewer）が `content_text` だけを取得するために使う。
+ *
+ * `GET /api/pages/:id/public-content` response. Used by read-only viewers
+ * (guests on public / unlisted notes, viewer-role members) to fetch the
+ * rendered plain text without participating in the Hocuspocus session.
+ */
+export interface PagePublicContentResponse {
+  id: string;
+  title: string | null;
+  content_text: string | null;
+  content_preview: string | null;
+  version: number;
+  updated_at: string;
+}
+
 /** POST /api/pages body. */
 export interface CreatePageBody {
   id?: string;
