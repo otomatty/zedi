@@ -42,6 +42,7 @@ import subscriptionManageRoutes from "./routes/subscriptionManage.js";
 import lintRoutes from "./routes/lint.js";
 import activityRoutes from "./routes/activity.js";
 import onboardingRoutes from "./routes/onboarding.js";
+import internalRoutes from "./routes/internal.js";
 
 /**
  * Creates and configures the Hono API app (routes, CORS, etc.).
@@ -124,6 +125,10 @@ export function createApp(): Hono<AppEnv> {
   // Onboarding wizard completion + status
   // セットアップウィザード完了・状況取得
   app.route("/api/onboarding", onboardingRoutes);
+
+  // Internal-only endpoints for service-to-service calls (Hocuspocus → API).
+  // 内部サービス間専用エンドポイント (Hocuspocus → API)。x-internal-secret 必須。
+  app.route("/api/internal", internalRoutes);
 
   // Pages
   app.route("/api/pages", pageRoutes);
