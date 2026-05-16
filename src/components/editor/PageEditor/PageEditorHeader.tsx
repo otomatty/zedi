@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Trash2, MoreHorizontal, Download, Copy, History } from "lucide-react";
+import { ArrowLeft, MoreHorizontal } from "lucide-react";
 import { Button, cn } from "@zedi/ui";
 import {
   DropdownMenu,
@@ -77,14 +77,80 @@ function getScrollTop(target: HTMLElement | Window): number {
   return target instanceof Window ? window.scrollY : target.scrollTop;
 }
 
+/**
+ * ページ詳細ツールバーのアクションメニュー項目。`/pages/:id` と
+ * `/notes/:noteId/:pageId` で共通の見た目・スクロール挙動を再利用しつつ、
+ * メニュー項目だけは呼び出し側が定義できるようにする。
+ *
+ * Menu item for the shared page-detail toolbar. Lets `/pages/:id` and
+ * `/notes/:noteId/:pageId` share layout / scroll behaviour while letting the
+ * caller decide which actions are exposed in the more-actions menu.
+ */
+export interface PageDetailToolbarAction {
+  /**
+   * 安定した識別子。React の key とテストのフックに使う。
+   * Stable identifier used as the React key and for testing hooks.
+   */
+  id: string;
+  /**
+   * 表示ラベル兼アクセシブルネーム。
+   * Visible label / aria label.
+   */
+  label: string;
+  /**
+   * メニュー項目左側に表示するアイコンコンポーネント（例: `Trash2`, `Download`）。
+   * Optional leading icon component (e.g. `Trash2`, `Download`).
+   */
+  icon?: React.ComponentType<{ className?: string }>;
+  /**
+   * メニュー項目クリック時のハンドラ。
+   * Handler invoked when the menu item is clicked.
+   */
+  onClick: () => void;
+  /**
+   * 真のとき項目を無効化する（mutation pending 中など）。
+   * Disable the item (e.g. while a mutation is pending).
+   */
+  disabled?: boolean;
+  /**
+   * 破壊的アクション用のスタイル（赤文字）を適用する。
+   * Apply destructive styling (red text).
+   */
+  destructive?: boolean;
+  /**
+   * この項目の直前に視覚的な区切り線を入れる。
+   * Render a visual separator immediately before this item.
+   */
+  separatorBefore?: boolean;
+}
+
 interface PageEditorHeaderProps {
-  lastSaved: number | null;
+  /**
+   * 最終保存時刻のタイムスタンプ。指定したときだけ「○○前に保存」を表示する。
+   * 閲覧専用やノート側のように保存時刻を持たないページ詳細では未指定でよい。
+   *
+   * Last-saved timestamp. The savedAt label is only shown when this is set,
+   * so read-only or note-detail callers without a save timestamp can omit it.
+   */
+  lastSaved?: number | null;
   onBack: () => void;
-  onDelete: () => void;
-  onExportMarkdown: () => void;
-  onCopyMarkdown: () => void;
-  /** 変更履歴モーダルを開く / Open version history modal */
-  onOpenHistory?: () => void;
+  /**
+   * ドロップダウンメニューに表示するアクション。空または未指定なら
+   * 「…」ボタン自体を出さない。
+   *
+   * Items in the more-actions dropdown. The trigger button is hidden when
+   * this is empty or undefined, so callers that have no actions get a clean
+   * toolbar with just the back button (plus any supplemental content).
+   */
+  menuItems?: PageDetailToolbarAction[];
+  /**
+   * 戻るボタンと「…」メニューの間に並べる追加コンテンツ。閲覧専用ラベルや
+   * カスタムボタンを差し込むためのスロット。
+   *
+   * Extra content rendered between the back button and the more-actions
+   * menu. Use it for things like the "閲覧専用" badge on note pages.
+   */
+  supplementalRightContent?: React.ReactNode;
   /** リアルタイムコラボレーション状態（有効時のみ渡す） */
   collaboration?: {
     status: ConnectionStatus;
@@ -95,20 +161,20 @@ interface PageEditorHeaderProps {
 }
 
 /**
- * Page-specific toolbar for PageEditor. Shown below the common `Header`
- * (which already provides search / UnifiedMenu), so this toolbar only
- * contains editor-specific actions (back, collaboration status, more menu).
+ * 共通ヘッダー直下に並べるページ詳細用ツールバー。`/pages/:id` と
+ * `/notes/:noteId/:pageId` の両方で同じ sticky / scroll-hide / inert 挙動を
+ * 共有するための薄いコンポーネント。
  *
- * PageEditor のページ固有ツールバー。検索・ユーザーメニューは共通 `Header`
- * 側で提供されるため、ここではエディタ固有の操作（戻る・コラボ・その他メニュー）のみ。
+ * Shared page-detail toolbar shown below the global `Header`. Both
+ * `/pages/:id` and `/notes/:noteId/:pageId` reuse this component so they
+ * share the same sticky / scroll-hide / inert focus behaviour; only the
+ * action menu items and supplemental content differ.
  */
 export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
   lastSaved,
   onBack,
-  onDelete,
-  onExportMarkdown,
-  onCopyMarkdown,
-  onOpenHistory,
+  menuItems,
+  supplementalRightContent,
   collaboration,
 }) => {
   const { t } = useTranslation();
@@ -158,6 +224,8 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
     }
   }, [hidden]);
 
+  const hasMenu = Boolean(menuItems && menuItems.length > 0);
+
   return (
     <div
       ref={wrapperRef}
@@ -197,42 +265,42 @@ export const PageEditorHeader: React.FC<PageEditorHeaderProps> = ({
             </span>
           )}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t("common.moreActions", "More actions")}
-                className="h-12 w-12"
-              >
-                <MoreHorizontal className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {onOpenHistory && (
-                <DropdownMenuItem onClick={onOpenHistory}>
-                  <History className="mr-2 h-4 w-4" />
-                  {t("editor.pageHistory.menuButton")}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={onExportMarkdown}>
-                <Download className="mr-2 h-4 w-4" />
-                {t("editor.pageMenu.exportMarkdown")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onCopyMarkdown}>
-                <Copy className="mr-2 h-4 w-4" />
-                {t("editor.pageMenu.copyMarkdown")}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={onDelete}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {t("editor.pageMenu.deletePage")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {supplementalRightContent}
+
+          {hasMenu && menuItems && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t("common.moreActions", "More actions")}
+                  className="h-12 w-12"
+                >
+                  <MoreHorizontal className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {menuItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <React.Fragment key={item.id}>
+                      {item.separatorBefore && <DropdownMenuSeparator />}
+                      <DropdownMenuItem
+                        onClick={item.onClick}
+                        disabled={item.disabled}
+                        className={
+                          item.destructive ? "text-destructive focus:text-destructive" : undefined
+                        }
+                      >
+                        {Icon && <Icon className="mr-2 h-4 w-4" />}
+                        {item.label}
+                      </DropdownMenuItem>
+                    </React.Fragment>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </Container>
     </div>

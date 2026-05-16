@@ -51,7 +51,7 @@ interface UsePageDeletionReturn {
  * issue #768: 削除を発火する前に呼び出し側 (`useEditorAutoSave`) の
  * `cancelPendingSave` を必ず実行し、保留中の autosave debounce と unmount
  * flush を抑止する。これにより `updatePage` が論理削除を上書きして
- * 「無題のページ」が `/home` に復活するレースを防ぐ。`handleDelete` だけは
+ * 「無題のページ」が `/notes/me` に復活するレースを防ぐ。`handleDelete` だけは
  * `onError` でユーザーがエディタに残るため、保留中の編集を落とさないよう
  * `onSuccess` 内（navigate 直前）でのみキャンセルする。
  *
@@ -64,7 +64,7 @@ interface UsePageDeletionReturn {
  * `cancelPendingSave` (from `useEditorAutoSave`) to clear pending autosave
  * debounces and suppress the unmount flush, preventing the race where
  * `updatePage` overwrites the soft delete and an "untitled" row reappears
- * on `/home`. `handleDelete` is the exception: its `onError` keeps the user
+ * on `/notes/me`. `handleDelete` is the exception: its `onError` keeps the user
  * on the editor, so cancellation is deferred to `onSuccess` (just before
  * `navigate`) to avoid silently dropping queued edits on a failed delete.
  */
@@ -81,16 +81,16 @@ export function usePageDeletion({
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState<string>("");
-  // 確認ダイアログ確定後の遷移先。デフォルトは /home。
-  // Navigation target to use after the confirmation dialog resolves. Defaults to /home.
-  const [pendingNavTarget, setPendingNavTarget] = useState<string>("/home");
+  // 確認ダイアログ確定後の遷移先。デフォルトは /notes/me。
+  // Navigation target to use after the confirmation dialog resolves. Defaults to /notes/me.
+  const [pendingNavTarget, setPendingNavTarget] = useState<string>("/notes/me");
 
   const handleDelete = useCallback(() => {
     if (currentPageId) {
       // issue #768 + Codex P2: 他のハンドラと違い、`handleDelete` の `onError`
       // ではユーザーがエディタに残るため、削除失敗時に保留中の autosave を
       // 落とすと最近の編集が失われる。そのため `cancelPendingSave` は削除が
-      // 成功して `/home` に遷移する直前（`onSuccess` 内）でのみ呼ぶ。
+      // 成功して `/notes/me` に遷移する直前（`onSuccess` 内）でのみ呼ぶ。
       //
       // issue #768 + Codex P2: unlike the other handlers, `handleDelete`'s
       // `onError` keeps the user on the editor, so cancelling the pending
@@ -103,7 +103,7 @@ export function usePageDeletion({
           toast({
             title: "ページを削除しました",
           });
-          navigate("/home");
+          navigate("/notes/me");
         },
         onError: () => {
           toast({
@@ -134,7 +134,7 @@ export function usePageDeletion({
           setDeleteReason("タイトルが未入力のページ");
         }
         // 戻る経由なので遷移先はホーム
-        setPendingNavTarget("/home");
+        setPendingNavTarget("/notes/me");
         setDeleteConfirmOpen(true);
         return;
       }
@@ -154,7 +154,7 @@ export function usePageDeletion({
         });
       }
     }
-    navigate("/home");
+    navigate("/notes/me");
   }, [
     navigate,
     currentPageId,
@@ -179,7 +179,7 @@ export function usePageDeletion({
     setDeleteConfirmOpen(false);
     navigate(pendingNavTarget);
     // 次回に備えてデフォルトに戻す / reset to default for next invocation
-    setPendingNavTarget("/home");
+    setPendingNavTarget("/notes/me");
   }, [
     currentPageId,
     deletePageMutation,
@@ -192,7 +192,7 @@ export function usePageDeletion({
 
   const handleCancelDelete = useCallback(() => {
     setDeleteConfirmOpen(false);
-    setPendingNavTarget("/home");
+    setPendingNavTarget("/notes/me");
   }, []);
 
   const handleOpenDuplicatePage = useCallback(

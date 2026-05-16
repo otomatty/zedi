@@ -145,7 +145,7 @@ describe("usePageDeletion.handleOpenDuplicatePage", () => {
     expect(result.current.deleteConfirmOpen).toBe(false);
   });
 
-  it("キャンセル後に handleBack を使うと /home へ戻る / pendingNavTarget resets so handleBack goes back to /home", () => {
+  it("キャンセル後に handleBack を使うと /notes/me へ戻る / pendingNavTarget resets so handleBack goes back to /notes/me", () => {
     const { result } = renderHook(() =>
       usePageDeletion({
         currentPageId: "dup-id",
@@ -162,8 +162,8 @@ describe("usePageDeletion.handleOpenDuplicatePage", () => {
     // handleBack は hasContent のため確認ダイアログを開くだけ
     act(() => result.current.handleConfirmDelete());
 
-    // 最終 navigate は /home であるべき
-    expect(mockNavigate).toHaveBeenLastCalledWith("/home");
+    // 最終 navigate は /notes/me であるべき
+    expect(mockNavigate).toHaveBeenLastCalledWith("/notes/me");
   });
 });
 
@@ -292,7 +292,7 @@ describe("usePageDeletion - cancelPendingSave 順序 (issue #768)", () => {
     act(() => result.current.handleDelete());
 
     expect(callOrder).toEqual(["mutate", "cancel"]);
-    expect(mockNavigate).toHaveBeenCalledWith("/home");
+    expect(mockNavigate).toHaveBeenCalledWith("/notes/me");
   });
 
   it("handleDelete: 削除失敗時は cancelPendingSave を呼ばず保留保存を保持する (Codex P2)", () => {

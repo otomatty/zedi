@@ -76,10 +76,13 @@ export function usePageEditorEffects(options: UsePageEditorEffectsOptions) {
 
   const { setPageContext, contentAppendHandlerRef } = useAIChatContext();
 
-  // /pages/new への直接アクセスはホームへリダイレクト
+  // /pages/new への直接アクセスはデフォルトノート (/notes/me) へリダイレクト。
+  // /home は #884 で廃止予定のため /notes/me に統一する。
+  // Direct visits to /pages/new redirect to the caller's default note
+  // (/notes/me). /home is being retired in #884 so we route to /notes/me.
   useEffect(() => {
     if (isNewPage) {
-      navigate("/home", { replace: true });
+      navigate("/notes/me", { replace: true });
     }
   }, [isNewPage, navigate]);
 

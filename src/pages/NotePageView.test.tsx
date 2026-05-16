@@ -12,6 +12,8 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { AIChatProvider } from "@/contexts/AIChatContext";
 
+const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
+
 // `vi.hoisted` で共有フック用の `vi.fn()` を巻き上げる。`vi.mock` のファクトリは
 // hoisting されてテストスコープの変数を参照できないので、モジュール境界をまたぐ
 // 共有状態はこの方式にする必要がある。`mockToast` を差し込むことで、`handleCopyToPersonal`
@@ -35,6 +37,7 @@ vi.mock("react-router-dom", async (importOriginal) => {
   return {
     ...actual,
     useParams: vi.fn(),
+    useNavigate: () => mockNavigate,
   };
 });
 
@@ -48,6 +51,11 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, fallback?: string) => fallback ?? key,
   }),
+  initReactI18next: { type: "3rdParty", init: () => undefined },
+  // Translation 関連の他コンシューマー（dateUtils → @/i18n 経由）が
+  // 副作用で import するための最低限のスタブ。
+  // Minimal stub so other consumers that pull in `@/i18n` via dateUtils
+  // (which uses `initReactI18next`) can load without a real i18n boot.
 }));
 
 vi.mock("@/hooks/useNoteQueries", () => ({
@@ -135,22 +143,34 @@ vi.mock("@/components/ai-chat/ContentWithAIChat", () => ({
 }));
 
 vi.mock("@zedi/ui", () => ({
-  Button: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
-    <button type="button" onClick={onClick}>
-      {children}
-    </button>
-  ),
-  DropdownMenu: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  DropdownMenuItem: ({
+  Button: ({
     children,
     onClick,
+    "aria-label": ariaLabel,
   }: {
     children: React.ReactNode;
     onClick?: () => void;
+    "aria-label"?: string;
   }) => (
-    <button type="button" onClick={onClick}>
+    <button type="button" onClick={onClick} aria-label={ariaLabel}>
+      {children}
+    </button>
+  ),
+  cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DropdownMenuSeparator: () => <hr data-testid="dropdown-separator" />,
+  DropdownMenuItem: ({
+    children,
+    onClick,
+    disabled,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+    disabled?: boolean;
+  }) => (
+    <button type="button" onClick={onClick} disabled={disabled}>
       {children}
     </button>
   ),
@@ -180,6 +200,7 @@ describe("NotePageView", () => {
     vi.clearAllMocks();
     mockToast.mockReset();
     mockSetPageContext.mockReset();
+    mockNavigate.mockReset();
     mockUpdatePageMutateAsync.mockResolvedValue({ skipped: false });
     mockApi.getPageContent.mockReset();
     mockApi.putPageContent.mockReset();
@@ -231,6 +252,121 @@ describe("NotePageView", () => {
     renderNotePageView();
 
     expect(screen.getByText(/ページが見つからないか、閲覧権限がありません/)).toBeInTheDocument();
+  });
+
+  // ── 共通ツールバー (`PageEditorHeader`) 統合 ─────────────────────
+  // Issue #884: NotePageView は `/pages/:id` と同じツールバーを再利用する。
+  // back ボタンは必ず `/notes/:noteId` に戻り、`/home` への fallback には依存
+  // しない。閲覧専用ラベル / 個人取り込みメニューは引き続き出すが、それぞれ
+  // 共通ツールバーの `supplementalRightContent` / `menuItems` 経由で渡される。
+  //
+  // Issue #884: NotePageView reuses the shared `PageEditorHeader`. Back must
+  // navigate to `/notes/:noteId` (no legacy `/home` fallback). Read-only
+  // badge and the "copy to personal" action still appear, but they now flow
+  // through the toolbar's `supplementalRightContent` / `menuItems` slots.
+  describe("shared toolbar (issue #884)", () => {
+    it("back ボタンは /notes/:noteId に遷移する / clicking back navigates to /notes/:noteId", () => {
+      vi.mocked(useNote).mockReturnValue({
+        note: { id: "note-1" },
+        access: { canView: true, canEdit: true },
+        source: "local",
+        isLoading: false,
+      } as never);
+      vi.mocked(useNotePage).mockReturnValue({
+        data: {
+          id: "page-1",
+          title: "Test Page",
+          content: "{}",
+          ownerUserId: "user-1",
+          noteId: "note-1",
+        },
+        isLoading: false,
+      } as never);
+
+      renderNotePageView();
+
+      // The back button uses aria-label "Back" (from i18n mock fallback).
+      const backButton = screen.getByRole("button", { name: "Back" });
+      fireEvent.click(backButton);
+
+      expect(mockNavigate).toHaveBeenCalledWith("/notes/note-1");
+      expect(mockNavigate).not.toHaveBeenCalledWith("/home");
+    });
+
+    it("閲覧専用ユーザーには `閲覧専用` ラベルが共通ツールバー右側に出る / surfaces the read-only badge for non-editors", () => {
+      vi.mocked(useNote).mockReturnValue({
+        note: { id: "note-1" },
+        access: { canView: true, canEdit: false },
+        source: "local",
+        isLoading: false,
+      } as never);
+      vi.mocked(useNotePage).mockReturnValue({
+        data: {
+          id: "page-1",
+          title: "Read only",
+          content: "{}",
+          ownerUserId: "user-other",
+          noteId: "note-1",
+        },
+        isLoading: false,
+      } as never);
+
+      renderNotePageView();
+
+      expect(screen.getByText("閲覧専用")).toBeInTheDocument();
+    });
+
+    it("編集可能ユーザーには `閲覧専用` ラベルを出さない / hides the badge when canEdit", () => {
+      vi.mocked(useNote).mockReturnValue({
+        note: { id: "note-1" },
+        access: { canView: true, canEdit: true },
+        source: "local",
+        isLoading: false,
+      } as never);
+      vi.mocked(useNotePage).mockReturnValue({
+        data: {
+          id: "page-1",
+          title: "Editable",
+          content: "{}",
+          ownerUserId: "user-1",
+          noteId: "note-1",
+        },
+        isLoading: false,
+      } as never);
+
+      renderNotePageView();
+
+      expect(screen.queryByText("閲覧専用")).not.toBeInTheDocument();
+    });
+
+    it("note 側未実装の削除アクションを共通ツールバーに露出しない / does not surface the personal-page delete action", () => {
+      vi.mocked(useNote).mockReturnValue({
+        note: { id: "note-1" },
+        access: { canView: true, canEdit: true },
+        source: "local",
+        isLoading: false,
+      } as never);
+      vi.mocked(useNotePage).mockReturnValue({
+        data: {
+          id: "page-1",
+          title: "Note-native",
+          content: "{}",
+          ownerUserId: "user-1",
+          noteId: "note-1",
+        },
+        isLoading: false,
+      } as never);
+
+      renderNotePageView();
+
+      // `/pages/:id` のツールバーは削除 / Markdown ボタンを露出するが、note 側はまだ未実装。
+      // The `/pages/:id` toolbar exposes delete / Markdown actions, but note pages
+      // don't implement them yet — verify they stay hidden.
+      expect(screen.queryByText("editor.pageMenu.deletePage")).not.toBeInTheDocument();
+      expect(screen.queryByText("editor.pageMenu.exportMarkdown")).not.toBeInTheDocument();
+      expect(screen.queryByText("editor.pageMenu.copyMarkdown")).not.toBeInTheDocument();
+      expect(screen.queryByText("editor.pageHistory.menuButton")).not.toBeInTheDocument();
+    });
   });
 
   it("renders editor when note and page are loaded with canEdit", () => {

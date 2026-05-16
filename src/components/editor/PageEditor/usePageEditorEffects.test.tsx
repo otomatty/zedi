@@ -85,7 +85,7 @@ describe("usePageEditorEffects", () => {
   });
 
   describe("navigation and initialization", () => {
-    it("navigates to /home when isNewPage is true", () => {
+    it("navigates to /notes/me when isNewPage is true", () => {
       renderHook(
         () =>
           usePageEditorEffects(
@@ -104,10 +104,10 @@ describe("usePageEditorEffects", () => {
         { wrapper },
       );
 
-      expect(mockNavigate).toHaveBeenCalledWith("/home", { replace: true });
+      expect(mockNavigate).toHaveBeenCalledWith("/notes/me", { replace: true });
     });
 
-    it("does not redirect to /home when isNewPage is false", () => {
+    it("does not redirect to /notes/me when isNewPage is false", () => {
       renderHook(
         () =>
           usePageEditorEffects(
@@ -121,7 +121,7 @@ describe("usePageEditorEffects", () => {
         { wrapper },
       );
 
-      expect(wasNavigateCalledWithPath(mockNavigate, "/home")).toBe(false);
+      expect(wasNavigateCalledWithPath(mockNavigate, "/notes/me")).toBe(false);
     });
 
     it("calls initialize when page is set and not yet initialized", () => {
@@ -219,7 +219,7 @@ describe("usePageEditorEffects", () => {
       expect(initialize).toHaveBeenCalledWith(page);
     });
 
-    it("redirects to /home when isNewPage flips to true after mount", () => {
+    it("redirects to /notes/me when isNewPage flips to true after mount", () => {
       const { rerender } = renderHook(
         (props: { isNewPage: boolean }) =>
           usePageEditorEffects(
@@ -233,11 +233,11 @@ describe("usePageEditorEffects", () => {
         { wrapper, initialProps: { isNewPage: false } },
       );
 
-      expect(wasNavigateCalledWithPath(mockNavigate, "/home")).toBe(false);
+      expect(wasNavigateCalledWithPath(mockNavigate, "/notes/me")).toBe(false);
 
       rerender({ isNewPage: true });
 
-      expect(mockNavigate).toHaveBeenCalledWith("/home", { replace: true });
+      expect(mockNavigate).toHaveBeenCalledWith("/notes/me", { replace: true });
     });
   });
 

@@ -1,5 +1,7 @@
-import React, { useState, useCallback } from "react";
-import { PageEditorHeader } from "./PageEditorHeader";
+import React, { useMemo, useState, useCallback } from "react";
+import { Copy, Download, History, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { PageEditorHeader, type PageDetailToolbarAction } from "./PageEditorHeader";
 import { PageEditorAlerts } from "./PageEditorAlerts";
 import { PageEditorContent } from "./PageEditorContent";
 import { PageEditorDialogs } from "./PageEditorDialogs";
@@ -100,6 +102,7 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
     onWikiContentApplied,
   } = props;
 
+  const { t } = useTranslation();
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const handleOpenHistory = useCallback(() => {
@@ -111,6 +114,42 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
     // Reload the page after restore to reflect the latest state
     window.location.reload();
   }, []);
+
+  // 個人ページ詳細のアクションメニュー項目。共通ツールバー (`PageEditorHeader`)
+  // へ渡せる形にまとめる。並び順は従来の: 履歴 → エクスポート → コピー → 区切り → 削除。
+  // Menu items for the personal page detail toolbar. Order preserves the
+  // previous layout: history → export → copy → separator → delete.
+  const menuItems = useMemo<PageDetailToolbarAction[]>(
+    () => [
+      {
+        id: "history",
+        label: t("editor.pageHistory.menuButton"),
+        icon: History,
+        onClick: handleOpenHistory,
+      },
+      {
+        id: "export-markdown",
+        label: t("editor.pageMenu.exportMarkdown"),
+        icon: Download,
+        onClick: onExportMarkdown,
+      },
+      {
+        id: "copy-markdown",
+        label: t("editor.pageMenu.copyMarkdown"),
+        icon: Copy,
+        onClick: onCopyMarkdown,
+      },
+      {
+        id: "delete",
+        label: t("editor.pageMenu.deletePage"),
+        icon: Trash2,
+        onClick: onDelete,
+        destructive: true,
+        separatorBefore: true,
+      },
+    ],
+    [t, handleOpenHistory, onExportMarkdown, onCopyMarkdown, onDelete],
+  );
 
   // React Compiler が optional chain の依存を保持できないため先に抽出する
   // Extract ydoc to avoid React Compiler memoization issue with optional chaining
@@ -128,10 +167,7 @@ export const PageEditorLayout: React.FC<PageEditorLayoutProps> = (props) => {
         <PageEditorHeader
           lastSaved={displayLastSaved}
           onBack={onBack}
-          onDelete={onDelete}
-          onExportMarkdown={onExportMarkdown}
-          onCopyMarkdown={onCopyMarkdown}
-          onOpenHistory={handleOpenHistory}
+          menuItems={menuItems}
           collaboration={undefined}
         />
 

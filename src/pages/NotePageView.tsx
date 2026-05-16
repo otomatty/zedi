@@ -1,18 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Download, MoreHorizontal } from "lucide-react";
-import Container from "@/components/layout/Container";
+import { Download } from "lucide-react";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
 import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  useToast,
-} from "@zedi/ui";
+  PageEditorHeader,
+  type PageDetailToolbarAction,
+} from "@/components/editor/PageEditor/PageEditorHeader";
+import { Button, useToast } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 import {
   useNote,
@@ -71,6 +67,7 @@ function NotePageEditorEditable({
   collaboration,
   isCollaborationEnabled,
   isTitleEditable,
+  toolbar,
 }: {
   page: Page;
   noteId: string;
@@ -78,6 +75,16 @@ function NotePageEditorEditable({
   isCollaborationEnabled: boolean;
   /** ページ所有者のみタイトル編集可。Only the page owner can edit the title. */
   isTitleEditable: boolean;
+  /**
+   * Sticky toolbar rendered as the first child of the scroll container
+   * (`ContentWithAIChat`), above `NoteWorkspaceToolbar`. Passed in from the
+   * parent so the shared `PageEditorHeader` can hook into the same scroll
+   * area and toggle visibility on scroll.
+   *
+   * 共通ツールバー。`ContentWithAIChat` の生成するスクロールコンテナ直下に
+   * 配置することで、`PageEditorHeader` の sticky / scroll-hide 挙動を維持する。
+   */
+  toolbar?: React.ReactNode;
 }): React.JSX.Element {
   const [editorContent, setEditorContent] = useState(page.content ?? "");
   const [title, setTitle] = useState(page.title);
@@ -244,6 +251,7 @@ function NotePageEditorEditable({
 
   return (
     <ContentWithAIChat>
+      {toolbar}
       <NoteWorkspaceToolbar />
       <PageEditorContent
         content={editorContent}
@@ -294,11 +302,12 @@ const NotePageView: React.FC = () => {
   );
 
   const handleBack = useCallback(() => {
-    if (noteId) {
-      navigate(`/notes/${noteId}`);
-    } else {
-      navigate("/home");
-    }
+    // `/notes/:noteId/:pageId` ルートなので `noteId` は常に存在する。`/home`
+    // への fallback は廃止済み（issue #884）。
+    // The route guarantees `noteId`, so we always navigate back to the
+    // owning note view. The legacy `/home` fallback was removed in #884.
+    if (!noteId) return;
+    navigate(`/notes/${noteId}`);
   }, [navigate, noteId]);
 
   const canEdit = canEditPage(access, userId, page);
@@ -313,10 +322,15 @@ const NotePageView: React.FC = () => {
   });
 
   // ノートネイティブページを自分の個人ページにコピーする (issue #713 Phase 3)。
-  // 元のノートページはノートに残り、コピーのみが呼び出し元の /home に現れる。
-  // 成功時はトーストで新しい個人ページへ誘導する。
-  // Copy this note-native page into the caller's personal pages. Source stays
-  // in the note; only the copy lands on /home. Toast offers to jump to it.
+  // 元のノートページはノートに残り、コピーのみが呼び出し元の個人ページ一覧
+  // (`/notes/me`) に現れる。成功時はトーストで新しい個人ページへ誘導する。
+  //
+  // Copy this note-native page into the caller's personal pages. Source
+  // stays in the note; only the copy lands in the caller's default note
+  // (`/notes/me`). The toast offers a CTA to jump to it. Plain function on
+  // purpose: `useCallback` cannot preserve memoization here (the mutation
+  // object identity flips with state transitions) so we let React Compiler
+  // handle the surrounding memo.
   const handleCopyToPersonal = async () => {
     if (!noteId || !page?.id) return;
     try {
@@ -332,7 +346,8 @@ const NotePageView: React.FC = () => {
       // If the server-side copy succeeded but the IndexedDB write-through did
       // not (`localImported: false`), navigating `/pages/:id` would land on
       // an empty read because the page grid reads IDB. Keep the success toast
-      // but drop the "Open" CTA; the next sync will reconcile `/home`.
+      // but drop the "Open" CTA; the next sync will reconcile the personal
+      // page list.
       toast({
         title: t("notes.pageCopiedToPersonal"),
         action: result.localImported ? (
@@ -349,6 +364,30 @@ const NotePageView: React.FC = () => {
       });
     }
   };
+
+  // 共通ツールバーに渡すアクションメニュー。ノートネイティブページ
+  // (`page.noteId === noteId`) かつサインイン済みのときだけ「個人に取り込み」
+  // を出す。`page.noteId === null` のリンク済み個人ページや未ログイン状態では
+  // サーバー側で copy が拒否されるため UI 側でも非表示にする（Codex P2）。
+  //
+  // Menu items for the shared toolbar. Surface "copy to personal" only for
+  // note-native pages (`page.noteId === noteId`) and signed-in viewers; the
+  // server rejects copy for linked personal pages (`page.noteId === null`)
+  // so we hide the entry instead of showing a guaranteed-fail action.
+  const showCopyToPersonal = Boolean(isSignedIn && page && page.noteId === noteId);
+  const menuItems: PageDetailToolbarAction[] | undefined = showCopyToPersonal
+    ? [
+        {
+          id: "copy-to-personal",
+          label: t("notes.copyToPersonal"),
+          icon: Download,
+          onClick: () => {
+            void handleCopyToPersonal();
+          },
+          disabled: copyToPersonalMutation.isPending,
+        },
+      ]
+    : undefined;
 
   const isLoading = isNoteLoading || isPageLoading;
   const isNotFound = !note || !access?.canView || !page;
@@ -369,75 +408,39 @@ const NotePageView: React.FC = () => {
     );
   }
 
+  // 共通ツールバー本体。canEdit 分岐で配置場所が変わるため JSX を一度だけ生成する。
+  // The shared toolbar is rendered once and placed inside whichever scroll
+  // container is active (`ContentWithAIChat` for editors, `bodyClassName`
+  // for read-only viewers) so `PageEditorHeader` can find a scrollable
+  // ancestor and remain sticky.
+  const toolbar = (
+    <PageEditorHeader
+      onBack={handleBack}
+      menuItems={menuItems}
+      supplementalRightContent={
+        !canEdit ? (
+          <span className="text-muted-foreground text-xs">{t("common.readOnly", "閲覧専用")}</span>
+        ) : undefined
+      }
+    />
+  );
+
+  // 編集時は ContentWithAIChat 内のモバイルスクロールラッパー（flex-1 +
+  // overflow-y-auto）に高さを伝搬させるため、ラッパーも flex 列にする。
+  // ブロックレイアウトのままだと子の `flex-1` が効かず、スクロールラッパーが
+  // コンテンツ高さに張り付き overflow-y-auto が発火しない。
+  // 閲覧専用時はここで本文をスクロールさせる。
+  // When editing, this wrapper is a flex column so the bounded height
+  // propagates down to ContentWithAIChat's mobile scroll wrapper (which
+  // relies on flex-1). In read-only mode, this wrapper scrolls the body
+  // itself.
+  const bodyClassName = canEdit
+    ? "flex min-h-0 flex-1 flex-col md:overflow-hidden"
+    : "min-h-0 flex-1 overflow-y-auto md:overflow-hidden";
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="border-border/60 shrink-0 border-b">
-        <Container className="flex h-10 items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={handleBack}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex items-center gap-2">
-            {!canEdit && <span className="text-muted-foreground text-xs">閲覧専用</span>}
-            {/*
-              「個人に取り込み」はノートネイティブページ (`page.noteId === noteId`) だけに出す。
-              このノートにリンクされているだけの個人ページ (`page.noteId === null`) は、
-              所有者ならすでに /home にあり、他メンバーにはサーバーがコピーを拒否する
-              （`Page does not belong to this note`）ため、メニューに出すと決め打ちで
-              失敗するアクションになる。両方の意味でリンク済みページでは出さない。
-              Issue #713 Phase 3 / Codex P2。
-
-              Gate "copy to personal" to note-native pages (`page.noteId === noteId`).
-              Linked personal pages (`page.noteId === null`) are already on the
-              owner's /home and, for other members, the server rejects the copy
-              (`Page does not belong to this note`). Showing the action for them
-              is a guaranteed-fail path, so hide it. Issue #713 Phase 3 / Codex P2.
-            */}
-            {isSignedIn && page.noteId === noteId && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={t("common.moreActions", "More actions")}
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={handleCopyToPersonal}
-                    disabled={copyToPersonalMutation.isPending}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    {t("notes.copyToPersonal")}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-        </Container>
-      </div>
-
-      {/* 編集時は `ContentWithAIChat` 側がスクロールを管理するため、このラッパーでは
-          二重スクロールを避ける。閲覧専用時は従来どおりここで本文をスクロールさせる。
-          When editing, `ContentWithAIChat` owns the scroll container, so keep
-          this wrapper non-scrollable to avoid nested scroll regions. In
-          read-only mode, this wrapper still scrolls the page body. */}
-      {/* 編集時は ContentWithAIChat 内のモバイルスクロールラッパー（flex-1 +
-          overflow-y-auto）に高さを伝搬させるため、このラッパーも flex 列にする。
-          ブロックレイアウトのままだと子の `flex-1` が効かず、スクロールラッパーが
-          コンテンツ高さに張り付き overflow-y-auto が発火しない。
-          When editing, this wrapper must be a flex column so the bounded height
-          propagates down to ContentWithAIChat's mobile scroll wrapper (which
-          relies on flex-1). Without `flex flex-col`, the child's `flex-1` is a
-          no-op in block layout and `overflow-y-auto` never engages. */}
-      <div
-        className={
-          canEdit
-            ? "flex min-h-0 flex-1 flex-col md:overflow-hidden"
-            : "min-h-0 flex-1 overflow-y-auto md:overflow-hidden"
-        }
-      >
+      <div className={bodyClassName}>
         <NoteWorkspaceProvider key={note.id} noteId={note.id}>
           {canEdit ? (
             <NotePageEditorEditable
@@ -447,23 +450,27 @@ const NotePageView: React.FC = () => {
               collaboration={collaboration}
               isCollaborationEnabled={isCollaborationEnabled}
               isTitleEditable={isTitleEditable}
+              toolbar={toolbar}
             />
           ) : (
-            <PageEditorContent
-              content={page?.content ?? ""}
-              title={page.title}
-              sourceUrl={page.sourceUrl}
-              currentPageId={page.id}
-              pageId={page.id}
-              isNewPage={false}
-              isWikiGenerating={false}
-              isReadOnly={true}
-              showLinkedPages={false}
-              showToolbar={false}
-              onContentChange={() => undefined}
-              onContentError={() => undefined}
-              pageNoteId={page.noteId ?? null}
-            />
+            <>
+              {toolbar}
+              <PageEditorContent
+                content={page?.content ?? ""}
+                title={page.title}
+                sourceUrl={page.sourceUrl}
+                currentPageId={page.id}
+                pageId={page.id}
+                isNewPage={false}
+                isWikiGenerating={false}
+                isReadOnly={true}
+                showLinkedPages={false}
+                showToolbar={false}
+                onContentChange={() => undefined}
+                onContentError={() => undefined}
+                pageNoteId={page.noteId ?? null}
+              />
+            </>
           )}
         </NoteWorkspaceProvider>
       </div>
