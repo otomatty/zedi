@@ -70,6 +70,9 @@ export function getPdfDocument(data: Uint8Array): Promise<PdfDocumentProxy> {
     cMapUrl: CMAP_URL,
     cMapPacked: true,
     standardFontDataUrl: STANDARD_FONT_DATA_URL,
+    // 信頼できない PDF を扱うため、内部 eval を明示的に無効化する（多層防御）。
+    // Disable internal eval for untrusted PDFs as a defense-in-depth measure.
+    isEvalSupported: false,
     // Workers are configured globally; using a fresh task per call is fine.
   }).promise;
 }
