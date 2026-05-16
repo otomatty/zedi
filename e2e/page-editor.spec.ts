@@ -16,11 +16,15 @@ test.describe("Page Editor", () => {
       await expect(page.getByPlaceholder("タイトル")).toBeVisible();
     });
 
-    test("redirects /pages/new to home (direct /pages/new is not a creation entry)", async ({
+    test("redirects /pages/new to the default note (direct /pages/new is not a creation entry)", async ({
       page,
     }) => {
+      // `/pages/new` 直接アクセスは /notes/me に飛ばし、NoteMeRedirect 経由で
+      // 既定の `/notes/:noteId` に着地する (issue #884)。`/home` 経路は廃止。
+      // `/pages/new` redirects to `/notes/me`, which `NoteMeRedirect` then
+      // resolves into `/notes/:noteId` — the legacy `/home` hop is gone (#884).
       await page.goto("/pages/new");
-      await expect(page).toHaveURL(/\/home/, { timeout: 10000 });
+      await expect(page).toHaveURL(/\/notes\/(me|[^/]+)/, { timeout: 10000 });
     });
   });
 
@@ -163,7 +167,14 @@ test.describe("Page Editor", () => {
   });
 
   test.describe("Navigation", () => {
-    test("should navigate back to home on back button click", async ({ page, helpers }) => {
+    // `/home` は #884 で廃止予定。back ボタン / 失敗時の遷移先は /notes/me に集約され、
+    // `NoteMeRedirect` 経由で `/notes/:noteId` に着地する。
+    // `/home` is being retired in #884: back-button navigation now lands on
+    // `/notes/me` which `NoteMeRedirect` resolves to `/notes/:noteId`.
+    test("should navigate back to the default note on back button click", async ({
+      page,
+      helpers,
+    }) => {
       await helpers.createNewPage(page);
 
       // Enter title to avoid delete warning
@@ -173,8 +184,8 @@ test.describe("Page Editor", () => {
       // Click back button
       await page.locator('button:has(svg[class*="lucide-arrow-left"])').click();
 
-      // Should be on home page
-      await expect(page).toHaveURL("/home");
+      // Should land on the default note (via /notes/me redirect)
+      await expect(page).toHaveURL(/\/notes\/(me|[^/]+)/);
     });
 
     test("should delete page on back if title is empty", async ({ page, helpers }) => {
@@ -187,15 +198,15 @@ test.describe("Page Editor", () => {
       // Click back button
       await page.locator('button:has(svg[class*="lucide-arrow-left"])').click();
 
-      // Should be on home page
-      await expect(page).toHaveURL("/home");
+      // Should land on the default note (via /notes/me redirect)
+      await expect(page).toHaveURL(/\/notes\/(me|[^/]+)/);
 
       // Page should not exist anymore
       await page.goto(pageUrl);
       await page.waitForTimeout(1000);
 
-      // Should redirect to home (page not found)
-      await expect(page).toHaveURL("/home");
+      // Should redirect to the default note (page not found)
+      await expect(page).toHaveURL(/\/notes\/(me|[^/]+)/);
     });
   });
 
@@ -229,13 +240,13 @@ test.describe("Page Editor", () => {
       await page.locator('button:has(svg[class*="lucide-more-horizontal"])').click();
       await page.getByText("削除").click();
 
-      // Should redirect to home
-      await expect(page).toHaveURL("/home");
+      // Should redirect to the default note (via /notes/me)
+      await expect(page).toHaveURL(/\/notes\/(me|[^/]+)/);
 
       // Page should not exist
       await page.goto(pageUrl);
       await page.waitForTimeout(1000);
-      await expect(page).toHaveURL("/home");
+      await expect(page).toHaveURL(/\/notes\/(me|[^/]+)/);
     });
   });
 
@@ -250,8 +261,8 @@ test.describe("Page Editor", () => {
       // Press Cmd+H (or Ctrl+H on Windows/Linux)
       await page.keyboard.press("Meta+h");
 
-      // Should be on home page
-      await expect(page).toHaveURL("/home");
+      // Should land on the default note (via /notes/me redirect)
+      await expect(page).toHaveURL(/\/notes\/(me|[^/]+)/);
     });
   });
 
@@ -329,7 +340,11 @@ test.describe("Page Editor", () => {
       await deletePromise;
 
       await expect(page.getByRole("alertdialog")).not.toBeVisible({ timeout: 5000 });
-      await expect(page).toHaveURL("/home");
+      // /home は /notes/me に redirect され、その後 NoteMeRedirect が /notes/:noteId
+      // に着地させるため、最終 URL は note detail になる (#884)。
+      // The /home hop redirects through /notes/me into /notes/:noteId, so the
+      // final URL after the delete settles on the note detail (#884).
+      await expect(page).toHaveURL(/\/notes\/(me|[^/]+)/);
       await expect(card).toHaveCount(0);
 
       const fab = page.locator('[data-testid="home-fab"]');

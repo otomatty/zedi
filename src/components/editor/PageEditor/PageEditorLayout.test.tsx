@@ -11,15 +11,27 @@ import type { PageEditorLayoutProps } from "./PageEditorLayout";
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
 vi.mock("./PageEditorHeader", () => ({
-  PageEditorHeader: ({ onOpenHistory }: { onOpenHistory?: () => void }) => (
-    <div data-testid="editor-header">
-      {onOpenHistory && (
-        <button data-testid="open-history-btn" onClick={onOpenHistory}>
-          Open History
-        </button>
-      )}
-    </div>
-  ),
+  PageEditorHeader: ({
+    menuItems,
+  }: {
+    menuItems?: Array<{ id: string; label: string; onClick: () => void }>;
+  }) => {
+    // PageEditorLayout は履歴メニュー項目を `menuItems` 配列で渡すように変更された
+    // ため、テストでも id ベースで該当項目を引いて click をディスパッチする。
+    // PageEditorLayout now passes the history action via the `menuItems` array,
+    // so the mock surfaces buttons keyed by id (matching the production
+    // toolbar item ids) instead of the old per-prop callbacks.
+    const historyItem = menuItems?.find((item) => item.id === "history");
+    return (
+      <div data-testid="editor-header">
+        {historyItem && (
+          <button data-testid="open-history-btn" onClick={historyItem.onClick}>
+            Open History
+          </button>
+        )}
+      </div>
+    );
+  },
 }));
 
 vi.mock("./PageEditorAlerts", () => ({
