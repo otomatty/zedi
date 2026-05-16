@@ -14,6 +14,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and, sql } from "drizzle-orm";
+import * as Y from "yjs";
 import { pages, pageContents, type Page } from "../schema/index.js";
 import { authRequired, authOptional } from "../middleware/auth.js";
 import type { AppEnv, Database } from "../types/index.js";
@@ -26,7 +27,111 @@ import { propagateTitleRename } from "../services/titleRenamePropagationService.
 import { deleteThumbnailObject } from "../services/thumbnailGcService.js";
 import { publishNoteEvent } from "../services/noteEventBroadcaster.js";
 import { syncPageGraphFromStoredYDoc } from "../services/pageGraphSyncService.js";
+import { applyWikiLinkMarksToYDoc } from "../services/ydocWikiLinkNormalizer.js";
 import { pageRowToWindowItem } from "./notes/eventHelpers.js";
+
+/**
+ * 未 mark の `[[Title]]` プレーンテキストを `wikiLink` mark へ昇格させる
+ * 「読み出し時の lazy migration」ヘルパー。Issue #880 Phase B 由来の
+ * y-prosemirror `unexpectedCase` を二度と踏まないよう、サーバが返すバイト列の
+ * 段階で確実に正規化済みにすることが目的。`marksApplied > 0` のときは楽観
+ * ロックで page_contents を更新し、競合した場合は in-memory バッファだけ
+ * 正規化したまま返す（次回保存で自然に追従する）。
+ *
+ * 楽観ロックでの永続化に成功した場合は、新しい `wikiLink` mark に対応する
+ * `links` / `ghost_links` を再構築するため `tryGraphSync` を fire-and-forget
+ * で呼ぶ。PR #887 のレビュー（CodeRabbit）で指摘された、GET 経路の lazy
+ * migration ではグラフ同期が走らずバックリンクが古いまま残る問題への対応。
+ *
+ * Lazy migration helper for the GET path: ensures the bytes returned by
+ * `/api/pages/:id/content` never contain unmarked `[[Title]]` plain text,
+ * eliminating the y-prosemirror `unexpectedCase` boundary case from Issue
+ * #880 Phase B. When marks are applied, persist with optimistic locking;
+ * on lock conflict, return the normalized buffer in-memory only and let
+ * the next save reconcile.
+ *
+ * When persistence succeeds, fire `tryGraphSync` so `links` / `ghost_links`
+ * are rebuilt to reflect the newly added `wikiLink` marks (PR #887 review
+ * by CodeRabbit: GET-side migration must not leave the graph stale).
+ */
+async function normalizeWikiLinksOnRead(
+  db: Database,
+  pageId: string,
+  buffer: Buffer,
+  version: number,
+  updatedAt: Date | null,
+): Promise<{ buffer: Buffer; version: number; updatedAt: Date | null }> {
+  if (buffer.length === 0) {
+    return { buffer, version, updatedAt };
+  }
+  try {
+    const doc = new Y.Doc();
+    Y.applyUpdate(doc, new Uint8Array(buffer));
+    const { marksApplied } = applyWikiLinkMarksToYDoc(doc);
+    if (marksApplied === 0) {
+      return { buffer, version, updatedAt };
+    }
+    const normalized = Buffer.from(Y.encodeStateAsUpdate(doc));
+    const now = new Date();
+    // 楽観ロック: 我々が読んだ version と DB が一致するときだけ更新する。
+    // 競合時は in-memory の正規化バッファだけ返し、永続化は次回の save に任せる。
+    // Optimistic lock: only update when DB still sits at our observed version.
+    // On conflict, return the in-memory normalized bytes; the next save by
+    // the client will eventually persist a marked-up state.
+    const updated = await db
+      .update(pageContents)
+      .set({
+        ydocState: normalized,
+        version: sql`${pageContents.version} + 1`,
+        updatedAt: now,
+      })
+      .where(and(eq(pageContents.pageId, pageId), eq(pageContents.version, version)))
+      .returning({ version: pageContents.version, updatedAt: pageContents.updatedAt });
+    const row = updated[0];
+    if (row) {
+      // 永続化に成功した場合のみ `links` / `ghost_links` を再構築する。楽観
+      // ロックが競合した場合は別経路の保存が同時に走っており、そちらが自分の
+      // タイミングでグラフ同期を発火するためここからは呼ばない。
+      // Trigger graph sync only when our optimistic-lock update actually wrote
+      // the new bytes. On lock conflict, a concurrent writer owns the next
+      // graph-sync invocation, so we stay silent here.
+      tryGraphSync(db, pageId);
+      return {
+        buffer: normalized,
+        version: row.version ?? version + 1,
+        updatedAt: row.updatedAt ?? now,
+      };
+    }
+    return { buffer: normalized, version, updatedAt };
+  } catch (error) {
+    console.error(`[WikiLinkNormalize] GET path failed for page=${pageId}:`, error);
+    return { buffer, version, updatedAt };
+  }
+}
+
+/**
+ * PUT 経路用の defense-in-depth 正規化。クライアントが何らかの理由で未 mark の
+ * `[[Title]]` を含む Y.Doc を送ってきても、永続化前に確実に mark 化してから
+ * 保存する。`buffer.length === 0` のときはスキップ。失敗時は原文を返してログのみ。
+ *
+ * Defense-in-depth normalizer for the PUT path. Should the client ever send
+ * a Y.Doc with unmarked `[[Title]]` text, normalize it before persistence so
+ * subsequent loads never see the un-promoted form. No-op on empty buffers;
+ * on error log and return the original buffer.
+ */
+function normalizeWikiLinksOnWrite(pageId: string, buffer: Buffer): Buffer {
+  if (buffer.length === 0) return buffer;
+  try {
+    const doc = new Y.Doc();
+    Y.applyUpdate(doc, new Uint8Array(buffer));
+    const { marksApplied } = applyWikiLinkMarksToYDoc(doc);
+    if (marksApplied === 0) return buffer;
+    return Buffer.from(Y.encodeStateAsUpdate(doc));
+  } catch (error) {
+    console.error(`[WikiLinkNormalize] PUT path failed for page=${pageId}:`, error);
+    return buffer;
+  }
+}
 
 /**
  * ベストエフォートで自動スナップショットを作成する。失敗してもメイン処理には影響しない。
@@ -309,18 +414,33 @@ app.get("/:id/content", authRequired, async (c) => {
       content_text: null,
     });
   }
-  const ydocBase64 =
+  const rawBuffer =
     row.ydocState instanceof Buffer
-      ? row.ydocState.toString("base64")
+      ? row.ydocState
       : typeof row.ydocState === "string"
-        ? row.ydocState
-        : Buffer.from(row.ydocState as unknown as ArrayBufferLike).toString("base64");
+        ? Buffer.from(row.ydocState, "base64")
+        : Buffer.from(row.ydocState as unknown as ArrayBufferLike);
+
+  // Issue #880 Phase B リグレッション対応: 未 mark の `[[Title]]` プレーン
+  // テキストをサーバ側で `wikiLink` mark に昇格させる。`local` モード経路は
+  // Hocuspocus を通らないため、ここが lazy migration の入口になる。
+  // Issue #880 Phase B regression fix: lazily migrate unmarked `[[Title]]`
+  // text on read. The `local` collaboration mode bypasses Hocuspocus, so
+  // this is the entry point for that path.
+  const normalized = await normalizeWikiLinksOnRead(
+    db,
+    pageId,
+    rawBuffer,
+    row.version ?? 0,
+    row.updatedAt ?? null,
+  );
+  const ydocBase64 = normalized.buffer.toString("base64");
 
   return c.json({
     ydoc_state: ydocBase64,
-    version: row.version,
+    version: normalized.version,
     content_text: row.contentText,
-    updated_at: row.updatedAt?.toISOString(),
+    updated_at: normalized.updatedAt?.toISOString(),
   });
 });
 
@@ -348,7 +468,12 @@ app.put("/:id/content", authRequired, async (c) => {
   // Editing requires note role + `canEdit` against the owning note.
   await assertPageEditAccess(db, pageId, userId);
 
-  const ydocBuffer = Buffer.from(body.ydoc_state, "base64");
+  // クライアントから届いたバイト列を defense-in-depth で正規化。万一未 mark の
+  // `[[Title]]` テキストが含まれていれば、永続化前に `wikiLink` mark を適用する。
+  // Defense-in-depth: normalize the incoming Y.Doc bytes so unmarked
+  // `[[Title]]` text never persists, even if the client sends it.
+  const rawYdocBuffer = Buffer.from(body.ydoc_state, "base64");
+  const ydocBuffer = normalizeWikiLinksOnWrite(pageId, rawYdocBuffer);
 
   // UPSERT page_contents with optimistic locking
   if (body.expected_version != null) {

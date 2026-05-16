@@ -17,6 +17,7 @@ import {
   type NoteAccessFacts,
 } from "./pageEditPermission.js";
 import { maybeCreateSnapshot } from "./snapshotUtils.js";
+import { applyWikiLinkMarksToYDoc } from "./ydocWikiLinkNormalizer.js";
 
 const PORT = parseInt(process.env.PORT || "1234", 10);
 const REDIS_URL = process.env.REDIS_URL;
@@ -309,6 +310,29 @@ async function loadDocumentFromDb(pageId: string): Promise<Y.Doc> {
     if (row?.ydoc_state) {
       Y.applyUpdate(doc, new Uint8Array(row.ydoc_state));
     }
+
+    // Issue #880 Phase B リグレッション対応: 未 mark の `[[Title]]` プレーンテキスト
+    // を本サーバ側で `wikiLink` mark に昇格させる。クライアント側で同等処理を
+    // 行っていた `applyWikiLinkMarksToEditor` を撤去し、y-prosemirror の同期
+    // 境界条件（lib0 `unexpectedCase`）を二度と踏まないようにする。
+    // `marksApplied > 0` のときは Hocuspocus の onStoreDocument が自然に拾って
+    // 保存するので、ここでは Y.Doc を変更するだけで永続化はトリガしない。
+    // 失敗してもベストエフォートでログに残し、ロード自体は継続する。
+    //
+    // Issue #880 Phase B regression fix: promote unmarked `[[Title]]` plain
+    // text to `wikiLink` marks server-side so the client never triggers the
+    // y-prosemirror `unexpectedCase` boundary case via `addMark` on synced
+    // docs. When `marksApplied > 0` the resulting Y.Doc update flows through
+    // Hocuspocus' normal save path. Best-effort: load proceeds even on error.
+    try {
+      const { marksApplied } = applyWikiLinkMarksToYDoc(doc);
+      if (marksApplied > 0) {
+        console.log(`[WikiLinkNormalize] page=${pageId} marksApplied=${marksApplied}`);
+      }
+    } catch (error) {
+      console.error(`[WikiLinkNormalize] Failed for page=${pageId}:`, error);
+    }
+
     return doc;
   } finally {
     client.release();
