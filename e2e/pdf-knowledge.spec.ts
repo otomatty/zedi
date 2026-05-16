@@ -42,7 +42,7 @@ const SAMPLE_PDF_PATH = "e2e/fixtures/sample.pdf";
 
 /**
  * `/api/sources/pdf` 系のエンドポイント名。Phase 1 ではバイナリ本体を受け取らない
- * 設計なので、ここに大きな body を持つ POST が飛んだら設計違反として fail する。
+ * 設計なので、ここに PDF バイト列を含む POST が飛んだら設計違反として fail する。
  *
  * Endpoints that must never receive raw PDF bytes. Phase 1's contract is that
  * the server only gets hashes + metadata + highlights — the actual bytes stay
@@ -51,26 +51,45 @@ const SAMPLE_PDF_PATH = "e2e/fixtures/sample.pdf";
 const PDF_API_PATH_PATTERN = /\/api\/sources\/pdf(?:$|\/)/u;
 
 /**
- * 8 KiB をしきい値として「明らかにバイナリを送ってる」リクエストを検知する。
- * メタデータのみの POST は数百バイトに収まるので、これより大きい body は
- * 誤って PDF バイナリを混入させた疑いがある、というシグナルにする。
+ * 「raw PDF」「base64 化された PDF」のどちらでも本文先頭に現れるマジック文字列。
+ * 単なるサイズしきい値だと、本 PR の sample.pdf (~941 B) のような小さい
+ * フィクスチャが誤って POST されたとき false negative になる。代わりに
+ * PDF シグネチャ (`%PDF-`) と、その base64 表現 (`JVBERi0`) を直接探す。
  *
- * 8 KiB is comfortably above metadata-only payloads (sha256 + filename +
- * counts ≈ a few hundred bytes) but well below even the smallest practical PDF.
- * Anything larger than this on a `/api/sources/pdf*` request is treated as a
- * regression of the "no binary on the wire" Phase 1 invariant.
+ * Both raw and base64-encoded PDFs start with one of these markers. The Phase 1
+ * invariant is "no PDF bytes on the wire" regardless of payload size, so a
+ * size-only threshold is too lax — a regression that uploads even the 941-byte
+ * `sample.pdf` fixture would slip past one. Magic-byte matching closes that
+ * gap (see review feedback on #871).
  */
-const BINARY_BODY_THRESHOLD_BYTES = 8 * 1024;
+const PDF_BODY_MARKERS = ["%PDF-", "JVBERi0"] as const;
 
 /**
- * 与えられた request の body サイズを安全に計測する。
- * Returns the request body size in bytes, defensively handling the (older)
- * Playwright shape where `postDataBuffer()` may return `null`.
+ * リクエスト body の中に PDF バイナリ (生 / base64) が混入していないか調べる。
+ * Phase 1 contract: PDF bytes must never be uploaded to the server. Inspect
+ * the raw post body for the PDF magic bytes — both the literal `%PDF-` header
+ * and the `JVBERi0` prefix that a base64-encoded PDF starts with.
+ *
+ * @returns 検出時は判定根拠を含むオブジェクト、未検出時は `null`。
  */
-function postBodySize(request: Request): number {
+function detectPdfBytesInBody(
+  request: Request,
+): { marker: string; bodySize: number; method: string } | null {
   const buf = request.postDataBuffer();
-  if (!buf) return 0;
-  return buf.byteLength;
+  if (!buf) return null;
+  // latin1 でデコードすると 0x00-0xFF が 1:1 で文字に写るため、バイナリの中に
+  // 紛れた ASCII シグネチャを安全に探せる。utf-8 だと不正なシーケンスで早期に
+  // 切れる可能性があるため避ける。
+  // latin1 maps every byte 1:1 to a code point, so ASCII signatures embedded
+  // in arbitrary binary survive the decode. utf-8 can silently truncate on
+  // invalid sequences, which would let a regression slip past.
+  const text = buf.toString("latin1");
+  for (const marker of PDF_BODY_MARKERS) {
+    if (text.includes(marker)) {
+      return { marker, bodySize: buf.byteLength, method: request.method() };
+    }
+  }
+  return null;
 }
 
 test.describe("PDF knowledge ingestion — fixtures sanity", () => {
@@ -112,15 +131,22 @@ test.describe("PDF knowledge ingestion — web (non-Tauri) target", () => {
 
   test("does not POST any PDF binary to /api/sources/pdf* on web", async ({ page }) => {
     // ネットワークインターセプト sentinel。Phase 1 設計違反を early-detect する。
-    // Network-level sentinel that detects a regression of the Phase 1 contract.
-    const offendingRequests: { url: string; size: number; method: string }[] = [];
+    // サイズ依存ではなく PDF マジックバイトで判定するので、本 PR の 941 バイト
+    // フィクスチャのような小サイズの regression も確実にフラグできる。
+    // Network-level sentinel for the "no PDF bytes on the wire" Phase 1
+    // contract. Uses magic-byte detection rather than a size threshold so a
+    // regression that uploads even the ~941-byte fixture is still caught.
+    const offendingRequests: {
+      url: string;
+      method: string;
+      marker: string;
+      bodySize: number;
+    }[] = [];
     page.on("request", (request) => {
       const url = request.url();
       if (!PDF_API_PATH_PATTERN.test(new URL(url).pathname)) return;
-      const size = postBodySize(request);
-      if (size > BINARY_BODY_THRESHOLD_BYTES) {
-        offendingRequests.push({ url, size, method: request.method() });
-      }
+      const hit = detectPdfBytesInBody(request);
+      if (hit) offendingRequests.push({ url, ...hit });
     });
 
     // Web 側からは結局 `/sources/:id/pdf` がアンサポート画面になるが、それでも
