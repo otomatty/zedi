@@ -210,7 +210,13 @@ export function useEditorLifecycle({
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [editor, isCollabSynced]);
+    // `pageId` を deps に含めることで、エディタインスタンスが使い回されたまま
+    // ページ遷移したケース (上の reset effect が ref を false に戻すケース) でも
+    // この effect が再実行されて正規化が走るようにする。
+    // `pageId` is in deps so that when the editor instance is reused across
+    // page navigation, the reset effect above flips the guard back to false
+    // AND this effect re-runs to perform the normalization on the new page.
+  }, [editor, isCollabSynced, pageId]);
 
   usePasteImageHandler({ editor, handleImageUpload });
 
