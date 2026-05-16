@@ -197,6 +197,13 @@
       "when": 1779062400000,
       "tag": "0028_add_page_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1779667200000,
+      "tag": "0029_invite_links_user_fk_cascade",
+      "breakpoints": true
     }
   ]
 }

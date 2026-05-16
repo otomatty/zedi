@@ -189,7 +189,7 @@ export const noteInviteLinks = pgTable(
       .default("viewer"),
     createdByUserId: text("created_by_user_id")
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "cascade" }),
     /** 有効期限（必須、無期限リンクは作れない） / Expiration (required; no forever links) */
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     /** 利用上限。null は無制限 / Max redemptions; null means unlimited */
@@ -235,7 +235,7 @@ export const noteInviteLinkRedemptions = pgTable(
       .references(() => noteInviteLinks.id, { onDelete: "cascade" }),
     redeemedByUserId: text("redeemed_by_user_id")
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "cascade" }),
     /** 受諾時点のメールアドレス（監査用） / Email at the time of redemption */
     redeemedEmail: text("redeemed_email").notNull(),
     redeemedAt: timestamp("redeemed_at", { withTimezone: true }).defaultNow().notNull(),
@@ -243,6 +243,13 @@ export const noteInviteLinkRedemptions = pgTable(
   (table) => [
     unique("uq_note_invite_link_redemptions_link_user").on(table.linkId, table.redeemedByUserId),
     index("idx_note_invite_link_redemptions_link").on(table.linkId),
+    // `redeemed_by_user_id` 単体のインデックス。`(link_id, redeemed_by_user_id)` の
+    // 複合ユニークでは先頭列でない当列を引けず、`ON DELETE CASCADE` 時の
+    // ユーザー削除でシーケンシャルスキャンになるのを避ける。
+    // Standalone index on `redeemed_by_user_id`; the composite unique above
+    // cannot serve queries that filter only by this column, so cascade
+    // deletes from `user` would otherwise sequential-scan this table.
+    index("idx_note_invite_link_redemptions_user").on(table.redeemedByUserId),
   ],
 );
 
