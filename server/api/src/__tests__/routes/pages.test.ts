@@ -54,6 +54,7 @@ vi.mock("../../services/defaultNoteService.js", () => ({
 }));
 
 import { Hono } from "hono";
+import * as Y from "yjs";
 import pageRoutes from "../../routes/pages.js";
 import { ensureDefaultNote, getDefaultNoteOrNull } from "../../services/defaultNoteService.js";
 import { createMockDb } from "../createMockDb.js";
@@ -155,6 +156,106 @@ describe("GET /api/pages/:id/content", () => {
     });
 
     expect(res.status).toBe(401);
+  });
+
+  // Issue #880 Phase B リグレッション対応: GET 時の lazy migration。
+  // `[[Title]]` を含む未 mark の Y.Doc を読んだら、サーバが mark 化してから
+  // 返し、楽観ロックで page_contents を更新する。
+  // Issue #880 Phase B regression fix: lazy migration on GET. When a row
+  // contains unmarked `[[Title]]`, the route normalizes before returning
+  // and persists via optimistic lock.
+  it("normalizes unmarked `[[Title]]` text on GET and bumps the version", async () => {
+    // 未 mark の `[[Foo]]` を持つ Y.Doc を作る。
+    // Build a Y.Doc carrying plain `[[Foo]]` (no wikiLink mark yet).
+    const doc = new Y.Doc();
+    const fragment = doc.getXmlFragment("default");
+    const paragraph = new Y.XmlElement("paragraph");
+    fragment.insert(0, [paragraph]);
+    const text = new Y.XmlText();
+    paragraph.insert(0, [text]);
+    text.insert(0, "see [[Foo]] for details");
+    const buffer = Buffer.from(Y.encodeStateAsUpdate(doc));
+
+    const app = createPagesApp([
+      ...pageAccessPrefix(),
+      // pageContents SELECT
+      [
+        {
+          ydocState: buffer,
+          version: 3,
+          contentText: "see [[Foo]] for details",
+          updatedAt: new Date("2026-05-16T10:00:00Z"),
+        },
+      ],
+      // pageContents UPDATE (optimistic lock success)
+      [{ version: 4, updatedAt: new Date("2026-05-16T10:00:01Z") }],
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/content`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ydoc_state: string; version: number };
+    expect(body.version).toBe(4);
+
+    // Decode the returned bytes and confirm wikiLink mark is now present.
+    const decoded = new Y.Doc();
+    Y.applyUpdate(decoded, new Uint8Array(Buffer.from(body.ydoc_state, "base64")));
+    const returnedFragment = decoded.getXmlFragment("default");
+    let hasWikiLink = false;
+    returnedFragment.toArray().forEach((node) => {
+      if (node instanceof Y.XmlElement) {
+        node.toArray().forEach((child) => {
+          if (child instanceof Y.XmlText) {
+            const delta = child.toDelta() as Array<{ attributes?: Record<string, unknown> }>;
+            if (delta.some((s) => s.attributes?.wikiLink)) hasWikiLink = true;
+          }
+        });
+      }
+    });
+    expect(hasWikiLink).toBe(true);
+  });
+
+  it("returns already-marked content as-is and does not consume an UPDATE chain", async () => {
+    // wikiLink mark 済みの Y.Doc。GET 経路では正規化が no-op になり UPDATE を
+    // 呼ばないため、UPDATE 結果はキューしない。
+    // Already-marked Y.Doc — the GET path's normalization is a no-op so no
+    // UPDATE chain should be consumed.
+    const doc = new Y.Doc();
+    const fragment = doc.getXmlFragment("default");
+    const paragraph = new Y.XmlElement("paragraph");
+    fragment.insert(0, [paragraph]);
+    const text = new Y.XmlText();
+    paragraph.insert(0, [text]);
+    text.insert(0, "[[Foo]]", {
+      wikiLink: { title: "Foo", exists: true, referenced: false, targetId: "page-foo" },
+    });
+    const buffer = Buffer.from(Y.encodeStateAsUpdate(doc));
+
+    const app = createPagesApp([
+      ...pageAccessPrefix(),
+      [
+        {
+          ydocState: buffer,
+          version: 7,
+          contentText: "[[Foo]]",
+          updatedAt: new Date("2026-05-16T11:00:00Z"),
+        },
+      ],
+      // Intentionally NOT queuing an UPDATE result; the handler must skip it.
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/content`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { version: number };
+    // Version is unchanged because the normalizer found nothing to do.
+    expect(body.version).toBe(7);
   });
 });
 
@@ -546,5 +647,68 @@ describe("PUT /api/pages/:id/content", () => {
     // 残るのは page_contents の version bump 1 件のみ。
     // The only UPDATE left is the page_contents version bump.
     expect(updateChains.length).toBe(1);
+  });
+
+  // Issue #880 Phase B リグレッション対応: PUT 経路でも defense-in-depth で
+  // 未 mark の `[[Title]]` を `wikiLink` mark 化してから保存する。
+  // Defense-in-depth: PUT path normalizes unmarked `[[Title]]` text before
+  // persisting so future GETs never see raw brackets.
+  it("normalizes unmarked `[[Title]]` text before persisting on PUT", async () => {
+    const doc = new Y.Doc();
+    const fragment = doc.getXmlFragment("default");
+    const paragraph = new Y.XmlElement("paragraph");
+    fragment.insert(0, [paragraph]);
+    const text = new Y.XmlText();
+    paragraph.insert(0, [text]);
+    text.insert(0, "see [[Bar]] here");
+    const ydocB64 = Buffer.from(Y.encodeStateAsUpdate(doc)).toString("base64");
+
+    const { app, chains } = createPagesAppWithChains([
+      ...pageAccessPrefix(),
+      [{ version: 5, pageId: PAGE_ID }],
+      [{ title: "T", contentPreview: "P" }],
+      [],
+      [],
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/content`, {
+      method: "PUT",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        ydoc_state: ydocB64,
+        expected_version: 4,
+      }),
+    });
+
+    expect(res.status).toBe(200);
+
+    // The page_contents UPDATE should have been called with a buffer where
+    // `[[Bar]]` is now wikiLink-marked. Decode the buffer from the `set()` op
+    // and confirm.
+    const updateChain = chains.find(
+      (c) => c.startMethod === "update" && c.ops.some((op) => op.method === "set"),
+    );
+    expect(updateChain).toBeDefined();
+    const setOp = updateChain?.ops.find((op) => op.method === "set");
+    expect(setOp).toBeDefined();
+    const setPayload = setOp?.args[0] as { ydocState?: Buffer } | undefined;
+    expect(setPayload?.ydocState).toBeInstanceOf(Buffer);
+    if (!setPayload?.ydocState) return;
+
+    const decoded = new Y.Doc();
+    Y.applyUpdate(decoded, new Uint8Array(setPayload.ydocState));
+    const decodedFragment = decoded.getXmlFragment("default");
+    let hasWikiLink = false;
+    decodedFragment.toArray().forEach((node) => {
+      if (node instanceof Y.XmlElement) {
+        node.toArray().forEach((child) => {
+          if (child instanceof Y.XmlText) {
+            const delta = child.toDelta() as Array<{ attributes?: Record<string, unknown> }>;
+            if (delta.some((s) => s.attributes?.wikiLink)) hasWikiLink = true;
+          }
+        });
+      }
+    });
+    expect(hasWikiLink).toBe(true);
   });
 });
