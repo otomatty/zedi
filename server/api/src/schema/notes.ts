@@ -243,6 +243,13 @@ export const noteInviteLinkRedemptions = pgTable(
   (table) => [
     unique("uq_note_invite_link_redemptions_link_user").on(table.linkId, table.redeemedByUserId),
     index("idx_note_invite_link_redemptions_link").on(table.linkId),
+    // `redeemed_by_user_id` 単体のインデックス。`(link_id, redeemed_by_user_id)` の
+    // 複合ユニークでは先頭列でない当列を引けず、`ON DELETE CASCADE` 時の
+    // ユーザー削除でシーケンシャルスキャンになるのを避ける。
+    // Standalone index on `redeemed_by_user_id`; the composite unique above
+    // cannot serve queries that filter only by this column, so cascade
+    // deletes from `user` would otherwise sequential-scan this table.
+    index("idx_note_invite_link_redemptions_user").on(table.redeemedByUserId),
   ],
 );
 

@@ -40,3 +40,11 @@ DO $$ BEGIN
 EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;
+--> statement-breakpoint
+-- `redeemed_by_user_id` 単体のインデックス。
+-- `(link_id, redeemed_by_user_id)` の複合ユニークは先頭列が `link_id` のため
+-- `redeemed_by_user_id` 単独検索には効かず、CASCADE 削除時の seq scan を招く。
+-- Standalone index on `redeemed_by_user_id` so cascade deletes from `user`
+-- can use an index instead of sequential-scanning this table.
+CREATE INDEX IF NOT EXISTS "idx_note_invite_link_redemptions_user"
+    ON "note_invite_link_redemptions" ("redeemed_by_user_id");
