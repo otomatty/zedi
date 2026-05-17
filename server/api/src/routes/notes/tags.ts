@@ -58,6 +58,22 @@ const TAGS_RESPONSE_VERSION = "v1";
  * `links.MAX(created_at)` / `ghost_links.MAX(created_at)` with their counts
  * makes the ETag shift on any page mutation, tag insert, or tag delete.
  */
+/**
+ * `db.execute` の生戻り値から `rows` 配列を取り出すための薄いヘルパー。
+ * pg ドライバ依存の型 (`QueryResult<Row>` 風) を `Array<Record<string, unknown>>`
+ * に揃え、呼び出し側でローカルに `unknown` キャストを散らばらせない
+ * (PR #897 Gemini medium レビュー)。
+ *
+ * Coerce a `db.execute` result into an `Array<Record<string, unknown>>` so
+ * downstream column reads don't each need their own `unknown` cast
+ * (PR #897 Gemini medium review). Driver-specific row shapes are reduced to a
+ * single boundary cast here.
+ */
+function executeRows(result: unknown): Array<Record<string, unknown>> {
+  const wrapper = result as { rows?: Array<Record<string, unknown>> };
+  return wrapper.rows ?? [];
+}
+
 function makeTagsETag(
   noteId: string,
   role: string,
@@ -105,48 +121,68 @@ app.get("/:noteId/tags", authOptional, async (c) => {
   if (!note) throw new HTTPException(404, { message: "Note not found" });
   if (!role) throw new HTTPException(403, { message: "Forbidden" });
 
-  // ETag 用のシグナル集約。3 テーブル × (MAX + COUNT) = 6 値だが、いずれも
-  // インデックスから安価に取得できる: `idx_pages_note_active_updated_id`,
-  // `idx_links_source_id` + `idx_links_link_type`, `idx_ghost_links_source_page_id`
-  // + `idx_ghost_links_link_type`。1 つの SELECT に scalar subquery で詰める
-  // ことで往復回数を抑える。
+  // ETag 用のシグナル集約 + 「タグなしページ件数」を 1 つの SELECT に詰める。
+  // 3 テーブル × (MAX + COUNT) と `none_count` の合計 7 値すべて、既存
+  // インデックス (`idx_pages_note_active_updated_id`, `idx_links_source_id`
+  // + `idx_links_link_type`, `idx_ghost_links_source_page_id` +
+  // `idx_ghost_links_link_type`) から安価に解決できる。`none_count` の
+  // `NOT EXISTS ... links` には削除済みタグページを除外する `is_deleted = false`
+  // を付け、`pages.ts` の untagged predicate と挙動を揃える (PR #897 Codex P2)。
   //
-  // ETag signal aggregation. Three tables × (MAX + COUNT) = six values, each
-  // resolvable from existing indexes. Folding them into a single SELECT via
-  // scalar subqueries keeps the round-trip count to 1.
-  const signalRows = await db.execute(sql`
-    SELECT
-      (SELECT MAX(updated_at) FROM pages WHERE note_id = ${noteId}::uuid AND is_deleted = false) AS pages_max_updated_at,
-      (SELECT COUNT(*)::int FROM pages WHERE note_id = ${noteId}::uuid AND is_deleted = false) AS pages_count,
-      (SELECT MAX(l.created_at)
-         FROM links l
-         JOIN pages s ON s.id = l.source_id
-         WHERE s.note_id = ${noteId}::uuid AND s.is_deleted = false AND l.link_type = 'tag'
-      ) AS links_max_created_at,
-      (SELECT COUNT(*)::int
-         FROM links l
-         JOIN pages s ON s.id = l.source_id
-         WHERE s.note_id = ${noteId}::uuid AND s.is_deleted = false AND l.link_type = 'tag'
-      ) AS links_count,
-      (SELECT MAX(gl.created_at)
-         FROM ghost_links gl
-         JOIN pages s ON s.id = gl.source_page_id
-         WHERE s.note_id = ${noteId}::uuid AND s.is_deleted = false AND gl.link_type = 'tag'
-      ) AS ghost_max_created_at,
-      (SELECT COUNT(*)::int
-         FROM ghost_links gl
-         JOIN pages s ON s.id = gl.source_page_id
-         WHERE s.note_id = ${noteId}::uuid AND s.is_deleted = false AND gl.link_type = 'tag'
-      ) AS ghost_count
-  `);
-  const signal =
-    (signalRows as unknown as { rows: Array<Record<string, unknown>> }).rows?.[0] ?? {};
+  // Fold the ETag signal aggregation and the `none_count` query into a single
+  // round-trip (PR #897 Gemini medium review). All seven scalars are
+  // resolvable from existing indexes. The `none_count` NOT EXISTS on `links`
+  // joins `pages.is_deleted = false` so pages whose only tag links target
+  // soft-deleted pages still register as "untagged", matching the predicate
+  // in `pages.ts` (PR #897 Codex P2).
+  const signalRows = executeRows(
+    await db.execute(sql`
+      SELECT
+        (SELECT MAX(updated_at) FROM pages WHERE note_id = ${noteId}::uuid AND is_deleted = false) AS pages_max_updated_at,
+        (SELECT COUNT(*)::int FROM pages WHERE note_id = ${noteId}::uuid AND is_deleted = false) AS pages_count,
+        (SELECT MAX(l.created_at)
+           FROM links l
+           JOIN pages s ON s.id = l.source_id
+           WHERE s.note_id = ${noteId}::uuid AND s.is_deleted = false AND l.link_type = 'tag'
+        ) AS links_max_created_at,
+        (SELECT COUNT(*)::int
+           FROM links l
+           JOIN pages s ON s.id = l.source_id
+           WHERE s.note_id = ${noteId}::uuid AND s.is_deleted = false AND l.link_type = 'tag'
+        ) AS links_count,
+        (SELECT MAX(gl.created_at)
+           FROM ghost_links gl
+           JOIN pages s ON s.id = gl.source_page_id
+           WHERE s.note_id = ${noteId}::uuid AND s.is_deleted = false AND gl.link_type = 'tag'
+        ) AS ghost_max_created_at,
+        (SELECT COUNT(*)::int
+           FROM ghost_links gl
+           JOIN pages s ON s.id = gl.source_page_id
+           WHERE s.note_id = ${noteId}::uuid AND s.is_deleted = false AND gl.link_type = 'tag'
+        ) AS ghost_count,
+        (SELECT COUNT(*)::int
+           FROM pages s
+           WHERE s.note_id = ${noteId}::uuid
+             AND s.is_deleted = false
+             AND NOT EXISTS (
+               SELECT 1 FROM links l
+               JOIN pages t ON t.id = l.target_id AND t.is_deleted = false
+               WHERE l.source_id = s.id AND l.link_type = 'tag'
+             )
+             AND NOT EXISTS (
+               SELECT 1 FROM ghost_links gl WHERE gl.source_page_id = s.id AND gl.link_type = 'tag'
+             )
+        ) AS none_count
+    `),
+  );
+  const signal = signalRows[0] ?? {};
   const pagesMaxUpdatedAt = (signal.pages_max_updated_at as Date | string | null) ?? null;
   const pagesCount = Number(signal.pages_count ?? 0);
   const linksMaxCreatedAt = (signal.links_max_created_at as Date | string | null) ?? null;
   const linksCount = Number(signal.links_count ?? 0);
   const ghostMaxCreatedAt = (signal.ghost_max_created_at as Date | string | null) ?? null;
   const ghostCount = Number(signal.ghost_count ?? 0);
+  const noneCount = Number(signal.none_count ?? 0);
 
   const etag = makeTagsETag(
     noteId,
@@ -168,94 +204,71 @@ app.get("/:noteId/tags", authOptional, async (c) => {
   }
 
   // メイン集計: 解決済みタグ (links 経由) と未解決タグ (ghost_links 経由) を
-  // 同じ key (`LOWER(name)`) で UNION し、外側で sum/合成して 1 行 / キーに
-  // まとめる。`resolved` は「すべての出現が links 経由か」のフラグなので、
-  // ghost_count = 0 で判定する。表示名は resolved 側 (links) の `pages.title`
-  // を優先する (`tag_display_name_resolved`)。それも無い場合は ghost 側の
-  // 最初の表記にフォールバック。
+  // 同じ key (`LOWER(name)`) で UNION し、外側で `GROUP BY name_lower` する。
+  // 表示名は resolved 側の表記を優先 (resolved が無いキーは ghost 側の最小
+  // 表記にフォールバック)。同じ `name_lower` に複数の表記が存在しても
+  // `MIN(...) FILTER (...)` で決定的に選ぶ。`resolved` フラグは ghost 側の
+  // 出現が 0 件かどうかで判定する。
   //
   // Main aggregation. Resolved tags (via `links` → tag-page `title`) and
   // unresolved tags (via `ghost_links.link_text`) are unioned on a
-  // case-insensitive key and summed in the outer SELECT. `resolved` is true
-  // only when the ghost contribution is 0. Display name prefers the
-  // resolved-side `pages.title`; falls back to the first ghost spelling.
-  const tagRows = await db.execute(sql`
-    WITH resolved AS (
+  // case-insensitive key and grouped in the outer SELECT. Display name comes
+  // from `MIN(display_name) FILTER (origin = 'resolved')` (or `MIN(display_name)`
+  // when no resolved row exists), avoiding both the per-group correlated
+  // subqueries and the non-deterministic `LIMIT 1` flagged on the previous
+  // revision (PR #897 Gemini medium / CodeRabbit minor reviews). `resolved`
+  // is true only when the ghost contribution is zero.
+  const tagRows = executeRows(
+    await db.execute(sql`
+      WITH resolved AS (
+        SELECT
+          LOWER(t.title) AS name_lower,
+          t.title AS display_name,
+          s.id AS source_id
+        FROM pages s
+        JOIN links l ON l.source_id = s.id AND l.link_type = 'tag'
+        JOIN pages t ON t.id = l.target_id
+        WHERE s.note_id = ${noteId}::uuid
+          AND s.is_deleted = false
+          AND t.is_deleted = false
+          AND t.title IS NOT NULL
+          AND LENGTH(TRIM(t.title)) > 0
+      ),
+      ghost AS (
+        SELECT
+          LOWER(gl.link_text) AS name_lower,
+          gl.link_text AS display_name,
+          s.id AS source_id
+        FROM pages s
+        JOIN ghost_links gl ON gl.source_page_id = s.id AND gl.link_type = 'tag'
+        WHERE s.note_id = ${noteId}::uuid
+          AND s.is_deleted = false
+          AND LENGTH(TRIM(gl.link_text)) > 0
+      ),
+      merged AS (
+        SELECT name_lower, display_name, source_id, 'resolved' AS origin FROM resolved
+        UNION ALL
+        SELECT name_lower, display_name, source_id, 'ghost' AS origin FROM ghost
+      )
       SELECT
-        LOWER(t.title) AS name_lower,
-        t.title AS display_name,
-        s.id AS source_id
-      FROM pages s
-      JOIN links l ON l.source_id = s.id AND l.link_type = 'tag'
-      JOIN pages t ON t.id = l.target_id
-      WHERE s.note_id = ${noteId}::uuid
-        AND s.is_deleted = false
-        AND t.is_deleted = false
-        AND t.title IS NOT NULL
-        AND LENGTH(TRIM(t.title)) > 0
-    ),
-    ghost AS (
-      SELECT
-        LOWER(gl.link_text) AS name_lower,
-        gl.link_text AS display_name,
-        s.id AS source_id
-      FROM pages s
-      JOIN ghost_links gl ON gl.source_page_id = s.id AND gl.link_type = 'tag'
-      WHERE s.note_id = ${noteId}::uuid
-        AND s.is_deleted = false
-        AND LENGTH(TRIM(gl.link_text)) > 0
-    ),
-    merged AS (
-      SELECT name_lower, display_name, source_id, 'resolved' AS origin FROM resolved
-      UNION ALL
-      SELECT name_lower, display_name, source_id, 'ghost' AS origin FROM ghost
-    )
-    SELECT
-      name_lower,
-      COALESCE(
-        (SELECT display_name FROM merged m2
-           WHERE m2.name_lower = merged.name_lower AND m2.origin = 'resolved'
-           LIMIT 1),
-        (SELECT display_name FROM merged m3
-           WHERE m3.name_lower = merged.name_lower
-           LIMIT 1)
-      ) AS display_name,
-      COUNT(DISTINCT source_id)::int AS page_count,
-      bool_and(origin = 'resolved') AS resolved
-    FROM merged
-    GROUP BY name_lower
-    ORDER BY page_count DESC, name_lower ASC
-  `);
-  const items: NoteTagAggregationItem[] = (
-    tagRows as unknown as { rows: Array<Record<string, unknown>> }
-  ).rows.map((r) => ({
+        name_lower,
+        COALESCE(
+          MIN(display_name) FILTER (WHERE origin = 'resolved'),
+          MIN(display_name)
+        ) AS display_name,
+        COUNT(DISTINCT source_id)::int AS page_count,
+        bool_and(origin = 'resolved') AS resolved
+      FROM merged
+      GROUP BY name_lower
+      ORDER BY page_count DESC, name_lower ASC
+    `),
+  );
+  const items: NoteTagAggregationItem[] = tagRows.map((r) => ({
     name: typeof r.display_name === "string" ? r.display_name : String(r.name_lower ?? ""),
     name_lower: String(r.name_lower ?? ""),
     page_count: Number(r.page_count ?? 0),
     resolved: r.resolved === true,
   }));
-
-  // 「タグなし」件数: 同じノートのアクティブページのうち、`links` / `ghost_links`
-  // どちらにも `link_type='tag'` の出辺を持たないものをカウントする。
-  //
-  // "Untagged page" count: active pages in the note with no outgoing
-  // `link_type='tag'` edge in either table.
-  const noneCountRows = await db.execute(sql`
-    SELECT COUNT(*)::int AS none_count
-    FROM pages s
-    WHERE s.note_id = ${noteId}::uuid
-      AND s.is_deleted = false
-      AND NOT EXISTS (
-        SELECT 1 FROM links l WHERE l.source_id = s.id AND l.link_type = 'tag'
-      )
-      AND NOT EXISTS (
-        SELECT 1 FROM ghost_links gl WHERE gl.source_page_id = s.id AND gl.link_type = 'tag'
-      )
-  `);
-  const noneCount = Number(
-    (noneCountRows as unknown as { rows: Array<Record<string, unknown>> }).rows?.[0]?.none_count ??
-      0,
-  );
 
   const response: NoteTagAggregationResponse = {
     items,

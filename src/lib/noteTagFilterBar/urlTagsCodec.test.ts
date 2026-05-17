@@ -64,6 +64,11 @@ describe("parseTagsParam", () => {
     });
   });
 
+  it("recognises __none__ case-insensitively (manual URL edits)", () => {
+    expect(parseTagsParam("__NONE__")).toEqual({ kind: "untagged-only" });
+    expect(parseTagsParam("__None__,foo")).toEqual({ kind: "untagged-only" });
+  });
+
   it("truncates at MAX_TAGS distinct tokens", () => {
     const many = Array.from({ length: MAX_TAGS + 5 }, (_, i) => `tag${i}`).join(",");
     const parsed = parseTagsParam(many);

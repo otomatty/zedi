@@ -112,8 +112,16 @@ export const TagFilterBar: React.FC<TagFilterBarProps> = ({
     );
   }
 
-  // タグも「タグなし」もゼロなら何も描画しない (バーは隠す)。
-  if (items.length === 0 && noneCount === 0) return null;
+  // タグも「タグなし」もゼロなら原則バーを隠すが、URL 由来でフィルタが
+  // 既に効いている場合は「クリア」ボタンを残すために描画を続ける (PR #897
+  // CodeRabbit minor)。これがないと選択タグが (削除・rename 等で) 集計から
+  // 消えた瞬間にフィルタを解除する手段が無くなる。
+  //
+  // Hide the bar when there are no chips to render — unless a URL-driven
+  // filter is still active. Keeping the bar mounted in that case preserves
+  // the clear button so users can always recover from an active filter
+  // whose tag no longer appears in the aggregation (PR #897 CodeRabbit minor).
+  if (items.length === 0 && noneCount === 0 && !hasActiveFilter) return null;
 
   return (
     <div

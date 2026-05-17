@@ -53,8 +53,10 @@ export function parseTagsParam(raw: string | null | undefined): SelectedTags {
   if (tokens.length === 0) return { kind: "none-selected" };
 
   // `__none__` is exclusive — any occurrence forces untagged-only mode so
-  // mixed URLs like `?tags=__none__,foo` collapse predictably.
-  if (tokens.some((t) => t === UNTAGGED_FILTER_TOKEN)) {
+  // mixed URLs like `?tags=__none__,foo` collapse predictably. The comparison
+  // is case-insensitive so `?tags=__NONE__` (manual edits / typo'd casing)
+  // is still recognised (PR #897 CodeRabbit minor).
+  if (tokens.some((t) => t.toLowerCase() === UNTAGGED_FILTER_TOKEN)) {
     return { kind: "untagged-only" };
   }
 

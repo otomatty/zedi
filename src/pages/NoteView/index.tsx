@@ -213,6 +213,21 @@ const NoteViewPageList: React.FC<{
   const { selected, setSelected } = useURLTagFilter();
   const aggregation = useNoteTagAggregation(noteId, { enabled: showFilterBar });
 
+  // バーが非表示のとき、URL に残った `?tags=foo` をそのまま PageGrid に流すと
+  // 「絞り込みが効いているのに UI から解除できない」幽霊フィルタ状態になる
+  // (ノート切替で URL が引き継がれた場合など、PR #897 Codex P1)。バーが
+  // 出ていないときは強制的に `none-selected` 扱いにして、フィルタは UI が
+  // 復活したときだけ機能するように倒す。URL は触らずに残しておくので、
+  // バーを再表示すれば前回の選択が復元される。
+  //
+  // Forwarding the URL-derived selection while the bar is hidden produces a
+  // phantom filter — the page list is constrained but there's no UI control
+  // to clear it (PR #897 Codex P1, e.g. when navigating from another note
+  // that left `?tags=` behind). Treat the filter as `none-selected` whenever
+  // the bar is hidden; we keep the URL untouched so the selection comes back
+  // if the user re-enables the bar.
+  const effectiveTagFilter = showFilterBar ? selected : { kind: "none-selected" as const };
+
   return (
     <>
       {showFilterBar && (
@@ -231,7 +246,7 @@ const NoteViewPageList: React.FC<{
           noteId={noteId}
           canEdit={canEdit}
           canDeletePage={canDeletePageInGrid}
-          tagFilter={selected}
+          tagFilter={effectiveTagFilter}
         />
       </div>
     </>

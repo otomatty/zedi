@@ -448,8 +448,21 @@ app.get("/:noteId/pages", authOptional, async (c) => {
   // compared case-insensitively against the lower-cased tags.
   if (tagsFilter) {
     if (tagsFilter.kind === "untagged-only") {
+      // 削除済みタグページへのリンクは untagged 判定で「無い」ものとして扱う。
+      // OR フィルタ側は `t.is_deleted = false` で削除済みを除外しているため、
+      // ここで `t.is_deleted = false` の JOIN を付けないと「削除済みタグページ
+      // のみ参照するページ」が通常タグにも `__none__` にもマッチせず消えて
+      // しまう (PR #897 Codex P2)。
+      //
+      // Ignore links whose target is soft-deleted when deciding "untagged":
+      // the OR-tag path already filters `t.is_deleted = false`, so without
+      // this `JOIN ... t.is_deleted = false` a page that only references
+      // tombstoned tag pages would match neither real tags nor `__none__`
+      // (PR #897 Codex P2).
       whereClauses.push(sql`NOT EXISTS (
-        SELECT 1 FROM links l WHERE l.source_id = ${pages.id} AND l.link_type = 'tag'
+        SELECT 1 FROM links l
+        JOIN pages t ON t.id = l.target_id AND t.is_deleted = false
+        WHERE l.source_id = ${pages.id} AND l.link_type = 'tag'
       )`);
       whereClauses.push(sql`NOT EXISTS (
         SELECT 1 FROM ghost_links gl WHERE gl.source_page_id = ${pages.id} AND gl.link_type = 'tag'
