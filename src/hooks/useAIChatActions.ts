@@ -162,10 +162,12 @@ export function useAIChatActions({ pageContext }: UseAIChatActionsOptions) {
             title: pageAction.title,
             content: pageAction.content,
           });
-          if (result?.id) {
+          if (result?.id && result.noteId) {
             // Issue #889 Phase 3: `/pages/:id` 撤去のため `/notes/:noteId/:pageId` に遷移。
+            // `noteId` が無い場合は不正な URL になるので遷移しない。
             // Issue #889 Phase 3: navigate to `/notes/:noteId/:pageId` after
-            // the standalone `/pages/:id` route was retired.
+            // the standalone `/pages/:id` route was retired. Skip when
+            // `noteId` is missing so we never build `/notes/undefined/...`.
             navigate(`/notes/${result.noteId}/${result.id}`);
           }
         } else if (action.type === "create-multiple-pages") {

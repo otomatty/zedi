@@ -58,10 +58,13 @@ async function handleCreatePage(
     title: action.title,
     content: "",
   });
-  if (result?.id) {
+  if (result?.id && result.noteId) {
     // Issue #889 Phase 3: `/pages/:id` 撤去のため `/notes/:noteId/:pageId` に遷移。
+    // `noteId` が無い場合は不正な URL になるので遷移しない（バックエンドの
+    // 想定外応答に対する防御）。
     // Issue #889 Phase 3: route to `/notes/:noteId/:pageId` (legacy
-    // `/pages/:id` route was retired).
+    // `/pages/:id` route was retired). Skip navigation when `noteId` is
+    // missing so we never build `/notes/undefined/...`.
     deps.navigate(`/notes/${result.noteId}/${result.id}`, {
       state: { pendingChatPageGeneration: pending },
     });
@@ -94,14 +97,16 @@ async function handleCreateMultiplePages(
       if (candidate) firstOutline = candidate;
     }
   }
-  if (firstCreated) {
+  if (firstCreated?.id && firstCreated.noteId) {
     const pending: PendingChatPageGenerationState = {
       outline: firstOutline,
       conversationText,
     };
     // Issue #889 Phase 3: `/pages/:id` 撤去のため `/notes/:noteId/:pageId` に遷移。
+    // `noteId` 欠落時は不正な URL になるため遷移を打ち切る。
     // Issue #889 Phase 3: route to `/notes/:noteId/:pageId` (legacy
-    // `/pages/:id` route was retired).
+    // `/pages/:id` route was retired). Skip navigation when `noteId` is
+    // missing so we never build `/notes/undefined/...`.
     deps.navigate(`/notes/${firstCreated.noteId}/${firstCreated.id}`, {
       state: { pendingChatPageGeneration: pending },
     });

@@ -211,21 +211,29 @@ describe("GET /api/activity/index", () => {
     ]);
   });
 
-  it("returns pageId and lastBuiltAt when __index__ page exists", async () => {
+  it("returns pageId, noteId, and lastBuiltAt when __index__ page exists", async () => {
     mockBuildIndex.mockResolvedValue({ totalPages: 0, categories: [] });
     const built = new Date("2026-04-15T12:00:00Z");
-    const { app } = createTestApp([[{ id: "page-index", updatedAt: built }]]);
+    // Issue #889 Phase 3: GET /api/activity/index は所属ノート ID も返す
+    // （クライアントが `/notes/:noteId/:pageId` を組み立てるため）。
+    // Issue #889 Phase 3: GET /api/activity/index now also returns the
+    // owning note id so clients can build `/notes/:noteId/:pageId`.
+    const { app } = createTestApp([
+      [{ id: "page-index", noteId: "note-default", updatedAt: built }],
+    ]);
 
     const res = await app.request("/api/activity/index", { headers: authHeaders() });
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       pageId: string | null;
+      noteId: string | null;
       lastBuiltAt: string | null;
       totalPages: number;
       categories: unknown[];
     };
     expect(body.pageId).toBe("page-index");
+    expect(body.noteId).toBe("note-default");
     expect(body.lastBuiltAt).toBe("2026-04-15T12:00:00.000Z");
   });
 });
@@ -234,8 +242,11 @@ describe("GET /api/activity/index", () => {
 
 describe("POST /api/activity/index/rebuild", () => {
   it("returns rebuilt summary and records an index_build activity", async () => {
+    // Issue #889 Phase 3: rebuild レスポンスにも noteId が含まれる。
+    // Issue #889 Phase 3: rebuild response also carries the owning note id.
     mockRebuildIndex.mockResolvedValue({
       pageId: "page-index",
+      noteId: "note-default",
       created: true,
       document: {
         totalPages: 5,
@@ -254,12 +265,14 @@ describe("POST /api/activity/index/rebuild", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       pageId: string;
+      noteId: string;
       created: boolean;
       totalPages: number;
       categories: Array<{ label: string; count: number }>;
       generatedAt: string;
     };
     expect(body.pageId).toBe("page-index");
+    expect(body.noteId).toBe("note-default");
     expect(body.created).toBe(true);
     expect(body.totalPages).toBe(5);
     expect(body.categories).toEqual([{ label: "A", count: 1 }]);

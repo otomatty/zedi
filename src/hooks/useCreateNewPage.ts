@@ -49,11 +49,18 @@ export function useCreateNewPage(options?: { noteId?: string }) {
         try {
           await addPageToNoteMutation.mutateAsync({ noteId, pageId: newPage.id });
         } catch (error) {
+          // ページ作成自体は成功しているのでデフォルトノート配下にフォールバック遷移する。
+          // 「作成失敗」と誤読されないよう、トーストはノートへの追加に失敗した旨を明示する。
+          // The page itself was created — only the re-link failed. Fall back
+          // to the page's default-note URL so the user isn't stranded, and
+          // surface the actual failure (attaching to the requested note)
+          // instead of a misleading "create failed" message.
           console.error("Failed to attach page to note:", error);
           toast({
-            title: "ページの作成に失敗しました",
+            title: "指定ノートへの追加に失敗しました",
             variant: "destructive",
           });
+          navigate(`/notes/${newPage.noteId}/${newPage.id}`);
           return;
         }
         navigate(`/notes/${noteId}/${newPage.id}`);

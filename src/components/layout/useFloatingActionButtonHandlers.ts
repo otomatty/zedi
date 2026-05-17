@@ -73,15 +73,18 @@ export function useFloatingActionButtonHandlers(
    * Issue #889 Phase 3 で `/pages/:id` を廃止。`noteId` プロップが渡されている
    * 場合は明示再紐づけ（ノートビューの FAB 経路）→`/notes/:noteId/:pageId`、
    * 未指定時はサーバが返す `newPage.noteId`（呼び出し元のデフォルトノート）
-   * 配下へ遷移する。紐づけに失敗した場合は toast を出して中断（スタンドアロン
-   * フォールバックを残すと誤ったノートのページとしてオープンしてしまう）。
+   * 配下へ遷移する。紐づけに失敗してもページ自体は作成済みなので、デフォルト
+   * ノート配下にフォールバック遷移し、ユーザーが孤立ページに辿り着けるよう
+   * にする（toast には「指定ノートへの追加に失敗」と明示）。
    *
    * Link the freshly-created page to the current note (if any) and navigate
    * to it. After Issue #889 Phase 3 retired `/pages/:id`, callers always land
    * on `/notes/:noteId/:pageId`: either the explicit `noteId` prop (after a
    * successful re-link) or the page's own `noteId` (the caller's default
-   * note). On re-link failure we surface a toast and stop instead of routing
-   * the user into a misleading standalone view.
+   * note). On re-link failure the page itself was still created, so we fall
+   * back to the default-note URL and surface a toast that calls out the
+   * actual failure (attaching to the requested note) instead of stranding
+   * the user.
    */
   const linkAndNavigate = useCallback(
     async (newPage: Page, navState?: Record<string, unknown>): Promise<void> => {
@@ -91,9 +94,13 @@ export function useFloatingActionButtonHandlers(
         } catch (error) {
           console.error("Failed to attach page to note:", error);
           toast({
-            title: t("common.createPageFailed"),
+            title: t("common.attachPageToNoteFailed"),
             variant: "destructive",
           });
+          navigate(
+            `/notes/${newPage.noteId}/${newPage.id}`,
+            navState ? { state: navState } : undefined,
+          );
           return;
         }
         navigate(`/notes/${noteId}/${newPage.id}`, navState ? { state: navState } : undefined);

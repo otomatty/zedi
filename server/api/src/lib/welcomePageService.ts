@@ -65,10 +65,17 @@ const welcomePageExtensions = [
 const welcomePageSchema = getSchema(welcomePageExtensions);
 
 /**
- * ウェルカムページ生成結果。Welcome page generation result.
+ * ウェルカムページ生成結果。Issue #889 Phase 3 で `/pages/:id` を撤去したため、
+ * オンボーディング完了後のクライアント遷移先（`/notes/:noteId/:pageId`）を
+ * 組み立てられるよう `noteId` も併せて返す。
+ *
+ * Welcome page generation result. After Issue #889 Phase 3 retired
+ * `/pages/:id`, the onboarding client needs `noteId` to build the
+ * `/notes/:noteId/:pageId` landing URL, so the service returns it too.
  */
 export interface WelcomePageCreationResult {
   pageId: string;
+  noteId: string;
   locale: WelcomePageLocale;
 }
 
@@ -183,7 +190,7 @@ export async function insertWelcomePage(
     // 並行リクエストが先に作成した。そのページを引いて返す。
     // Someone else inserted first; look up their page.
     const existingId = await findExistingWelcomePage(tx, userId);
-    if (existingId) return { pageId: existingId, locale };
+    if (existingId) return { pageId: existingId, noteId: defaultNote.id, locale };
     throw new Error("Welcome page conflict but no existing page found");
   }
 
@@ -194,7 +201,7 @@ export async function insertWelcomePage(
     contentText: contentPreview,
   });
 
-  return { pageId: page.id, locale };
+  return { pageId: page.id, noteId: defaultNote.id, locale };
 }
 
 /**

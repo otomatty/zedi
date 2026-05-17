@@ -37,6 +37,7 @@
   "useWithoutSignIn": "Use without signing in",
   "startUsingApp": "Start using the app",
   "createPageFailed": "Failed to create page",
+  "attachPageToNoteFailed": "Failed to add page to the selected note",
   "copyFailed": "Copy failed",
   "untitledPage": "Untitled page",
   "sharedNoteContext": "(Shared note)",

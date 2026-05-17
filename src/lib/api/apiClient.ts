@@ -856,6 +856,14 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     }): Promise<{
       setup_completed_at: string | null;
       welcome_page_id: string | null;
+      /**
+       * Owning note id of the welcome page. Issue #889 Phase 3 で `/pages/:id`
+       * を撤去したため、クライアントは `/notes/:noteId/:pageId` に着地させる。
+       *
+       * Owning note id paired with `welcome_page_id` so the client can build
+       * `/notes/:noteId/:pageId` after Issue #889 Phase 3 retired `/pages/:id`.
+       */
+      welcome_page_note_id: string | null;
       welcome_page_created_at: string | null;
       welcome_page_locale: "ja" | "en" | null;
     }> {
@@ -873,6 +881,8 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     async getOnboardingStatus(): Promise<{
       setup_completed_at: string | null;
       welcome_page_id: string | null;
+      /** Issue #889 Phase 3: see `completeOnboarding` doc. */
+      welcome_page_note_id: string | null;
       welcome_page_created_at: string | null;
       home_slides_shown_at: string | null;
       auto_create_update_notice: boolean;
