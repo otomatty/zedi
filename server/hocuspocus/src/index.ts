@@ -9,6 +9,7 @@ import {
   warnDevAuthBypassOnce,
 } from "./dev-auth-bypass.js";
 import { buildContentPreview, extractTextFromYXml } from "./extractPlainTextFromYXml.js";
+import { evaluateHealth } from "./health.js";
 import {
   canEditFromRole,
   resolveNoteRole,
@@ -24,6 +25,19 @@ const REDIS_URL = process.env.REDIS_URL;
 const DATABASE_URL = process.env.DATABASE_URL;
 const API_INTERNAL_URL = process.env.API_INTERNAL_URL;
 const INTERNAL_SECRET = process.env.BETTER_AUTH_SECRET?.trim();
+
+/**
+ * Postgres プールの最大同時接続数。`pg.Pool` は `max` を public フィールドとして
+ * 公開していないため、コンストラクタに渡した値と `/health` で参照する値を本定数で
+ * 共有する。Railway 上の Hocuspocus は単一インスタンス想定なのでここで上限を直接
+ * 表現する。
+ *
+ * Pool size shared between `pg.Pool({ max })` and the `/health` snapshot.
+ * `pg.Pool` does not expose `max` publicly, so we keep the source of truth
+ * here. Hocuspocus runs as a single Railway replica, so this directly caps
+ * total live Postgres clients.
+ */
+const PG_POOL_MAX = 10;
 
 /** Cached env reads for auth paths (avoid repeated `process.env` lookups). / 認証経路用に env を一度だけ読む */
 const NODE_ENV = process.env.NODE_ENV;
@@ -56,7 +70,7 @@ function getPool(): Pool {
   }
   pgPool = new Pool({
     connectionString: DATABASE_URL,
-    max: 10,
+    max: PG_POOL_MAX,
     idleTimeoutMillis: 30000,
   });
   return pgPool;
@@ -647,18 +661,28 @@ hocuspocusServer.httpServer.on("request", (req: IncomingMessage, res: ServerResp
 });
 
 async function handleHttpRequestFallback(requestUrl: URL, res: ServerResponse): Promise<void> {
-  // ヘルスチェックエンドポイント
+  // ヘルスチェックエンドポイント。Issue #889 Phase 5 で `connections` / `documents`
+  // に加えて Postgres プールの飽和度も返すよう拡張した。ステータス自体は
+  // Railway の `restartPolicy` が拾えるよう常に HTTP 200 にし、`status` フィールド
+  // (`healthy` / `degraded`) で外部監視がアラートを上げる想定。
+  //
+  // `/health` returns connection / document counts and Postgres pool
+  // saturation. HTTP status stays 200 so Railway never restarts purely on
+  // pool pressure; external monitors page on `status !== "healthy"`.
   if (requestUrl.pathname === "/health" || requestUrl.pathname === "/") {
+    const pool = pgPool;
+    const payload = evaluateHealth({
+      connections: hocuspocus.getConnectionsCount(),
+      documents: hocuspocus.getDocumentsCount(),
+      pool: {
+        totalCount: pool?.totalCount ?? 0,
+        idleCount: pool?.idleCount ?? 0,
+        waitingCount: pool?.waitingCount ?? 0,
+      },
+      poolMax: PG_POOL_MAX,
+    });
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(
-      JSON.stringify({
-        status: "healthy",
-        service: "zedi-hocuspocus",
-        timestamp: new Date().toISOString(),
-        connections: hocuspocus.getConnectionsCount(),
-        documents: hocuspocus.getDocumentsCount(),
-      }),
-    );
+    res.end(JSON.stringify(payload));
     return;
   }
 

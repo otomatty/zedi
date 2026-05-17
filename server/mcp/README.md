@@ -197,12 +197,15 @@ Claude Code の `mcpServers` では、HTTP transport 向け設定を使う。`Au
 
 ### ページ
 
-| ツール名                   | 概要                                                          |
-| -------------------------- | ------------------------------------------------------------- |
-| `zedi_get_page`            | 単一ページの Y.Doc state と `content_text` を取得。           |
-| `zedi_create_page`         | 新規ページを作成 (Y.Doc は空)。                               |
-| `zedi_update_page_content` | ページの Y.Doc state を `expected_version` で楽観ロック更新。 |
-| `zedi_delete_page`         | ページをソフトデリートする。                                  |
+| ツール名           | 概要                                                                                           |
+| ------------------ | ---------------------------------------------------------------------------------------------- |
+| `zedi_get_page`    | 単一ページの本文 (`content_text`) とメタデータを読み取り専用で取得。Y.Doc バイト列は含まない。 |
+| `zedi_create_page` | 新規ページを作成 (Y.Doc は空)。                                                                |
+| `zedi_delete_page` | ページをソフトデリートする。                                                                   |
+
+> Issue #889 Phase 5 で MCP は read-only に縮退しました。ページ本文の更新は Zedi クライアント (Hocuspocus 経由のリアルタイム編集) から行ってください。`zedi_update_page_content` は廃止されました。
+>
+> _Issue #889 Phase 5 made MCP read-only. To edit a page body, use the Zedi web/desktop client which writes through Hocuspocus. The retired tool was `zedi_update_page_content`._
 
 ### ノート
 
@@ -239,7 +242,7 @@ Claude Code の `mcpServers` では、HTTP transport 向け設定を使う。`Au
 | `zedi_search`   | タイトルと本文で全文検索。`scope: own` or `shared`、`limit` を指定可能。 |
 | `zedi_clip_url` | 公開 URL を Readability で整形し、新規ページとして保存。                 |
 
-計 20 ツール。ツール名の一覧は `src/tools/index.ts` の `ALL_TOOL_NAMES` にも定義済み。
+計 19 ツール。ツール名の一覧は `src/tools/index.ts` の `ALL_TOOL_NAMES` にも定義済み。
 
 ---
 
@@ -252,7 +255,7 @@ Claude Code の `mcpServers` では、HTTP transport 向け設定を使う。`Au
 ### ツール呼び出しが 401 / 403 を返す
 
 - トークンの有効期限が切れている (`MCP_JWT_EXP_DAYS` 日で失効)。`zedi-mcp-cli login` でトークンを再発行する。
-- スコープが足りない。書き込み系ツール (`zedi_create_note`, `zedi_update_page_content` など) は `mcp:write` を要求する。`issue-mcp-token.ts` の第 2 引数に `mcp:read,mcp:write` を渡す、もしくは CLI ログイン時に既定の `mcp:read,mcp:write` で発行する。
+- スコープが足りない。書き込み系ツール (`zedi_create_note`, `zedi_add_page_to_note` など) は `mcp:write` を要求する。`issue-mcp-token.ts` の第 2 引数に `mcp:read,mcp:write` を渡す、もしくは CLI ログイン時に既定の `mcp:read,mcp:write` で発行する。なお Issue #889 Phase 5 以降、ページ本文の更新ツールは MCP から削除されている。
 - `ZEDI_API_URL` の指す API サーバーと、トークンを発行した API サーバーが別物 (署名鍵が違う)。同じ環境で発行したトークンを使うこと。
 
 ### HTTP transport に接続できない / Claude Code から見えない
@@ -260,10 +263,6 @@ Claude Code の `mcpServers` では、HTTP transport 向け設定を使う。`Au
 - `curl https://<railway-domain>/health` が `{ "ok": true, ... }` を返すか確認。返らない場合はデプロイが立ち上がっていない。
 - Claude Code の設定で `type: "http"` と `Authorization` ヘッダが両方指定されているか確認。
 - Railway の内部通信を使うとき、`ZEDI_API_URL` は内部 URL (`http://api.railway.internal:3000` 等) を指す必要がある。外向き URL を設定すると自己呼び出しでループする可能性がある。
-
-### ツールが `400` を返し "expected_version mismatch" になる
-
-`zedi_update_page_content` は楽観ロック。直前に `zedi_get_page` で最新の `version` を取得し、そのまま `expected_version` に渡すこと。
 
 ### HTTPS でない stdio 出力でクライアントが壊れる
 
