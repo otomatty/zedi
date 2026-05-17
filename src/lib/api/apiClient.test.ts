@@ -149,7 +149,7 @@ describe("apiClient", () => {
       const client = createApiClient({ getToken, baseUrl: "https://api.test.example.com" });
 
       try {
-        await client.getPageContent("missing");
+        await client.getPagePublicContent("missing");
         expect.fail("Expected ApiError");
       } catch (err) {
         expect(err).toBeInstanceOf(ApiError);
@@ -297,7 +297,7 @@ describe("apiClient", () => {
 
       const client = createApiClient({ baseUrl: "https://api.test.example.com" });
 
-      await expect(client.getPageContent("x")).rejects.toMatchObject({
+      await expect(client.getPagePublicContent("x")).rejects.toMatchObject({
         status: 418,
         message: "I'm a teapot",
       });

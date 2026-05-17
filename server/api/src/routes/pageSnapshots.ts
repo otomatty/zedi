@@ -13,8 +13,25 @@ import { pages, pageContents, pageSnapshots, users } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
 import { assertPageViewAccess, assertPageEditAccess } from "../services/pageAccessService.js";
-import { pruneSnapshotsExceedingLimitSql } from "../services/snapshotService.js";
+import { MAX_SNAPSHOTS_PER_PAGE } from "../constants.js";
 import { invalidateHocuspocusDocument } from "../lib/hocuspocusInvalidation.js";
+
+/**
+ * 保持上限を超えた古いスナップショットを削除する SQL（Drizzle raw）。
+ * 復元トランザクションの末尾で実行する。
+ *
+ * Raw SQL fragment that deletes snapshots beyond the retention limit. Run at
+ * the tail of the restore transaction so a restore never pushes the page over
+ * `MAX_SNAPSHOTS_PER_PAGE`. Auto-snapshot pruning now lives on the Hocuspocus
+ * side (server/hocuspocus/src/snapshotUtils.ts) — this helper is the only
+ * pruning path on the API side.
+ */
+function pruneSnapshotsExceedingLimitSql(pageId: string) {
+  return sql`DELETE FROM page_snapshots WHERE id IN (
+    SELECT id FROM page_snapshots WHERE page_id = ${pageId}
+    ORDER BY created_at DESC OFFSET ${MAX_SNAPSHOTS_PER_PAGE}
+  )`;
+}
 
 const app = new Hono<AppEnv>();
 
@@ -115,7 +132,7 @@ app.get("/:id/snapshots/:snapshotId", authRequired, async (c) => {
  * POST /:id/snapshots/:snapshotId/restore
  *
  * スナップショットを復元する。編集権限を持つユーザーのみが実行可能で、判定は
- * 他のページ書き込み系エンドポイント（`PUT /api/pages/:id/content` など）と
+ * 他のページ書き込み系エンドポイント（`PUT /api/pages/:id` など）と
  * 同じく `assertPageEditAccess` に委譲する。
  *
  * - Issue #823 以降、すべてのページは `pages.note_id` でノートに所属する。復元は

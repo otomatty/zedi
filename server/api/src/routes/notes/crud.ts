@@ -133,19 +133,19 @@ function toEpochMillis(value: Date | string | null | undefined): number {
 /**
  * Note 詳細レスポンス用の weak ETag を生成する。`note.updatedAt` と role に
  * 加えて、ページの最大 `updated_at` と件数も混ぜることで、`notes.updated_at`
- * を経由しないページ単体編集（`PUT /api/pages/:id/content`・タイトル変更・
- * ハード削除）でも ETag が変わるようにする。
+ * を経由しないページ単体編集（Hocuspocus 経由の本文保存・`PUT /api/pages/:id`
+ * によるタイトル変更・ハード削除）でも ETag が変わるようにする。
  * weak (`W/...`) を採用するのは、`view_count` のフェイヤアンドフォーゲット
  * 更新によりレスポンス body が byte-for-byte 一致しないため。
  *
  * Generates a weak ETag for note detail responses. The hash mixes
  * `note.updatedAt`, the resolved role, and a pages-change signal
  * (`MAX(pages.updated_at) + COUNT(*)`) so that page-only edits which do not
- * bump `notes.updated_at` (e.g. `PUT /api/pages/:id/content`, title rename,
- * hard delete) still invalidate the validator. The ETag is weak (`W/...`)
- * because the fire-and-forget `view_count` update can shift the response
- * body byte-for-byte even when the semantically meaningful state has not
- * changed.
+ * bump `notes.updated_at` (e.g. Hocuspocus-driven content saves, title
+ * renames via `PUT /api/pages/:id`, hard delete) still invalidate the
+ * validator. The ETag is weak (`W/...`) because the fire-and-forget
+ * `view_count` update can shift the response body byte-for-byte even when
+ * the semantically meaningful state has not changed.
  */
 function makeNoteETag(
   noteId: string,
@@ -433,9 +433,10 @@ app.get("/:noteId", authOptional, async (c) => {
   //
   // Aggregate `MAX(updated_at)` and `COUNT(*)` over active pages so the ETag
   // captures page-level mutations that do not bump `notes.updated_at`
-  // (content edits via `/api/pages/:id/content`, title rename, hard
-  // delete). The partial composite index added in Phase 3 lets Postgres
-  // resolve this from the index alone, keeping the cost negligible.
+  // (Hocuspocus-driven content edits, title renames via
+  // `PUT /api/pages/:id`, hard delete). The partial composite index added
+  // in Phase 3 lets Postgres resolve this from the index alone, keeping the
+  // cost negligible.
   const pagesSignalRows = await db
     .select({
       // drizzle の `sql<Date | null>\`...\`` は型ヒントだけで、raw SQL 集約 (typed

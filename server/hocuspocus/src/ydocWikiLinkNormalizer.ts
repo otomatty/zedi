@@ -1,23 +1,49 @@
 /**
  * Y.Doc 上の未 mark な `[[Title]]` プレーンテキストを `wikiLink` mark へ昇格させる
- * 純粋なヘルパー。`server/api/src/services/ydocWikiLinkNormalizer.ts` と意図的に
- * 同等のロジックを複製している（CLAUDE.md / AGENTS.md にあるとおり Hocuspocus
- * パッケージは独立した Bun build context のため共有 import 不可）。
+ * 純粋なヘルパー。
+ *
+ * Issue #889 Phase 4 で `local` コラボレーションモードと
+ * `GET/PUT /api/pages/:id/content` 経路を廃止した結果、Y.Doc バイト列に対する
+ * 正規化を行う必要があるのは Hocuspocus 側のみとなった。これに伴い、かつて
+ * 同一ロジックを保持していた API 側の `ydocWikiLinkNormalizer` および
+ * クライアント側の drift 検出テストは削除されている。
  *
  * Pure helper that promotes unmarked `[[Title]]` plain text inside a Y.Doc to
- * `wikiLink` marks. Intentionally mirrors
- * `server/api/src/services/ydocWikiLinkNormalizer.ts`; the Hocuspocus server
- * runs in its own Bun build context (Railway) and cannot import from
- * `server/api`. The drift detector at
- * `src/lib/ydocWikiLinkNormalizerSync.test.ts` fails CI if the body diverges.
+ * `wikiLink` marks.
  *
- * ⚠️ 変更時は `server/api/src/services/ydocWikiLinkNormalizer.ts` も合わせて
- *    更新すること（先頭 docblock 以外はバイト等価で同期される前提）。
- *    Keep this byte-equivalent (below the leading docblock) with the
- *    api-side copy whenever it changes.
+ * Issue #889 Phase 4 retired the `local` collaboration mode and the
+ * `GET/PUT /api/pages/:id/content` REST routes, so Y.Doc byte-stream
+ * normalization is only required on the Hocuspocus side. The previous API-side
+ * copy and the client-side drift detector have been removed accordingly.
  *
- * 詳細な設計方針 / スキップ条件 / 冪等性については API 側の同名ファイルを参照。
- * See the api-side copy for design notes, skip rules, and idempotency.
+ * 設計方針 / Design notes:
+ * - `Y.XmlText.format(index, length, attrs)` のみを使い、テキストの内容や位置を
+ *   変更しない。並走している他クライアントの編集と衝突しても、Yjs の CRDT
+ *   セマンティクスで安全にマージされる。
+ * - 適用は単一の `doc.transact` にまとめ、observer 通知を 1 回に集約する。
+ *   Hocuspocus の保存 / グラフ同期はこの単一更新に反応する。
+ * - スキップ条件:
+ *     1. 既に `wikiLink` 属性を持つセグメント（再 mark 抑止）。
+ *     2. `code` 属性を持つセグメント（インラインコード）。
+ *     3. `codeBlock` / `code_block` / `executableCodeBlock` 配下のテキスト全体。
+ *     4. 空タイトル `[[   ]]`。
+ * - 既存の他 mark（`bold` 等）は `format` の上書き挙動で温存される。Yjs の
+ *   `format` は新しい attribute だけを差分適用するため、Quill の retain と
+ *   同等のセマンティクス。
+ *
+ * - Mutates only via `Y.XmlText.format(index, length, attrs)`; text content
+ *   and absolute positions are untouched. Concurrent edits on other clients
+ *   merge cleanly under Yjs's CRDT semantics.
+ * - All formatting changes are batched into a single `doc.transact` so
+ *   observers (e.g. Hocuspocus persistence, link graph rebuild) wake up once.
+ * - Skip rules:
+ *     1. Segments already carrying a `wikiLink` mark (no double-marking).
+ *     2. Segments inside an inline `code` mark.
+ *     3. Text inside `codeBlock` / `code_block` / `executableCodeBlock`.
+ *     4. Empty titles like `[[   ]]`.
+ * - Other marks (e.g. `bold`) are preserved because `Y.XmlText.format` only
+ *   touches the attributes it receives — analogous to a Quill `retain` with
+ *   attributes.
  */
 
 import * as Y from "yjs";

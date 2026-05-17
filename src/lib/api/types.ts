@@ -104,23 +104,6 @@ export interface PostSyncPagesResponse {
   conflicts: Array<{ id: string; server_updated_at: string }>;
 }
 
-/** GET /api/pages/:id/content response. */
-export interface PageContentResponse {
-  ydoc_state: string; // base64
-  version: number;
-  content_text?: string | null;
-  updated_at?: string;
-}
-
-/** PUT /api/pages/:id/content body. */
-export interface PutPageContentBody {
-  ydoc_state: string; // base64
-  content_text?: string;
-  content_preview?: string;
-  title?: string;
-  expected_version?: number;
-}
-
 /**
  * `PUT /api/pages/:id` ボディ。タイトル等のメタデータだけを更新する。
  * Y.Doc バイト列は Hocuspocus 経由で扱うため含めない。

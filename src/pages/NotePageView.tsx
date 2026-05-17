@@ -28,7 +28,6 @@ import {
   useNoteApi,
   useRemovePageFromNote,
 } from "@/hooks/useNoteQueries";
-import { useUpdatePage } from "@/hooks/usePageQueries";
 import { useAuth } from "@/hooks/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
@@ -170,7 +169,7 @@ function NotePageEditorEditable({
    * 親が削除成功時に呼ぶ「保留中タイトル保存のキャンセル」を流す ref。
    * 削除直後の navigate で `NotePageEditorEditable` がアンマウントされる際、
    * 既存の cleanup が pending title を flush して既に消したページに対して
-   * `putPageContent` を発火する競合 (Codex P2) を抑止する。
+   * `updatePageMetadata` を発火する競合 (Codex P2) を抑止する。
    *
    * Mutable ref the parent calls in the delete-success path to cancel any
    * debounced title save before navigation. Without this, the unmount
@@ -187,7 +186,6 @@ function NotePageEditorEditable({
   const noteWorkspace = useNoteWorkspaceOptional();
   const workspaceRoot = noteWorkspace?.workspaceRoot ?? null;
   const editorInsertRef = useRef<((content: unknown) => boolean) | null>(null);
-  const updatePageMutation = useUpdatePage();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -272,32 +270,24 @@ function NotePageEditorEditable({
   persistTitleRef.current = async (nextTitle: string) => {
     const previousTitle = lastSavedTitleRef.current;
     try {
-      if (page.noteId !== null) {
-        const current = await api.getPageContent(page.id);
-        if (suppressTitleSaveEffectsRef.current) return;
-        await api.putPageContent(page.id, {
-          ydoc_state: current.ydoc_state,
-          content_text: current.content_text ?? undefined,
-          expected_version: current.version,
-          title: nextTitle,
-        });
-      } else {
-        await updatePageMutation.mutateAsync({
-          pageId: page.id,
-          updates: { title: nextTitle },
-        });
-      }
+      // Issue #889 Phase 4: 旧来の `getPageContent` + `putPageContent` 経由のタイトル
+      // 更新は撤廃し、Y.Doc バイト列を介さない `PUT /api/pages/:id` (metadata only)
+      // に一本化する。`local` モード廃止に伴い、すべてのページは note 配下にあり
+      // `updatePageMetadata` が単一の正規 REST 経路。
+      // Issue #889 Phase 4: drop the legacy `getPageContent` + `putPageContent`
+      // round-trip and rename via `PUT /api/pages/:id` (metadata only). Every
+      // page now belongs to a note, so `updatePageMetadata` is the single
+      // canonical REST entry point for title saves.
+      await api.updatePageMetadata(page.id, { title: nextTitle });
       // 削除完了後はキャッシュ無効化も lastSaved 更新もスキップする。
       // After cancel (delete path), skip cache invalidation and lastSaved update —
       // `useRemovePageFromNote` has already invalidated note caches.
       if (suppressTitleSaveEffectsRef.current) return;
       lastSavedTitleRef.current = nextTitle;
-      // `useUpdatePage` updates `pageKeys.*` caches, but the note page list and
-      // detail are held under `noteKeys.*`. Invalidate those so the new title
-      // propagates to the note view and sidebar.
-      // `useUpdatePage` は `pageKeys.*` を更新するが、ノート側のキャッシュは
-      // `noteKeys.*` にあるため、タイトル変更をノート表示やサイドバーに反映
-      // させるには明示的に無効化する必要がある。
+      // ノート側のキャッシュは `noteKeys.*` 配下にあるため、タイトル変更を
+      // ノート表示やサイドバーに反映させるために明示的に無効化する。
+      // The note view and sidebar pull from `noteKeys.*`, so invalidate those
+      // explicitly to propagate the rename.
       queryClient.invalidateQueries({ queryKey: noteKeys.page(noteId, page.id) });
       queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(noteId) });
     } catch (error) {
@@ -812,7 +802,7 @@ const NotePageView: React.FC = () => {
   // delete-success navigation. The editable child writes its own cancel
   // function into this ref while mounted (cleared on unmount); the parent
   // invokes it inside `onSuccess` so the about-to-unmount cleanup no longer
-  // fires a `putPageContent` against the page we just removed. Codex P2
+  // fires a `updatePageMetadata` against the page we just removed. Codex P2
   // review on PR #891.
   const cancelPendingTitleSaveRef = useRef<(() => void) | null>(null);
 
@@ -873,7 +863,7 @@ const NotePageView: React.FC = () => {
           setDeleteConfirmOpen(false);
           // navigate でアンマウントされる前に、編集中の保留タイトル保存を破棄する。
           // 既存の cleanup が pending を flush すると、消したばかりのページに
-          // `putPageContent` が飛んで保存失敗トーストが出てしまう (Codex P2)。
+          // `updatePageMetadata` が飛んで保存失敗トーストが出てしまう (Codex P2)。
           //
           // Cancel any debounced title save before navigation so the editable
           // child's unmount cleanup does not flush against the just-removed

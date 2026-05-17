@@ -28,8 +28,13 @@ const {
   mockToast: vi.fn(),
   mockUpdatePageMutateAsync: vi.fn().mockResolvedValue({ skipped: false }),
   mockApi: {
-    getPageContent: vi.fn(),
-    putPageContent: vi.fn(),
+    // Issue #889 Phase 4: タイトル保存は `PUT /api/pages/:id`
+    // (`updatePageMetadata`) に統一されたため、旧 `getPageContent` /
+    // `putPageContent` のモックは撤去している。
+    // Issue #889 Phase 4: title saves now go through
+    // `PUT /api/pages/:id` (`updatePageMetadata`) exclusively, so the legacy
+    // `getPageContent` / `putPageContent` mocks have been removed.
+    updatePageMetadata: vi.fn(),
   },
   mockSetPageContext: vi.fn(),
   mockExportMarkdown: vi.fn(),
@@ -315,8 +320,7 @@ describe("NotePageView", () => {
     mockSetPageContext.mockReset();
     mockNavigate.mockReset();
     mockUpdatePageMutateAsync.mockResolvedValue({ skipped: false });
-    mockApi.getPageContent.mockReset();
-    mockApi.putPageContent.mockReset();
+    mockApi.updatePageMetadata.mockReset();
     mockExportMarkdown.mockReset();
     mockCopyMarkdown.mockReset().mockResolvedValue(undefined);
     mockRemoveFromNoteMutate.mockReset();
@@ -714,28 +718,31 @@ describe("NotePageView", () => {
       expect(modal).toHaveAttribute("data-page-id", "page-1");
     });
 
-    // Codex P2 review on PR #891: 削除成功直後の navigate でアンマウント flush が
-    // 走ると、保留中のタイトル保存が「もう存在しないページ」に対する
-    // `putPageContent` を撃ってしまい spurious な failed-toast が出る。
-    // `change-title` で debounce 中のタイトルを作った状態で削除を成功させ、
-    // `mockApi.putPageContent` が呼ばれていないことで cancel hook の効果を検証する。
+    // Codex P2 review on PR #891 + Issue #889 Phase 4: 削除成功直後の navigate で
+    // アンマウント flush が走ると、保留中のタイトル保存が「もう存在しない
+    // ページ」に対する `updatePageMetadata` を撃ってしまい spurious な
+    // failed-toast が出る。`change-title` で debounce 中のタイトルを作った状態で
+    // 削除を成功させ、`mockApi.updatePageMetadata` が呼ばれていないことで
+    // cancel hook の効果を検証する。
     //
-    // Pin the cancel-pending-title-save behavior added for Codex P2. We prime
-    // a pending debounced title change, then confirm a successful delete; the
-    // editable child's unmount flush must be neutered before navigation so
-    // `putPageContent` is never invoked against the just-removed page.
+    // Pin the cancel-pending-title-save behavior added for Codex P2 (now
+    // exercising the Phase 4 `updatePageMetadata` path). We prime a pending
+    // debounced title change, then confirm a successful delete; the editable
+    // child's unmount flush must be neutered before navigation so
+    // `updatePageMetadata` is never invoked against the just-removed page.
     it("削除成功時に保留中のタイトル保存をキャンセルする / cancels pending title save before delete-success navigation", async () => {
       setupEditableRender();
-      // 漏れた unmount-flush が `putPageContent` まで到達できるよう、
-      // `getPageContent` も成功させておく。
-      // Make `getPageContent` succeed so a leaked unmount-flush would reach
-      // `putPageContent` — the assertions below check both entry points.
-      mockApi.getPageContent.mockResolvedValue({
-        ydoc_state: "AQ==",
-        version: 3,
-        content_text: "body",
+      // 漏れた unmount-flush が `updatePageMetadata` まで到達したケースを検出
+      // できるように、応答も用意しておく。
+      // Wire up a resolved response so any leaked unmount-flush would actually
+      // reach `updatePageMetadata` — the assertion below depends on this never
+      // firing.
+      mockApi.updatePageMetadata.mockResolvedValue({
+        id: "page-1",
+        title: "Edited title",
+        content_preview: null,
+        updated_at: "2026-05-17T00:00:00Z",
       });
-      mockApi.putPageContent.mockResolvedValue({ version: 4 });
       mockRemoveFromNoteMutate.mockImplementation((_args, options) => {
         options?.onSuccess?.();
       });
@@ -769,13 +776,12 @@ describe("NotePageView", () => {
       vi.useRealTimers();
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      // タイトル保存経路の最初のサーバ呼び出しが getPageContent。これが呼ばれて
+      // タイトル保存経路は `updatePageMetadata` 一発のみ。これが呼ばれて
       // いなければ pendingTitleRef は確実に null 化されている。
-      // `getPageContent` is the first server call in the title-save flush
-      // path; asserting it never fires guarantees the cancel hook neutered
+      // The Phase 4 title-save flush issues a single `updatePageMetadata`
+      // call; asserting it never fires guarantees the cancel hook neutered
       // the pending state before unmount.
-      expect(mockApi.getPageContent).not.toHaveBeenCalled();
-      expect(mockApi.putPageContent).not.toHaveBeenCalled();
+      expect(mockApi.updatePageMetadata).not.toHaveBeenCalled();
       // unmount-flush が走らなければ `errors.titleSaveFailedTitle` の
       // destructive トーストも当然出ない。
       // No spurious title-save-failed toast either.
@@ -784,8 +790,8 @@ describe("NotePageView", () => {
       );
     });
 
-    // CodeRabbit major review on PR #891: debounce が既に発火して
-    // `persistTitleRef.current()` が `getPageContent`/`putPageContent` を await
+    // CodeRabbit major review on PR #891 + Issue #889 Phase 4: debounce が既に
+    // 発火して `persistTitleRef.current()` が `updatePageMetadata` を await
     // している最中に削除が成功すると、後から in-flight save が「ページが既に
     // 存在しない」エラーを返し、削除成功の直後に `errors.titleSaveFailedTitle`
     // の destructive トーストが出てしまう。`suppressTitleSaveEffectsRef` が
@@ -793,16 +799,11 @@ describe("NotePageView", () => {
     //
     // Regression test for the in-flight title-save suppression. When the
     // debounce has already fired and the save is mid-await, the cancel hook
-    // raises a suppress flag so the rejected `putPageContent` does not toast
-    // `errors.titleSaveFailedTitle` after the delete has navigated away.
+    // raises a suppress flag so the rejected `updatePageMetadata` does not
+    // toast `errors.titleSaveFailedTitle` after the delete has navigated away.
     it("削除成功時に進行中のタイトル保存失敗のトーストを抑止する / suppresses in-flight title-save failure toast after delete success", async () => {
       setupEditableRender();
-      mockApi.getPageContent.mockResolvedValue({
-        ydoc_state: "AQ==",
-        version: 3,
-        content_text: "body",
-      });
-      // `putPageContent` 呼び出し時に毎回 fresh な保留 promise を返すよう
+      // `updatePageMetadata` 呼び出し時に毎回 fresh な保留 promise を返すよう
       // `mockImplementation` を使う。`mockReturnValue` で一度作る方式だと
       // `rejectPut` の捕捉が呼び出しタイミングと無関係に進んで「テストが本当に
       // in-flight 経路を踏んだか」を保証しにくい (CodeRabbit major)。
@@ -812,7 +813,7 @@ describe("NotePageView", () => {
       // `mockReturnValue` makes it harder to prove the test actually reached
       // the in-flight path before we reject. CodeRabbit major review.
       let rejectPut: (err: Error) => void = () => undefined;
-      mockApi.putPageContent.mockImplementation(
+      mockApi.updatePageMetadata.mockImplementation(
         () =>
           new Promise((_, reject) => {
             rejectPut = reject;
@@ -825,29 +826,28 @@ describe("NotePageView", () => {
       const { unmount } = renderNotePageView();
 
       // タイトルを編集して debounce timer を仕掛け、500ms 経過させて save を発火。
-      // `getPageContent` は解決済み、`putPageContent` は保留 = in-flight save。
+      // `updatePageMetadata` は保留 = in-flight save。
       // Stage a title change, flush the debounce so the save enters its
-      // awaiting state — `getPageContent` resolves, `putPageContent` is left
-      // pending so the save is genuinely mid-flight.
+      // awaiting state — `updatePageMetadata` is left pending so the save is
+      // genuinely mid-flight.
       fireEvent.click(screen.getByText("change-title"));
       await vi.advanceTimersByTimeAsync(500);
 
-      // save が `putPageContent` まで進んでいることを明示的に確認する。ここを
-      // 通らない限り `rejectPut(...)` は no-op になり、最終アサートが理由で
-      // 通ったように見えてしまう (CodeRabbit major)。`vi.waitFor` は実時間で
-      // ポーリングするので real timers に切り替えてから呼ぶ。
+      // save が `updatePageMetadata` まで進んでいることを明示的に確認する。
+      // ここを通らない限り `rejectPut(...)` は no-op になり、最終アサートが
+      // 理由で通ったように見えてしまう (CodeRabbit major)。`vi.waitFor` は
+      // 実時間でポーリングするので real timers に切り替えてから呼ぶ。
       // Pin that the save actually entered the in-flight path before we
       // trigger delete; otherwise `rejectPut(...)` is a no-op and the final
       // assertion passes for the wrong reason. `vi.waitFor` polls in real
       // time so flip to real timers first.
       vi.useRealTimers();
       await vi.waitFor(() => {
-        expect(mockApi.getPageContent).toHaveBeenCalledTimes(1);
-        expect(mockApi.putPageContent).toHaveBeenCalledTimes(1);
+        expect(mockApi.updatePageMetadata).toHaveBeenCalledTimes(1);
       });
 
       // この時点で in-flight。削除を発火する。
-      // Trigger delete while the save is still awaiting `putPageContent`.
+      // Trigger delete while the save is still awaiting `updatePageMetadata`.
       fireEvent.click(screen.getByText("editor.pageMenu.deletePage"));
       fireEvent.click(screen.getByTestId("confirm-delete"));
 
@@ -855,8 +855,8 @@ describe("NotePageView", () => {
       // Simulate the post-navigate unmount.
       unmount();
 
-      // 削除済みページ側の `putPageContent` を 404 相当で決着させる。
-      // Resolve the deferred `putPageContent` with the "deleted" error.
+      // 削除済みページ側の `updatePageMetadata` を 404 相当で決着させる。
+      // Resolve the deferred `updatePageMetadata` with the "deleted" error.
       rejectPut(new Error("page not found"));
       await new Promise((resolve) => setTimeout(resolve, 0));
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -1044,7 +1044,7 @@ describe("NotePageView", () => {
     expect(copyItem).toBeDisabled();
   });
 
-  it("saves note-native page titles through the page-content API for note editors", async () => {
+  it("saves note-native page titles through the metadata API for note editors", async () => {
     vi.mocked(useNote).mockReturnValue({
       note: { id: "note-1" },
       access: { canView: true, canEdit: true },
@@ -1061,12 +1061,12 @@ describe("NotePageView", () => {
       },
       isLoading: false,
     } as never);
-    mockApi.getPageContent.mockResolvedValue({
-      ydoc_state: "AQ==",
-      version: 3,
-      content_text: "body",
+    mockApi.updatePageMetadata.mockResolvedValue({
+      id: "page-1",
+      title: "Edited title",
+      content_preview: null,
+      updated_at: "2026-05-17T00:00:00Z",
     });
-    mockApi.putPageContent.mockResolvedValue({ version: 4 });
 
     renderNotePageView();
     fireEvent.click(screen.getByText("change-title"));
@@ -1074,11 +1074,14 @@ describe("NotePageView", () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(mockApi.putPageContent).toHaveBeenCalledTimes(1);
-    expect(mockApi.putPageContent).toHaveBeenCalledWith("page-1", {
-      ydoc_state: "AQ==",
-      content_text: "body",
-      expected_version: 3,
+    // Issue #889 Phase 4: タイトル保存は Y.Doc を介さず、`PUT /api/pages/:id`
+    // (`updatePageMetadata`) ひとつだけが発火する。旧 `getPageContent` +
+    // `putPageContent` の 2 段経路は廃止されている。
+    // Issue #889 Phase 4: title saves now fire a single `updatePageMetadata`
+    // call instead of the legacy `getPageContent` + `putPageContent`
+    // round-trip.
+    expect(mockApi.updatePageMetadata).toHaveBeenCalledTimes(1);
+    expect(mockApi.updatePageMetadata).toHaveBeenCalledWith("page-1", {
       title: "Edited title",
     });
     expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
@@ -1102,12 +1105,7 @@ describe("NotePageView", () => {
       },
       isLoading: false,
     } as never);
-    mockApi.getPageContent.mockResolvedValue({
-      ydoc_state: "AQ==",
-      version: 3,
-      content_text: "body",
-    });
-    mockApi.putPageContent.mockRejectedValue(new Error("save failed"));
+    mockApi.updatePageMetadata.mockRejectedValue(new Error("save failed"));
 
     renderNotePageView();
     fireEvent.click(screen.getByText("change-title"));
@@ -1152,7 +1150,7 @@ describe("NotePageView", () => {
     await Promise.resolve();
 
     expect(screen.getByTestId("page-title")).toHaveTextContent("Original title");
-    expect(mockApi.putPageContent).not.toHaveBeenCalled();
+    expect(mockApi.updatePageMetadata).not.toHaveBeenCalled();
     expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
   });
 
@@ -1188,7 +1186,7 @@ describe("NotePageView", () => {
     expect(screen.getByTestId("note-public-view")).toBeInTheDocument();
     expect(screen.queryByTestId("page-editor")).not.toBeInTheDocument();
     expect(screen.queryByText("change-title")).not.toBeInTheDocument();
-    expect(mockApi.putPageContent).not.toHaveBeenCalled();
+    expect(mockApi.updatePageMetadata).not.toHaveBeenCalled();
     expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
   });
 
