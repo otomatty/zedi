@@ -3,7 +3,7 @@ import { Copy, Download, History, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { PageEditorHeader, type PageDetailToolbarAction } from "./PageEditorHeader";
 import { PageEditorAlerts } from "./PageEditorAlerts";
-import { PageEditorContent } from "./PageEditorContent";
+import { PageEditorContent } from "@/components/note/PageEditorContent";
 import { PageEditorDialogs } from "./PageEditorDialogs";
 import { ContentWithAIChat } from "../../ai-chat/ContentWithAIChat";
 import { PageHistoryModal } from "../pageHistory/PageHistoryModal";

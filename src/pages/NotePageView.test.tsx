@@ -119,7 +119,7 @@ vi.mock("@/components/layout/Container", () => ({
   ),
 }));
 
-vi.mock("@/components/editor/PageEditor/PageEditorContent", () => ({
+vi.mock("@/components/note/PageEditorContent", () => ({
   PageEditorContent: ({
     title,
     onTitleChange,
@@ -133,6 +133,16 @@ vi.mock("@/components/editor/PageEditor/PageEditorContent", () => ({
         change-title
       </button>
     </div>
+  ),
+}));
+
+// 読み取り専用分岐 (`!canEdit`) は `NotePagePublicView` に委譲される。
+// 内部実装をここで描画する必要はないので test 用 stub に差し替える。
+// The `!canEdit` branch delegates to `NotePagePublicView`. Stub it so the
+// branch test only asserts the delegation, not the inner rendering.
+vi.mock("@/components/note/NotePagePublicView", () => ({
+  NotePagePublicView: ({ pageId }: { pageId: string }) => (
+    <div data-testid="note-public-view" data-page-id={pageId} />
   ),
 }));
 
@@ -392,6 +402,37 @@ describe("NotePageView", () => {
     expect(screen.getByTestId("page-editor")).toBeInTheDocument();
   });
 
+  // Issue #889 Phase 2: 非編集者には Y.Doc を一切張らない `NotePagePublicView` に委譲する。
+  // Issue #889 Phase 2: Non-editors are delegated to `NotePagePublicView`, which
+  // never opens a Y.Doc / WebSocket session.
+  it("非編集者には NotePagePublicView を描画する / delegates the read-only branch to NotePagePublicView", () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: false },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Read only",
+        content: "{}",
+        ownerUserId: "user-other",
+        noteId: "note-1",
+      },
+      isLoading: false,
+    } as never);
+
+    renderNotePageView();
+
+    const publicView = screen.getByTestId("note-public-view");
+    expect(publicView).toBeInTheDocument();
+    expect(publicView).toHaveAttribute("data-page-id", "page-1");
+    // 編集パスの `PageEditorContent` は描画されないこと。
+    // The editable-path `PageEditorContent` must not be rendered.
+    expect(screen.queryByTestId("page-editor")).not.toBeInTheDocument();
+  });
+
   it("saves note-native page titles through the page-content API for note editors", async () => {
     vi.mocked(useNote).mockReturnValue({
       note: { id: "note-1" },
@@ -523,12 +564,19 @@ describe("NotePageView", () => {
     } as never);
 
     renderNotePageView();
-    fireEvent.click(screen.getByText("change-title"));
     vi.advanceTimersByTime(500);
     await Promise.resolve();
 
+    // Issue #889 Phase 2: 非編集者には NotePagePublicView を描画する。
+    // 編集可能な PageEditorContent (`page-editor` / `change-title` ボタンを持つ)
+    // は mount されないため、タイトル編集や save 経路には決して到達しない。
+    // Issue #889 Phase 2: Non-editors render `NotePagePublicView` instead of the
+    // editable `PageEditorContent`, so the title-edit button never mounts and
+    // the save paths are unreachable by construction.
     expect(screen.getByText("閲覧専用")).toBeInTheDocument();
-    expect(screen.getByTestId("page-title")).toHaveTextContent("Original title");
+    expect(screen.getByTestId("note-public-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("page-editor")).not.toBeInTheDocument();
+    expect(screen.queryByText("change-title")).not.toBeInTheDocument();
     expect(mockApi.putPageContent).not.toHaveBeenCalled();
     expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
   });

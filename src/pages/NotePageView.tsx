@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Download } from "lucide-react";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
-import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
+import { PageEditorContent } from "@/components/note/PageEditorContent";
+import { NotePagePublicView } from "@/components/note/NotePagePublicView";
 import {
   PageEditorHeader,
   type PageDetailToolbarAction,
@@ -455,21 +456,7 @@ const NotePageView: React.FC = () => {
           ) : (
             <>
               {toolbar}
-              <PageEditorContent
-                content={page?.content ?? ""}
-                title={page.title}
-                sourceUrl={page.sourceUrl}
-                currentPageId={page.id}
-                pageId={page.id}
-                isNewPage={false}
-                isWikiGenerating={false}
-                isReadOnly={true}
-                showLinkedPages={false}
-                showToolbar={false}
-                onContentChange={() => undefined}
-                onContentError={() => undefined}
-                pageNoteId={page.noteId ?? null}
-              />
+              <NotePagePublicView pageId={page.id} page={page} />
             </>
           )}
         </NoteWorkspaceProvider>
