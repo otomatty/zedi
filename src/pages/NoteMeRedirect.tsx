@@ -1,5 +1,6 @@
 import React from "react";
 import { Navigate, useLocation, useSearchParams } from "react-router-dom";
+import { Skeleton } from "@zedi/ui";
 import Container from "@/components/layout/Container";
 import { PageGridSkeleton } from "@/components/page/PageGrid";
 import { useContainerColumns } from "@/hooks/useContainerColumns";
@@ -72,17 +73,25 @@ const NoteMeRedirect: React.FC = () => {
   }
 
   if (isLoading) {
-    // 旧実装の独自 3 カラムスケルトンは、リダイレクト先 `NoteView` の `PageGrid`
-    // が出すスケルトンと見た目がズレて視覚的なジャンプが発生していたため、
-    // 同じ `PageGridSkeleton` を先行表示してジャンプを抑える。
-    // The previous bespoke 3-column skeleton diverged from the `PageGridSkeleton`
-    // rendered by the destination `NoteView`, causing a visible jump after
-    // redirect. Render the same skeleton here so the transition is seamless.
+    // リダイレクト先 `NoteView` は `Container` 内に「タイトル行 → ページグリッド」の
+    // 縦並びを描画するため、解決中も同じ縦リズム（タイトル相当の高さ + `space-y-4`
+    // による mt-4 相当のギャップ）を確保した上で、`PageGrid` 本体と同じ
+    // `PageGridSkeleton` を表示する。これにより `NoteView` 遷移時にグリッドが
+    // 上下にずれるレイアウトジャンプを抑える（PR #898 gemini-code-assist review）。
+    //
+    // `NoteView` lays out a title row above the page grid inside the same
+    // `Container`, so the skeleton mirrors that rhythm: a title-shaped
+    // `Skeleton` plus `space-y-4` (≈ the `mt-4` gap above the grid) keeps the
+    // skeleton grid aligned with the eventual grid, eliminating the vertical
+    // jump observed after redirect (raised by gemini-code-assist on PR #898).
     return (
       <div className="min-h-0 flex-1 py-6">
         <Container>
-          <div ref={columnsRef}>
-            <PageGridSkeleton columns={columns} />
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-48" />
+            <div ref={columnsRef}>
+              <PageGridSkeleton columns={columns} />
+            </div>
           </div>
         </Container>
       </div>
