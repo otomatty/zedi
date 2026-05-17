@@ -257,7 +257,10 @@ function PromoteToWikiDialogBody({
       };
       toast({ title: t("aiChat.notifications.promoteSuccess") });
       onClose();
-      navigate(`/pages/${firstCreated.id}`, {
+      // Issue #889 Phase 3: `/pages/:id` 撤去のため `/notes/:noteId/:pageId` に遷移。
+      // Issue #889 Phase 3: route to `/notes/:noteId/:pageId` after `/pages/:id`
+      // was retired.
+      navigate(`/notes/${firstCreated.noteId}/${firstCreated.id}`, {
         state: { pendingChatPageGeneration: pending },
       });
     } catch {

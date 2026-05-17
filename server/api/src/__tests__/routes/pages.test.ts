@@ -454,9 +454,18 @@ describe("POST /api/pages", () => {
 
     expect(res.status).toBe(201);
     expect(ensureDefaultNote).toHaveBeenCalledTimes(1);
-    const body = (await res.json()) as { id: string; owner_id: string };
+    const body = (await res.json()) as {
+      id: string;
+      owner_id: string;
+      note_id: string;
+    };
     expect(body.id).toBe("new-page-id");
     expect(body.owner_id).toBe(TEST_USER_ID);
+    // Issue #889 Phase 3: クライアントが `/notes/:noteId/:pageId` へ遷移するため
+    // POST レスポンスに `note_id` が含まれる必要がある。
+    // Issue #889 Phase 3: clients navigate to `/notes/:noteId/:pageId`, so the
+    // POST response must carry `note_id`.
+    expect(body.note_id).toBe("default-note-mock");
   });
 
   it("returns 403 when note_id points to a note the caller cannot edit", async () => {

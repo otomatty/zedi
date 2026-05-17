@@ -6,9 +6,18 @@ import type { Page, PageSummary } from "@/types/page";
 
 /**
  * Card data for linked pages display
+ *
+ * `noteId` は遷移先 URL `/notes/:noteId/:pageId` を組み立てるために必要
+ * （Issue #889 Phase 3 で `/pages/:id` ルートを撤去）。Issue #823 / #825 以降
+ * 全ページは所属ノートを必ず 1 つ持つので non-null。
+ *
+ * `noteId` is required to build the `/notes/:noteId/:pageId` URL (Issue #889
+ * Phase 3 retired `/pages/:id`). Non-null since every page belongs to exactly
+ * one note (Issues #823 / #825).
  */
 export interface PageCard {
   id: string;
+  noteId: string;
   title: string;
   preview: string; // Content preview (50 chars)
   updatedAt: number;
@@ -62,6 +71,7 @@ export interface CalculateLinkedPagesOptimizedInput {
 export function pageToCard(page: Page): PageCard {
   return {
     id: page.id,
+    noteId: page.noteId,
     title: page.title,
     preview: getContentPreview(page.content, 50),
     updatedAt: page.updatedAt,
@@ -75,6 +85,7 @@ export function pageToCard(page: Page): PageCard {
 export function summaryToCard(summary: PageSummary): PageCard {
   return {
     id: summary.id,
+    noteId: summary.noteId,
     title: summary.title,
     preview: "", // No content available in summary
     updatedAt: summary.updatedAt,

@@ -1,8 +1,12 @@
 /**
  * CollaborationManager
- * Y.jsドキュメントの管理、IndexedDB永続化を担当。
- * mode='local': 個人ページ。y-indexeddb + REST API で Y.Doc を同期。WebSocket なし。
- * mode='collaborative': 共有ノート内ページ。Hocuspocus WebSocket 経由でリアルタイム同期。
+ * Y.js ドキュメントの IndexedDB 永続化と Hocuspocus WebSocket 同期を担当する。
+ * Issue #889 Phase 3 で `local` 専用の REST 経由 Y.Doc 保存経路は廃止された。
+ * 全ページは所属ノートを持ち、Hocuspocus でリアルタイム同期される。
+ *
+ * Manages Y.js IndexedDB persistence and Hocuspocus WebSocket sync.
+ * Issue #889 Phase 3 retired the legacy `local` REST sync path: every page
+ * now belongs to a note and syncs through Hocuspocus.
  */
 
 import * as Y from "yjs";
@@ -11,28 +15,6 @@ import { IndexeddbPersistence } from "y-indexeddb";
 import { Awareness } from "y-protocols/awareness";
 import type { UserPresence, ConnectionStatus, CollaborationState } from "./types";
 import { getUserColor } from "./types";
-import { extractPlainTextFromYXmlFragment } from "./plainTextFromYXmlFragment";
-
-/**
- * コラボレーションの動作モード。
- * Collaboration operating mode: local (personal pages) or collaborative (shared notes).
- */
-export type CollaborationManagerMode = "local" | "collaborative";
-
-/** Debounce timer for saving Y.Doc to API in local mode. */
-const API_SAVE_DEBOUNCE_MS = 2000;
-
-/** 二重化検知: マージ後テキストがこの倍率を超えて増加したら二重化とみなす */
-const DUPLICATION_RATIO_THRESHOLD = 1.5;
-
-/** ブラウザの keepalive ペイロード制限（64 KiB）より少し小さい安全な上限（バイト） */
-const KEEPALIVE_PAYLOAD_LIMIT = 63 * 1024;
-
-/**
- * ページ一覧用プレビューの最大文字数。
- * Maximum character length for page list content preview.
- */
-const CONTENT_PREVIEW_MAX_LENGTH = 120;
 
 /**
  * Y.js ドキュメントの管理・永続化・リアルタイム同期を担当するマネージャー。
@@ -46,19 +28,9 @@ export class CollaborationManager {
   private pageId: string;
   private userId: string;
   private userName: string;
-  private readonly mode: CollaborationManagerMode;
   private listeners: Set<(state: CollaborationState) => void> = new Set();
   private state: CollaborationState;
   private destroyed = false;
-  /** Timer for debounced API save (local mode only). */
-  private apiSaveTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Whether initial API fetch has completed (local mode). */
-  private apiFetched = false;
-  /**
-   * ページタイトル。saveToApi 時に PUT リクエストに含めてサーバーに同期する。
-   * Page title included in PUT requests to keep the server in sync.
-   */
-  private pageTitle: string | null = null;
 
   /**
    * 新しい CollaborationManager を作成する。
@@ -69,12 +41,10 @@ export class CollaborationManager {
     userId: string,
     userName: string,
     private getAuthToken: () => Promise<string | null>,
-    options?: { mode?: CollaborationManagerMode },
   ) {
     this.pageId = pageId;
     this.userId = userId;
     this.userName = userName;
-    this.mode = options?.mode ?? "local";
 
     this.ydoc = new Y.Doc();
 
@@ -86,219 +56,18 @@ export class CollaborationManager {
     };
 
     // IndexedDB 永続化（常時有効）
+    // Always-on IndexedDB persistence; WebSocket sync starts after local load.
     this.idbProvider = new IndexeddbPersistence(`zedi-doc-${pageId}`, this.ydoc);
 
     this.idbProvider.on("synced", () => {
-      if (this.mode === "local") {
-        // 個人ページ: IndexedDB synced 後に API から最新 Y.Doc を fetch してマージ
-        this.fetchAndMergeFromApi();
-      } else {
-        this.connectWebSocket();
-      }
+      this.connectWebSocket();
     });
-  }
-
-  /**
-   * API リクエスト用の origin。`VITE_API_BASE_URL` の末尾スラッシュ（複数可）を除去し、URL 連結時の二重スラッシュを防ぐ。
-   * Resolves API origin from env, stripping one or more trailing slashes to avoid `//api` in URLs.
-   */
-  private getApiOrigin(): string {
-    const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
-    const baseUrl = rawBaseUrl.replace(/\/+$/, "");
-    return baseUrl || (typeof window !== "undefined" ? window.location.origin : "");
-  }
-
-  /**
-   * Y.js エンコード済みステートを Base64 文字列に変換する（大きなペイロードはチャンク処理）。
-   * Encodes a Y.js state update to Base64 (chunked for large payloads).
-   */
-  private encodeStateUpdateToBase64(state: Uint8Array): string {
-    let b64 = "";
-    const chunkSize = 8192;
-    for (let i = 0; i < state.length; i += chunkSize) {
-      b64 += String.fromCharCode(...state.subarray(i, i + chunkSize));
-    }
-    return btoa(b64);
-  }
-
-  /**
-   * REST API から Y.Doc を取得してローカル Y.Doc にマージする（local モード用）。
-   * マージ後、Y.Doc の変更監視を開始する。
-   */
-  private async fetchAndMergeFromApi(): Promise<void> {
-    try {
-      if (this.destroyed) return;
-
-      const origin = this.getApiOrigin();
-      const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
-
-      const beforeText = this.getPlainText();
-
-      const res = await fetch(url, {
-        credentials: "include",
-      });
-
-      if (this.destroyed) return;
-
-      if (res.ok) {
-        const data = (await res.json()) as {
-          ok?: boolean;
-          data?: { ydoc_state?: string };
-          ydoc_state?: string;
-        };
-        const envelope = data?.ok === true && data?.data ? data.data : data;
-        const b64 = envelope?.ydoc_state;
-        if (b64 && typeof b64 === "string") {
-          const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-          if (binary.length > 2) {
-            Y.applyUpdate(this.ydoc, binary);
-            this.detectContentDuplication(beforeText, "api-merge");
-          }
-        }
-      } else if (res.status === 401) {
-        // 未認証の場合はローカルのみで続行
-      } else if (res.status === 404) {
-        // コンテンツ未保存のページでは 404 は想定内。エラー扱いしない。
-      } else {
-        console.warn(`[Collab] API content fetch failed: ${res.status}`);
-      }
-    } catch (err) {
-      console.warn("[Collab] API content fetch error:", err);
-    }
-
-    this.apiFetched = true;
-    this.updateState({ status: "connected", isSynced: true });
-    this.startLocalObserver();
-  }
-
-  /**
-   * Y.Doc の変更を監視し、debounce して API へ保存する（local モード用）。
-   */
-  private startLocalObserver(): void {
-    this.ydoc.on("update", () => {
-      if (this.destroyed || this.mode !== "local") return;
-      this.scheduleSaveToApi();
-    });
-  }
-
-  /**
-   * Debounced save via PUT /api/pages/:id/content.
-   */
-  private scheduleSaveToApi(): void {
-    if (this.apiSaveTimer) clearTimeout(this.apiSaveTimer);
-    this.apiSaveTimer = setTimeout(() => {
-      this.saveToApi();
-    }, API_SAVE_DEBOUNCE_MS);
-  }
-
-  /**
-   * Cancel debounce and save immediately (e.g. after applying URL-clip initial content).
-   * No-op in collaborative mode or when destroyed.
-   */
-  flushSave(): void {
-    if (this.destroyed || this.mode !== "local") return;
-    if (this.apiSaveTimer) {
-      clearTimeout(this.apiSaveTimer);
-      this.apiSaveTimer = null;
-    }
-    void this.saveToApi();
-  }
-
-  /**
-   * PUT /content 用 JSON ボディ。ydoc_state / content_text / content_preview に加え、setPageTitle 済みなら title を含む。
-   * Build JSON body for PUT /content. Includes ydoc_state, content_text, content_preview, and optionally title.
-   */
-  private buildPutContentBody(ydocStateB64: string, contentText: string): Record<string, string> {
-    const trimmed = contentText.trim().replace(/\s+/g, " ");
-    const contentPreview =
-      trimmed.length <= CONTENT_PREVIEW_MAX_LENGTH
-        ? trimmed
-        : trimmed.slice(0, CONTENT_PREVIEW_MAX_LENGTH).trim() + "...";
-
-    const payload: Record<string, string> = {
-      ydoc_state: ydocStateB64,
-      content_text: contentText,
-      content_preview: contentPreview,
-    };
-    if (this.pageTitle !== null) {
-      payload.title = this.pageTitle;
-    }
-    return payload;
-  }
-
-  private async saveToApi(): Promise<void> {
-    if (this.destroyed) return;
-    try {
-      const state = Y.encodeStateAsUpdate(this.ydoc);
-      if (state.length <= 2) return; // empty Y.Doc
-
-      const b64 = this.encodeStateUpdateToBase64(state);
-      const contentText = this.getPlainText();
-
-      const origin = this.getApiOrigin();
-      const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
-
-      const payload = this.buildPutContentBody(b64, contentText);
-
-      const res = await fetch(url, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      if (this.destroyed) return;
-      if (!res.ok) {
-        console.warn(`[Collab] API save failed: ${res.status}`);
-      }
-    } catch (err) {
-      console.warn("[Collab] API save error:", err);
-    }
-  }
-
-  /**
-   * Y.Doc のプレーンテキストを取得するヘルパー
-   */
-  private getPlainText(): string {
-    return this.extractText(this.ydoc.getXmlFragment("default"));
-  }
-
-  /**
-   * コンテンツの二重化を検知する。
-   * マージ前後のテキストを比較し、不自然な増加があれば console.error で報告する。
-   */
-  private detectContentDuplication(beforeText: string, phase: string): void {
-    const afterText = this.getPlainText();
-    if (beforeText.length < 10) return;
-    if (afterText.length <= beforeText.length) return;
-
-    const ratio = afterText.length / beforeText.length;
-    if (ratio < DUPLICATION_RATIO_THRESHOLD) return;
-
-    const occurrences = afterText.split(beforeText).length - 1;
-    if (occurrences < 2) return;
-
-    console.error(
-      `[Collab] Content duplication detected after ${phase} (page: ${this.pageId.slice(0, 8)})`,
-      {
-        beforeLength: beforeText.length,
-        afterLength: afterText.length,
-        ratio: ratio.toFixed(2),
-      },
-    );
-  }
-
-  /**
-   * XmlFragment からプレーンテキストを抽出
-   */
-  private extractText(fragment: Y.XmlFragment): string {
-    return extractPlainTextFromYXmlFragment(fragment);
   }
 
   private async connectWebSocket() {
+    if (this.destroyed) return;
     const token = await this.getAuthToken();
+    if (this.destroyed) return;
     if (!token) {
       console.warn("[Collab] No auth token, staying offline");
       this.updateState({ status: "disconnected" });
@@ -405,14 +174,6 @@ export class CollaborationManager {
   }
 
   /**
-   * ページタイトルを設定する。次回の saveToApi / fireAndForgetSave で PUT に含まれる。
-   * Set the page title so it is included in subsequent PUT requests to the server.
-   */
-  setPageTitle(title: string): void {
-    this.pageTitle = title;
-  }
-
-  /**
    * Y.Docを取得
    */
   get document(): Y.Doc {
@@ -460,21 +221,6 @@ export class CollaborationManager {
   destroy() {
     this.destroyed = true;
 
-    // API save タイマーをキャンセル
-    if (this.apiSaveTimer) {
-      clearTimeout(this.apiSaveTimer);
-      this.apiSaveTimer = null;
-    }
-
-    // 最終保存: ydoc 破棄前に同期的にステートをエンコードし、非同期で送信
-    if (this.mode === "local" && this.apiFetched) {
-      const state = Y.encodeStateAsUpdate(this.ydoc);
-      if (state.length > 2) {
-        const contentText = this.getPlainText();
-        this.fireAndForgetSave(state, contentText);
-      }
-    }
-
     // プレゼンスをクリア
     if (this.awareness) {
       this.awareness.setLocalState(null);
@@ -486,35 +232,5 @@ export class CollaborationManager {
     this.ydoc.destroy();
 
     this.listeners.clear();
-  }
-
-  /**
-   * 破棄後の最終保存。エンコード済みステートを受け取り、ydoc に依存しない。
-   * keepalive: true でページ離脱後もリクエストが完了するようにする。
-   * ブラウザの keepalive ペイロード制限（約 64 KiB）を超える場合は keepalive なしで送信する。
-   */
-  private fireAndForgetSave(state: Uint8Array, contentText: string): void {
-    const b64 = this.encodeStateUpdateToBase64(state);
-
-    const payload = this.buildPutContentBody(b64, contentText);
-    const body = JSON.stringify(payload);
-    const bodyByteLength =
-      typeof TextEncoder !== "undefined" ? new TextEncoder().encode(body).length : body.length * 2;
-    const useKeepalive = bodyByteLength <= KEEPALIVE_PAYLOAD_LIMIT;
-
-    const origin = this.getApiOrigin();
-    const url = `${origin}/api/pages/${encodeURIComponent(this.pageId)}/content`;
-
-    fetch(url, {
-      method: "PUT",
-      keepalive: useKeepalive,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body,
-    }).catch(() => {
-      // 最終保存の失敗は無視（ページ離脱中のため処理不能）
-    });
   }
 }

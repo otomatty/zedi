@@ -163,7 +163,10 @@ export function useAIChatActions({ pageContext }: UseAIChatActionsOptions) {
             content: pageAction.content,
           });
           if (result?.id) {
-            navigate(`/pages/${result.id}`);
+            // Issue #889 Phase 3: `/pages/:id` 撤去のため `/notes/:noteId/:pageId` に遷移。
+            // Issue #889 Phase 3: navigate to `/notes/:noteId/:pageId` after
+            // the standalone `/pages/:id` route was retired.
+            navigate(`/notes/${result.noteId}/${result.id}`);
           }
         } else if (action.type === "create-multiple-pages") {
           /**

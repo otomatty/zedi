@@ -37,7 +37,12 @@ interface SearchResultCardBase {
 export interface SearchResultCardPageItem extends SearchResultCardBase {
   kind: "page";
   pageId: string;
-  noteId?: string;
+  /**
+   * 所属ノート ID。Issue #889 Phase 3 で `/pages/:id` を廃止し、全ページ結果が
+   * `/notes/:noteId/:pageId` に統合された。Issue #825 で型も non-null。
+   * Owning note id; required after Issue #889 Phase 3 / #825.
+   */
+  noteId: string;
   sourceUrl?: string;
 }
 
@@ -61,6 +66,13 @@ export interface SearchResultCardPdfHighlightItem extends SearchResultCardBase {
   sourceId: string;
   pdfPage: number;
   derivedPageId: string | null;
+  /**
+   * 派生 Zedi ページの所属ノート ID。`/notes/:noteId/:pageId` 遷移用
+   * （Issue #889 Phase 3 で `/pages/:id` を廃止）。
+   * Owning note id of the derived page; required for `/notes/:noteId/:pageId`
+   * after Issue #889 Phase 3.
+   */
+  derivedPageNoteId: string | null;
 }
 
 function formatDate(ts: number): string {

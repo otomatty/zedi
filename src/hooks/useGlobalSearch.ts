@@ -112,8 +112,16 @@ interface GlobalSearchResultBase {
 export interface GlobalSearchPageResultItem extends GlobalSearchResultBase {
   kind: "page";
   pageId: string;
-  /** 共有ノート結果で設定される。Set for shared-note results; navigate to /notes/:noteId/:pageId. */
-  noteId?: string;
+  /**
+   * 所属ノート ID。Issue #823 / #825 で全ページが non-null `note_id` を持つ
+   * ようになって以降は必須。`/notes/:noteId/:pageId` の遷移先を組み立てる
+   * （Issue #889 Phase 3 で `/pages/:id` を廃止）。
+   *
+   * Owning note id. Required since every page has a non-null `note_id` after
+   * Issues #823 / #825, and Issue #889 Phase 3 retired the standalone
+   * `/pages/:id` route — navigation always lands on `/notes/:noteId/:pageId`.
+   */
+  noteId: string;
   sourceUrl?: string;
 }
 
@@ -130,6 +138,14 @@ export interface GlobalSearchPdfHighlightResultItem extends GlobalSearchResultBa
   pdfPage: number;
   /** 派生 Zedi ページ ID（あればクリック時にそちらへ優先遷移）。Optional derived page id. */
   derivedPageId: string | null;
+  /**
+   * 派生ページの所属ノート ID。Issue #889 Phase 3 で `/pages/:id` を廃止したため、
+   * 派生ページに飛ぶには noteId が必須。`derivedPageId === null` の場合は `null`。
+   *
+   * Derived page's owning note id. Required after Issue #889 Phase 3 retired
+   * `/pages/:id`; `null` when `derivedPageId` is also `null`.
+   */
+  derivedPageNoteId: string | null;
 }
 
 /**
@@ -255,6 +271,7 @@ export function buildPdfHighlightItem(
     sourceDisplayName: displayName,
     pdfPage: row.pdf_page,
     derivedPageId: row.derived_page_id,
+    derivedPageNoteId: row.derived_page_note_id,
     title,
     highlightedText,
     matchType: "content",
@@ -312,6 +329,12 @@ export function buildGlobalSearchResults(
       return {
         kind: "page",
         pageId: page.id,
+        // Issue #825: `Page.noteId` は non-null。Issue #889 Phase 3 で
+        // `/pages/:id` を廃止したため、検索結果も常に noteId を保持して
+        // `/notes/:noteId/:pageId` に遷移する。
+        // Issue #825: `Page.noteId` is non-null. Issue #889 Phase 3 retired
+        // `/pages/:id` so search results always carry the note id.
+        noteId: page.noteId,
         title: page.title || i18n.t("common.untitledPage"),
         highlightedText,
         matchType,
@@ -331,11 +354,11 @@ export function buildGlobalSearchResults(
       return {
         kind: "page",
         pageId: r.id,
-        // ノートネイティブ / リンク済みノート所属ページのみ /notes ルーティングに乗せる。
-        // 単なるリンク済み個人ページ (`note_id IS NULL`) は note 側に飛ばさず /pages へ。
-        // Only note-native rows route under /notes; bare linked personal rows
-        // (`note_id IS NULL`) keep the personal /pages destination.
-        noteId: r.note_id ?? undefined,
+        // Issue #823 / #825 でサーバ側の `note_id` も non-null になった。
+        // Issue #889 Phase 3 で `/pages/:id` 経路は廃止。
+        // Issues #823 / #825 made the server-side `note_id` non-null too;
+        // Issue #889 Phase 3 retired the `/pages/:id` route.
+        noteId: r.note_id,
         title: r.title?.trim() ? r.title : i18n.t("common.untitledPage"),
         highlightedText: highlightedText || i18n.t("common.sharedNoteContext"),
         matchType: "content" as MatchType,

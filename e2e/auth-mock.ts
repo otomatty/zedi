@@ -28,10 +28,16 @@ const helpers = {
   },
 
   /**
-   * Create a new page and return its ID.
-   * Uses the home FAB (「新規作成」): `/pages/new` is no longer a creation entry (editor redirects to /home).
+   * Create a new page from the home FAB and return its note/page id pair.
+   *
+   * Issue #889 Phase 3 で `/pages/:id` ルートを撤去したため、作成後は必ず
+   * `/notes/:noteId/:pageId` に遷移する。テスト側もこの URL を待つように更新する。
+   *
+   * Issue #889 Phase 3 retired `/pages/:id`, so pages always land on
+   * `/notes/:noteId/:pageId` after creation. This helper waits on that URL and
+   * returns both ids; callers that only care about the page id can destructure.
    */
-  async createNewPage(page: Page): Promise<string> {
+  async createNewPage(page: Page): Promise<{ noteId: string; pageId: string }> {
     await page.goto("/home");
     await page.waitForLoadState("networkidle");
 
@@ -40,21 +46,22 @@ const helpers = {
     await page.locator('[data-testid="home-fab"]').click();
     await page.getByRole("button", { name: "新規作成" }).click();
 
-    // `^/pages/<id>$` のみを許容し、`/notes/.../pages/<id>` のようなノート配下ルートに
-    // 誤遷移した場合はリグレッションとして検知できるように pathname 完全一致で判定する。
-    // Match only the top-level `/pages/:id` route; a regression that accidentally
-    // creates a note-scoped page should fail this helper instead of silently passing.
-    await page.waitForURL((url) => /^\/pages\/(?!new$)[^/]+$/.test(url.pathname), {
+    // 作成後の遷移先は常に `/notes/:noteId/:pageId`（Issue #889 Phase 3）。
+    // 旧 `/pages/:id` に着地した場合はリグレッションとして失敗させる。
+    // After Issue #889 Phase 3 the post-create URL is always
+    // `/notes/:noteId/:pageId`. Reject the legacy `/pages/:id` shape so a
+    // regression surfaces immediately instead of silently passing.
+    await page.waitForURL((url) => /^\/notes\/[^/]+\/[^/]+$/.test(url.pathname), {
       timeout: 15000,
     });
 
     const { pathname } = new URL(page.url());
-    const match = pathname.match(/^\/pages\/([^/]+)$/);
+    const match = pathname.match(/^\/notes\/([^/]+)\/([^/]+)$/);
     if (!match) {
-      throw new Error(`Failed to extract page ID from URL: ${page.url()}`);
+      throw new Error(`Failed to extract note/page IDs from URL: ${page.url()}`);
     }
 
-    return match[1];
+    return { noteId: match[1], pageId: match[2] };
   },
 
   /**

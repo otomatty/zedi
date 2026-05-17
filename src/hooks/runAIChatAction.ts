@@ -59,7 +59,10 @@ async function handleCreatePage(
     content: "",
   });
   if (result?.id) {
-    deps.navigate(`/pages/${result.id}`, {
+    // Issue #889 Phase 3: `/pages/:id` 撤去のため `/notes/:noteId/:pageId` に遷移。
+    // Issue #889 Phase 3: route to `/notes/:noteId/:pageId` (legacy
+    // `/pages/:id` route was retired).
+    deps.navigate(`/notes/${result.noteId}/${result.id}`, {
       state: { pendingChatPageGeneration: pending },
     });
   }
@@ -75,7 +78,7 @@ async function handleCreateMultiplePages(
   deps: RunAIChatActionDeps,
   action: CreateMultiplePagesAction,
 ): Promise<void> {
-  let firstCreatedId: string | undefined;
+  let firstCreated: Page | undefined;
   let firstOutline = "";
   const conversationText = serializeChatMessagesForPageGeneration(deps.messages);
   for (const page of action.pages) {
@@ -83,20 +86,23 @@ async function handleCreateMultiplePages(
       title: page.title,
       content: "",
     });
-    if (created?.id && firstCreatedId === undefined) {
-      firstCreatedId = created.id;
+    if (created?.id && firstCreated === undefined) {
+      firstCreated = created;
     }
-    if (firstCreatedId && !firstOutline) {
+    if (firstCreated && !firstOutline) {
       const candidate = page.content?.trim() ?? "";
       if (candidate) firstOutline = candidate;
     }
   }
-  if (firstCreatedId) {
+  if (firstCreated) {
     const pending: PendingChatPageGenerationState = {
       outline: firstOutline,
       conversationText,
     };
-    deps.navigate(`/pages/${firstCreatedId}`, {
+    // Issue #889 Phase 3: `/pages/:id` 撤去のため `/notes/:noteId/:pageId` に遷移。
+    // Issue #889 Phase 3: route to `/notes/:noteId/:pageId` (legacy
+    // `/pages/:id` route was retired).
+    deps.navigate(`/notes/${firstCreated.noteId}/${firstCreated.id}`, {
       state: { pendingChatPageGeneration: pending },
     });
   }

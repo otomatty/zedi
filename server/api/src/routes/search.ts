@@ -258,6 +258,12 @@ async function runPdfHighlightSearch(
 ): Promise<Array<Record<string, unknown>>> {
   if (isPdfHighlightSearchDisabled()) return [];
 
+  // Issue #889 Phase 3: 派生ページの所属ノート ID もまとめて返す。
+  // クライアント側 (`resolveSearchResultUrl`) が `/notes/:noteId/:pageId` を
+  // 組み立てるため、`/pages/:id` 廃止後は `derived_page_note_id` が必須。
+  // Issue #889 Phase 3: include the derived page's `note_id` so the client
+  // can build `/notes/:noteId/:pageId` after the `/pages/:id` route was
+  // retired.
   const result = await db.execute(sql`
     SELECT
       h.id          AS highlight_id,
@@ -266,11 +272,13 @@ async function runPdfHighlightSearch(
       h.pdf_page    AS pdf_page,
       h.text        AS text,
       h.derived_page_id AS derived_page_id,
+      p.note_id     AS derived_page_note_id,
       h.updated_at  AS updated_at,
       s.display_name AS source_display_name,
       s.title       AS source_title
     FROM pdf_highlights h
     INNER JOIN sources s ON s.id = h.source_id
+    LEFT JOIN pages p ON p.id = h.derived_page_id
     WHERE h.owner_id = ${userId}
       AND s.kind = 'pdf_local'
       AND h.text ILIKE ${pattern}

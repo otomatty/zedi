@@ -32,13 +32,16 @@ interface PageCardProps {
   page: PageSummary;
   index?: number;
   /**
-   * ノート文脈での表示時は `noteId` を渡す。遷移先・削除セマンティクスが
-   * `/notes/:noteId/:pageId` 配下に切り替わる。未指定時は従来の `/pages/:id`
-   * （個人ページ向け）として動作する。
+   * ノート文脈での表示時は `noteId` を渡す。削除セマンティクスがノートからの
+   * 取り外し（`useRemovePageFromNote`）に切り替わる。未指定時は通常のページ
+   * 削除（`useDeletePage`）として動作する。遷移先は常に `page.noteId` を使った
+   * `/notes/:noteId/:pageId` (Issue #889 Phase 3 で `/pages/:id` を廃止)。
    *
-   * Pass `noteId` when rendering inside a note. Navigation and the delete
-   * mutation switch to the note-scoped variants. Without it the card behaves
-   * as the legacy personal-page card under `/pages/:id`.
+   * Pass `noteId` when rendering inside a note. The delete mutation switches
+   * to the note-scoped removal (`useRemovePageFromNote`). Without it the card
+   * uses the personal page delete. Navigation always targets
+   * `/notes/:noteId/:pageId` using `page.noteId` (Issue #889 Phase 3 retired
+   * the `/pages/:id` route).
    */
   noteId?: string;
   /**
@@ -84,7 +87,13 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0, noteId, canDelete 
   const isClipped = !!page.sourceUrl;
   const displayTitle = page.title || t("common.untitledPage");
 
-  const targetHref = noteId ? `/notes/${noteId}/${page.id}` : `/pages/${page.id}`;
+  // Issue #889 Phase 3: `/pages/:id` は廃止。常に所属ノート配下の URL に遷移する。
+  // `noteId` プロップが渡された場合は明示指定を優先（ノート内表示）し、無い場合は
+  // PageSummary の `noteId` を使う（Issue #825 で non-null 保証済み）。
+  // Issue #889 Phase 3: `/pages/:id` is retired. Navigation always targets the
+  // note-scoped URL. Use the explicit `noteId` prop when rendering inside a
+  // note, else fall back to `page.noteId` (non-null since Issue #825).
+  const targetHref = `/notes/${noteId ?? page.noteId}/${page.id}`;
 
   const handleClick = () => {
     // ドラッグ直後のクリックを無視 / Ignore click right after drag
@@ -134,7 +143,7 @@ const PageCard: React.FC<PageCardProps> = ({ page, index = 0, noteId, canDelete 
         title: t("common.page.duplicated"),
         description: t("common.page.duplicatedWithTitle", { title: newTitle }),
       });
-      navigate(`/pages/${newPage.id}`);
+      navigate(`/notes/${newPage.noteId}/${newPage.id}`);
     } catch (error) {
       console.error("Failed to duplicate page:", error);
       toast({

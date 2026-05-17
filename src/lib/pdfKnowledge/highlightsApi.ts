@@ -31,6 +31,18 @@ export interface PdfHighlight {
   sourceId: string;
   ownerId: string;
   derivedPageId: string | null;
+  /**
+   * 派生ページ（`derivedPageId`）の所属ノート ID。「派生ページを開く」リンクの
+   * 遷移先 `/notes/:noteId/:pageId` を組み立てるためにサーバが left join で
+   * 同梱する（Issue #889 Phase 3 で `/pages/:id` を廃止）。派生ページが無い
+   * ハイライトでは `null`。
+   *
+   * Owning note id of the derived page, returned by the server via a left
+   * join with `pages`. Used to build the `/notes/:noteId/:pageId` URL for the
+   * "Open derived page" link (Issue #889 Phase 3 retired `/pages/:id`).
+   * `null` when the highlight has no derived page yet.
+   */
+  derivedPageNoteId: string | null;
   pdfPage: number;
   rects: PdfHighlightRect[];
   text: string;

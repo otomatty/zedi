@@ -5,14 +5,15 @@ import { useNoteTitleIndex } from "@/hooks/useNoteQueries";
 
 interface UseWikiLinkNavigationOptions {
   /**
-   * 編集中ページの noteId。`null` は個人ページ、文字列値はノートネイティブ
-   * ページ。リンク先の検索スコープと遷移先 URL を切り替えるために使用する。
-   * Issue #713 Phase 4。
+   * 編集中ページの noteId。`null` はレガシー個人ページ呼び出しの fallback で、
+   * Issue #889 Phase 3 で `/pages/:id` ルートが廃止された後は、解決された
+   * `foundPage.noteId` を使って `/notes/:noteId/:pageId` に統合的に遷移する。
+   * 通常はノート ID を渡す（Issue #713 Phase 4 / #889 Phase 3）。
    *
-   * Owning note ID of the page being edited. `null` scopes resolution to
-   * personal pages and navigates to `/pages/:id`; a string scopes resolution
-   * to same-note pages and navigates to `/notes/:noteId/:pageId`. See
-   * issue #713 Phase 4.
+   * Owning note ID of the page being edited. `null` is kept for legacy
+   * personal-page callers, but Issue #889 Phase 3 retired `/pages/:id` so
+   * navigation always lands on `/notes/:noteId/:pageId` using the resolved
+   * `foundPage.noteId`. Callers normally pass the owning note id.
    */
   pageNoteId: string | null;
 }
@@ -62,11 +63,18 @@ export function useWikiLinkNavigation(
 
   const personalResolved = useMemo(() => {
     if (!shouldQueryPersonal || !linkTitleToFind) {
-      return { data: null as { id: string; title: string } | null, isFetched: true };
+      return {
+        data: null as { id: string; title: string; noteId: string } | null,
+        isFetched: true,
+      };
     }
     if (personalLookup.data) {
       return {
-        data: { id: personalLookup.data.id, title: personalLookup.data.title },
+        data: {
+          id: personalLookup.data.id,
+          title: personalLookup.data.title,
+          noteId: personalLookup.data.noteId,
+        },
         isFetched: personalLookup.isFetched,
       };
     }
@@ -76,7 +84,7 @@ export function useWikiLinkNavigation(
       (p) => !p.isDeleted && (p.title ?? "").trim().toLowerCase() === normalized,
     );
     return {
-      data: found ? { id: found.id, title: found.title } : null,
+      data: found ? { id: found.id, title: found.title, noteId: found.noteId } : null,
       isFetched: personalLookup.isFetched && !personalSummary.isLoading,
     };
   }, [
@@ -104,7 +112,10 @@ export function useWikiLinkNavigation(
 
   const noteLookup = useMemo(() => {
     if (!shouldQueryNote || !linkTitleToFind) {
-      return { data: null as { id: string; title: string } | null, isFetched: true };
+      return {
+        data: null as { id: string; title: string; noteId: string } | null,
+        isFetched: true,
+      };
     }
     const normalized = linkTitleToFind.trim().toLowerCase();
     const list = noteTitleIndexQuery.data ?? [];
@@ -116,10 +127,19 @@ export function useWikiLinkNavigation(
       (p) => !p.isDeleted && (p.title ?? "").trim().toLowerCase() === normalized,
     );
     return {
-      data: found ? { id: found.id, title: found.title } : null,
+      // `useNoteTitleIndex` の結果はノート所属が確定しているので noteId は
+      // 入力の `pageNoteId` を流用する（!== null は shouldQueryNote で保証済み）。
+      // Note-scope hits all belong to `pageNoteId`, so reuse it for the noteId.
+      data: found && pageNoteId ? { id: found.id, title: found.title, noteId: pageNoteId } : null,
       isFetched: noteTitleIndexQuery.isFetched,
     };
-  }, [shouldQueryNote, linkTitleToFind, noteTitleIndexQuery.data, noteTitleIndexQuery.isFetched]);
+  }, [
+    shouldQueryNote,
+    linkTitleToFind,
+    noteTitleIndexQuery.data,
+    noteTitleIndexQuery.isFetched,
+    pageNoteId,
+  ]);
 
   const foundPage = pageNoteId === null ? personalResolved.data : noteLookup.data;
   const isFetched = pageNoteId === null ? personalResolved.isFetched : noteLookup.isFetched;
@@ -156,19 +176,17 @@ export function useWikiLinkNavigation(
       if (!title.trim()) return;
 
       if (foundPage) {
-        // 既存ページが見つかった場合はそのページに移動。ノートスコープ時は
-        // 短縮形の `/notes/:noteId/:pageId`（App.tsx の canonical ルート）に
-        // 直接遷移して、旧パス `/notes/:noteId/pages/:pageId` のリダイレクトを
-        // 踏まないようにする。個人スコープ時は従来どおり `/pages/:id`。
+        // Issue #889 Phase 3 で `/pages/:id` が廃止されたため、全ケースで
+        // `/notes/:noteId/:pageId` に遷移する。`foundPage.noteId` は
+        // 個人スコープ・ノートスコープいずれの解決パスでもセット済み。
         //
-        // Existing page: route to `/notes/:noteId/:pageId` (the canonical
-        // note page route defined in `App.tsx`) to avoid the legacy
-        // `/notes/:noteId/pages/:pageId` redirect hop. Personal scope uses
-        // `/pages/:id` as before.
-        const target = pageNoteId
-          ? `/notes/${pageNoteId}/${foundPage.id}`
-          : `/pages/${foundPage.id}`;
-        navigate(target, { replace: false, flushSync: true });
+        // After Issue #889 Phase 3 retired `/pages/:id`, navigation always
+        // targets `/notes/:noteId/:pageId`. Both resolution paths populate
+        // `foundPage.noteId` so this branch unifies cleanly.
+        navigate(`/notes/${foundPage.noteId}/${foundPage.id}`, {
+          replace: false,
+          flushSync: true,
+        });
       } else {
         // ページが見つからなかった場合は確認ダイアログを表示
         setPendingCreatePageTitle(title);
@@ -184,12 +202,16 @@ export function useWikiLinkNavigation(
   }, [foundPage, isFetched, linkTitleToFind, navigate, pageNoteId]);
 
   // Handle create page confirmation
-  // 新規ページ作成パスは個人スコープでのみ有効。ノートネイティブページの
-  // 作成はノート配下の別フロー（`POST /api/notes/:noteId/pages`）で行うため、
-  // ここでは個人ページとして作成し `/pages/:id` へ遷移する。Issue #713 Phase 4。
+  // 新規ページ作成は `useCreatePage` 経由でデフォルトノートまたは指定ノートに
+  // 作成され、サーバが返す `note_id` を使って `/notes/:noteId/:pageId` に遷移する
+  // （Issue #889 Phase 3 で `/pages/:id` 経路は撤去）。ノートスコープ時の
+  // 新規作成は別経路（`POST /api/notes/:noteId/pages`）が担うため、現状は
+  // 個人デフォルトノートへのフォールバックだけ提供する。
   //
-  // Page creation from a WikiLink is only supported in personal scope; note
-  // scope is handled by a separate flow (`POST /api/notes/:noteId/pages`).
+  // After Issue #889 Phase 3 the `/pages/:id` route is gone; `useCreatePage`
+  // attaches the new page to the caller's default note and the server returns
+  // `note_id`, so navigation always lands on `/notes/:noteId/:pageId`. Note-
+  // scoped creation is still handled separately via `POST /api/notes/:noteId/pages`.
   const handleConfirmCreate = useCallback(async () => {
     if (!pendingCreatePageTitle) return;
     if (pageNoteId) {
@@ -206,7 +228,10 @@ export function useWikiLinkNavigation(
       });
       setCreatePageDialogOpen(false);
       setPendingCreatePageTitle(null);
-      navigate(`/pages/${newPage.id}`, { replace: false, flushSync: true });
+      navigate(`/notes/${newPage.noteId}/${newPage.id}`, {
+        replace: false,
+        flushSync: true,
+      });
     } catch (error) {
       console.error("Failed to create page:", error);
     }

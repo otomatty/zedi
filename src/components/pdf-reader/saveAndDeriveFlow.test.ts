@@ -16,6 +16,7 @@ function makeHighlight(overrides: Partial<PdfHighlight> = {}): PdfHighlight {
     sourceId: "src-1",
     ownerId: "u-1",
     derivedPageId: null,
+    derivedPageNoteId: null,
     pdfPage: 2,
     rects: [{ x1: 0, y1: 0, x2: 1, y2: 1 }],
     text: "Long enough body text for the citation.",
@@ -33,6 +34,7 @@ describe("runSaveAndDeriveFlow", () => {
     const createHighlight = vi.fn().mockResolvedValue({ highlight: makeHighlight() });
     const derivePage = vi.fn().mockResolvedValue({
       pageId: "page-99",
+      noteId: "note-99",
       templateContent: '{"type":"doc","content":[]}',
     });
 
@@ -67,7 +69,7 @@ describe("runSaveAndDeriveFlow", () => {
     expect(parsed.type).toBe("doc");
     expect(parsed.content.some((n) => n.type === "blockquote")).toBe(true);
 
-    expect(navigate).toHaveBeenCalledWith("/pages/page-99", {
+    expect(navigate).toHaveBeenCalledWith("/notes/note-99/page-99", {
       state: { initialContent: '{"type":"doc","content":[]}' },
     });
     expect(result).toEqual({ status: "ok", pageId: "page-99" });
@@ -78,6 +80,7 @@ describe("runSaveAndDeriveFlow", () => {
     const createHighlight = vi.fn().mockResolvedValue({ highlight: makeHighlight() });
     const derivePage = vi.fn().mockResolvedValue({
       pageId: "page-42",
+      noteId: "note-42",
       // No `templateContent` on the response — older server or proxy.
     });
 
@@ -94,7 +97,7 @@ describe("runSaveAndDeriveFlow", () => {
     });
 
     const call = navigate.mock.calls[0];
-    expect(call[0]).toBe("/pages/page-42");
+    expect(call[0]).toBe("/notes/note-42/page-42");
     const state = (call[1] as { state: { initialContent: string } }).state;
     // The fallback uses the locally-built templateContent (same shape).
     expect(JSON.parse(state.initialContent).type).toBe("doc");
@@ -103,10 +106,15 @@ describe("runSaveAndDeriveFlow", () => {
   it("navigates without state when the server reports alreadyDerived: true", async () => {
     const navigate = vi.fn();
     const createHighlight = vi.fn().mockResolvedValue({
-      highlight: makeHighlight({ id: "existing-h", derivedPageId: "page-existing" }),
+      highlight: makeHighlight({
+        id: "existing-h",
+        derivedPageId: "page-existing",
+        derivedPageNoteId: "note-existing",
+      }),
     });
     const derivePage = vi.fn().mockResolvedValue({
       pageId: "page-existing",
+      noteId: "note-existing",
       alreadyDerived: true,
     });
 
@@ -122,7 +130,7 @@ describe("runSaveAndDeriveFlow", () => {
       navigate,
     });
 
-    expect(navigate).toHaveBeenCalledWith("/pages/page-existing");
+    expect(navigate).toHaveBeenCalledWith("/notes/note-existing/page-existing");
     expect(navigate.mock.calls[0][1]).toBeUndefined();
     expect(result).toEqual({ status: "alreadyDerived", pageId: "page-existing" });
   });

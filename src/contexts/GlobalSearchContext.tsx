@@ -12,16 +12,16 @@ interface GlobalSearchContextValue {
    * 検索結果アイテムを選択したときの遷移ロジック。
    * Navigation handler for a selected search result item.
    *
-   * Issue #864:
-   * - `kind="page"`: 従来どおり `/notes/:noteId/:pageId` または `/pages/:pageId`。
+   * Issue #864 / #889 Phase 3:
+   * - `kind="page"`: 常に `/notes/:noteId/:pageId` へ遷移する
+   *   （Issue #889 Phase 3 で `/pages/:pageId` を廃止）。
    * - `kind="pdf_highlight"`: 派生 Zedi ページがあればそちらへ、なければ
-   *   `/sources/:sourceId/pdf#page=N` の PDF ビューア（後続 PR で実装）へ。
+   *   `/sources/:sourceId/pdf#page=N` の PDF ビューアへ。
    *
-   * - `kind="page"`: same as before — note-scoped or standalone page URL.
-   * - `kind="pdf_highlight"`: route to the derived Zedi page if one exists,
-   *   otherwise deep-link to the PDF viewer at `/sources/:sourceId/pdf#page=N`.
-   *   The hash carries the page number so the viewer (built in a follow-up PR
-   *   tracked by the parent issue otomatty/zedi#389) can scroll to it.
+   * - `kind="page"`: always routes to `/notes/:noteId/:pageId` since
+   *   Issue #889 Phase 3 retired `/pages/:pageId`.
+   * - `kind="pdf_highlight"`: prefers the derived Zedi page when one exists,
+   *   otherwise deep-links to the PDF viewer at `/sources/:sourceId/pdf#page=N`.
    */
   handleSelect: (item: GlobalSearchResultItem) => void;
   /** Enterキーで検索結果ページへ遷移 */
@@ -46,11 +46,12 @@ const GlobalSearchContext = createContext<GlobalSearchContextValue | null>(null)
  */
 export function resolveSearchResultUrl(item: GlobalSearchResultItem): string {
   if (item.kind === "page") {
-    if (item.noteId) return `/notes/${item.noteId}/${item.pageId}`;
-    return `/pages/${item.pageId}`;
+    return `/notes/${item.noteId}/${item.pageId}`;
   }
   // kind === "pdf_highlight"
-  if (item.derivedPageId) return `/pages/${item.derivedPageId}`;
+  if (item.derivedPageId && item.derivedPageNoteId) {
+    return `/notes/${item.derivedPageNoteId}/${item.derivedPageId}`;
+  }
   return `/sources/${item.sourceId}/pdf#page=${item.pdfPage}`;
 }
 

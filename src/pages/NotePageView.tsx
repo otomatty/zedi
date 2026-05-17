@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Download, History, Trash2 } from "lucide-react";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
@@ -125,6 +125,8 @@ function NotePageEditorEditable({
   collaboration,
   isCollaborationEnabled,
   isTitleEditable,
+  initialContent,
+  onInitialContentApplied,
   onBack,
   onRequestDelete,
   isDeletePending,
@@ -137,6 +139,18 @@ function NotePageEditorEditable({
   isCollaborationEnabled: boolean;
   /** ページ所有者のみタイトル編集可。Only the page owner can edit the title. */
   isTitleEditable: boolean;
+  /**
+   * URL クリッパー等の作成経路から渡される Tiptap JSON 文字列。Hocuspocus の
+   * 初期同期完了後、Y.Doc が空であれば一度だけ反映してから `onInitialContentApplied`
+   * でクリアする（Issue #889 Phase 3 で `flushSave` を廃止）。
+   *
+   * Seed Tiptap JSON forwarded from create flows (e.g. Web Clipper). Applied
+   * once after the initial Hocuspocus sync when the Y.Doc is empty, then
+   * cleared via `onInitialContentApplied` (Issue #889 Phase 3 retired
+   * `flushSave`).
+   */
+  initialContent?: string;
+  onInitialContentApplied?: () => void;
   /** ヘッダーの戻るボタン。Toolbar back button. */
   onBack: () => void;
   /**
@@ -466,6 +480,8 @@ function NotePageEditorEditable({
           collaboration={isCollaborationEnabled ? collaboration : undefined}
           insertAtCursorRef={editorInsertRef}
           pageNoteId={page.noteId ?? null}
+          initialContent={initialContent}
+          onInitialContentApplied={onInitialContentApplied}
         />
       </ContentWithAIChat>
       {historyOpen && (
@@ -701,10 +717,39 @@ function NotePageDeleteConfirmDialog({
 const NotePageView: React.FC = () => {
   const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isSignedIn, userId } = useAuth();
   const { t } = useTranslation();
   const { toast } = useToast();
   const removeFromNoteMutation = useRemovePageFromNote();
+
+  // 作成経路（Web Clipper / 画像作成 など）が `navigate("/notes/:noteId/:pageId",
+  // { state: { initialContent } })` で渡してくる Tiptap JSON を一度だけ取り込む。
+  // Hocuspocus が初期同期を完了し Y.Doc が空であれば、エディタ側が seed → Y.Doc
+  // に書き込み、`onInitialContentApplied` でクリアする (Issue #889 Phase 3 で
+  // 旧来の `flushSave` 経路を撤去)。location.state に紐づくため URL は綺麗な
+  // ままで、リロード時には自然に消える。
+  //
+  // Create flows (Web Clipper, image creation, etc.) pass a Tiptap JSON seed
+  // via `navigate("/notes/:noteId/:pageId", { state: { initialContent } })`.
+  // After the initial Hocuspocus sync the editor writes it into the Y.Doc
+  // exactly once and calls `onInitialContentApplied` to clear the state
+  // (Issue #889 Phase 3 retired the legacy `flushSave` REST path).
+  const locationStateInitialContent =
+    typeof (location.state as { initialContent?: unknown } | null)?.initialContent === "string"
+      ? ((location.state as { initialContent: string }).initialContent ?? undefined)
+      : undefined;
+  const [pendingInitialContent, setPendingInitialContent] = useState<string | undefined>(
+    locationStateInitialContent,
+  );
+  const handleInitialContentApplied = useCallback(() => {
+    setPendingInitialContent(undefined);
+    // `location.state` をクリアしてリロード時に再投入されないようにする。
+    // Clear `location.state` so a reload does not re-seed the same content.
+    if (location.state) {
+      navigate(location.pathname + location.search + location.hash, { replace: true, state: null });
+    }
+  }, [location.hash, location.pathname, location.search, location.state, navigate]);
 
   const {
     note,
@@ -753,7 +798,6 @@ const NotePageView: React.FC = () => {
   const collaboration = useCollaboration({
     pageId: collaborationPageId,
     enabled: isCollaborationEnabled,
-    mode: "collaborative",
   });
 
   const handleRequestDelete = useCallback(() => {
@@ -866,6 +910,8 @@ const NotePageView: React.FC = () => {
               collaboration={collaboration}
               isCollaborationEnabled={isCollaborationEnabled}
               isTitleEditable={isTitleEditable}
+              initialContent={pendingInitialContent}
+              onInitialContentApplied={handleInitialContentApplied}
               onBack={handleBack}
               onRequestDelete={handleRequestDelete}
               isDeletePending={isDeletePending}

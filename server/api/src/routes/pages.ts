@@ -728,6 +728,7 @@ app.post("/", authRequired, async (c) => {
     {
       id: row.id,
       owner_id: row.ownerId,
+      note_id: row.noteId,
       source_page_id: row.sourcePageId ?? null,
       title: row.title ?? null,
       content_preview: row.contentPreview ?? null,

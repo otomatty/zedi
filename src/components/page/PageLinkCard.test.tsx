@@ -7,6 +7,7 @@ import type { PageCard } from "@/hooks/useLinkedPages";
 describe("PageLinkCard", () => {
   const createPageCard = (overrides?: Partial<PageCard>): PageCard => ({
     id: "page-1",
+    noteId: "note-1",
     title: "Test Page",
     preview: "This is a test preview",
     updatedAt: Date.now() - 1000 * 60 * 60, // 1 hour ago
