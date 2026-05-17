@@ -238,12 +238,27 @@ function NotePageEditorEditable({
   // object on every state transition (idle → pending → success), so referencing
   // the mutation directly in a `useCallback` dep array would cause the unmount
   // flush effect's cleanup to fire mid-typing and flush the debounce early.
+  // 削除フローが進行中の save をキャンセルしたいと宣言したら立てるフラグ。
+  // debounce 済みで既に in-flight な `persistTitleRef.current()` は単純な
+  // timer cancel では止められないため、await 後に毎回このフラグを見て
+  // 早期 return する。Cache invalidation / setTitle ロールバック / toast /
+  // throw のすべてを抑止する。CodeRabbit major (PR #891)。
+  //
+  // Set by the cancel hook when the delete path wants in-flight saves to be
+  // dropped. Clearing the debounce timer alone cannot stop a save that
+  // already entered `persistTitleRef.current()` and is awaiting the
+  // network, so this flag is re-checked after each await — when set, the
+  // save returns without invalidating caches, rolling back the title,
+  // toasting, or re-throwing. CodeRabbit major review on PR #891.
+  const suppressTitleSaveEffectsRef = useRef(false);
+
   const persistTitleRef = useRef<(nextTitle: string) => Promise<void>>(async () => {});
   persistTitleRef.current = async (nextTitle: string) => {
     const previousTitle = lastSavedTitleRef.current;
     try {
       if (page.noteId !== null) {
         const current = await api.getPageContent(page.id);
+        if (suppressTitleSaveEffectsRef.current) return;
         await api.putPageContent(page.id, {
           ydoc_state: current.ydoc_state,
           content_text: current.content_text ?? undefined,
@@ -256,6 +271,10 @@ function NotePageEditorEditable({
           updates: { title: nextTitle },
         });
       }
+      // 削除完了後はキャッシュ無効化も lastSaved 更新もスキップする。
+      // After cancel (delete path), skip cache invalidation and lastSaved update —
+      // `useRemovePageFromNote` has already invalidated note caches.
+      if (suppressTitleSaveEffectsRef.current) return;
       lastSavedTitleRef.current = nextTitle;
       // `useUpdatePage` updates `pageKeys.*` caches, but the note page list and
       // detail are held under `noteKeys.*`. Invalidate those so the new title
@@ -266,6 +285,11 @@ function NotePageEditorEditable({
       queryClient.invalidateQueries({ queryKey: noteKeys.page(noteId, page.id) });
       queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(noteId) });
     } catch (error) {
+      // 削除済みページに対する失敗は予期されたもの。toast / rollback を抑止する。
+      // Expected failure path when the page was just deleted out from under us;
+      // suppress toast + rollback + rethrow so we don't surface
+      // `errors.titleSaveFailedTitle` right after a successful delete.
+      if (suppressTitleSaveEffectsRef.current) return;
       if (pendingTitleRef.current === null) {
         setTitle(previousTitle);
       }
@@ -334,17 +358,23 @@ function NotePageEditorEditable({
   }, []);
 
   // 削除フローから「保留中タイトル保存をキャンセルしてアンマウント flush を
-  // 抑止する」関数を呼べるよう、親から渡された ref に書き込む。timer と
-  // `pendingTitleRef` を両方 null 化すれば、アンマウント時の
-  // `flushPendingTitleRef.current()` は pending null で即 return する。
+  // 抑止する」関数を呼べるよう、親から渡された ref に書き込む。
+  // 1) debounce timer をクリア → 未着火の save を抑止
+  // 2) `pendingTitleRef` を null 化 → アンマウント flush は pending null で即 return
+  // 3) `suppressTitleSaveEffectsRef` を立てる → 既に in-flight な save が
+  //    完了/失敗してもキャッシュ更新・toast・throw を全部スキップする
   //
   // Expose a cancel function to the parent via ref so the delete-success path
-  // can drop the pending title save before unmount. Clearing both the timer
-  // and `pendingTitleRef.current` makes the unmount-flush a no-op (the flush
-  // bails when `pending === null`). Codex P2 review on PR #891.
+  // can drop the pending title save before unmount. Three guards combined:
+  // 1) clear the debounce timer (kills not-yet-fired saves);
+  // 2) null `pendingTitleRef.current` (makes the unmount flush a no-op);
+  // 3) raise `suppressTitleSaveEffectsRef` so any save that's already mid-await
+  //    no longer triggers cache invalidation / toast / rollback / rethrow.
+  // Codex P2 + CodeRabbit major reviews on PR #891.
   useEffect(() => {
     if (!cancelPendingTitleSaveRef) return;
     cancelPendingTitleSaveRef.current = () => {
+      suppressTitleSaveEffectsRef.current = true;
       if (titleSaveTimerRef.current) {
         clearTimeout(titleSaveTimerRef.current);
         titleSaveTimerRef.current = null;
@@ -700,6 +730,18 @@ const NotePageView: React.FC = () => {
 
   const handleConfirmDelete = useCallback(() => {
     if (!noteId || !page?.id) return;
+    // `removeFromNoteMutation.isPending` は次の React コミットまで true に
+    // ならないため、`AlertDialogAction` の `disabled` だけでは同一フレームの
+    // 二重クリックを防げない（CodeRabbit major）。同期的に `isPending` を
+    // 見て早期 return することで、`mutate` の二重発火と二重 toast / 二重
+    // navigate を確実に抑止する。
+    //
+    // `removeFromNoteMutation.isPending` only flips on the next render commit,
+    // so the `disabled` prop on `AlertDialogAction` cannot stop same-frame
+    // double-clicks. Bail synchronously on `isPending` to keep `mutate` from
+    // firing twice (which would surface duplicate toasts + navigations).
+    // CodeRabbit major review on PR #891.
+    if (removeFromNoteMutation.isPending) return;
     const displayTitle = page.title || t("common.untitledPage");
     removeFromNoteMutation.mutate(
       { noteId, pageId: page.id },

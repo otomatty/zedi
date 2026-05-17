@@ -717,6 +717,109 @@ describe("NotePageView", () => {
         expect.objectContaining({ title: "errors.titleSaveFailedTitle" }),
       );
     });
+
+    // CodeRabbit major review on PR #891: debounce が既に発火して
+    // `persistTitleRef.current()` が `getPageContent`/`putPageContent` を await
+    // している最中に削除が成功すると、後から in-flight save が「ページが既に
+    // 存在しない」エラーを返し、削除成功の直後に `errors.titleSaveFailedTitle`
+    // の destructive トーストが出てしまう。`suppressTitleSaveEffectsRef` が
+    // この経路で toast を出さないことを検証する。
+    //
+    // Regression test for the in-flight title-save suppression. When the
+    // debounce has already fired and the save is mid-await, the cancel hook
+    // raises a suppress flag so the rejected `putPageContent` does not toast
+    // `errors.titleSaveFailedTitle` after the delete has navigated away.
+    it("削除成功時に進行中のタイトル保存失敗のトーストを抑止する / suppresses in-flight title-save failure toast after delete success", async () => {
+      setupEditableRender();
+      mockApi.getPageContent.mockResolvedValue({
+        ydoc_state: "AQ==",
+        version: 3,
+        content_text: "body",
+      });
+      // `putPageContent` を保留にしておき、削除確定後にエラーで決着させる。
+      // Defer `putPageContent` and reject it post-delete to simulate
+      // "page no longer exists" returning after the navigation completes.
+      let rejectPut: (err: Error) => void = () => undefined;
+      mockApi.putPageContent.mockReturnValue(
+        new Promise((_, reject) => {
+          rejectPut = reject;
+        }),
+      );
+      mockRemoveFromNoteMutate.mockImplementation((_args, options) => {
+        options?.onSuccess?.();
+      });
+
+      const { unmount } = renderNotePageView();
+
+      // タイトルを編集して debounce timer を仕掛け、500ms 経過させて save を発火。
+      // `getPageContent` は解決済み、`putPageContent` は保留 = in-flight save。
+      // Stage a title change, flush the debounce so the save enters its
+      // awaiting state — `getPageContent` resolves, `putPageContent` is left
+      // pending so the save is genuinely mid-flight.
+      fireEvent.click(screen.getByText("change-title"));
+      await vi.advanceTimersByTimeAsync(500);
+
+      // この時点で in-flight。削除を発火する。
+      // Trigger delete while the save is still awaiting `putPageContent`.
+      fireEvent.click(screen.getByText("editor.pageMenu.deletePage"));
+      fireEvent.click(screen.getByTestId("confirm-delete"));
+
+      // navigate 後のアンマウントを再現。
+      // Simulate the post-navigate unmount.
+      unmount();
+
+      // 削除済みページ側の `putPageContent` を 404 相当で決着させる。
+      // Resolve the deferred `putPageContent` with the "deleted" error.
+      vi.useRealTimers();
+      rejectPut(new Error("page not found"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // 抑止フラグが立っているので失敗 toast は出ないはず。
+      // Suppress flag should be set, so the destructive toast must not fire.
+      expect(mockToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ title: "errors.titleSaveFailedTitle" }),
+      );
+    });
+
+    // CodeRabbit major review on PR #891: `AlertDialogAction` の `disabled` は
+    // 次回コミットまで反映されないため、同一フレームの二重クリックで
+    // `mutate` が二回走ってしまう。`isPending` を同期ガードに使うことで
+    // 二回目を弾く動作をピン止めする。
+    //
+    // Same-frame double-click guard: the AlertDialog's `disabled` prop doesn't
+    // update until next render, so a synchronous `isPending` bail-out is the
+    // only thing keeping `mutate` from firing twice. Force the mutation into
+    // a pending state and verify a second confirm click is a no-op.
+    it("削除確定が同期的に二回呼ばれても mutate は一回しか走らない / guards handleConfirmDelete against same-frame double submit", () => {
+      setupEditableRender();
+      // 1 回目で `isPending: true` に切り替えてから 2 回目をシミュレートする。
+      // Flip the mutation hook into pending after the first call so the
+      // second synchronous click hits the `isPending` guard.
+      let pending = false;
+      vi.mocked(useRemovePageFromNote).mockImplementation(
+        () =>
+          ({
+            mutate: (...args: unknown[]) => {
+              pending = true;
+              mockRemoveFromNoteMutate(...args);
+            },
+            get isPending() {
+              return pending;
+            },
+          }) as never,
+      );
+      renderNotePageView();
+
+      fireEvent.click(screen.getByText("editor.pageMenu.deletePage"));
+      // Confirm button is rendered inside the dialog; click it twice in the
+      // same task. The second click must not reach `mutate`.
+      const confirmButton = screen.getByTestId("confirm-delete");
+      fireEvent.click(confirmButton);
+      fireEvent.click(confirmButton);
+
+      expect(mockRemoveFromNoteMutate).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("renders editor when note and page are loaded with canEdit", () => {
