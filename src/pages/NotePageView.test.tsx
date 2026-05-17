@@ -486,6 +486,21 @@ describe("NotePageView", () => {
     // remain available since they read `page.content` client-side.
     it("未ログインの read-only viewer には履歴項目を出さず、エクスポート/コピーは残す / hides history but keeps export/copy for unauthenticated read-only viewers", () => {
       vi.mocked(useAuth).mockReturnValue({ isSignedIn: false, userId: undefined } as never);
+      // `useAuth` を未ログインに切り替えるなら、同じく `isSignedIn` を持つ
+      // `useNoteApi` も整合させておく（CodeRabbit）。現状の実装は `useAuth`
+      // 側だけを読んでいるが、将来 `useNoteApi.isSignedIn` を参照しても
+      // テストが silently pass しないよう fixture をそろえる。
+      // Keep the auth fixtures coherent: if `useAuth.isSignedIn` is false, the
+      // sibling `useNoteApi.isSignedIn` should match. The component currently
+      // only reads from `useAuth`, but aligning the fixture prevents a future
+      // refactor from silently passing this test.
+      vi.mocked(useNoteApi).mockReturnValue({
+        api: mockApi,
+        userId: "",
+        userEmail: undefined,
+        isSignedIn: false,
+        isLoaded: true,
+      } as never);
       vi.mocked(useNote).mockReturnValue({
         note: { id: "note-1" },
         access: { canView: true, canEdit: false },
@@ -736,14 +751,21 @@ describe("NotePageView", () => {
         version: 3,
         content_text: "body",
       });
-      // `putPageContent` を保留にしておき、削除確定後にエラーで決着させる。
-      // Defer `putPageContent` and reject it post-delete to simulate
-      // "page no longer exists" returning after the navigation completes.
+      // `putPageContent` 呼び出し時に毎回 fresh な保留 promise を返すよう
+      // `mockImplementation` を使う。`mockReturnValue` で一度作る方式だと
+      // `rejectPut` の捕捉が呼び出しタイミングと無関係に進んで「テストが本当に
+      // in-flight 経路を踏んだか」を保証しにくい (CodeRabbit major)。
+      //
+      // Use `mockImplementation` so each call creates a fresh deferred and
+      // captures its `reject` at invocation time. Stubbing once up-front with
+      // `mockReturnValue` makes it harder to prove the test actually reached
+      // the in-flight path before we reject. CodeRabbit major review.
       let rejectPut: (err: Error) => void = () => undefined;
-      mockApi.putPageContent.mockReturnValue(
-        new Promise((_, reject) => {
-          rejectPut = reject;
-        }),
+      mockApi.putPageContent.mockImplementation(
+        () =>
+          new Promise((_, reject) => {
+            rejectPut = reject;
+          }),
       );
       mockRemoveFromNoteMutate.mockImplementation((_args, options) => {
         options?.onSuccess?.();
@@ -759,6 +781,20 @@ describe("NotePageView", () => {
       fireEvent.click(screen.getByText("change-title"));
       await vi.advanceTimersByTimeAsync(500);
 
+      // save が `putPageContent` まで進んでいることを明示的に確認する。ここを
+      // 通らない限り `rejectPut(...)` は no-op になり、最終アサートが理由で
+      // 通ったように見えてしまう (CodeRabbit major)。`vi.waitFor` は実時間で
+      // ポーリングするので real timers に切り替えてから呼ぶ。
+      // Pin that the save actually entered the in-flight path before we
+      // trigger delete; otherwise `rejectPut(...)` is a no-op and the final
+      // assertion passes for the wrong reason. `vi.waitFor` polls in real
+      // time so flip to real timers first.
+      vi.useRealTimers();
+      await vi.waitFor(() => {
+        expect(mockApi.getPageContent).toHaveBeenCalledTimes(1);
+        expect(mockApi.putPageContent).toHaveBeenCalledTimes(1);
+      });
+
       // この時点で in-flight。削除を発火する。
       // Trigger delete while the save is still awaiting `putPageContent`.
       fireEvent.click(screen.getByText("editor.pageMenu.deletePage"));
@@ -770,7 +806,6 @@ describe("NotePageView", () => {
 
       // 削除済みページ側の `putPageContent` を 404 相当で決着させる。
       // Resolve the deferred `putPageContent` with the "deleted" error.
-      vi.useRealTimers();
       rejectPut(new Error("page not found"));
       await new Promise((resolve) => setTimeout(resolve, 0));
       await new Promise((resolve) => setTimeout(resolve, 0));
