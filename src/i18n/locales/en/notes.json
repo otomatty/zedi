@@ -48,6 +48,7 @@
     "members": "Members",
     "links": "Share links",
     "domains": "Domains",
+    "filterBar": "Tag filter",
     "danger": "Delete"
   },
   "generalSectionDescription": "Update the note title shown across the app.",
@@ -233,6 +234,8 @@
     "description": "Show a hashtag filter bar above the page list.",
     "showByDefault": "Show by default",
     "showByDefaultHelp": "When off, members can opt-in individually.",
-    "userOverrideHint": "Your visibility preference is saved per device."
+    "userOverrideHint": "Your visibility preference is saved per device.",
+    "userOverrideOn": "On this device, the bar is set to always show.",
+    "userOverrideOff": "On this device, the bar is set to always hide."
   }
 }

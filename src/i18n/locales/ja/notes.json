@@ -48,6 +48,7 @@
     "members": "メンバー",
     "links": "招待リンク",
     "domains": "ドメイン招待",
+    "filterBar": "タグフィルタ",
     "danger": "削除"
   },
   "generalSectionDescription": "ノートのタイトルを変更します。",
@@ -233,6 +234,8 @@
     "description": "ページ一覧の上部にハッシュタグの絞り込みバーを表示します。",
     "showByDefault": "既定で表示する",
     "showByDefaultHelp": "オフのときは、各メンバーが個別に表示を有効化できます。",
-    "userOverrideHint": "あなたの表示設定は端末ごとに保存されます。"
+    "userOverrideHint": "あなたの表示設定は端末ごとに保存されます。",
+    "userOverrideOn": "この端末では「常に表示」が設定されています。",
+    "userOverrideOff": "この端末では「常に非表示」が設定されています。"
   }
 }
