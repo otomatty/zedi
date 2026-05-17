@@ -26,6 +26,8 @@ export function noteRowToApi(note: Note): NoteApiFields {
     is_official: note.isOfficial,
     is_default: note.isDefault,
     view_count: note.viewCount,
+    show_tag_filter_bar: note.showTagFilterBar,
+    default_filter_tags: note.defaultFilterTags,
     created_at: note.createdAt,
     updated_at: note.updatedAt,
     is_deleted: note.isDeleted,

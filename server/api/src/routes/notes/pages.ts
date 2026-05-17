@@ -169,6 +169,64 @@ function parsePagesInclude(raw: string | undefined): { preview: boolean; thumbna
   };
 }
 
+/**
+ * `/notes/:noteId/pages?tags=...` のタグフィルタに使う最大要素数。クライアント
+ * 側 (`urlTagsCodec.MAX_TAGS`) と整合させる。
+ *
+ * Cap on the number of tags accepted in `?tags=`, matching the client-side
+ * `urlTagsCodec.MAX_TAGS` constant.
+ */
+const MAX_TAGS_FILTER = 20;
+
+/**
+ * `?tags=` URL クエリのパース結果。
+ *
+ * - `null`: パラメータ無し or 空文字 — フィルタを適用しない。
+ * - `{ kind: 'tags' }`: 小文字キーの OR フィルタ。
+ * - `{ kind: 'untagged-only' }`: `__none__` トークン — タグ無しページのみ。
+ *
+ * Parsed `?tags=` value:
+ * - `null` for no filter
+ * - `{ kind: 'tags' }` for a lower-cased OR list
+ * - `{ kind: 'untagged-only' }` for the `__none__` token
+ */
+export type TagsFilter = { kind: "tags"; tags: string[] } | { kind: "untagged-only" } | null;
+
+/**
+ * `?tags=` を {@link TagsFilter} へ正規化する。クライアント側 codec
+ * (`urlTagsCodec.parseTagsParam`) と同じ規則: トリム・小文字化・重複排除・
+ * `MAX_TAGS_FILTER` で切り詰め。`__none__` が混ざれば untagged-only。要素 0
+ * なら `null` を返してフィルタ無し扱い。不正値で 500 になるのを避けるため、
+ * 文字列長や形が外れたものは静かに無視する (URL 経由の壊れた値で 400 を
+ * 出してエラー画面に飛ばしたくないため)。
+ *
+ * Mirror of `urlTagsCodec.parseTagsParam` for server-side use. Lenient: malformed
+ * tokens are silently dropped so a stale or broken URL doesn't 400 the
+ * listing endpoint. Returns `null` to mean "no filter".
+ */
+function parseTagsFilter(raw: string | undefined): TagsFilter {
+  if (raw === undefined || raw === null) return null;
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  const tokens = trimmed
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0 && t.length <= 100);
+  if (tokens.length === 0) return null;
+  if (tokens.some((t) => t === "__none__")) return { kind: "untagged-only" };
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const token of tokens) {
+    const key = token.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(key);
+    if (normalized.length >= MAX_TAGS_FILTER) break;
+  }
+  if (normalized.length === 0) return null;
+  return { kind: "tags", tags: normalized };
+}
+
 const app = new Hono<AppEnv>();
 
 // ── POST /:noteId/pages ─────────────────────────────────────────────────────
@@ -359,6 +417,7 @@ app.get("/:noteId/pages", authOptional, async (c) => {
   const limit = parsePagesLimit(c.req.query("limit"));
   const cursor = decodePagesCursor(c.req.query("cursor"));
   const include = parsePagesInclude(c.req.query("include"));
+  const tagsFilter = parseTagsFilter(c.req.query("tags"));
 
   // keyset 条件: `(updated_at, id)` を `(c.updatedAt, c.id)` より小さい組に絞る。
   // `ORDER BY updated_at DESC, id DESC` と同じ向きで進めるため、
@@ -375,6 +434,47 @@ app.get("/:noteId/pages", authOptional, async (c) => {
   // gemini-code-assist + codex on PR #865). Fetching `limit + 1` rows lets
   // us emit `next_cursor` without a separate count query.
   const whereClauses = [eq(pages.noteId, noteId), eq(pages.isDeleted, false)];
+
+  // タグフィルタ (`?tags=`) を WHERE 句に AND で足す。`untagged-only` は
+  // `links` / `ghost_links` どちらにも `link_type='tag'` の出辺が無いページに
+  // 絞り込む。通常の OR フィルタは `links → target.title` または
+  // `ghost_links.link_text` のいずれかが選択タグに含まれるページに絞る。
+  // 小文字キーで突合し、`pages.title` 側も `LOWER(...)` で比較する。
+  //
+  // Apply `?tags=` as an additional WHERE predicate on top of the keyset
+  // pagination. `untagged-only` keeps only pages with zero `link_type='tag'`
+  // edges in both tables. The OR list matches pages whose tag edge points at
+  // a page title in the set or whose ghost-link text is in the set, all
+  // compared case-insensitively against the lower-cased tags.
+  if (tagsFilter) {
+    if (tagsFilter.kind === "untagged-only") {
+      whereClauses.push(sql`NOT EXISTS (
+        SELECT 1 FROM links l WHERE l.source_id = ${pages.id} AND l.link_type = 'tag'
+      )`);
+      whereClauses.push(sql`NOT EXISTS (
+        SELECT 1 FROM ghost_links gl WHERE gl.source_page_id = ${pages.id} AND gl.link_type = 'tag'
+      )`);
+    } else {
+      const tagsParam = sql`${tagsFilter.tags}::text[]`;
+      whereClauses.push(sql`(
+        EXISTS (
+          SELECT 1 FROM links l
+          JOIN pages t ON t.id = l.target_id
+          WHERE l.source_id = ${pages.id}
+            AND l.link_type = 'tag'
+            AND t.is_deleted = false
+            AND LOWER(t.title) = ANY(${tagsParam})
+        )
+        OR EXISTS (
+          SELECT 1 FROM ghost_links gl
+          WHERE gl.source_page_id = ${pages.id}
+            AND gl.link_type = 'tag'
+            AND LOWER(gl.link_text) = ANY(${tagsParam})
+        )
+      )`);
+    }
+  }
+
   if (cursor) {
     const cursorTsSql = sql`${cursor.updatedAt}::timestamptz`;
     // drizzle の `or()` は要素が空配列のとき undefined を返す型だが、ここでは

@@ -47,6 +47,16 @@ export interface NoteApiFields {
    */
   is_default: boolean;
   view_count: number;
+  /**
+   * `/notes/:noteId` のタグフィルタバーをオーナーが既定で表示するか。
+   * Owner-declared default for the tag filter bar above the page list.
+   */
+  show_tag_filter_bar: boolean;
+  /**
+   * フィルタバーの既定選択タグ (小文字キー、`__none__` トークンを含み得る)。
+   * Default tags selected on first load (lower-cased keys; may contain `__none__`).
+   */
+  default_filter_tags: string[];
   created_at: Date;
   updated_at: Date;
   is_deleted: boolean;
@@ -185,4 +195,44 @@ export interface DiscoverApiItem {
 export interface DiscoverApiResponse {
   official: DiscoverApiItem[];
   notes: DiscoverApiItem[];
+}
+
+/**
+ * `GET /api/notes/:noteId/tags` の `items[]` 1 件分。
+ * Single row from the note tag aggregation endpoint.
+ *
+ * - `name` は表示名 (resolved 側を優先)。
+ * - `name_lower` は大文字小文字無視のキー。
+ * - `page_count` はこのタグが付いているアクティブページの distinct 件数。
+ * - `resolved` はすべての出現が `links` 経由 (同名ページが存在) であれば `true`、
+ *   1 件でも `ghost_links` 経由が混ざれば `false`。
+ *
+ * `name` is the display spelling (resolved-side wins); `name_lower` is the
+ * case-insensitive key; `page_count` is the distinct count of active pages
+ * tagged with this name; `resolved` is `true` only when every occurrence
+ * resolves via `links`.
+ */
+export interface NoteTagAggregationItem {
+  name: string;
+  name_lower: string;
+  page_count: number;
+  resolved: boolean;
+}
+
+/**
+ * `GET /api/notes/:noteId/tags` のレスポンス全体。
+ * Full response shape for the note tag aggregation endpoint.
+ *
+ * `none_count` は「`links` / `ghost_links` どちらにも `link_type='tag'` の
+ * 出辺を持たないアクティブページ」の件数。「タグなし」フィルタの件数表示と、
+ * UI で「タグなし」チップを出すかの判定に使う。
+ *
+ * `none_count` is the number of active pages with no outgoing tag edge in
+ * either `links` or `ghost_links`; the UI uses it for the "untagged" chip
+ * count and visibility.
+ */
+export interface NoteTagAggregationResponse {
+  items: NoteTagAggregationItem[];
+  none_count: number;
+  total_pages: number;
 }
