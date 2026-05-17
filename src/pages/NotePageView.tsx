@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Download, History, Trash2 } from "lucide-react";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
-import { PageEditorContent } from "@/components/editor/PageEditor/PageEditorContent";
+import { PageEditorContent } from "@/components/note/PageEditorContent";
+import { NotePagePublicView } from "@/components/note/NotePagePublicView";
 import {
   PageEditorHeader,
   type PageDetailToolbarAction,
@@ -35,6 +36,7 @@ import { NoteWorkspaceProvider, useNoteWorkspaceOptional } from "@/contexts/Note
 import { useAIChatContext } from "@/contexts/AIChatContext";
 import { NoteWorkspaceToolbar } from "@/components/note/NoteWorkspaceToolbar";
 import { useMarkdownExport } from "@/components/editor/PageEditor/useMarkdownExport";
+import { usePagePublicContent } from "@/hooks/usePagePublicContent";
 import { PageHistoryModal } from "@/components/editor/pageHistory/PageHistoryModal";
 import { convertMarkdownToTiptapContent } from "@/lib/markdownToTiptap";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
@@ -481,12 +483,23 @@ function NotePageEditorEditable({
 
 /**
  * 閲覧専用モードのノートページ本文。共通ツールバーには「変更履歴」「Markdown
- * でエクスポート」「Markdown をコピー」を出すが、削除は出さない。Markdown の
- * ソースは `page.title` / `page.content` をそのまま使う。
+ * でエクスポート」「Markdown をコピー」を出すが、削除は出さない。本文の表示と
+ * Markdown export / copy の両ソースは共有フック `usePagePublicContent`
+ * (`GET /api/pages/:id/public-content`) 由来の `publicContent.title` /
+ * `content_text` を使う。`apiPageToPage` がメタデータの `content` を `""` に
+ * 落とすため `page.content` を読むと export が空になる回帰になっていた
+ * (Codex P1, PR #893)。`NotePagePublicView` も同じフックを使い、TanStack
+ * Query のクエリキーで 1 リクエストに dedup される。
  *
  * Read-only note page body. Surfaces the shared toolbar with history /
- * export / copy actions but omits delete. Markdown export and copy read the
- * saved `page.title` / `page.content` directly.
+ * export / copy actions but omits delete. The visible body and the Markdown
+ * export / copy actions both source their text from the shared
+ * `usePagePublicContent` hook (`GET /api/pages/:id/public-content`) —
+ * specifically `publicContent.title` / `publicContent.content_text` — to
+ * avoid the regression where reading `page.content` produced empty exports
+ * (`apiPageToPage` strips `content` to `""`; Codex P1 review on PR #893).
+ * `NotePagePublicView` consumes the same hook, so TanStack Query dedups the
+ * two consumers into a single network request.
  */
 function NotePageReadOnly({
   page,
@@ -514,9 +527,26 @@ function NotePageReadOnly({
 }): React.JSX.Element {
   const { t } = useTranslation();
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Codex P1 (PR #893 review): export/copy のソースとしての `page.content` は
+  // `apiPageToPage` 内で常に `""` にされている。一方で画面に出ている本文は
+  // `GET /api/pages/:id/public-content` の `content_text` を経由するため、
+  // この経路でも同じ public-content を引いて両者を揃える。`NotePagePublicView`
+  // と共通の `usePagePublicContent` フックを使うため TanStack Query 上で
+  // 1 リクエストに dedup される。
+  //
+  // Codex P1 (PR #893 review): `page.content` is `""` for every read-only
+  // page (`apiPageToPage` strips it). Without this fix, Markdown export /
+  // copy generated empty output while the body was visible on screen.
+  // Source the export from the same `public-content` query that powers
+  // `NotePagePublicView` — the shared `usePagePublicContent` hook ensures
+  // both consumers dedup into a single network request.
+  const { data: publicContent, isLoading: isPublicContentLoading } = usePagePublicContent(page.id);
+  const exportSource = publicContent?.content_text ?? "";
+  const isExportSourceReady = Boolean(publicContent && !isPublicContentLoading);
   const { handleExportMarkdown, handleCopyMarkdown } = useMarkdownExport(
-    page.title,
-    page.content ?? "",
+    publicContent?.title ?? page.title,
+    exportSource,
     page.sourceUrl,
   );
 
@@ -544,17 +574,38 @@ function NotePageReadOnly({
         label: t("editor.pageMenu.exportMarkdown"),
         icon: Download,
         onClick: handleExportMarkdown,
+        // 公開コンテンツが未到着の段階で空 Markdown を吐かないように無効化。
+        // Block invocation until the public-content query resolves to avoid
+        // exporting an empty Markdown file (Codex P1, PR #893).
+        disabled: !isExportSourceReady,
       },
       {
         id: "copy-markdown",
         label: t("editor.pageMenu.copyMarkdown"),
         icon: Copy,
         onClick: handleCopyMarkdown,
+        disabled: !isExportSourceReady,
       },
     );
     return items;
-  }, [t, canViewHistory, handleOpenHistory, handleExportMarkdown, handleCopyMarkdown]);
+  }, [
+    t,
+    canViewHistory,
+    handleOpenHistory,
+    handleExportMarkdown,
+    handleCopyMarkdown,
+    isExportSourceReady,
+  ]);
 
+  // Issue #889 Phase 2: 本文は `NotePagePublicView` に委譲し、Y.Doc / WebSocket を
+  // 一切張らずに `GET /api/pages/:id/public-content` から読み取る。`NotePageReadOnly`
+  // 自体はツールバー (履歴 / Markdown export / copy) と PageHistoryModal の chrome
+  // を担当する。
+  //
+  // Issue #889 Phase 2: Delegate the body to `NotePagePublicView`, which loads
+  // text-only content via the public-content endpoint and avoids opening any
+  // Y.Doc or WebSocket session. `NotePageReadOnly` keeps responsibility for the
+  // toolbar (history / Markdown export / copy) and the history modal chrome.
   return (
     <>
       <PageEditorHeader
@@ -562,21 +613,7 @@ function NotePageReadOnly({
         menuItems={menuItems}
         supplementalRightContent={supplementalRightContent}
       />
-      <PageEditorContent
-        content={page.content ?? ""}
-        title={page.title}
-        sourceUrl={page.sourceUrl}
-        currentPageId={page.id}
-        pageId={page.id}
-        isNewPage={false}
-        isWikiGenerating={false}
-        isReadOnly={true}
-        showLinkedPages={false}
-        showToolbar={false}
-        onContentChange={() => undefined}
-        onContentError={() => undefined}
-        pageNoteId={page.noteId ?? null}
-      />
+      <NotePagePublicView pageId={page.id} page={page} />
       {historyOpen && (
         <PageHistoryModal
           open={historyOpen}

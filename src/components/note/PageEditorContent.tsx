@@ -1,17 +1,17 @@
 import React, { useRef, useCallback, useMemo } from "react";
 import type { MutableRefObject } from "react";
 import { Loader2 } from "lucide-react";
-import TiptapEditor from "../TiptapEditor";
-import type { ContentError } from "../TiptapEditor/useContentSanitizer";
-import type { CollaborationConfig } from "../TiptapEditor/types";
-import { SourceUrlBadge } from "../SourceUrlBadge";
-import { WikiGeneratorButton } from "../WikiGeneratorButton";
+import TiptapEditor from "@/components/editor/TiptapEditor";
+import type { ContentError } from "@/components/editor/TiptapEditor/useContentSanitizer";
+import type { CollaborationConfig } from "@/components/editor/TiptapEditor/types";
+import { SourceUrlBadge } from "@/components/editor/SourceUrlBadge";
+import { WikiGeneratorButton } from "@/components/editor/WikiGeneratorButton";
 import { LinkedPagesSection } from "@/components/page/LinkedPagesSection";
 import { LintSuggestions } from "@/components/page/LintSuggestions";
 import Container from "@/components/layout/Container";
 import { isContentNotEmpty } from "@/lib/contentUtils";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
-import type { WikiGeneratorStatus } from "./types";
+import type { WikiGeneratorStatus } from "@/hooks/useWikiGenerator";
 import { PageTitleBlock } from "./PageTitleBlock";
 
 /**

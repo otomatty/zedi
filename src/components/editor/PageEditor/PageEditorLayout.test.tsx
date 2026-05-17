@@ -38,7 +38,7 @@ vi.mock("./PageEditorAlerts", () => ({
   PageEditorAlerts: () => <div data-testid="editor-alerts" />,
 }));
 
-vi.mock("./PageEditorContent", () => ({
+vi.mock("@/components/note/PageEditorContent", () => ({
   PageEditorContent: () => <div data-testid="editor-content" />,
 }));
 

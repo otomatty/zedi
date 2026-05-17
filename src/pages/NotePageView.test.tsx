@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import NotePageView from "./NotePageView";
 import { useNote, useNotePage, useNoteApi, useRemovePageFromNote } from "@/hooks/useNoteQueries";
 import { useAuth } from "@/hooks/useAuth";
+import { usePagePublicContent } from "@/hooks/usePagePublicContent";
 import { AIChatProvider } from "@/contexts/AIChatContext";
 
 const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
@@ -22,6 +23,7 @@ const {
   mockExportMarkdown,
   mockCopyMarkdown,
   mockRemoveFromNoteMutate,
+  mockUseMarkdownExport,
 } = vi.hoisted(() => ({
   mockToast: vi.fn(),
   mockUpdatePageMutateAsync: vi.fn().mockResolvedValue({ skipped: false }),
@@ -33,6 +35,13 @@ const {
   mockExportMarkdown: vi.fn(),
   mockCopyMarkdown: vi.fn().mockResolvedValue(undefined),
   mockRemoveFromNoteMutate: vi.fn(),
+  // `useMarkdownExport(title, body, sourceUrl)` の呼び出し引数を捕捉するための
+  // モック。Codex P1 (PR #893) の「export/copy が `page.content` を読んで空に
+  // なる」回帰を防ぐためのテストで、引き渡された `body` を検査する。
+  // Capture the args `useMarkdownExport(title, body, sourceUrl)` is called with
+  // so the regression test (Codex P1 on PR #893) can assert the body matches
+  // the public-content response rather than the always-empty `page.content`.
+  mockUseMarkdownExport: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -120,10 +129,24 @@ vi.mock("@/hooks/useCollaboration", () => ({
 }));
 
 vi.mock("@/components/editor/PageEditor/useMarkdownExport", () => ({
-  useMarkdownExport: vi.fn(() => ({
-    handleExportMarkdown: mockExportMarkdown,
-    handleCopyMarkdown: mockCopyMarkdown,
-  })),
+  useMarkdownExport: (...args: unknown[]) => {
+    mockUseMarkdownExport(...args);
+    return {
+      handleExportMarkdown: mockExportMarkdown,
+      handleCopyMarkdown: mockCopyMarkdown,
+    };
+  },
+}));
+
+// 読み取り専用経路の Markdown export ソースは `usePagePublicContent` 経由で
+// 取得した `content_text` に切り替わった (Codex P1, PR #893)。テストは初期値で
+// 「ロード完了 + 本文あり」を返し、必要なテストだけ `mockReturnValue` で上書きする。
+// The read-only Markdown export source now comes from `usePagePublicContent`
+// (Codex P1 on PR #893). Default mock returns a resolved, non-empty body;
+// individual tests override via `mockReturnValue` when they need a different
+// state (loading / empty content / error).
+vi.mock("@/hooks/usePagePublicContent", () => ({
+  usePagePublicContent: vi.fn(),
 }));
 
 // `PageHistoryModal` は重い依存（yjs / snapshot queries）を引き込むので、テスト
@@ -152,7 +175,7 @@ vi.mock("@/components/layout/Container", () => ({
   ),
 }));
 
-vi.mock("@/components/editor/PageEditor/PageEditorContent", () => ({
+vi.mock("@/components/note/PageEditorContent", () => ({
   PageEditorContent: ({
     title,
     onTitleChange,
@@ -166,6 +189,16 @@ vi.mock("@/components/editor/PageEditor/PageEditorContent", () => ({
         change-title
       </button>
     </div>
+  ),
+}));
+
+// 読み取り専用分岐 (`!canEdit`) は `NotePagePublicView` に委譲される。
+// 内部実装をここで描画する必要はないので test 用 stub に差し替える。
+// The `!canEdit` branch delegates to `NotePagePublicView`. Stub it so the
+// branch test only asserts the delegation, not the inner rendering.
+vi.mock("@/components/note/NotePagePublicView", () => ({
+  NotePagePublicView: ({ pageId }: { pageId: string }) => (
+    <div data-testid="note-public-view" data-page-id={pageId} />
   ),
 }));
 
@@ -287,6 +320,24 @@ describe("NotePageView", () => {
     mockExportMarkdown.mockReset();
     mockCopyMarkdown.mockReset().mockResolvedValue(undefined);
     mockRemoveFromNoteMutate.mockReset();
+    mockUseMarkdownExport.mockReset();
+    // 既定: read-only 経路の公開コンテンツは「ロード完了 + 本文あり」。
+    // Default: read-only public content is resolved with a non-empty body so
+    // existing tests asserting menu item presence and click behavior remain
+    // unaffected. Individual tests override this for loading / empty cases.
+    vi.mocked(usePagePublicContent).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Public title",
+        content_text: "public body",
+        content_preview: null,
+        version: 1,
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    } as never);
     vi.mocked(useRemovePageFromNote).mockReturnValue({
       mutate: mockRemoveFromNoteMutate,
       isPending: false,
@@ -880,6 +931,119 @@ describe("NotePageView", () => {
     expect(screen.getByTestId("page-editor")).toBeInTheDocument();
   });
 
+  // Issue #889 Phase 2: 非編集者には Y.Doc を一切張らない `NotePagePublicView` に委譲する。
+  // Issue #889 Phase 2: Non-editors are delegated to `NotePagePublicView`, which
+  // never opens a Y.Doc / WebSocket session.
+  it("非編集者には NotePagePublicView を描画する / delegates the read-only branch to NotePagePublicView", () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: false },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Read only",
+        content: "{}",
+        ownerUserId: "user-other",
+        noteId: "note-1",
+      },
+      isLoading: false,
+    } as never);
+
+    renderNotePageView();
+
+    const publicView = screen.getByTestId("note-public-view");
+    expect(publicView).toBeInTheDocument();
+    expect(publicView).toHaveAttribute("data-page-id", "page-1");
+    // 編集パスの `PageEditorContent` は描画されないこと。
+    // The editable-path `PageEditorContent` must not be rendered.
+    expect(screen.queryByTestId("page-editor")).not.toBeInTheDocument();
+  });
+
+  // Codex P1 (PR #893): `useNotePage` 経由の `page.content` は常に "" のため、
+  // 読み取り経路の Markdown export / copy は `usePagePublicContent` 由来の
+  // `content_text` を使う必要がある。
+  // Codex P1 (PR #893): `page.content` from `useNotePage` is always `""`, so
+  // read-only Markdown export / copy must consume `content_text` from the
+  // public-content query instead.
+  it("読み取り経路の Markdown export は public-content の content_text を使う / read-only Markdown export sources text from public-content", () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: false },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        // `apiPageToPage` is hard-coded to `""` here; this is the regression input.
+        title: "Stale metadata title",
+        content: "",
+        ownerUserId: "user-other",
+        noteId: "note-1",
+      },
+      isLoading: false,
+    } as never);
+    vi.mocked(usePagePublicContent).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Fresh public title",
+        content_text: "real body from public-content",
+        content_preview: null,
+        version: 1,
+        updated_at: "2026-01-01T00:00:00Z",
+      },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    } as never);
+
+    renderNotePageView();
+
+    // `useMarkdownExport(title, body, sourceUrl)` の 2 引数目に public-content の
+    // `content_text` が、1 引数目に response の `title` が渡ること。
+    // The second arg to `useMarkdownExport(title, body, sourceUrl)` must be the
+    // public-content `content_text` and the first arg must be its `title`.
+    expect(mockUseMarkdownExport).toHaveBeenCalled();
+    const lastCall = mockUseMarkdownExport.mock.calls[mockUseMarkdownExport.mock.calls.length - 1];
+    expect(lastCall?.[0]).toBe("Fresh public title");
+    expect(lastCall?.[1]).toBe("real body from public-content");
+  });
+
+  it("public-content が未到着の間は export/copy メニュー項目を無効化する / disables export/copy until public-content resolves", () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: false },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Loading body",
+        content: "",
+        ownerUserId: "user-other",
+        noteId: "note-1",
+      },
+      isLoading: false,
+    } as never);
+    vi.mocked(usePagePublicContent).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+      refetch: vi.fn(),
+    } as never);
+
+    renderNotePageView();
+
+    const exportItem = screen.getByText("editor.pageMenu.exportMarkdown").closest("button");
+    const copyItem = screen.getByText("editor.pageMenu.copyMarkdown").closest("button");
+    expect(exportItem).toBeDisabled();
+    expect(copyItem).toBeDisabled();
+  });
+
   it("saves note-native page titles through the page-content API for note editors", async () => {
     vi.mocked(useNote).mockReturnValue({
       note: { id: "note-1" },
@@ -1011,12 +1175,19 @@ describe("NotePageView", () => {
     } as never);
 
     renderNotePageView();
-    fireEvent.click(screen.getByText("change-title"));
     vi.advanceTimersByTime(500);
     await Promise.resolve();
 
+    // Issue #889 Phase 2: 非編集者には NotePagePublicView を描画する。
+    // 編集可能な PageEditorContent (`page-editor` / `change-title` ボタンを持つ)
+    // は mount されないため、タイトル編集や save 経路には決して到達しない。
+    // Issue #889 Phase 2: Non-editors render `NotePagePublicView` instead of the
+    // editable `PageEditorContent`, so the title-edit button never mounts and
+    // the save paths are unreachable by construction.
     expect(screen.getByText("閲覧専用")).toBeInTheDocument();
-    expect(screen.getByTestId("page-title")).toHaveTextContent("Original title");
+    expect(screen.getByTestId("note-public-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("page-editor")).not.toBeInTheDocument();
+    expect(screen.queryByText("change-title")).not.toBeInTheDocument();
     expect(mockApi.putPageContent).not.toHaveBeenCalled();
     expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
   });
