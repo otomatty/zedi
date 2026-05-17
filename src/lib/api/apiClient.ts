@@ -36,7 +36,10 @@ import type {
   NotePageWindowInclude,
   NotePageWindowResponse,
   NotePageTitleIndexResponse,
+  NoteTagAggregationResponse,
 } from "./types";
+import type { SelectedTags } from "@/types/tagFilter";
+import { serializeTagsParam } from "@/lib/noteTagFilterBar/urlTagsCodec";
 
 export type { NoteListItem };
 
@@ -479,6 +482,7 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
         cursor?: string | null;
         limit?: number;
         include?: ReadonlyArray<NotePageWindowInclude>;
+        tags?: SelectedTags;
       } = {},
     ): Promise<NotePageWindowResponse> {
       const query: Record<string, string> = {};
@@ -492,10 +496,32 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
         const tokens = Array.from(new Set(params.include));
         query.include = tokens.join(",");
       }
+      if (params.tags) {
+        // `serializeTagsParam` は none-selected で null を返すので param 自体を
+        // 省略する。`__none__` や `tags=a,b` の URL 形は codec が決める。
+        // Skip the param when the filter is `none-selected`; the codec
+        // encodes `__none__` / `tags=a,b` consistently with the front-end URL.
+        const serialized = serializeTagsParam(params.tags);
+        if (serialized) query.tags = serialized;
+      }
       return reqOptionalAuth<NotePageWindowResponse>(
         "GET",
         `/api/notes/${encodeURIComponent(noteId)}/pages`,
         { query },
+      );
+    },
+
+    /**
+     * `GET /api/notes/:noteId/tags` — タグフィルタバー用の集計を取得する。
+     * `authOptional` なので公開 / unlisted ノートは未ログインでも呼べる。
+     *
+     * Fetch the tag aggregation for the filter bar. `authOptional`, so
+     * public / unlisted notes are reachable without sign-in.
+     */
+    async getNoteTags(noteId: string): Promise<NoteTagAggregationResponse> {
+      return reqOptionalAuth<NoteTagAggregationResponse>(
+        "GET",
+        `/api/notes/${encodeURIComponent(noteId)}/tags`,
       );
     },
 
@@ -541,7 +567,22 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     /** PUT /api/notes/:id — update note (owner only). */
     async updateNote(
       noteId: string,
-      body: { title?: string; visibility?: string; edit_permission?: string },
+      body: {
+        title?: string;
+        visibility?: string;
+        edit_permission?: string;
+        /**
+         * オーナーが既定でタグフィルタバーを表示するか。ユーザー側は localStorage
+         * で個別に上書き可能。
+         * Owner-side default for showing the filter bar; users can override locally.
+         */
+        show_tag_filter_bar?: boolean;
+        /**
+         * フィルタバーの既定選択タグ（小文字キー、`__none__` を含み得る）。
+         * Default tags selected on first load (lower-cased; may include `__none__`).
+         */
+        default_filter_tags?: string[];
+      },
     ): Promise<NoteListItem> {
       return req<NoteListItem>("PUT", `/api/notes/${encodeURIComponent(noteId)}`, { body });
     },

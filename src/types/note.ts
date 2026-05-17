@@ -38,6 +38,19 @@ export interface Note {
    */
   isDefault: boolean;
   viewCount: number;
+  /**
+   * オーナーが「`/notes/:noteId` のページ一覧上部にタグフィルタバーを既定で
+   * 表示する」と宣言したか。ユーザーは localStorage で個別に上書き可能。
+   *
+   * Owner-declared default for showing the tag filter bar above the page
+   * list on `/notes/:noteId`. Per-user overrides live in localStorage.
+   */
+  showTagFilterBar: boolean;
+  /**
+   * フィルタバーの既定選択タグ（小文字キー、`__none__` トークンを含み得る）。
+   * Default tags selected on first load (lower-cased keys; may include `__none__`).
+   */
+  defaultFilterTags: string[];
   createdAt: number;
   updatedAt: number;
   isDeleted: boolean;
