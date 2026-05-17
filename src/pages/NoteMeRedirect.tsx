@@ -1,7 +1,8 @@
 import React from "react";
 import { Navigate, useLocation, useSearchParams } from "react-router-dom";
-import { Skeleton } from "@zedi/ui";
 import Container from "@/components/layout/Container";
+import { PageGridSkeleton } from "@/components/page/PageGrid";
+import { useContainerColumns } from "@/hooks/useContainerColumns";
 import { useMyNote } from "@/hooks/useNoteQueries";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { isClipUrlAllowed } from "@/lib/webClipper";
@@ -54,6 +55,11 @@ const NoteMeRedirect: React.FC = () => {
   const location = useLocation();
   const { needsSetupWizard } = useOnboarding();
   const { data, isLoading, error } = useMyNote({ enabled: !needsSetupWizard });
+  // リダイレクト先の `NoteView` 内 `PageGrid` と同じ列数計測ロジックを使い、
+  // 解決中スケルトンと遷移後の実コンテンツでカード列数を一致させる。
+  // Use the same container-width measurement as the destination `PageGrid` so
+  // the placeholder columns match the eventual rendered grid.
+  const { ref: columnsRef, columns } = useContainerColumns();
 
   // セットアップウィザード未完了のユーザーは先にオンボーディングに送る。
   // useMyNote 側の API は idempotent だがウィザード後にデフォルトノートを
@@ -66,16 +72,17 @@ const NoteMeRedirect: React.FC = () => {
   }
 
   if (isLoading) {
+    // 旧実装の独自 3 カラムスケルトンは、リダイレクト先 `NoteView` の `PageGrid`
+    // が出すスケルトンと見た目がズレて視覚的なジャンプが発生していたため、
+    // 同じ `PageGridSkeleton` を先行表示してジャンプを抑える。
+    // The previous bespoke 3-column skeleton diverged from the `PageGridSkeleton`
+    // rendered by the destination `NoteView`, causing a visible jump after
+    // redirect. Render the same skeleton here so the transition is seamless.
     return (
-      <div className="min-h-0 flex-1 py-10">
+      <div className="min-h-0 flex-1 py-6">
         <Container>
-          <div className="space-y-4">
-            <Skeleton className="h-8 w-48" />
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-            </div>
+          <div ref={columnsRef}>
+            <PageGridSkeleton columns={columns} />
           </div>
         </Container>
       </div>
