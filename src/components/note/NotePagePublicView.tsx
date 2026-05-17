@@ -1,9 +1,8 @@
 import React, { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@zedi/ui";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
-import { useNoteApi } from "@/hooks/useNoteQueries";
+import { usePagePublicContent } from "@/hooks/usePagePublicContent";
 import { ApiError } from "@/lib/api";
 import { convertMarkdownToTiptapContent } from "@/lib/markdownToTiptap";
 import type { Page } from "@/types/page";
@@ -62,18 +61,13 @@ export interface NotePagePublicViewProps {
  */
 export const NotePagePublicView: React.FC<NotePagePublicViewProps> = ({ pageId, page }) => {
   const { t } = useTranslation();
-  const { api } = useNoteApi();
 
-  // 専用フックを別途切らない理由: 現状の consumer はこの 1 箇所のみ。
-  // 2 件目が増えたら `pageKeys.publicContent(pageId)` を切り出して hoist する。
-  // Inlined to avoid a new shared hook while this is the sole consumer; if a
-  // second caller appears, hoist the query key into `pageKeys.publicContent`.
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["page-public-content", pageId],
-    queryFn: () => api.getPagePublicContent(pageId),
-    enabled: Boolean(pageId),
-    staleTime: 1000 * 60,
-  });
+  // クエリキー (`["page-public-content", pageId]`) は `usePagePublicContent`
+  // が定義しており、`NotePageReadOnly` の Markdown export 経路と共有される。
+  // The shared query key lives in `usePagePublicContent` and is reused by
+  // `NotePageReadOnly` so Markdown export and the rendered body never drift
+  // apart (Codex P1 review on PR #893).
+  const { data, isLoading, error, refetch } = usePagePublicContent(pageId);
 
   // `PageEditorContent.content` は `useContentSanitizer` 内で `JSON.parse` される
   // Tiptap JSON 前提のため、プレーンテキストの `content_text` を直接渡すと解析

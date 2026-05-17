@@ -36,6 +36,7 @@ import { NoteWorkspaceProvider, useNoteWorkspaceOptional } from "@/contexts/Note
 import { useAIChatContext } from "@/contexts/AIChatContext";
 import { NoteWorkspaceToolbar } from "@/components/note/NoteWorkspaceToolbar";
 import { useMarkdownExport } from "@/components/editor/PageEditor/useMarkdownExport";
+import { usePagePublicContent } from "@/hooks/usePagePublicContent";
 import { PageHistoryModal } from "@/components/editor/pageHistory/PageHistoryModal";
 import { convertMarkdownToTiptapContent } from "@/lib/markdownToTiptap";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
@@ -515,9 +516,26 @@ function NotePageReadOnly({
 }): React.JSX.Element {
   const { t } = useTranslation();
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Codex P1 (PR #893 review): export/copy のソースとしての `page.content` は
+  // `apiPageToPage` 内で常に `""` にされている。一方で画面に出ている本文は
+  // `GET /api/pages/:id/public-content` の `content_text` を経由するため、
+  // この経路でも同じ public-content を引いて両者を揃える。`NotePagePublicView`
+  // と共通の `usePagePublicContent` フックを使うため TanStack Query 上で
+  // 1 リクエストに dedup される。
+  //
+  // Codex P1 (PR #893 review): `page.content` is `""` for every read-only
+  // page (`apiPageToPage` strips it). Without this fix, Markdown export /
+  // copy generated empty output while the body was visible on screen.
+  // Source the export from the same `public-content` query that powers
+  // `NotePagePublicView` — the shared `usePagePublicContent` hook ensures
+  // both consumers dedup into a single network request.
+  const { data: publicContent, isLoading: isPublicContentLoading } = usePagePublicContent(page.id);
+  const exportSource = publicContent?.content_text ?? "";
+  const isExportSourceReady = Boolean(publicContent && !isPublicContentLoading);
   const { handleExportMarkdown, handleCopyMarkdown } = useMarkdownExport(
-    page.title,
-    page.content ?? "",
+    publicContent?.title ?? page.title,
+    exportSource,
     page.sourceUrl,
   );
 
@@ -545,16 +563,28 @@ function NotePageReadOnly({
         label: t("editor.pageMenu.exportMarkdown"),
         icon: Download,
         onClick: handleExportMarkdown,
+        // 公開コンテンツが未到着の段階で空 Markdown を吐かないように無効化。
+        // Block invocation until the public-content query resolves to avoid
+        // exporting an empty Markdown file (Codex P1, PR #893).
+        disabled: !isExportSourceReady,
       },
       {
         id: "copy-markdown",
         label: t("editor.pageMenu.copyMarkdown"),
         icon: Copy,
         onClick: handleCopyMarkdown,
+        disabled: !isExportSourceReady,
       },
     );
     return items;
-  }, [t, canViewHistory, handleOpenHistory, handleExportMarkdown, handleCopyMarkdown]);
+  }, [
+    t,
+    canViewHistory,
+    handleOpenHistory,
+    handleExportMarkdown,
+    handleCopyMarkdown,
+    isExportSourceReady,
+  ]);
 
   // Issue #889 Phase 2: 本文は `NotePagePublicView` に委譲し、Y.Doc / WebSocket を
   // 一切張らずに `GET /api/pages/:id/public-content` から読み取る。`NotePageReadOnly`
