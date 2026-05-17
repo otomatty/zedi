@@ -37,8 +37,6 @@ function createMockApi(): ApiClient {
     upsertMe: vi.fn(),
     getSyncPages: vi.fn(),
     postSyncPages: vi.fn(),
-    getPageContent: vi.fn(),
-    putPageContent: vi.fn(),
     createPage: vi.fn(),
     deletePage: vi.fn(),
     getNotes: vi.fn(),

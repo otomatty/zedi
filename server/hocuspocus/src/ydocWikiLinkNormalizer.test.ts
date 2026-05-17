@@ -1,16 +1,14 @@
 /**
- * Hocuspocus 側に複製した `applyWikiLinkMarksToYDoc` のスモークテスト。
- * 詳細な受入条件テストは `server/api/src/__tests__/services/ydocWikiLinkNormalizer.test.ts`
- * 側で実施しており、こちらは「複製がリンクできる / 主要 3 パスで期待動作する」
- * のみを最小限で確認する。`src/lib/ydocWikiLinkNormalizerSync.test.ts` がバイト
- * レベル一致を別途保証する。
+ * `applyWikiLinkMarksToYDoc` の動作確認テスト。Issue #889 Phase 4 で API 側の
+ * 二重実装と client 側 drift 検出テストを削除して以降、本テストが唯一の
+ * 自動テストとなる。promote / skip-already-marked / idempotent の 3 経路を
+ * 中心にカバーする。
  *
- * Smoke tests for the Hocuspocus copy of `applyWikiLinkMarksToYDoc`. The
- * exhaustive contract suite lives in the api-side test; this file only
- * checks that the copy compiles, links, and behaves correctly on the three
- * canonical paths (promote, skip-already-marked, idempotent). The drift
- * detector in `src/lib/ydocWikiLinkNormalizerSync.test.ts` guarantees the
- * two implementations stay byte-equivalent.
+ * Behaviour tests for `applyWikiLinkMarksToYDoc`. Since Issue #889 Phase 4
+ * removed the api-side duplicate implementation and the client-side drift
+ * detector, this file is now the sole automated coverage. It exercises the
+ * three canonical paths: promotion of unmarked literals, skipping marks that
+ * already exist, and idempotency on repeat invocation.
  */
 
 import { describe, it, expect } from "vitest";
@@ -33,7 +31,7 @@ function buildParagraphDoc(
   return { doc, text };
 }
 
-describe("applyWikiLinkMarksToYDoc (hocuspocus copy)", () => {
+describe("applyWikiLinkMarksToYDoc", () => {
   it("promotes unmarked `[[Title]]` to a wikiLink mark", () => {
     const { doc, text } = buildParagraphDoc([{ insert: "see [[Foo]] now" }]);
     const result = applyWikiLinkMarksToYDoc(doc);

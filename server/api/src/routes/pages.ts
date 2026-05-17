@@ -1,159 +1,41 @@
 /**
- * /api/pages — ページ CRUD + コンテンツ管理
+ * /api/pages — ページ CRUD + 読み取り専用コンテンツ取得
  *
  * GET    /api/pages                       — 後方互換のページ一覧（Issue #823 以降は `Deprecation: true`）。
  *        新規実装は `GET /api/notes/me` → `GET /api/notes/:noteId/pages` を推奨。
  *        — Legacy page listing (sends `Deprecation: true` after issue #823).
  *        Prefer `GET /api/notes/me` then `GET /api/notes/:noteId/pages` for new clients.
- * GET    /api/pages/:id/content        — Y.Doc コンテンツ取得（`page_contents` 行が未作成の空ページは 200 + 空 ydoc）
- *        — Retrieve Y.Doc content (200 + empty `ydoc_state` when no `page_contents` row).
  * GET    /api/pages/:id/public-content — 読み取り専用のページ本文（ゲスト・viewer 用 / Y.Doc を返さない）
  *        — Read-only page text for guests / viewer-only callers (no Y.Doc bytes).
- * PUT    /api/pages/:id/content        — Y.Doc コンテンツ更新 (楽観的ロック) / Update with optimistic locking
+ * GET    /api/pages/:id                — 単一ページのメタデータ取得 / Single-page metadata fetch
  * PUT    /api/pages/:id                — ページメタデータ（タイトル等）更新 / Update page metadata (title, preview)
  * POST   /api/pages                    — 新規ページ作成 / Create page
  * DELETE /api/pages/:id                — ページ論理削除 / Soft-delete page
+ *
+ * Issue #889 Phase 4: `local` コラボレーションモード廃止に伴い、Y.Doc バイト列を
+ * 直接やり取りする `GET/PUT /api/pages/:id/content` ルートは削除した。本文の
+ * 編集はすべて Hocuspocus WebSocket 経由、読み取り専用閲覧は
+ * `GET /api/pages/:id/public-content` 経由に統一されている。
+ *
+ * Issue #889 Phase 4: the `local` collaboration mode has been retired. The
+ * legacy `GET/PUT /api/pages/:id/content` routes that exchanged raw Y.Doc
+ * bytes are gone — editors flow through Hocuspocus over WebSocket, while
+ * read-only consumers use `GET /api/pages/:id/public-content`.
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and, sql } from "drizzle-orm";
-import * as Y from "yjs";
 import { pages, pageContents, type Page } from "../schema/index.js";
 import { authRequired, authOptional } from "../middleware/auth.js";
 import type { AppEnv, Database } from "../types/index.js";
 import { ensureDefaultNote, getDefaultNoteOrNull } from "../services/defaultNoteService.js";
 import { getNoteRole, canEdit } from "./notes/helpers.js";
 import { extractEmailDomain } from "../lib/freeEmailDomains.js";
-import { maybeCreateSnapshot } from "../services/snapshotService.js";
-import { assertPageViewAccess, assertPageEditAccess } from "../services/pageAccessService.js";
+import { assertPageEditAccess } from "../services/pageAccessService.js";
 import { propagateTitleRename } from "../services/titleRenamePropagationService.js";
 import { deleteThumbnailObject } from "../services/thumbnailGcService.js";
 import { publishNoteEvent } from "../services/noteEventBroadcaster.js";
-import { syncPageGraphFromStoredYDoc } from "../services/pageGraphSyncService.js";
-import { applyWikiLinkMarksToYDoc } from "../services/ydocWikiLinkNormalizer.js";
 import { pageRowToWindowItem } from "./notes/eventHelpers.js";
-
-/**
- * 未 mark の `[[Title]]` プレーンテキストを `wikiLink` mark へ昇格させる
- * 「読み出し時の lazy migration」ヘルパー。Issue #880 Phase B 由来の
- * y-prosemirror `unexpectedCase` を二度と踏まないよう、サーバが返すバイト列の
- * 段階で確実に正規化済みにすることが目的。`marksApplied > 0` のときは楽観
- * ロックで page_contents を更新し、競合した場合は in-memory バッファだけ
- * 正規化したまま返す（次回保存で自然に追従する）。
- *
- * 楽観ロックでの永続化に成功した場合は、新しい `wikiLink` mark に対応する
- * `links` / `ghost_links` を再構築するため `tryGraphSync` を fire-and-forget
- * で呼ぶ。PR #887 のレビュー（CodeRabbit）で指摘された、GET 経路の lazy
- * migration ではグラフ同期が走らずバックリンクが古いまま残る問題への対応。
- *
- * Lazy migration helper for the GET path: ensures the bytes returned by
- * `/api/pages/:id/content` never contain unmarked `[[Title]]` plain text,
- * eliminating the y-prosemirror `unexpectedCase` boundary case from Issue
- * #880 Phase B. When marks are applied, persist with optimistic locking;
- * on lock conflict, return the normalized buffer in-memory only and let
- * the next save reconcile.
- *
- * When persistence succeeds, fire `tryGraphSync` so `links` / `ghost_links`
- * are rebuilt to reflect the newly added `wikiLink` marks (PR #887 review
- * by CodeRabbit: GET-side migration must not leave the graph stale).
- */
-async function normalizeWikiLinksOnRead(
-  db: Database,
-  pageId: string,
-  buffer: Buffer,
-  version: number,
-  updatedAt: Date | null,
-): Promise<{ buffer: Buffer; version: number; updatedAt: Date | null }> {
-  if (buffer.length === 0) {
-    return { buffer, version, updatedAt };
-  }
-  try {
-    const doc = new Y.Doc();
-    Y.applyUpdate(doc, new Uint8Array(buffer));
-    const { marksApplied } = applyWikiLinkMarksToYDoc(doc);
-    if (marksApplied === 0) {
-      return { buffer, version, updatedAt };
-    }
-    const normalized = Buffer.from(Y.encodeStateAsUpdate(doc));
-    const now = new Date();
-    // 楽観ロック: 我々が読んだ version と DB が一致するときだけ更新する。
-    // 競合時は in-memory の正規化バッファだけ返し、永続化は次回の save に任せる。
-    // Optimistic lock: only update when DB still sits at our observed version.
-    // On conflict, return the in-memory normalized bytes; the next save by
-    // the client will eventually persist a marked-up state.
-    const updated = await db
-      .update(pageContents)
-      .set({
-        ydocState: normalized,
-        version: sql`${pageContents.version} + 1`,
-        updatedAt: now,
-      })
-      .where(and(eq(pageContents.pageId, pageId), eq(pageContents.version, version)))
-      .returning({ version: pageContents.version, updatedAt: pageContents.updatedAt });
-    const row = updated[0];
-    if (row) {
-      // 永続化に成功した場合のみ `links` / `ghost_links` を再構築する。楽観
-      // ロックが競合した場合は別経路の保存が同時に走っており、そちらが自分の
-      // タイミングでグラフ同期を発火するためここからは呼ばない。
-      // Trigger graph sync only when our optimistic-lock update actually wrote
-      // the new bytes. On lock conflict, a concurrent writer owns the next
-      // graph-sync invocation, so we stay silent here.
-      tryGraphSync(db, pageId);
-      return {
-        buffer: normalized,
-        version: row.version ?? version + 1,
-        updatedAt: row.updatedAt ?? now,
-      };
-    }
-    return { buffer: normalized, version, updatedAt };
-  } catch (error) {
-    console.error(`[WikiLinkNormalize] GET path failed for page=${pageId}:`, error);
-    return { buffer, version, updatedAt };
-  }
-}
-
-/**
- * PUT 経路用の defense-in-depth 正規化。クライアントが何らかの理由で未 mark の
- * `[[Title]]` を含む Y.Doc を送ってきても、永続化前に確実に mark 化してから
- * 保存する。`buffer.length === 0` のときはスキップ。失敗時は原文を返してログのみ。
- *
- * Defense-in-depth normalizer for the PUT path. Should the client ever send
- * a Y.Doc with unmarked `[[Title]]` text, normalize it before persistence so
- * subsequent loads never see the un-promoted form. No-op on empty buffers;
- * on error log and return the original buffer.
- */
-function normalizeWikiLinksOnWrite(pageId: string, buffer: Buffer): Buffer {
-  if (buffer.length === 0) return buffer;
-  try {
-    const doc = new Y.Doc();
-    Y.applyUpdate(doc, new Uint8Array(buffer));
-    const { marksApplied } = applyWikiLinkMarksToYDoc(doc);
-    if (marksApplied === 0) return buffer;
-    return Buffer.from(Y.encodeStateAsUpdate(doc));
-  } catch (error) {
-    console.error(`[WikiLinkNormalize] PUT path failed for page=${pageId}:`, error);
-    return buffer;
-  }
-}
-
-/**
- * ベストエフォートで自動スナップショットを作成する。失敗してもメイン処理には影響しない。
- * Best-effort auto-snapshot creation. Failures are logged but never propagate.
- */
-async function tryAutoSnapshot(
-  db: Database,
-  pageId: string,
-  ydocState: Buffer,
-  contentText: string | null,
-  version: number,
-  userId: string,
-): Promise<void> {
-  try {
-    await maybeCreateSnapshot(db, pageId, ydocState, contentText, version, userId);
-  } catch (error) {
-    console.error(`[Snapshot] Failed to create auto-snapshot for page ${pageId}:`, error);
-  }
-}
 
 const app = new Hono<AppEnv>();
 
@@ -182,24 +64,9 @@ function tryPropagateTitleRename(
 }
 
 /**
- * 本文保存後に、現在の Y.Doc から `links` / `ghost_links` を再構築する
- * (issue #880 Phase C)。本文保存のレスポンスはブロックしないよう
- * fire-and-forget。失敗は本文保存とは独立にログに残す。
- *
- * Fire-and-forget rebuild of `links` / `ghost_links` from the just-saved
- * Y.Doc (issue #880 Phase C). Failures are logged but do not block the
- * content save response.
- */
-function tryGraphSync(db: Database, pageId: string): void {
-  void syncPageGraphFromStoredYDoc(db, pageId).catch((error) => {
-    console.error(`[PageGraphSync] Background graph sync crashed for page ${pageId}:`, error);
-  });
-}
-
-/**
- * Issue #860 Phase 4: PUT /content で title / content_preview が「実際に」変わった
- * ときだけ `page.updated` をノート購読者へ配信する。クライアントが現在値を
- * 毎回ラウンドトリップする実装でも spam しないよう、`applyPagesMetadataUpdate`
+ * Issue #860 Phase 4: title / content_preview が「実際に」変わったときだけ
+ * `page.updated` をノート購読者へ配信する。クライアントが現在値を毎回
+ * ラウンドトリップする実装でも spam しないよう、`applyPagesMetadataUpdate`
  * の戻り値 `metadataChanged` で判定する。`updatedRow` も同じ helper の
  * `.returning()` から渡るため、ここでは追加 SELECT を発生させない
  * （gemini-code-assist + coderabbitai review on PR #867）。
@@ -221,9 +88,9 @@ function emitPageUpdatedIfChanged(metadataChanged: boolean, updatedRow: Page | n
 }
 
 /**
- * PUT /content リクエストから pages テーブルの更新セットを構築し、変更があれば適用する。
- * タイトル更新を検出した場合は旧タイトルを返して呼び出し側から伝播処理を
- * 起動できるようにする（issue #726）。
+ * PUT メタデータリクエストから pages テーブルの更新セットを構築し、変更があれば
+ * 適用する。タイトル更新を検出した場合は旧タイトルを返して呼び出し側から
+ * 伝播処理を起動できるようにする（issue #726）。
  *
  * Issue #860 Phase 4 で 2 つの戻り値を追加した:
  * - `metadataChanged`: 現在値と比較して title または content_preview が
@@ -390,269 +257,6 @@ app.get("/", authRequired, async (c) => {
   `);
 
   return c.json({ pages: result.rows });
-});
-
-// ── GET /pages/:id/content ──────────────────────────────────────────────────
-app.get("/:id/content", authRequired, async (c) => {
-  const pageId = c.req.param("id");
-  const userId = c.get("userId");
-  const db = c.get("db");
-
-  // すべてのページはノート所属。閲覧は `getNoteRole(pages.note_id)` が成立すれば可。
-  // Every page belongs to a note; viewing requires a resolved note role on `pages.note_id`.
-  await assertPageViewAccess(db, pageId, userId);
-
-  // コンテンツ取得
-  const content = await db
-    .select()
-    .from(pageContents)
-    .where(eq(pageContents.pageId, pageId))
-    .limit(1);
-
-  const row = content[0];
-  if (!row) {
-    return c.json({
-      ydoc_state: "",
-      version: 0,
-      content_text: null,
-    });
-  }
-  const rawBuffer =
-    row.ydocState instanceof Buffer
-      ? row.ydocState
-      : typeof row.ydocState === "string"
-        ? Buffer.from(row.ydocState, "base64")
-        : Buffer.from(row.ydocState as unknown as ArrayBufferLike);
-
-  // Issue #880 Phase B リグレッション対応: 未 mark の `[[Title]]` プレーン
-  // テキストをサーバ側で `wikiLink` mark に昇格させる。`local` モード経路は
-  // Hocuspocus を通らないため、ここが lazy migration の入口になる。
-  // Issue #880 Phase B regression fix: lazily migrate unmarked `[[Title]]`
-  // text on read. The `local` collaboration mode bypasses Hocuspocus, so
-  // this is the entry point for that path.
-  const normalized = await normalizeWikiLinksOnRead(
-    db,
-    pageId,
-    rawBuffer,
-    row.version ?? 0,
-    row.updatedAt ?? null,
-  );
-  const ydocBase64 = normalized.buffer.toString("base64");
-
-  return c.json({
-    ydoc_state: ydocBase64,
-    version: normalized.version,
-    content_text: row.contentText,
-    updated_at: normalized.updatedAt?.toISOString(),
-  });
-});
-
-// ── PUT /pages/:id/content ──────────────────────────────────────────────────
-app.put("/:id/content", authRequired, async (c) => {
-  const pageId = c.req.param("id");
-  const userId = c.get("userId");
-  const db = c.get("db");
-
-  const body = await c.req.json<{
-    ydoc_state: string; // base64-encoded Y.Doc state
-    expected_version?: number;
-    content_text?: string;
-    content_preview?: string;
-    title?: string;
-  }>();
-
-  // Allow "" so clients can round-trip GET (empty ydoc_state) with PUT + expected_version.
-  // GET が ydoc_state: "" を返した場合もそのまま初回保存できるようにする。
-  if (body.ydoc_state === undefined || body.ydoc_state === null) {
-    throw new HTTPException(400, { message: "ydoc_state is required" });
-  }
-
-  // 編集はノートロール + `editPermission` (`canEdit`) で判定する。
-  // Editing requires note role + `canEdit` against the owning note.
-  await assertPageEditAccess(db, pageId, userId);
-
-  // クライアントから届いたバイト列を defense-in-depth で正規化。万一未 mark の
-  // `[[Title]]` テキストが含まれていれば、永続化前に `wikiLink` mark を適用する。
-  // Defense-in-depth: normalize the incoming Y.Doc bytes so unmarked
-  // `[[Title]]` text never persists, even if the client sends it.
-  const rawYdocBuffer = Buffer.from(body.ydoc_state, "base64");
-  const ydocBuffer = normalizeWikiLinksOnWrite(pageId, rawYdocBuffer);
-
-  // UPSERT page_contents with optimistic locking
-  if (body.expected_version != null) {
-    // First save after GET returned version 0 with no row: insert the initial row.
-    // GET が page_contents 未作成で version:0 を返した契約に合わせ、expected_version:0 で初回 INSERT を許容する。
-    if (body.expected_version === 0) {
-      const firstSave = await db.transaction(async (tx) => {
-        const inserted = await tx
-          .insert(pageContents)
-          .values({
-            pageId,
-            ydocState: ydocBuffer,
-            version: 1,
-            contentText: body.content_text ?? null,
-          })
-          .onConflictDoNothing({ target: pageContents.pageId })
-          .returning();
-
-        if (!inserted.length) {
-          return { done: false as const };
-        }
-
-        const insertedRow = inserted[0];
-        if (!insertedRow) throw new HTTPException(500, { message: "Insert failed" });
-
-        const { renamed, metadataChanged, updatedRow } = await applyPagesMetadataUpdate(
-          tx,
-          pageId,
-          body,
-        );
-
-        return {
-          done: true as const,
-          version: insertedRow.version ?? 1,
-          renamed,
-          metadataChanged,
-          updatedRow,
-        };
-      });
-
-      if (firstSave.done) {
-        void tryAutoSnapshot(
-          db,
-          pageId,
-          ydocBuffer,
-          body.content_text ?? null,
-          firstSave.version,
-          userId,
-        );
-        if (firstSave.renamed) {
-          tryPropagateTitleRename(
-            db,
-            pageId,
-            firstSave.renamed.oldTitle,
-            firstSave.renamed.newTitle,
-          );
-        }
-        // Issue #880 Phase C: 本文保存と同じトリガーでリンクグラフを再構築する。
-        // Issue #880 Phase C: rebuild outgoing edges from the saved Y.Doc.
-        tryGraphSync(db, pageId);
-        // Issue #860 Phase 4: メタデータが実際に変化したときだけ通知。
-        // Issue #860 Phase 4: emit only when metadata really changed.
-        emitPageUpdatedIfChanged(firstSave.metadataChanged, firstSave.updatedRow);
-        return c.json({ version: firstSave.version });
-      }
-    }
-
-    // 楽観的ロック: expected_version と一致する場合のみ更新
-    const updated = await db
-      .update(pageContents)
-      .set({
-        ydocState: ydocBuffer,
-        version: sql`${pageContents.version} + 1`,
-        contentText: body.content_text ?? null,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(pageContents.pageId, pageId), eq(pageContents.version, body.expected_version)))
-      .returning();
-
-    if (!updated.length) {
-      // バージョン不一致: 現在のバージョンを返す
-      const current = await db
-        .select({ version: pageContents.version })
-        .from(pageContents)
-        .where(eq(pageContents.pageId, pageId))
-        .limit(1);
-
-      throw new HTTPException(409, {
-        message: `Version conflict. Current version: ${current[0]?.version ?? 0}`,
-      });
-    }
-
-    const updatedRow = updated[0];
-    if (!updatedRow) throw new HTTPException(500, { message: "Update failed" });
-
-    const {
-      renamed,
-      metadataChanged,
-      updatedRow: metadataRow,
-    } = await applyPagesMetadataUpdate(db, pageId, body);
-
-    void tryAutoSnapshot(
-      db,
-      pageId,
-      ydocBuffer,
-      body.content_text ?? null,
-      updatedRow.version ?? 0,
-      userId,
-    );
-
-    if (renamed) {
-      tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
-    }
-
-    // Issue #880 Phase C: 楽観的ロック成功経路でもグラフ再構築を発火する。
-    // Issue #880 Phase C: trigger graph rebuild on the optimistic-lock path.
-    tryGraphSync(db, pageId);
-
-    // Issue #860 Phase 4: optimistic-lock 経路のメタデータ変化を通知。
-    // Notify subscribers from the optimistic-lock path as well.
-    emitPageUpdatedIfChanged(metadataChanged, metadataRow);
-
-    return c.json({ version: updatedRow.version ?? 0 });
-  }
-
-  // No optimistic locking: UPSERT
-  const result = await db
-    .insert(pageContents)
-    .values({
-      pageId,
-      ydocState: ydocBuffer,
-      version: 1,
-      contentText: body.content_text ?? null,
-    })
-    .onConflictDoUpdate({
-      target: pageContents.pageId,
-      set: {
-        ydocState: ydocBuffer,
-        version: sql`${pageContents.version} + 1`,
-        contentText: body.content_text ?? null,
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
-
-  const {
-    renamed,
-    metadataChanged,
-    updatedRow: metadataRow,
-  } = await applyPagesMetadataUpdate(db, pageId, body);
-
-  const resultRow = result[0];
-  if (!resultRow) throw new HTTPException(500, { message: "Upsert failed" });
-
-  void tryAutoSnapshot(
-    db,
-    pageId,
-    ydocBuffer,
-    body.content_text ?? null,
-    resultRow.version ?? 0,
-    userId,
-  );
-
-  if (renamed) {
-    tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
-  }
-
-  // Issue #880 Phase C: UPSERT 経路（楽観的ロック未使用）でも graph 再構築する。
-  // Issue #880 Phase C: trigger graph rebuild on the UPSERT path too.
-  tryGraphSync(db, pageId);
-
-  // Issue #860 Phase 4: UPSERT 経路（楽観的ロック未使用）でも emit。
-  // Issue #860 Phase 4: emit from the UPSERT path too (no optimistic lock).
-  emitPageUpdatedIfChanged(metadataChanged, metadataRow);
-
-  return c.json({ version: resultRow.version });
 });
 
 // ── POST /pages ─────────────────────────────────────────────────────────────
@@ -884,21 +488,21 @@ app.delete("/:id", authRequired, async (c) => {
  * 更新する。Y.Doc 本体は Hocuspocus WebSocket 経由で更新されるため、本ルートで
  * バイト列を受け付けることはない。
  *
- * `local` コラボレーションモード廃止（REST 経由で Y.Doc を同期する経路の削除）に
- * 伴い、タイトル変更を REST から行いたいクライアント向けに独立した経路として
- * 用意した。既存の `applyPagesMetadataUpdate` / `tryPropagateTitleRename` /
- * `emitPageUpdatedIfChanged` を再利用するため、`PUT /:id/content` 経路と同じ整合性
- * （タイトル伝播・SSE 通知のゲーティング）が保たれる。
+ * Issue #889 で `local` コラボレーションモードと REST 経由の Y.Doc 同期を廃止
+ * したため、タイトル変更等の純粋なメタデータ更新は本ルートに一本化されている。
+ * `applyPagesMetadataUpdate` / `tryPropagateTitleRename` /
+ * `emitPageUpdatedIfChanged` を通じて、タイトル伝播・SSE 通知のゲーティングを
+ * 一貫して適用する。
  *
  * `PUT /api/pages/:pageId` updates page metadata only (title and
  * content_preview). The Y.Doc payload is owned by Hocuspocus and is never
  * accepted here.
  *
- * Introduced when the `local` collaboration mode was retired so callers that
- * need to rename a page via REST have a stable endpoint. Reuses
- * `applyPagesMetadataUpdate`, `tryPropagateTitleRename`, and
- * `emitPageUpdatedIfChanged` so the title-propagation and SSE-emit invariants
- * stay identical to the legacy `PUT /:id/content` path.
+ * Issue #889 retired the `local` collaboration mode along with the REST Y.Doc
+ * sync path, so this is now the canonical REST entry point for pure metadata
+ * updates. The shared helpers (`applyPagesMetadataUpdate`,
+ * `tryPropagateTitleRename`, `emitPageUpdatedIfChanged`) keep the
+ * title-propagation and SSE-emit invariants consistent.
  *
  * @returns 200 + `{ id, title, content_preview, updated_at }` on success.
  *          400 when the body is empty (neither `title` nor `content_preview`).
@@ -992,10 +596,11 @@ app.put("/:id", authRequired, async (c) => {
  * `GET /api/pages/:pageId/public-content` — 読み取り専用のページ本文 API。
  * `page_contents.content_text` と派生情報のみ返し、Y.Doc バイト列は返さない。
  *
- * `local` モード廃止後、編集者は Hocuspocus WebSocket 経由でページを開くが、
- * 未ログインの guest（public / unlisted ノートを覗いている読者）や viewer ロールの
- * メンバーは WebSocket 接続を張らずに REST で本文だけ読みたい。本ルートはその
- * 経路を提供する。Y.Doc バイト列を返さないため、編集セッションは絶対に始まらない。
+ * Issue #889 で `local` モードと `GET /api/pages/:id/content` を廃止したため、
+ * 編集者は Hocuspocus WebSocket 経由でページを開く。未ログインの guest
+ * （public / unlisted ノートを覗いている読者）や viewer ロールのメンバーは
+ * WebSocket 接続を張らずに REST で本文だけ読みたいので、本ルートがその唯一の
+ * 経路となる。Y.Doc バイト列を返さないため、編集セッションは絶対に始まらない。
  *
  * 認証は `authOptional`。所属ノートに対する `getNoteRole` で role を解決し、
  * `null`（private / restricted ノートを未認可で要求した等）の場合は 403 を返す。

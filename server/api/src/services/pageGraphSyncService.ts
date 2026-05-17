@@ -8,8 +8,14 @@
  * match the current document contents (issue #880 Phase C).
  *
  * 呼び出し元 / Callers:
- *   - `PUT /api/pages/:id/content` (REST 経路の本文保存後)
  *   - Hocuspocus 保存経路 (internal HTTP `POST /api/internal/pages/:id/graph-sync`)
+ *
+ * Issue #889 Phase 4 で `PUT /api/pages/:id/content` ルートを廃止して以降、
+ * 本サービスを直接叩く REST 経路は無くなり、本文保存後の再構築は Hocuspocus
+ * からの internal HTTP のみが発火する。
+ * Issue #889 Phase 4 retired the `PUT /api/pages/:id/content` route, so the
+ * only remaining trigger is the Hocuspocus-side internal HTTP call after
+ * persistence.
  *
  * 設計方針 / Design notes:
  *   - 解決スコープは「ソースページと同じ `pages.note_id`」のページ集合のみ。

@@ -7,8 +7,6 @@ import type {
   SyncPagesResponse,
   PostSyncPagesBody,
   PostSyncPagesResponse,
-  PageContentResponse,
-  PutPageContentBody,
   PagePublicContentResponse,
   UpdatePageMetadataBody,
   UpdatePageMetadataResponse,
@@ -317,26 +315,17 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       }
     },
 
-    /** GET /api/pages/:id/content — ydoc_state (base64), version. 404 if no content. */
-    async getPageContent(pageId: string): Promise<PageContentResponse> {
-      return req<PageContentResponse>("GET", `/api/pages/${encodeURIComponent(pageId)}/content`);
-    },
-
-    /** PUT /api/pages/:id/content — upload Y.Doc state. Optional version for optimistic lock. */
-    async putPageContent(pageId: string, body: PutPageContentBody): Promise<{ version: number }> {
-      return req<{ version: number }>("PUT", `/api/pages/${encodeURIComponent(pageId)}/content`, {
-        body,
-      });
-    },
-
     /**
      * `PUT /api/pages/:id` — タイトル等のメタデータだけを更新する。
-     * `local` モード廃止に伴い、Y.Doc を扱わない純粋な REST メタデータ更新経路として
-     * 追加された。サインインユーザーの編集権限が前提。
+     * Issue #889 で `local` モードと旧 `GET/PUT /api/pages/:id/content` を撤去した
+     * 結果、Y.Doc は Hocuspocus が一括で扱い、本ルートが REST 経由のタイトル /
+     * メタデータ更新の唯一の正規経路となった。サインインユーザーの編集権限が前提。
      *
      * `PUT /api/pages/:id` updates page metadata only (title,
-     * content_preview). Introduced when the `local` collaboration mode was
-     * retired so callers that rename via REST have a stable endpoint.
+     * content_preview). Issue #889 retired the `local` mode and the legacy
+     * `GET/PUT /api/pages/:id/content` round-trip; Hocuspocus now owns the
+     * Y.Doc state exclusively, so this is the canonical REST entry point for
+     * title / metadata updates.
      */
     async updatePageMetadata(
       pageId: string,

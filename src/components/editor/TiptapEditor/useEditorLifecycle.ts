@@ -144,18 +144,19 @@ export function useEditorLifecycle({
   // ProseMirror トランザクション経由で `wikiLink` mark に昇格していたが、
   // y-prosemirror が多数 mark を一括同期する境界で lib0 の
   // `unexpectedCase` を踏み、editor view ごと破壊されるリグレッションが
-  // 発生した。サーバ側 (Hocuspocus `onLoadDocument` および
-  // `GET /api/pages/:id/content` / `PUT /api/pages/:id/content`) で
-  // `applyWikiLinkMarksToYDoc` による正規化を行うように移行したため、
-  // クライアントの post-sync 正規化は不要となり撤去した。
+  // 発生した。Issue #889 Phase 4 で `local` モードと
+  // `GET/PUT /api/pages/:id/content` を廃止して以降、Y.Doc バイト列の正規化は
+  // Hocuspocus `onLoadDocument` の `applyWikiLinkMarksToYDoc` に一本化されて
+  // おり、クライアント側の post-sync 正規化は不要なため撤去した状態を維持する。
   //
   // The post-sync client normalization that called
   // `applyWikiLinkMarksToEditor` here used to trigger a y-prosemirror
   // `unexpectedCase` boundary case on large multi-mark dispatches (Issue
-  // #880 Phase B regression). Normalization now happens server-side
-  // (Hocuspocus on-load + API GET/PUT via `applyWikiLinkMarksToYDoc`), so
-  // the client never receives an un-promoted `[[Title]]` plain text from a
-  // synced document.
+  // #880 Phase B regression). Since Issue #889 Phase 4 retired the `local`
+  // mode and the `GET/PUT /api/pages/:id/content` routes, normalization now
+  // happens exclusively in Hocuspocus `onLoadDocument` via
+  // `applyWikiLinkMarksToYDoc`, so the client never receives an un-promoted
+  // `[[Title]]` plain text from a synced document.
 
   usePasteImageHandler({ editor, handleImageUpload });
 

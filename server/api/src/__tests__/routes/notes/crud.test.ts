@@ -688,14 +688,15 @@ describe("GET /api/notes/:noteId", () => {
     });
 
     it("should change ETag when a page is edited even if notes.updated_at is unchanged", async () => {
-      // Codex P1 (#856 review): ページ単体編集 (`PUT /api/pages/:id/content` 等)
-      // で `notes.updated_at` が動かなくても、ETag は変わるべき。pages signal
-      // (MAX(updated_at), COUNT) を ETag のハッシュ入力に混ぜることで保証する。
+      // Codex P1 (#856 review): ページ単体編集 (Hocuspocus 経由の本文保存・
+      // `PUT /api/pages/:id` 等) で `notes.updated_at` が動かなくても、ETag は
+      // 変わるべき。pages signal (MAX(updated_at), COUNT) を ETag のハッシュ
+      // 入力に混ぜることで保証する。
       //
       // Codex P1 (#856 review): editing a page via routes that do not bump
-      // `notes.updated_at` (e.g. `PUT /api/pages/:id/content`) must still
-      // shift the ETag. Verified by sending the same note row twice with
-      // different `MAX(pages.updated_at)` values.
+      // `notes.updated_at` (Hocuspocus-driven content saves, title renames via
+      // `PUT /api/pages/:id`) must still shift the ETag. Verified by sending
+      // the same note row twice with different `MAX(pages.updated_at)` values.
       const mockNote = createMockNote();
       const { app } = createTestApp([
         [mockNote],
