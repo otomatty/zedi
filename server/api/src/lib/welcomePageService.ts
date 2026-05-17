@@ -101,21 +101,29 @@ function extractPreviewText(doc: TiptapNode, maxLength = 200): string {
 }
 
 /**
- * 生きている（未削除の）ウェルカムページが既にあればその ID と kind を返す。
+ * 生きている（未削除の）ウェルカムページが既にあれば `id` と `noteId` を返す。
  * DB 側の部分ユニーク index `idx_pages_unique_welcome_per_owner` と
- * 整合する、アプリケーションレイヤー側のルックアップ。
+ * 整合する、アプリケーションレイヤー側のルックアップ。Issue #889 Phase 3 で
+ * `noteId` も返すようにし、conflict-read パスでデフォルトノートではなく実際
+ * に永続化された `note_id` を採用する。
  *
- * Returns the existing live welcome page for the user, if any. Mirrors the
- * partial unique index `idx_pages_unique_welcome_per_owner` and lets callers
- * recover gracefully from concurrent inserts.
+ * Returns the existing live welcome page (id + owning note id) for the user,
+ * if any. Mirrors the partial unique index
+ * `idx_pages_unique_welcome_per_owner` and lets callers recover gracefully
+ * from concurrent inserts. Issue #889 Phase 3 returns the persisted
+ * `note_id` so the conflict-read path uses the actual stored value instead
+ * of the caller's resolved default note.
  */
-async function findExistingWelcomePage(tx: DbOrTx, userId: string): Promise<string | null> {
+async function findExistingWelcomePage(
+  tx: DbOrTx,
+  userId: string,
+): Promise<{ id: string; noteId: string } | null> {
   const rows = await tx
-    .select({ id: pages.id })
+    .select({ id: pages.id, noteId: pages.noteId })
     .from(pages)
     .where(and(eq(pages.ownerId, userId), eq(pages.kind, "welcome"), eq(pages.isDeleted, false)))
     .limit(1);
-  return rows[0]?.id ?? null;
+  return rows[0] ?? null;
 }
 
 /**
@@ -187,10 +195,15 @@ export async function insertWelcomePage(
     .returning({ id: pages.id });
   const page = inserted[0];
   if (!page) {
-    // 並行リクエストが先に作成した。そのページを引いて返す。
-    // Someone else inserted first; look up their page.
-    const existingId = await findExistingWelcomePage(tx, userId);
-    if (existingId) return { pageId: existingId, noteId: defaultNote.id, locale };
+    // 並行リクエストが先に作成した。そのページを引いて、永続化済みの
+    // note_id をそのまま返す（自前で resolve したデフォルトノート ID に
+    // 寄せると、勝者ノートとずれた場合に不正な遷移先 URL を作ってしまう）。
+    // CodeRabbit (PR #894): use the persisted note id rather than the
+    // locally resolved default note id, in case they have diverged.
+    // Someone else inserted first; look up their page and return its
+    // stored note_id verbatim so the response URL is always valid.
+    const existing = await findExistingWelcomePage(tx, userId);
+    if (existing) return { pageId: existing.id, noteId: existing.noteId, locale };
     throw new Error("Welcome page conflict but no existing page found");
   }
 

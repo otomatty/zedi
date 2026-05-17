@@ -757,23 +757,25 @@ const NotePageView: React.FC = () => {
   // 追跡し、新しい history entry に initialContent が乗っていればその場で再
   // 取り込みする。`onInitialContentApplied` 後のクリア navigate は新しい
   // location.key を生成するが、その時点で `locationStateInitialContent` は
-  // undefined になっているので `setPendingInitialContent` は呼ばれず、適用済み
-  // seed の再投入は起きない。useEffect + setState はカスケード再レンダーを
-  // 起こすため避ける (eslint-plugin-react-hooks `you-might-not-need-an-effect`)。
+  // undefined になっているので `setPendingInitialContent(undefined)` が呼ばれ、
+  // 適用済み seed の再投入は起きない。逆に「state なしで隣ページに移動した」
+  // ような route 変更でも、まだ消費されていない古い seed をその場で undefined
+  // にリセットすることで、`<NotePageEditorEditable key={page.id}>` の再マウント
+  // 先に古い initialContent が渡るのを防ぐ (CodeRabbit P1)。useEffect + setState
+  // はカスケード再レンダーを起こすため避ける (`you-might-not-need-an-effect`)。
   //
   // Synchronous "derived state from props" pattern: track `location.key` in
   // state so a history entry carrying `initialContent` is consumed during
   // render. The post-apply `navigate(..., { replace: true, state: null })`
-  // mints a new `location.key`, but by then `locationStateInitialContent`
-  // is already `undefined`, so the guard skips re-ingestion. Using
-  // `useEffect` + `setState` here is flagged by the
-  // `you-might-not-need-an-effect` lint rule.
+  // mints a new `location.key` with no state, so we always re-synchronise
+  // `pendingInitialContent` from the current location — that clears any
+  // unconsumed seed before the next `<NotePageEditorEditable key={page.id}>`
+  // remount could receive it (CodeRabbit P1). Using `useEffect` + `setState`
+  // here is flagged by the `you-might-not-need-an-effect` lint rule.
   const [trackedLocationKey, setTrackedLocationKey] = useState(location.key);
   if (trackedLocationKey !== location.key) {
     setTrackedLocationKey(location.key);
-    if (locationStateInitialContent) {
-      setPendingInitialContent(locationStateInitialContent);
-    }
+    setPendingInitialContent(locationStateInitialContent);
   }
   const handleInitialContentApplied = useCallback(() => {
     setPendingInitialContent(undefined);

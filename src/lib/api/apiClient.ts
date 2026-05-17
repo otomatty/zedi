@@ -881,7 +881,12 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     async getOnboardingStatus(): Promise<{
       setup_completed_at: string | null;
       welcome_page_id: string | null;
-      /** Issue #889 Phase 3: see `completeOnboarding` doc. */
+      /**
+       * Issue #889 Phase 3: `completeOnboarding` の説明を参照。`welcome_page_id`
+       * と組で `/notes/:noteId/:pageId` を組み立てるためのノート ID。
+       * Issue #889 Phase 3: see `completeOnboarding` doc — paired with
+       * `welcome_page_id` to build the `/notes/:noteId/:pageId` URL.
+       */
       welcome_page_note_id: string | null;
       welcome_page_created_at: string | null;
       home_slides_shown_at: string | null;

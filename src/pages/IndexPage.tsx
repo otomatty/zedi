@@ -45,7 +45,11 @@ interface IndexFetchResponse {
  */
 interface IndexRebuildResponse {
   pageId: string;
-  /** Issue #889 Phase 3: see `IndexFetchResponse.noteId`. */
+  /**
+   * `__index__` ページの所属ノート ID。`IndexFetchResponse.noteId` と同じ目的。
+   * Owning note id of the `__index__` page — same role as
+   * `IndexFetchResponse.noteId`.
+   */
   noteId: string;
   created: boolean;
   totalPages: number;
@@ -59,7 +63,11 @@ interface IndexRebuildResponse {
  */
 interface IndexViewModel {
   pageId: string | null;
-  /** Issue #889 Phase 3: see `IndexFetchResponse.noteId`. */
+  /**
+   * `__index__` ページの所属ノート ID。`IndexFetchResponse.noteId` と同じ。
+   * Owning note id of the `__index__` page — same as
+   * `IndexFetchResponse.noteId`.
+   */
   noteId: string | null;
   totalPages: number;
   categories: Array<{ label: string; count: number }>;
