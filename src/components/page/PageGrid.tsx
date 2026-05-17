@@ -74,8 +74,17 @@ function findScrollParent(el: HTMLElement | null): HTMLElement | null {
   return null;
 }
 
-/** スケルトン表示。列数は親の PageGrid で計測した columns を渡す（表示の一貫性のため） */
-const PageGridSkeleton: React.FC<{ columns: 2 | 3 | 4 | 5 | 6 }> = ({ columns }) => (
+/**
+ * スケルトン表示。列数は親の PageGrid で計測した columns を渡す（表示の一貫性のため）。
+ * `NoteMeRedirect` のように PageGrid 本体をマウントせずに先行表示したい箇所からも
+ * 再利用できるよう export している。
+ *
+ * Page grid skeleton. The `columns` prop comes from the parent's
+ * `useContainerColumns` measurement so the skeleton lines up with the eventual
+ * content. Exported so surfaces that resolve a target before mounting the real
+ * `PageGrid` (e.g. `NoteMeRedirect`) can render the same placeholder.
+ */
+export const PageGridSkeleton: React.FC<{ columns: 2 | 3 | 4 | 5 | 6 }> = ({ columns }) => (
   <div className={cn("grid gap-3", gridColsClass[columns])}>
     {skeletonItems.map((index) => (
       <div

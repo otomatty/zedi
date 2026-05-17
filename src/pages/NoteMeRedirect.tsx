@@ -2,6 +2,8 @@ import React from "react";
 import { Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { Skeleton } from "@zedi/ui";
 import Container from "@/components/layout/Container";
+import { PageGridSkeleton } from "@/components/page/PageGrid";
+import { useContainerColumns } from "@/hooks/useContainerColumns";
 import { useMyNote } from "@/hooks/useNoteQueries";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { isClipUrlAllowed } from "@/lib/webClipper";
@@ -54,6 +56,11 @@ const NoteMeRedirect: React.FC = () => {
   const location = useLocation();
   const { needsSetupWizard } = useOnboarding();
   const { data, isLoading, error } = useMyNote({ enabled: !needsSetupWizard });
+  // リダイレクト先の `NoteView` 内 `PageGrid` と同じ列数計測ロジックを使い、
+  // 解決中スケルトンと遷移後の実コンテンツでカード列数を一致させる。
+  // Use the same container-width measurement as the destination `PageGrid` so
+  // the placeholder columns match the eventual rendered grid.
+  const { ref: columnsRef, columns } = useContainerColumns();
 
   // セットアップウィザード未完了のユーザーは先にオンボーディングに送る。
   // useMyNote 側の API は idempotent だがウィザード後にデフォルトノートを
@@ -66,15 +73,24 @@ const NoteMeRedirect: React.FC = () => {
   }
 
   if (isLoading) {
+    // リダイレクト先 `NoteView` は `Container` 内に「タイトル行 → ページグリッド」の
+    // 縦並びを描画するため、解決中も同じ縦リズム（タイトル相当の高さ + `space-y-4`
+    // による mt-4 相当のギャップ）を確保した上で、`PageGrid` 本体と同じ
+    // `PageGridSkeleton` を表示する。これにより `NoteView` 遷移時にグリッドが
+    // 上下にずれるレイアウトジャンプを抑える（PR #898 gemini-code-assist review）。
+    //
+    // `NoteView` lays out a title row above the page grid inside the same
+    // `Container`, so the skeleton mirrors that rhythm: a title-shaped
+    // `Skeleton` plus `space-y-4` (≈ the `mt-4` gap above the grid) keeps the
+    // skeleton grid aligned with the eventual grid, eliminating the vertical
+    // jump observed after redirect (raised by gemini-code-assist on PR #898).
     return (
-      <div className="min-h-0 flex-1 py-10">
+      <div className="min-h-0 flex-1 py-6">
         <Container>
           <div className="space-y-4">
             <Skeleton className="h-8 w-48" />
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
+            <div ref={columnsRef}>
+              <PageGridSkeleton columns={columns} />
             </div>
           </div>
         </Container>
