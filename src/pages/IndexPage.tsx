@@ -27,6 +27,13 @@ import { getActiveLocale } from "@/lib/dateUtils";
  */
 interface IndexFetchResponse {
   pageId: string | null;
+  /**
+   * Owning note id of the `__index__` page. Issue #889 Phase 3 で `/pages/:id`
+   * を撤去したため、リンク先 `/notes/:noteId/:pageId` を組み立てる用に追加。
+   * Owning note id added so the client can build `/notes/:noteId/:pageId`
+   * after Issue #889 Phase 3 retired `/pages/:id`.
+   */
+  noteId: string | null;
   lastBuiltAt: string | null;
   totalPages: number;
   categories: Array<{ label: string; count: number }>;
@@ -38,6 +45,12 @@ interface IndexFetchResponse {
  */
 interface IndexRebuildResponse {
   pageId: string;
+  /**
+   * `__index__` ページの所属ノート ID。`IndexFetchResponse.noteId` と同じ目的。
+   * Owning note id of the `__index__` page — same role as
+   * `IndexFetchResponse.noteId`.
+   */
+  noteId: string;
   created: boolean;
   totalPages: number;
   categories: Array<{ label: string; count: number }>;
@@ -50,6 +63,12 @@ interface IndexRebuildResponse {
  */
 interface IndexViewModel {
   pageId: string | null;
+  /**
+   * `__index__` ページの所属ノート ID。`IndexFetchResponse.noteId` と同じ。
+   * Owning note id of the `__index__` page — same as
+   * `IndexFetchResponse.noteId`.
+   */
+  noteId: string | null;
   totalPages: number;
   categories: Array<{ label: string; count: number }>;
   /** ISO-8601 — `lastBuiltAt` from GET or `generatedAt` from POST. / 表示用時刻。 */
@@ -111,6 +130,7 @@ const IndexPage: React.FC = () => {
       const result = await fetchIndex();
       setData({
         pageId: result.pageId,
+        noteId: result.noteId,
         totalPages: result.totalPages,
         categories: result.categories,
         timestamp: result.lastBuiltAt,
@@ -129,6 +149,7 @@ const IndexPage: React.FC = () => {
       const result = await rebuildIndex();
       setData({
         pageId: result.pageId,
+        noteId: result.noteId,
         totalPages: result.totalPages,
         categories: result.categories,
         timestamp: result.generatedAt,
@@ -210,10 +231,13 @@ const IndexPage: React.FC = () => {
                       {t("common.wikiIndex.notBuiltYet")}
                     </div>
                   )}
-                  {data.pageId && (
+                  {data.pageId && data.noteId && (
                     <div className="mt-2">
                       <Link
-                        to={`/pages/${data.pageId}`}
+                        // Issue #889 Phase 3: `/pages/:id` 撤去のためノート配下の URL に切り替え。
+                        // Issue #889 Phase 3: route through `/notes/:noteId/:pageId` after
+                        // the standalone `/pages/:id` route was retired.
+                        to={`/notes/${data.noteId}/${data.pageId}`}
                         className="text-primary text-sm underline underline-offset-2"
                       >
                         {t("common.wikiIndex.openIndexPage")}

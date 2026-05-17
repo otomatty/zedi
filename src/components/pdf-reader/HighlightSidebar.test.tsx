@@ -31,6 +31,7 @@ function makeHighlight(overrides: Partial<PdfHighlight>): PdfHighlight {
     sourceId: "s1",
     ownerId: "u1",
     derivedPageId: null,
+    derivedPageNoteId: null,
     pdfPage: 1,
     rects: [{ x1: 0, y1: 0, x2: 1, y2: 1 }],
     text: "hello world",
@@ -89,8 +90,14 @@ describe("HighlightSidebar", () => {
     hoisted.usePdfHighlightsMock.mockReturnValue({
       data: {
         highlights: [
-          makeHighlight({ id: "with-page", derivedPageId: "page-1" }),
-          makeHighlight({ id: "without-page", derivedPageId: null }),
+          // Issue #889 Phase 3: link build requires both pageId + noteId, so
+          // the sidebar only renders the link when both are populated.
+          makeHighlight({
+            id: "with-page",
+            derivedPageId: "page-1",
+            derivedPageNoteId: "note-1",
+          }),
+          makeHighlight({ id: "without-page", derivedPageId: null, derivedPageNoteId: null }),
         ],
       },
       isLoading: false,
@@ -101,7 +108,7 @@ describe("HighlightSidebar", () => {
     const links = screen.getAllByRole("button", { name: /派生ページを開く/ });
     expect(links.length).toBe(1);
     fireEvent.click(links[0]);
-    expect(onOpen).toHaveBeenCalledWith("page-1");
+    expect(onOpen).toHaveBeenCalledWith("page-1", "note-1");
   });
 
   it("invokes delete mutation after confirm", () => {

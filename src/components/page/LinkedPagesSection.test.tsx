@@ -66,6 +66,7 @@ describe("LinkedPagesSection", () => {
     mockLinkedPagesData.outgoingLinks = [
       {
         id: "page-1",
+        noteId: "note-1",
         title: "Outgoing Page",
         preview: "Preview text",
         updatedAt: Date.now(),
@@ -74,6 +75,7 @@ describe("LinkedPagesSection", () => {
     mockLinkedPagesData.backlinks = [
       {
         id: "backlink-1",
+        noteId: "note-1",
         title: "Backlink Page",
         preview: "Backlink preview",
         updatedAt: Date.now(),
@@ -102,6 +104,7 @@ describe("LinkedPagesSection", () => {
       {
         source: {
           id: "source-page",
+          noteId: "note-1",
           title: "Source Page",
           preview: "Source preview",
           updatedAt: Date.now(),
@@ -109,12 +112,14 @@ describe("LinkedPagesSection", () => {
         children: [
           {
             id: "child-1",
+            noteId: "note-1",
             title: "Child Page 1",
             preview: "Child preview",
             updatedAt: Date.now(),
           },
           {
             id: "child-2",
+            noteId: "note-1",
             title: "Child Page 2",
             preview: "Child preview 2",
             updatedAt: Date.now(),
@@ -135,6 +140,7 @@ describe("LinkedPagesSection", () => {
     mockLinkedPagesData.outgoingLinks = [
       {
         id: "target-page",
+        noteId: "target-note",
         title: "Target Page",
         preview: "Preview",
         updatedAt: Date.now(),
@@ -145,7 +151,7 @@ describe("LinkedPagesSection", () => {
 
     await user.click(screen.getByText("Target Page"));
 
-    expect(mockNavigate).toHaveBeenCalledWith("/pages/target-page");
+    expect(mockNavigate).toHaveBeenCalledWith("/notes/target-note/target-page");
   });
 
   it("should navigate to source page when link group source is clicked", async () => {
@@ -154,6 +160,7 @@ describe("LinkedPagesSection", () => {
       {
         source: {
           id: "source-page",
+          noteId: "source-note",
           title: "Source Page",
           preview: "Source preview",
           updatedAt: Date.now(),
@@ -161,6 +168,7 @@ describe("LinkedPagesSection", () => {
         children: [
           {
             id: "child-1",
+            noteId: "source-note",
             title: "Child Page",
             preview: "Child preview",
             updatedAt: Date.now(),
@@ -173,7 +181,7 @@ describe("LinkedPagesSection", () => {
 
     await user.click(screen.getByText("Source Page"));
 
-    expect(mockNavigate).toHaveBeenCalledWith("/pages/source-page");
+    expect(mockNavigate).toHaveBeenCalledWith("/notes/source-note/source-page");
   });
 
   it("should navigate to child page when child card is clicked", async () => {
@@ -182,6 +190,7 @@ describe("LinkedPagesSection", () => {
       {
         source: {
           id: "source-page",
+          noteId: "source-note",
           title: "Source Page",
           preview: "Source preview",
           updatedAt: Date.now(),
@@ -189,6 +198,7 @@ describe("LinkedPagesSection", () => {
         children: [
           {
             id: "child-page",
+            noteId: "child-note",
             title: "Child Page",
             preview: "Child preview",
             updatedAt: Date.now(),
@@ -201,13 +211,13 @@ describe("LinkedPagesSection", () => {
 
     await user.click(screen.getByText("Child Page"));
 
-    expect(mockNavigate).toHaveBeenCalledWith("/pages/child-page");
+    expect(mockNavigate).toHaveBeenCalledWith("/notes/child-note/child-page");
   });
 
   it("should create page and navigate when ghost link is clicked", async () => {
     const user = userEvent.setup();
     mockLinkedPagesData.ghostLinks = ["New Page Title"];
-    mockCreatePage.mockResolvedValue({ id: "new-page-id" });
+    mockCreatePage.mockResolvedValue({ id: "new-page-id", noteId: "default-note" });
 
     renderComponent();
 
@@ -218,7 +228,7 @@ describe("LinkedPagesSection", () => {
     });
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith("/pages/new-page-id", {
+      expect(mockNavigate).toHaveBeenCalledWith("/notes/default-note/new-page-id", {
         flushSync: true,
       });
     });
@@ -226,15 +236,16 @@ describe("LinkedPagesSection", () => {
 
   it("should render all sections when all link types exist", () => {
     mockLinkedPagesData.outgoingLinks = [
-      { id: "out-1", title: "Outgoing", preview: "", updatedAt: Date.now() },
+      { id: "out-1", noteId: "note-1", title: "Outgoing", preview: "", updatedAt: Date.now() },
     ];
     mockLinkedPagesData.backlinks = [
-      { id: "back-1", title: "Backlink", preview: "", updatedAt: Date.now() },
+      { id: "back-1", noteId: "note-1", title: "Backlink", preview: "", updatedAt: Date.now() },
     ];
     mockLinkedPagesData.outgoingLinksWithChildren = [
       {
         source: {
           id: "source-1",
+          noteId: "note-1",
           title: "SourceWithChildren",
           preview: "",
           updatedAt: Date.now(),
@@ -242,6 +253,7 @@ describe("LinkedPagesSection", () => {
         children: [
           {
             id: "child-1",
+            noteId: "note-1",
             title: "ChildPage",
             preview: "",
             updatedAt: Date.now(),

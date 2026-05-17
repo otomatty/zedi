@@ -23,7 +23,7 @@ function createTestPage(id: string, title: string, content: string, options?: Pa
   return {
     id,
     ownerUserId: "test-user",
-    noteId: null,
+    noteId: "default-note",
     title,
     content,
     createdAt: now,
@@ -317,6 +317,7 @@ function createHighlightRow(
     pdf_page: 1,
     text: "highlighted body",
     derived_page_id: null,
+    derived_page_note_id: null,
     source_display_name: "paper.pdf",
     source_title: null,
     updated_at: new Date().toISOString(),
@@ -329,7 +330,7 @@ function createPersonalPage(id: string, title: string): Page {
   return {
     id,
     ownerUserId: "u1",
-    noteId: null,
+    noteId: "default-note",
     title,
     content: createPlainTextContent("body"),
     createdAt: now,

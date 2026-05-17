@@ -181,6 +181,15 @@ export interface CreatePageBody {
    */
   thumbnail_object_id?: string | null;
   source_url?: string | null;
+  /**
+   * 明示的に所属させるノート ID。省略時はサーバが呼び出し元のデフォルトノート
+   * (`is_default = true`) を使う（Issue #823 以降）。
+   *
+   * Optional explicit note id to attach the new page to. When omitted, the
+   * server falls back to the caller's default note (`is_default = true`)
+   * since Issue #823.
+   */
+  note_id?: string | null;
 }
 
 /** POST /api/pages response (same shape as SyncPageItem). */
@@ -267,6 +276,8 @@ export type SearchPageResultRow = {
  * @property pdf_page       1 始まり PDF ページ番号。1-indexed PDF page.
  * @property text           ハイライト本文テキスト（プレビュー用）。Highlight body text.
  * @property derived_page_id 派生 Zedi ページがあればその ID。Optional derived page id.
+ * @property derived_page_note_id 派生 Zedi ページの所属ノート ID（Issue #889 Phase 3 で
+ *   `/notes/:noteId/:pageId` 遷移のために追加）。Derived page's owning note id.
  * @property source_display_name UI 用ファイル名。Display filename.
  * @property source_title   PDF メタデータ由来のタイトル（あれば）。Optional PDF title.
  * @property updated_at     ハイライトの最終更新時刻 ISO。Highlight `updated_at` ISO.
@@ -279,6 +290,13 @@ export type SearchPdfHighlightResultRow = {
   pdf_page: number;
   text: string;
   derived_page_id: string | null;
+  /**
+   * 派生 Zedi ページの所属ノート ID（派生が無い場合は null）。
+   * `derived_page_id` と組で `/notes/:noteId/:pageId` を組み立てる。
+   * Derived page's owning note id (null when no derived page exists).
+   * Paired with `derived_page_id` to build the `/notes/:noteId/:pageId` URL.
+   */
+  derived_page_note_id: string | null;
   source_display_name: string | null;
   source_title: string | null;
   updated_at: string;

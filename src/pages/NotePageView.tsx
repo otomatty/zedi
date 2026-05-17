@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Download, History, Trash2 } from "lucide-react";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
@@ -125,6 +125,8 @@ function NotePageEditorEditable({
   collaboration,
   isCollaborationEnabled,
   isTitleEditable,
+  initialContent,
+  onInitialContentApplied,
   onBack,
   onRequestDelete,
   isDeletePending,
@@ -137,6 +139,18 @@ function NotePageEditorEditable({
   isCollaborationEnabled: boolean;
   /** ページ所有者のみタイトル編集可。Only the page owner can edit the title. */
   isTitleEditable: boolean;
+  /**
+   * URL クリッパー等の作成経路から渡される Tiptap JSON 文字列。Hocuspocus の
+   * 初期同期完了後、Y.Doc が空であれば一度だけ反映してから `onInitialContentApplied`
+   * でクリアする（Issue #889 Phase 3 で `flushSave` を廃止）。
+   *
+   * Seed Tiptap JSON forwarded from create flows (e.g. Web Clipper). Applied
+   * once after the initial Hocuspocus sync when the Y.Doc is empty, then
+   * cleared via `onInitialContentApplied` (Issue #889 Phase 3 retired
+   * `flushSave`).
+   */
+  initialContent?: string;
+  onInitialContentApplied?: () => void;
   /** ヘッダーの戻るボタン。Toolbar back button. */
   onBack: () => void;
   /**
@@ -466,6 +480,8 @@ function NotePageEditorEditable({
           collaboration={isCollaborationEnabled ? collaboration : undefined}
           insertAtCursorRef={editorInsertRef}
           pageNoteId={page.noteId ?? null}
+          initialContent={initialContent}
+          onInitialContentApplied={onInitialContentApplied}
         />
       </ContentWithAIChat>
       {historyOpen && (
@@ -701,10 +717,74 @@ function NotePageDeleteConfirmDialog({
 const NotePageView: React.FC = () => {
   const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isSignedIn, userId } = useAuth();
   const { t } = useTranslation();
   const { toast } = useToast();
   const removeFromNoteMutation = useRemovePageFromNote();
+
+  // 作成経路（Web Clipper / 画像作成 など）が `navigate("/notes/:noteId/:pageId",
+  // { state: { initialContent } })` で渡してくる Tiptap JSON を取り込む。
+  // Hocuspocus が初期同期を完了し Y.Doc が空であれば、エディタ側が seed → Y.Doc
+  // に書き込み、`onInitialContentApplied` でクリアする (Issue #889 Phase 3 で
+  // 旧来の `flushSave` 経路を撤去)。
+  //
+  // `NotePageView` は `/notes/:noteId/:pageId` 全体を共通インスタンスで描画する
+  // ため、ユーザーが既にこの画面にいる状態で別ページへ create-then-navigate
+  // した場合でも seed を反映できるよう、location.key を見て新規 state を再
+  // 取り込みする (Codex P1)。state 適用後は `location.state` を replace で
+  // クリアしてリロード時に再投入されないようにする。
+  //
+  // Create flows (Web Clipper, image creation, etc.) pass a Tiptap JSON seed
+  // via `navigate("/notes/:noteId/:pageId", { state: { initialContent } })`.
+  // Issue #889 Phase 3 retired the legacy `flushSave` REST path; the editor
+  // writes the seed into the Y.Doc after the initial Hocuspocus sync and
+  // then calls `onInitialContentApplied` to drop it.
+  //
+  // `NotePageView` stays mounted across `/notes/:noteId/:pageId` -> another
+  // `/notes/:noteId/:pageId` navigations, so we re-hydrate
+  // `pendingInitialContent` whenever `location.key` changes (Codex P1).
+  // Applied state is cleared via `navigate(..., { replace: true, state: null })`
+  // so a reload does not re-seed.
+  const locationStateInitialContent =
+    typeof (location.state as { initialContent?: unknown } | null)?.initialContent === "string"
+      ? (location.state as { initialContent: string }).initialContent
+      : undefined;
+  const [pendingInitialContent, setPendingInitialContent] = useState<string | undefined>(
+    locationStateInitialContent,
+  );
+  // React 推奨の「同期 derived state」パターンで location.key を state として
+  // 追跡し、新しい history entry に initialContent が乗っていればその場で再
+  // 取り込みする。`onInitialContentApplied` 後のクリア navigate は新しい
+  // location.key を生成するが、その時点で `locationStateInitialContent` は
+  // undefined になっているので `setPendingInitialContent(undefined)` が呼ばれ、
+  // 適用済み seed の再投入は起きない。逆に「state なしで隣ページに移動した」
+  // ような route 変更でも、まだ消費されていない古い seed をその場で undefined
+  // にリセットすることで、`<NotePageEditorEditable key={page.id}>` の再マウント
+  // 先に古い initialContent が渡るのを防ぐ (CodeRabbit P1)。useEffect + setState
+  // はカスケード再レンダーを起こすため避ける (`you-might-not-need-an-effect`)。
+  //
+  // Synchronous "derived state from props" pattern: track `location.key` in
+  // state so a history entry carrying `initialContent` is consumed during
+  // render. The post-apply `navigate(..., { replace: true, state: null })`
+  // mints a new `location.key` with no state, so we always re-synchronise
+  // `pendingInitialContent` from the current location — that clears any
+  // unconsumed seed before the next `<NotePageEditorEditable key={page.id}>`
+  // remount could receive it (CodeRabbit P1). Using `useEffect` + `setState`
+  // here is flagged by the `you-might-not-need-an-effect` lint rule.
+  const [trackedLocationKey, setTrackedLocationKey] = useState(location.key);
+  if (trackedLocationKey !== location.key) {
+    setTrackedLocationKey(location.key);
+    setPendingInitialContent(locationStateInitialContent);
+  }
+  const handleInitialContentApplied = useCallback(() => {
+    setPendingInitialContent(undefined);
+    // `location.state` をクリアしてリロード時に再投入されないようにする。
+    // Clear `location.state` so a reload does not re-seed the same content.
+    if (location.state) {
+      navigate(location.pathname + location.search + location.hash, { replace: true, state: null });
+    }
+  }, [location.hash, location.pathname, location.search, location.state, navigate]);
 
   const {
     note,
@@ -753,7 +833,6 @@ const NotePageView: React.FC = () => {
   const collaboration = useCollaboration({
     pageId: collaborationPageId,
     enabled: isCollaborationEnabled,
-    mode: "collaborative",
   });
 
   const handleRequestDelete = useCallback(() => {
@@ -866,6 +945,8 @@ const NotePageView: React.FC = () => {
               collaboration={collaboration}
               isCollaborationEnabled={isCollaborationEnabled}
               isTitleEditable={isTitleEditable}
+              initialContent={pendingInitialContent}
+              onInitialContentApplied={handleInitialContentApplied}
               onBack={handleBack}
               onRequestDelete={handleRequestDelete}
               isDeletePending={isDeletePending}

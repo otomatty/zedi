@@ -21,7 +21,8 @@ const LONG_PRESS_MS = 500;
  * モバイルでは長押しでプレビューを表示する。
  *
  * Renders a clickable WikiLink in AI chat with hover preview.
- * Existing pages link to /pages/:id, missing pages render as ghost style.
+ * Existing pages link to `/notes/:noteId/:pageId`, missing pages render as
+ * ghost style (Issue #889 Phase 3 で `/pages/:id` を撤去)。
  * Supports long-press preview on mobile.
  */
 export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
@@ -140,7 +141,13 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
       <HoverCardTrigger asChild>
         {page ? (
           <Link
-            to={`/pages/${page.id}`}
+            // Issue #889 Phase 3: `/pages/:id` は撤去済みのため、所属ノート配下の
+            // canonical URL に遷移する。`Page.noteId` は Issue #823 / #825 以降
+            // non-null。
+            // Issue #889 Phase 3: route to `/notes/:noteId/:pageId` since the
+            // standalone `/pages/:id` route was retired. `Page.noteId` is
+            // non-null after Issues #823 / #825.
+            to={`/notes/${page.noteId}/${page.id}`}
             className="text-primary decoration-primary/50 hover:decoration-primary rounded px-0.5 font-medium underline underline-offset-2 transition-colors"
             onClick={handleAnchorClick}
             {...touchProps}

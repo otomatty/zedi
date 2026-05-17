@@ -82,11 +82,22 @@ export async function runSaveAndDeriveFlow(
       highlightId: highlight.id,
       body: { title, contentPreview, templateContent },
     });
+    // Issue #889 Phase 3: `/pages/:id` は廃止。サーバが返す `noteId` を使って
+    // `/notes/:noteId/:pageId` に直接遷移する。
+    // Issue #889 Phase 3: `/pages/:id` retired; navigate to
+    // `/notes/:noteId/:pageId` using the `noteId` returned by the server.
+    if (!derived.noteId) {
+      return {
+        status: "error",
+        error: new Error("derivePage response missing noteId"),
+      };
+    }
+    const target = `/notes/${derived.noteId}/${derived.pageId}`;
     if (derived.alreadyDerived) {
-      input.navigate(`/pages/${derived.pageId}`);
+      input.navigate(target);
       return { status: "alreadyDerived", pageId: derived.pageId };
     }
-    input.navigate(`/pages/${derived.pageId}`, {
+    input.navigate(target, {
       state: { initialContent: derived.templateContent ?? templateContent },
     });
     return { status: "ok", pageId: derived.pageId };

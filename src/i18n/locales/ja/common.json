@@ -37,6 +37,7 @@
   "useWithoutSignIn": "ログインせずに使う",
   "startUsingApp": "アプリを使い始める",
   "createPageFailed": "ページの作成に失敗しました",
+  "attachPageToNoteFailed": "指定ノートへの追加に失敗しました",
   "copyFailed": "コピーに失敗しました",
   "untitledPage": "無題のページ",
   "sharedNoteContext": "（共有ノート）",

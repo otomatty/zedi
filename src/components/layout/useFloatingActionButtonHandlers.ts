@@ -10,6 +10,7 @@ import { useAddPageToNote } from "@/hooks/useNoteQueries";
 import { useToast } from "@zedi/ui";
 import { deleteCommittedThumbnail } from "@/lib/thumbnailCommit";
 import { getThumbnailApiBaseUrl } from "@/components/editor/TiptapEditor/thumbnailApiHelpers";
+import type { Page } from "@/types/page";
 import type { FABMenuOption } from "./FABMenu";
 
 /** FAB の作成・クリップ・画像ダイアログ制御用オプション。Options for FAB create/clip/image dialog handlers. */
@@ -69,27 +70,48 @@ export function useFloatingActionButtonHandlers(
 
   /**
    * 作成済みページをノートに紐づけ、ノート配下のパスに遷移する。
-   * Link the created page to the current note (if any) and navigate into it.
+   * Issue #889 Phase 3 で `/pages/:id` を廃止。`noteId` プロップが渡されている
+   * 場合は明示再紐づけ（ノートビューの FAB 経路）→`/notes/:noteId/:pageId`、
+   * 未指定時はサーバが返す `newPage.noteId`（呼び出し元のデフォルトノート）
+   * 配下へ遷移する。紐づけに失敗してもページ自体は作成済みなので、デフォルト
+   * ノート配下にフォールバック遷移し、ユーザーが孤立ページに辿り着けるよう
+   * にする（toast には「指定ノートへの追加に失敗」と明示）。
+   *
+   * Link the freshly-created page to the current note (if any) and navigate
+   * to it. After Issue #889 Phase 3 retired `/pages/:id`, callers always land
+   * on `/notes/:noteId/:pageId`: either the explicit `noteId` prop (after a
+   * successful re-link) or the page's own `noteId` (the caller's default
+   * note). On re-link failure the page itself was still created, so we fall
+   * back to the default-note URL and surface a toast that calls out the
+   * actual failure (attaching to the requested note) instead of stranding
+   * the user.
    */
   const linkAndNavigate = useCallback(
-    async (pageId: string, navState?: Record<string, unknown>): Promise<void> => {
-      if (noteId) {
+    async (newPage: Page, navState?: Record<string, unknown>): Promise<void> => {
+      if (noteId && noteId !== newPage.noteId) {
         try {
-          await addPageToNoteMutation.mutateAsync({ noteId, pageId });
+          await addPageToNoteMutation.mutateAsync({ noteId, pageId: newPage.id });
         } catch (error) {
-          // 紐づけ失敗時はスタンドアロンページとして遷移させ、ユーザー操作を止めない。
-          // If linking fails, fall back to the standalone page so the user
-          // can still see and edit their newly created page.
           console.error("Failed to attach page to note:", error);
-          navigate(`/pages/${pageId}`, navState ? { state: navState } : undefined);
+          toast({
+            title: t("common.attachPageToNoteFailed"),
+            variant: "destructive",
+          });
+          navigate(
+            `/notes/${newPage.noteId}/${newPage.id}`,
+            navState ? { state: navState } : undefined,
+          );
           return;
         }
-        navigate(`/notes/${noteId}/${pageId}`, navState ? { state: navState } : undefined);
+        navigate(`/notes/${noteId}/${newPage.id}`, navState ? { state: navState } : undefined);
         return;
       }
-      navigate(`/pages/${pageId}`, navState ? { state: navState } : undefined);
+      navigate(
+        `/notes/${newPage.noteId}/${newPage.id}`,
+        navState ? { state: navState } : undefined,
+      );
     },
-    [addPageToNoteMutation, navigate, noteId],
+    [addPageToNoteMutation, navigate, noteId, toast, t],
   );
 
   const handleMenuSelect = useCallback(
@@ -166,7 +188,7 @@ export function useFloatingActionButtonHandlers(
         });
         throw error;
       }
-      await linkAndNavigate(newPage.id, { initialContent: content });
+      await linkAndNavigate(newPage, { initialContent: content });
     },
     [createPageMutation, linkAndNavigate, toast, t],
   );
@@ -195,7 +217,7 @@ export function useFloatingActionButtonHandlers(
           title: "",
           content,
         });
-        await linkAndNavigate(newPage.id);
+        await linkAndNavigate(newPage);
       } catch (error) {
         console.error("Failed to create page from image:", error);
         toast({

@@ -334,7 +334,10 @@ export function PdfReader() {
     el?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
   const handleOpenDerivedPage = useCallback(
-    (pageId: string) => navigate(`/pages/${pageId}`),
+    // Issue #889 Phase 3: `/pages/:id` 廃止のため `/notes/:noteId/:pageId` に遷移。
+    // Issue #889 Phase 3: route to `/notes/:noteId/:pageId` after `/pages/:id`
+    // was retired.
+    (pageId: string, noteId: string) => navigate(`/notes/${noteId}/${pageId}`),
     [navigate],
   );
 

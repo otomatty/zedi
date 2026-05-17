@@ -22,7 +22,6 @@ import AuthCallback from "./pages/AuthCallback";
 import ExtensionAuth from "./pages/ExtensionAuth";
 import ExtensionAuthCallback from "./pages/ExtensionAuthCallback";
 import McpAuthorize from "./pages/McpAuthorize";
-import PageEditorPage from "./pages/PageEditor";
 import PdfReaderPage from "./pages/pdfKnowledge/PdfReaderPage";
 import Settings from "./pages/Settings";
 import WikiSchemaPage from "./pages/WikiSchemaPage";
@@ -63,16 +62,6 @@ const queryClient = new QueryClient();
 function LegacyAIChatConversationRedirect() {
   const { conversationId } = useParams<{ conversationId: string }>();
   return <Navigate to={`/ai/${conversationId}`} replace />;
-}
-
-/**
- * Redirect singular `/page/:id` to plural `/pages/:id` while preserving search/hash.
- * 旧パス `/page/:id` を複数形 `/pages/:id` にリダイレクト（search/hash は保持）。
- */
-function LegacyPageRedirect() {
-  const { id } = useParams<{ id: string }>();
-  const { search, hash } = useLocation();
-  return <Navigate to={`/pages/${id}${search}${hash}`} replace />;
 }
 
 /**
@@ -258,10 +247,6 @@ const App = () => (
                           ページのリンクが 404 にならないよう URL を確保する。 */}
                       <Route path="/notes/official-guide" element={<OfficialGuidePlaceholder />} />
                       <Route path="/notes" element={<Notes />} />
-                      <Route path="/pages/:id" element={<PageEditorPage />} />
-                      {/* Legacy singular path — redirect to plural.
-                          旧単数形パス — 複数形にリダイレクト。 */}
-                      <Route path="/page/:id" element={<LegacyPageRedirect />} />
                       {/* PDF 知識化ビューア (issue otomatty/zedi#389).
                           Web から開いた場合は `PdfReaderUnsupported` を表示。
                           PDF knowledge viewer; web falls back to the

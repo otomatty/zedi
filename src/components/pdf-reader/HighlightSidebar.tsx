@@ -25,8 +25,13 @@ export interface HighlightSidebarProps {
   activeHighlightId?: string | null;
   /** Called when the user clicks a sidebar row. */
   onSelectHighlight?: (highlight: PdfHighlight) => void;
-  /** Called when the user clicks "Open derived page". */
-  onOpenDerivedPage?: (pageId: string) => void;
+  /**
+   * Called when the user clicks "Open derived page".
+   * 派生ページの URL は `/notes/:noteId/:pageId` のため、`pageId` に加えて
+   * `noteId` も渡す（Issue #889 Phase 3 で `/pages/:id` を廃止）。
+   * Receives both ids since the route is `/notes/:noteId/:pageId`.
+   */
+  onOpenDerivedPage?: (pageId: string, noteId: string) => void;
 }
 
 const COLOR_SWATCHES: Record<PdfHighlightColor, string> = {
@@ -157,10 +162,15 @@ export function HighlightSidebar({
                         ))}
                       </div>
                     )}
-                    {h.derivedPageId && (
+                    {h.derivedPageId && h.derivedPageNoteId && (
                       <button
                         type="button"
-                        onClick={() => onOpenDerivedPage?.(h.derivedPageId as string)}
+                        onClick={() =>
+                          onOpenDerivedPage?.(
+                            h.derivedPageId as string,
+                            h.derivedPageNoteId as string,
+                          )
+                        }
                         className="text-primary inline-flex items-center gap-1 text-xs underline-offset-2 hover:underline"
                       >
                         <FileText className="size-3" />

@@ -82,6 +82,7 @@ export default function SearchResults() {
         return {
           kind: "page",
           pageId: page.id,
+          noteId: page.noteId,
           title: page.title || t("common.untitledPage"),
           snippet,
           highlightedSnippet,
@@ -117,7 +118,7 @@ export default function SearchResults() {
         return {
           kind: "page",
           pageId: r.id,
-          noteId: r.note_id ?? undefined,
+          noteId: r.note_id,
           title: r.title?.trim() ? r.title : t("common.untitledPage"),
           snippet,
           highlightedSnippet,
@@ -155,6 +156,7 @@ export default function SearchResults() {
           sourceId: r.source_id,
           pdfPage: r.pdf_page,
           derivedPageId: r.derived_page_id,
+          derivedPageNoteId: r.derived_page_note_id,
           title: display.title,
           snippet: display.snippet,
           highlightedSnippet: display.highlightedText,
@@ -186,6 +188,7 @@ export default function SearchResults() {
           sourceDisplayName: "",
           pdfPage: item.pdfPage,
           derivedPageId: item.derivedPageId,
+          derivedPageNoteId: item.derivedPageNoteId,
           title: item.title,
           highlightedText: item.highlightedSnippet,
           matchType: item.matchType,
@@ -215,7 +218,9 @@ export default function SearchResults() {
     if (item.kind === "pdf_highlight") {
       return `pdf-${item.sourceId}-${item.highlightId}`;
     }
-    return item.noteId ? `shared-${item.noteId}-${item.pageId}` : `personal-${item.pageId}`;
+    // Issue #889 Phase 3 以降は全ページが note id を持つので統一キーで足りる。
+    // Every page row carries a note id since Issue #889 Phase 3.
+    return `page-${item.noteId}-${item.pageId}`;
   };
 
   return (

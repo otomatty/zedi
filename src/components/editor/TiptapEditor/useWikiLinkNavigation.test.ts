@@ -34,6 +34,12 @@ vi.mock("@/hooks/useNoteQueries", () => ({
 import { usePageByTitle } from "@/hooks/usePageQueries";
 import { useNoteTitleIndex } from "@/hooks/useNoteQueries";
 
+// Issue #889 Phase 3: `/pages/:id` 廃止に伴い、個人スコープのナビゲーションも
+// `/notes/:noteId/:pageId` に統合された。テストの期待値も note-scoped に揃える。
+// Issue #889 Phase 3: personal-scope navigation now also targets
+// `/notes/:noteId/:pageId` since `/pages/:id` has been retired.
+const DEFAULT_NOTE_ID = "default-note";
+
 describe("useWikiLinkNavigation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -78,7 +84,10 @@ describe("useWikiLinkNavigation", () => {
     vi.mocked(usePageByTitle).mockImplementation(
       (title: string) =>
         ({
-          data: title === "Existing Page" ? { id: "existing-id" } : undefined,
+          data:
+            title === "Existing Page"
+              ? { id: "existing-id", title: "Existing Page", noteId: DEFAULT_NOTE_ID }
+              : undefined,
           isFetched: title !== "",
         }) as ReturnType<typeof usePageByTitle>,
     );
@@ -92,7 +101,7 @@ describe("useWikiLinkNavigation", () => {
     });
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith("/pages/existing-id", {
+      expect(mockNavigate).toHaveBeenCalledWith(`/notes/${DEFAULT_NOTE_ID}/existing-id`, {
         replace: false,
         flushSync: true,
       });
@@ -130,7 +139,7 @@ describe("useWikiLinkNavigation", () => {
   });
 
   it("handleConfirmCreate calls mutateAsync and navigates on success", async () => {
-    mockMutateAsync.mockResolvedValue({ id: "new-page-id" });
+    mockMutateAsync.mockResolvedValue({ id: "new-page-id", noteId: DEFAULT_NOTE_ID });
 
     vi.mocked(usePageByTitle).mockImplementation(
       (title: string) =>
@@ -161,7 +170,7 @@ describe("useWikiLinkNavigation", () => {
       title: "New Page Title",
       content: "",
     });
-    expect(mockNavigate).toHaveBeenCalledWith("/pages/new-page-id", {
+    expect(mockNavigate).toHaveBeenCalledWith(`/notes/${DEFAULT_NOTE_ID}/new-page-id`, {
       replace: false,
       flushSync: true,
     });
@@ -170,8 +179,9 @@ describe("useWikiLinkNavigation", () => {
   });
 
   it("re-clicking a just-created title navigates immediately without reopening dialog", async () => {
-    mockMutateAsync.mockResolvedValue({ id: "new-page-id" });
-    const byTitleCache: Record<string, { id: string } | undefined> = {};
+    mockMutateAsync.mockResolvedValue({ id: "new-page-id", noteId: DEFAULT_NOTE_ID });
+    const byTitleCache: Record<string, { id: string; title: string; noteId: string } | undefined> =
+      {};
     vi.mocked(usePageByTitle).mockImplementation(
       (title: string) =>
         ({
@@ -197,7 +207,11 @@ describe("useWikiLinkNavigation", () => {
     });
 
     // Simulate useCreatePage onSuccess: byTitle cache is now populated
-    byTitleCache["Fresh Page"] = { id: "new-page-id" };
+    byTitleCache["Fresh Page"] = {
+      id: "new-page-id",
+      title: "Fresh Page",
+      noteId: DEFAULT_NOTE_ID,
+    };
     mockNavigate.mockClear();
 
     act(() => {
@@ -205,7 +219,7 @@ describe("useWikiLinkNavigation", () => {
     });
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith("/pages/new-page-id", {
+      expect(mockNavigate).toHaveBeenCalledWith(`/notes/${DEFAULT_NOTE_ID}/new-page-id`, {
         replace: false,
         flushSync: true,
       });

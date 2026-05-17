@@ -34,6 +34,7 @@ function makeHighlight(overrides: Partial<PdfHighlight>): PdfHighlight {
     sourceId: "s1",
     ownerId: "u1",
     derivedPageId: null,
+    derivedPageNoteId: null,
     pdfPage: 1,
     rects: [{ x1: 10, y1: 50, x2: 60, y2: 70 }],
     text: "hello",

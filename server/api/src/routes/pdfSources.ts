@@ -244,9 +244,30 @@ app.get("/pdf/:sourceId/highlights", authRequired, async (c) => {
   const sourceId = c.req.param("sourceId");
   await loadOwnedPdfSourceOrThrow(db, sourceId, userId);
 
+  // Issue #889 Phase 3: `/pages/:id` 廃止に伴い、「派生ページを開く」リンクは
+  // `/notes/:noteId/:pageId` を組み立てる必要があるため、ハイライト行に派生先
+  // ページの `noteId` を `derivedPageNoteId` として同梱して返す（外部 join で
+  // 個別に取得する N+1 を避ける）。
+  // Issue #889 Phase 3: include `derivedPageNoteId` from a left join with
+  // `pages` so the client can build `/notes/:noteId/:pageId` for the "Open
+  // derived page" link without a follow-up request.
   const rows = await db
-    .select()
+    .select({
+      id: pdfHighlights.id,
+      sourceId: pdfHighlights.sourceId,
+      ownerId: pdfHighlights.ownerId,
+      derivedPageId: pdfHighlights.derivedPageId,
+      derivedPageNoteId: pages.noteId,
+      pdfPage: pdfHighlights.pdfPage,
+      rects: pdfHighlights.rects,
+      text: pdfHighlights.text,
+      color: pdfHighlights.color,
+      note: pdfHighlights.note,
+      createdAt: pdfHighlights.createdAt,
+      updatedAt: pdfHighlights.updatedAt,
+    })
     .from(pdfHighlights)
+    .leftJoin(pages, eq(pages.id, pdfHighlights.derivedPageId))
     .where(eq(pdfHighlights.sourceId, sourceId))
     .orderBy(pdfHighlights.pdfPage, pdfHighlights.createdAt);
 
@@ -414,9 +435,21 @@ app.post(
       .limit(1);
     if (!highlightRow) throw new HTTPException(404, { message: "Highlight not found" });
     if (highlightRow.derivedPageId) {
-      // 既に派生ページがあるので冪等に既存 ID を返す。
-      // Idempotent: a derived page already exists.
-      return c.json({ pageId: highlightRow.derivedPageId, alreadyDerived: true });
+      // 既に派生ページがあるので冪等に既存 ID を返す。Issue #889 Phase 3 で
+      // `/pages/:id` が廃止されたため、クライアントが `/notes/:noteId/:pageId`
+      // へ遷移できるよう `noteId` も含めて返す（page row から引く）。
+      // Idempotent: include `noteId` so the client can build the
+      // `/notes/:noteId/:pageId` URL (Issue #889 Phase 3 retired `/pages/:id`).
+      const [existing] = await db
+        .select({ noteId: pages.noteId })
+        .from(pages)
+        .where(eq(pages.id, highlightRow.derivedPageId))
+        .limit(1);
+      return c.json({
+        pageId: highlightRow.derivedPageId,
+        alreadyDerived: true,
+        noteId: existing?.noteId ?? null,
+      });
     }
 
     let body: DerivePageBody = {};

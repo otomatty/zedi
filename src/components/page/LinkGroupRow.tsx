@@ -6,7 +6,11 @@ import type { OutgoingLinkWithChildren } from "@/hooks/useLinkedPages";
 
 interface LinkGroupRowProps {
   linkGroup: OutgoingLinkWithChildren;
-  onPageClick: (pageId: string) => void;
+  /**
+   * `/notes/:noteId/:pageId` 遷移用に noteId も渡す（Issue #889 Phase 3）。
+   * Passes `noteId` so the parent can build the `/notes/:noteId/:pageId` URL.
+   */
+  onPageClick: (pageId: string, noteId: string) => void;
 }
 
 /**
@@ -21,7 +25,7 @@ export function LinkGroupRow({ linkGroup, onPageClick }: LinkGroupRowProps) {
         {/* Source link card (distinguished style) */}
         <Card
           className="border-primary/20 bg-primary/5 hover:bg-accent flex aspect-square cursor-pointer flex-col transition-colors"
-          onClick={() => onPageClick(linkGroup.source.id)}
+          onClick={() => onPageClick(linkGroup.source.id, linkGroup.source.noteId)}
         >
           <CardHeader className="p-3 pb-1">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
@@ -41,7 +45,11 @@ export function LinkGroupRow({ linkGroup, onPageClick }: LinkGroupRowProps) {
 
         {/* Child pages */}
         {linkGroup.children.map((child) => (
-          <PageLinkCard key={child.id} page={child} onClick={() => onPageClick(child.id)} />
+          <PageLinkCard
+            key={child.id}
+            page={child}
+            onClick={() => onPageClick(child.id, child.noteId)}
+          />
         ))}
       </div>
     </div>
