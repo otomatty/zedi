@@ -127,6 +127,7 @@ function NotePageEditorEditable({
   onRequestDelete,
   isDeletePending,
   supplementalRightContent,
+  cancelPendingTitleSaveRef,
 }: {
   page: Page;
   noteId: string;
@@ -149,6 +150,19 @@ function NotePageEditorEditable({
   isDeletePending: boolean;
   /** ツールバー右側の追加スロット。Supplemental right-side toolbar slot. */
   supplementalRightContent?: React.ReactNode;
+  /**
+   * 親が削除成功時に呼ぶ「保留中タイトル保存のキャンセル」を流す ref。
+   * 削除直後の navigate で `NotePageEditorEditable` がアンマウントされる際、
+   * 既存の cleanup が pending title を flush して既に消したページに対して
+   * `putPageContent` を発火する競合 (Codex P2) を抑止する。
+   *
+   * Mutable ref the parent calls in the delete-success path to cancel any
+   * debounced title save before navigation. Without this, the unmount
+   * cleanup in this component flushes the pending title against the
+   * just-deleted page and surfaces a spurious title-save-failed toast
+   * (Codex P2 review on PR #891).
+   */
+  cancelPendingTitleSaveRef?: React.MutableRefObject<(() => void) | null>;
 }): React.JSX.Element {
   const [editorContent, setEditorContent] = useState(page.content ?? "");
   const [title, setTitle] = useState(page.title);
@@ -319,6 +333,29 @@ function NotePageEditorEditable({
     };
   }, []);
 
+  // 削除フローから「保留中タイトル保存をキャンセルしてアンマウント flush を
+  // 抑止する」関数を呼べるよう、親から渡された ref に書き込む。timer と
+  // `pendingTitleRef` を両方 null 化すれば、アンマウント時の
+  // `flushPendingTitleRef.current()` は pending null で即 return する。
+  //
+  // Expose a cancel function to the parent via ref so the delete-success path
+  // can drop the pending title save before unmount. Clearing both the timer
+  // and `pendingTitleRef.current` makes the unmount-flush a no-op (the flush
+  // bails when `pending === null`). Codex P2 review on PR #891.
+  useEffect(() => {
+    if (!cancelPendingTitleSaveRef) return;
+    cancelPendingTitleSaveRef.current = () => {
+      if (titleSaveTimerRef.current) {
+        clearTimeout(titleSaveTimerRef.current);
+        titleSaveTimerRef.current = null;
+      }
+      pendingTitleRef.current = null;
+    };
+    return () => {
+      cancelPendingTitleSaveRef.current = null;
+    };
+  }, [cancelPendingTitleSaveRef]);
+
   const handleOpenHistory = useCallback(() => {
     setHistoryOpen(true);
   }, []);
@@ -425,10 +462,25 @@ function NotePageReadOnly({
   page,
   onBack,
   supplementalRightContent,
+  canViewHistory,
 }: {
   page: Page;
   onBack: () => void;
   supplementalRightContent?: React.ReactNode;
+  /**
+   * 履歴メニューを出してよいかどうか。サーバの `/api/pages/:id/snapshots` は
+   * `authRequired` のため、未ログインの guest が公開・unlisted ノートを
+   * 閲覧している場合に履歴を出すと 401 で必ず失敗する (Codex P2)。呼び出し側で
+   * `isSignedIn` を渡し、未認証時は履歴項目自体を出さない。
+   *
+   * Whether the history menu item should be exposed. The server's
+   * `/api/pages/:id/snapshots` route is `authRequired`, so showing the
+   * history entry to unauthenticated guests viewing a public / unlisted
+   * note page would guarantee a 401 inside `PageHistoryModal`. The parent
+   * passes `isSignedIn` so we hide the entry instead of exposing a broken
+   * flow (Codex P2 review on PR #891).
+   */
+  canViewHistory: boolean;
 }): React.JSX.Element {
   const { t } = useTranslation();
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -446,16 +498,32 @@ function NotePageReadOnly({
     window.location.reload();
   }, []);
 
-  const menuItems = useMemo<PageDetailToolbarAction[]>(
-    () =>
-      buildSharedMenuItems({
-        t,
-        onOpenHistory: handleOpenHistory,
-        onExportMarkdown: handleExportMarkdown,
-        onCopyMarkdown: handleCopyMarkdown,
-      }),
-    [t, handleOpenHistory, handleExportMarkdown, handleCopyMarkdown],
-  );
+  const menuItems = useMemo<PageDetailToolbarAction[]>(() => {
+    const items: PageDetailToolbarAction[] = [];
+    if (canViewHistory) {
+      items.push({
+        id: "history",
+        label: t("editor.pageHistory.menuButton"),
+        icon: History,
+        onClick: handleOpenHistory,
+      });
+    }
+    items.push(
+      {
+        id: "export-markdown",
+        label: t("editor.pageMenu.exportMarkdown"),
+        icon: Download,
+        onClick: handleExportMarkdown,
+      },
+      {
+        id: "copy-markdown",
+        label: t("editor.pageMenu.copyMarkdown"),
+        icon: Copy,
+        onClick: handleCopyMarkdown,
+      },
+    );
+    return items;
+  }, [t, canViewHistory, handleOpenHistory, handleExportMarkdown, handleCopyMarkdown]);
 
   return (
     <>
@@ -587,6 +655,20 @@ const NotePageView: React.FC = () => {
 
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
+  // 削除成功時に編集中の保留タイトル保存を flush せずに捨てるためのフック。
+  // `NotePageEditorEditable` がマウント中、自分自身のキャンセル関数をここに
+  // 書き込む（mount 時に set、unmount 時に null）。削除直後の navigate で
+  // child が unmount される前に呼び出すことで、もう存在しないページに
+  // タイトル保存リクエストが飛ぶのを防ぐ (Codex P2 review on PR #891)。
+  //
+  // Mutable handle used to cancel any debounced title save before the
+  // delete-success navigation. The editable child writes its own cancel
+  // function into this ref while mounted (cleared on unmount); the parent
+  // invokes it inside `onSuccess` so the about-to-unmount cleanup no longer
+  // fires a `putPageContent` against the page we just removed. Codex P2
+  // review on PR #891.
+  const cancelPendingTitleSaveRef = useRef<(() => void) | null>(null);
+
   const handleBack = useCallback(() => {
     // `/notes/:noteId/:pageId` ルートなので `noteId` は常に存在する。`/home`
     // への fallback は廃止済み（issue #884）。
@@ -631,6 +713,14 @@ const NotePageView: React.FC = () => {
           // `useRemovePageFromNote` already invalidates the note detail and
           // window caches; nothing extra to do here.
           setDeleteConfirmOpen(false);
+          // navigate でアンマウントされる前に、編集中の保留タイトル保存を破棄する。
+          // 既存の cleanup が pending を flush すると、消したばかりのページに
+          // `putPageContent` が飛んで保存失敗トーストが出てしまう (Codex P2)。
+          //
+          // Cancel any debounced title save before navigation so the editable
+          // child's unmount cleanup does not flush against the just-removed
+          // page. Codex P2 review on PR #891.
+          cancelPendingTitleSaveRef.current?.();
           navigate(`/notes/${noteId}`);
         },
         onError: (error) => {
@@ -701,12 +791,14 @@ const NotePageView: React.FC = () => {
               onRequestDelete={handleRequestDelete}
               isDeletePending={isDeletePending}
               supplementalRightContent={supplementalRightContent}
+              cancelPendingTitleSaveRef={cancelPendingTitleSaveRef}
             />
           ) : (
             <NotePageReadOnly
               page={page}
               onBack={handleBack}
               supplementalRightContent={supplementalRightContent}
+              canViewHistory={isSignedIn}
             />
           )}
         </NoteWorkspaceProvider>

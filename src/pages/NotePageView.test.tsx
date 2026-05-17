@@ -479,6 +479,37 @@ describe("NotePageView", () => {
       // Delete is hidden in read-only mode (no permission).
       expect(screen.queryByText("editor.pageMenu.deletePage")).not.toBeInTheDocument();
     });
+
+    // Codex P2 review on PR #891: `/api/pages/:id/snapshots` requires auth, so
+    // unauthenticated guests viewing a public / unlisted note page must not see
+    // the history entry (it would 401 inside `PageHistoryModal`). Export / copy
+    // remain available since they read `page.content` client-side.
+    it("未ログインの read-only viewer には履歴項目を出さず、エクスポート/コピーは残す / hides history but keeps export/copy for unauthenticated read-only viewers", () => {
+      vi.mocked(useAuth).mockReturnValue({ isSignedIn: false, userId: undefined } as never);
+      vi.mocked(useNote).mockReturnValue({
+        note: { id: "note-1" },
+        access: { canView: true, canEdit: false },
+        source: "remote",
+        isLoading: false,
+      } as never);
+      vi.mocked(useNotePage).mockReturnValue({
+        data: {
+          id: "page-1",
+          title: "Guest viewable",
+          content: "Body",
+          ownerUserId: "user-other",
+          noteId: "note-1",
+        },
+        isLoading: false,
+      } as never);
+
+      renderNotePageView();
+
+      expect(screen.queryByText("editor.pageHistory.menuButton")).not.toBeInTheDocument();
+      expect(screen.getByText("editor.pageMenu.exportMarkdown")).toBeInTheDocument();
+      expect(screen.getByText("editor.pageMenu.copyMarkdown")).toBeInTheDocument();
+      expect(screen.queryByText("editor.pageMenu.deletePage")).not.toBeInTheDocument();
+    });
   });
 
   describe("menu actions (issue #890)", () => {
@@ -615,6 +646,76 @@ describe("NotePageView", () => {
       const modal = screen.getByTestId("page-history-modal");
       expect(modal).toBeInTheDocument();
       expect(modal).toHaveAttribute("data-page-id", "page-1");
+    });
+
+    // Codex P2 review on PR #891: 削除成功直後の navigate でアンマウント flush が
+    // 走ると、保留中のタイトル保存が「もう存在しないページ」に対する
+    // `putPageContent` を撃ってしまい spurious な failed-toast が出る。
+    // `change-title` で debounce 中のタイトルを作った状態で削除を成功させ、
+    // `mockApi.putPageContent` が呼ばれていないことで cancel hook の効果を検証する。
+    //
+    // Pin the cancel-pending-title-save behavior added for Codex P2. We prime
+    // a pending debounced title change, then confirm a successful delete; the
+    // editable child's unmount flush must be neutered before navigation so
+    // `putPageContent` is never invoked against the just-removed page.
+    it("削除成功時に保留中のタイトル保存をキャンセルする / cancels pending title save before delete-success navigation", async () => {
+      setupEditableRender();
+      // 漏れた unmount-flush が `putPageContent` まで到達できるよう、
+      // `getPageContent` も成功させておく。
+      // Make `getPageContent` succeed so a leaked unmount-flush would reach
+      // `putPageContent` — the assertions below check both entry points.
+      mockApi.getPageContent.mockResolvedValue({
+        ydoc_state: "AQ==",
+        version: 3,
+        content_text: "body",
+      });
+      mockApi.putPageContent.mockResolvedValue({ version: 4 });
+      mockRemoveFromNoteMutate.mockImplementation((_args, options) => {
+        options?.onSuccess?.();
+      });
+      // `useNavigate` はモック化済みなので、本番の "navigate → route unmount"
+      // を再現するには明示的に `unmount()` する必要がある。`render()` の戻り値を
+      // 取って後で呼ぶ。
+      // `useNavigate` is mocked in this suite, so navigation never actually
+      // unmounts the route's children. Capture `unmount` from `render()` and
+      // invoke it explicitly to reproduce the production sequence
+      // (delete onSuccess → navigate → react-router unmounts `NotePageView`).
+      const { unmount } = renderNotePageView();
+
+      // 編集中のタイトル変更で debounce タイマーを設置する。timer は flush 前に
+      // キャンセルされる前提なので `advanceTimersByTime` は呼ばない。
+      // Stage a debounced title change without flushing it; the delete flow
+      // must cancel the timer before unmount runs.
+      fireEvent.click(screen.getByText("change-title"));
+
+      fireEvent.click(screen.getByText("editor.pageMenu.deletePage"));
+      fireEvent.click(screen.getByTestId("confirm-delete"));
+
+      expect(mockNavigate).toHaveBeenCalledWith("/notes/note-1");
+
+      // ここで navigate 相当のアンマウントを実行する。cancel hook が onSuccess
+      // 内で走っているはずなので、unmount cleanup の `flushPendingTitleRef.current()`
+      // は pending == null で即 return すべき。
+      // Simulate the post-navigate unmount. The cancel hook should have run
+      // inside `onSuccess`, so the unmount cleanup's
+      // `flushPendingTitleRef.current()` must short-circuit on a null pending.
+      unmount();
+      vi.useRealTimers();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // タイトル保存経路の最初のサーバ呼び出しが getPageContent。これが呼ばれて
+      // いなければ pendingTitleRef は確実に null 化されている。
+      // `getPageContent` is the first server call in the title-save flush
+      // path; asserting it never fires guarantees the cancel hook neutered
+      // the pending state before unmount.
+      expect(mockApi.getPageContent).not.toHaveBeenCalled();
+      expect(mockApi.putPageContent).not.toHaveBeenCalled();
+      // unmount-flush が走らなければ `errors.titleSaveFailedTitle` の
+      // destructive トーストも当然出ない。
+      // No spurious title-save-failed toast either.
+      expect(mockToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ title: "errors.titleSaveFailedTitle" }),
+      );
     });
   });
 
