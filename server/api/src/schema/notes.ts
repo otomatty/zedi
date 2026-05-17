@@ -51,6 +51,29 @@ export const notes = pgTable(
      * per owner; the delete guard lives in the API layer.
      */
     isDefault: boolean("is_default").notNull().default(false),
+    /**
+     * ノートのオーナーが「`/notes/:noteId` のページ一覧上部にタグフィルタバーを
+     * 既定で表示する」と宣言する真偽値。ユーザーは localStorage で個別に上書き
+     * できる (`zedi-note-filter-preferences`)。
+     *
+     * Owner-declared default for showing the tag filter bar above the page
+     * list on `/notes/:noteId`. Individual users can override it via
+     * localStorage (`zedi-note-filter-preferences`).
+     */
+    showTagFilterBar: boolean("show_tag_filter_bar").notNull().default(false),
+    /**
+     * フィルタバーの既定選択タグ (小文字キー)。空配列は「既定では何も選択しない」、
+     * `['__none__']` は「タグなしページのみ」を既定にする。URL の `?tags=` が
+     * 指定されていればそちらが優先される。
+     *
+     * Default tag selection (lower-cased keys) for the filter bar. An empty
+     * array means "select nothing by default"; `['__none__']` defaults to
+     * "untagged pages only". The URL `?tags=` always wins over this default.
+     */
+    defaultFilterTags: text("default_filter_tags")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     isDeleted: boolean("is_deleted").default(false).notNull(),

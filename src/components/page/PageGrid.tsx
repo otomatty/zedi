@@ -10,6 +10,7 @@ import EmptyState from "./EmptyState";
 import { cn, Skeleton } from "@zedi/ui";
 import { hasNeverSynced } from "@/lib/sync";
 import type { PageSummary } from "@/types/page";
+import type { SelectedTags } from "@/types/tagFilter";
 
 /**
  * 末尾検知の前倒し量（行数）。virtual range の末尾がリストの末尾から
@@ -136,6 +137,16 @@ interface PageGridProps {
    * server's `canEdit` guard remains the source of truth.
    */
   canDeletePage?: (page: PageSummary) => boolean;
+  /**
+   * ノート文脈時に適用するタグフィルタ。`none-selected` (デフォルト) のときは
+   * フィルタ無し。値が変わると `useInfiniteNotePages` の queryKey も変わるので
+   * ウィンドウキャッシュは混ざらない。`noteId` 未指定時は無視される。
+   *
+   * Tag filter forwarded to `useInfiniteNotePages` when rendering in a note
+   * context. Changing the filter spawns a new infinite query so prior windows
+   * never leak. Ignored when `noteId` is not provided.
+   */
+  tagFilter?: SelectedTags;
 }
 
 /**
@@ -163,6 +174,7 @@ const PageGrid: React.FC<PageGridProps> = ({
   noteId,
   canEdit = true,
   canDeletePage,
+  tagFilter,
 }) => {
   const { ref: containerRef, columns } = useContainerColumns();
   const isNoteContext = Boolean(noteId);
@@ -178,7 +190,10 @@ const PageGrid: React.FC<PageGridProps> = ({
   // In a note context, fetch the page list as a keyset-paginated infinite
   // query (issue #860 Phase 3). The server's `updated_at DESC, id DESC` order
   // is preserved verbatim; no client-side resort.
-  const noteInfinite = useInfiniteNotePages(noteId ?? "", { enabled: isNoteContext });
+  const noteInfinite = useInfiniteNotePages(noteId ?? "", {
+    enabled: isNoteContext,
+    tagFilter,
+  });
   // Issue #860 Phase 4: ノート画面を開いている間だけ SSE を張り、ページ追加・
   // 更新・削除・権限変更イベントを React Query infinite cache に差分適用する。
   // 結果として `useAddPageToNote` / `useRemovePageFromNote` の onSuccess

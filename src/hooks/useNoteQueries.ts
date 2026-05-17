@@ -21,6 +21,8 @@ import type {
 } from "@/lib/api/types";
 import type { Note, NoteAccess, NoteMember, NoteMemberRole } from "@/types/note";
 import type { Page, PageSummary } from "@/types/page";
+import type { SelectedTags } from "@/types/tagFilter";
+import { serializeTagsParam } from "@/lib/noteTagFilterBar/urlTagsCodec";
 import { pageKeys, useRepository } from "@/hooks/usePageQueries";
 
 /** Page in a note with who added it (for canDeletePage). */
@@ -105,6 +107,7 @@ export const noteKeys = {
     userEmail: string | undefined,
     include: ReadonlyArray<NotePageWindowInclude>,
     pageSize: number,
+    tagFilter: SelectedTags = { kind: "none-selected" },
   ) =>
     [
       ...noteKeys.pages(),
@@ -114,6 +117,12 @@ export const noteKeys = {
       userEmail ?? "",
       [...include].sort().join(","),
       pageSize,
+      // タグフィルタの正規化文字列を queryKey に混ぜることで、フィルタが変わると
+      // React Query が別 query 扱いし、既存 InfiniteData と混ざらない。
+      // Folding the serialized filter into the key forces React Query to treat
+      // each filter as a distinct query, preventing stale `InfiniteData`
+      // windows from polluting the next filter state.
+      serializeTagsParam(tagFilter) ?? "",
     ] as const,
   /**
    * `noteId` 配下のすべての window エントリ（任意の include / pageSize / 認証
@@ -170,6 +179,8 @@ function apiNoteToNote(item: {
   is_official?: boolean;
   is_default?: boolean;
   view_count?: number;
+  show_tag_filter_bar?: boolean;
+  default_filter_tags?: string[];
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
@@ -183,6 +194,8 @@ function apiNoteToNote(item: {
     isOfficial: item.is_official ?? false,
     isDefault: item.is_default ?? false,
     viewCount: item.view_count ?? 0,
+    showTagFilterBar: item.show_tag_filter_bar ?? false,
+    defaultFilterTags: Array.isArray(item.default_filter_tags) ? [...item.default_filter_tags] : [],
     createdAt: parseTs(item.created_at),
     updatedAt: parseTs(item.updated_at),
     isDeleted: item.is_deleted,
@@ -708,6 +721,16 @@ export interface UseInfiniteNotePagesOptions {
    * before the caller has confirmed view permission.
    */
   enabled?: boolean;
+  /**
+   * タグフィルタバー由来の `?tags=` フィルタ。`none-selected` を渡したときは
+   * パラメータを付けずに全件取得する。値を変えると React Query は別 query
+   * 扱いし、既存 InfiniteData は破棄される。
+   *
+   * Tag filter bar selection. `none-selected` fetches everything (no param);
+   * changing the filter spawns a new React Query so prior `InfiniteData` is
+   * not reused.
+   */
+  tagFilter?: SelectedTags;
 }
 
 /**
@@ -769,6 +792,7 @@ export function useInfiniteNotePages(noteId: string, options: UseInfiniteNotePag
   const { api, userId, userEmail, isLoaded } = useNoteApi();
   const include = options.include ?? DEFAULT_INFINITE_NOTE_PAGES_INCLUDE;
   const pageSize = options.pageSize ?? DEFAULT_INFINITE_NOTE_PAGES_SIZE;
+  const tagFilter: SelectedTags = options.tagFilter ?? { kind: "none-selected" };
   const enabled = (options.enabled ?? true) && isLoaded && !!noteId;
 
   const query = useInfiniteQuery<
@@ -778,13 +802,14 @@ export function useInfiniteNotePages(noteId: string, options: UseInfiniteNotePag
     readonly unknown[],
     string | null
   >({
-    queryKey: noteKeys.pagesWindow(noteId, userId, userEmail, include, pageSize),
+    queryKey: noteKeys.pagesWindow(noteId, userId, userEmail, include, pageSize, tagFilter),
     queryFn: async (ctx): Promise<NotePageWindowResponse> => {
       const cursor = ctx.pageParam ?? null;
       return api.getNotePages(noteId, {
         cursor,
         limit: pageSize,
         include,
+        tags: tagFilter,
       });
     },
     enabled,
@@ -939,8 +964,15 @@ export function useCreateNote() {
 }
 
 /**
- * ノートの title / visibility / editPermission を更新するミューテーションフック。
- * Mutation hook for updating a note's title / visibility / editPermission.
+ * ノートの title / visibility / editPermission およびタグフィルタバー設定を
+ * 更新するミューテーションフック。`showTagFilterBar` / `defaultFilterTags` は
+ * オーナーが既定値を管理するためのフィールドで、ユーザーは localStorage で
+ * 上書きできる（フックは扱わない）。
+ *
+ * Mutation hook for updating note attributes, including the owner-side
+ * defaults for the tag filter bar (`showTagFilterBar` / `defaultFilterTags`).
+ * Per-user filter-bar overrides live in localStorage and are not touched
+ * here.
  */
 export function useUpdateNote() {
   const { api } = useNoteApi();
@@ -952,12 +984,19 @@ export function useUpdateNote() {
       updates,
     }: {
       noteId: string;
-      updates: Partial<Pick<Note, "title" | "visibility" | "editPermission">>;
+      updates: Partial<
+        Pick<
+          Note,
+          "title" | "visibility" | "editPermission" | "showTagFilterBar" | "defaultFilterTags"
+        >
+      >;
     }) => {
       await api.updateNote(noteId, {
         title: updates.title,
         visibility: updates.visibility,
         edit_permission: updates.editPermission,
+        show_tag_filter_bar: updates.showTagFilterBar,
+        default_filter_tags: updates.defaultFilterTags,
       });
       return { noteId, updates };
     },

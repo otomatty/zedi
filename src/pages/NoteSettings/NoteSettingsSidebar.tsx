@@ -2,7 +2,15 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { cn } from "@zedi/ui";
-import { AtSign, Globe, Link2, Settings as SettingsIcon, Trash2, UsersRound } from "lucide-react";
+import {
+  AtSign,
+  Filter,
+  Globe,
+  Link2,
+  Settings as SettingsIcon,
+  Trash2,
+  UsersRound,
+} from "lucide-react";
 
 /**
  * 設定画面サイドナビの 1 項目。アイコン / ラベル i18n キー / サブルートパスを持つ。
@@ -12,7 +20,7 @@ import { AtSign, Globe, Link2, Settings as SettingsIcon, Trash2, UsersRound } fr
  */
 export interface NoteSettingsNavItem {
   /** サブパス。`/notes/:noteId/settings/<key>` の `<key>` 部分。 */
-  key: "general" | "visibility" | "members" | "links" | "domains" | "danger";
+  key: "general" | "visibility" | "members" | "links" | "domains" | "filter-bar" | "danger";
   /** i18n キー（`notes.settingsNav.<key>` ベース）。 */
   labelI18nKey: string;
   /** 行頭アイコン（lucide-react）。 */
@@ -64,6 +72,12 @@ const NAV_ITEMS: NavItemSpec[] = [
     labelI18nKey: "notes.settingsNav.domains",
     Icon: AtSign,
     visibleFor: ["owner", "editor"],
+  },
+  {
+    key: "filter-bar",
+    labelI18nKey: "notes.settingsNav.filterBar",
+    Icon: Filter,
+    visibleFor: ["owner"],
   },
   {
     key: "danger",

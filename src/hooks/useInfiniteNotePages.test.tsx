@@ -106,6 +106,7 @@ describe("useInfiniteNotePages", () => {
       cursor: null,
       limit: 50,
       include: ["preview", "thumbnail"],
+      tags: { kind: "none-selected" },
     });
     expect(result.current.pages).toHaveLength(1);
     expect(result.current.pages[0]?.id).toBe("p1");
@@ -135,6 +136,7 @@ describe("useInfiniteNotePages", () => {
       cursor: null,
       limit: 25,
       include: ["preview"],
+      tags: { kind: "none-selected" },
     });
 
     await act(async () => {
@@ -147,6 +149,7 @@ describe("useInfiniteNotePages", () => {
       cursor: "cursor-abc",
       limit: 25,
       include: ["preview"],
+      tags: { kind: "none-selected" },
     });
     expect(result.current.pages.map((p) => p.id)).toEqual(["p1", "p2"]);
     expect(result.current.hasNextPage).toBe(false);
@@ -175,5 +178,50 @@ describe("useInfiniteNotePages", () => {
     });
 
     expect(mockGetNotePages).not.toHaveBeenCalled();
+  });
+
+  it("forwards a non-default tagFilter on every windowed fetch (PR #897)", async () => {
+    mockGetNotePages
+      .mockResolvedValueOnce({
+        items: [makeItem("p1", "2026-05-13T10:00:00.000000Z")],
+        next_cursor: "cursor-abc",
+      })
+      .mockResolvedValueOnce({
+        items: [makeItem("p2", "2026-05-13T09:00:00.000000Z")],
+        next_cursor: null,
+      });
+
+    const tagFilter = { kind: "tags" as const, tags: ["typescript", "react"] };
+    const { result } = renderHook(
+      () =>
+        useInfiniteNotePages("note-1", {
+          pageSize: 25,
+          include: ["preview"],
+          tagFilter,
+        }),
+      { wrapper: wrapperWithClient(makeQueryClient()) },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(mockGetNotePages).toHaveBeenLastCalledWith("note-1", {
+      cursor: null,
+      limit: 25,
+      include: ["preview"],
+      tags: tagFilter,
+    });
+
+    await act(async () => {
+      await result.current.fetchNextPage();
+    });
+
+    await waitFor(() => expect(result.current.isFetchingNextPage).toBe(false));
+    expect(mockGetNotePages).toHaveBeenCalledTimes(2);
+    expect(mockGetNotePages).toHaveBeenLastCalledWith("note-1", {
+      cursor: "cursor-abc",
+      limit: 25,
+      include: ["preview"],
+      tags: tagFilter,
+    });
+    expect(result.current.pages.map((p) => p.id)).toEqual(["p1", "p2"]);
   });
 });

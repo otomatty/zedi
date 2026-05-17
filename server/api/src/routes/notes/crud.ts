@@ -53,7 +53,7 @@ const ALLOWED_EDIT_PERMISSION = new Set<NoteEditPermission>([
  * validators from clients cannot revive an outdated cached body via 304
  * (Issue #860 Phase 0). Bump this whenever the wire shape changes.
  */
-const NOTE_DETAIL_RESPONSE_VERSION = "v3";
+const NOTE_DETAIL_RESPONSE_VERSION = "v4";
 
 function validateVisibility(value: string | undefined): NoteVisibility {
   if (value === undefined) return "private";
@@ -94,6 +94,74 @@ function parseIsOfficialForUpdate(value: unknown): boolean | undefined {
   if (typeof value === "boolean") return value;
   throw new HTTPException(400, { message: "Invalid is_official" });
 }
+
+/**
+ * ノート更新ボディの `show_tag_filter_bar` を真偽値に正規化する。未指定は
+ * `undefined` を返す（クライアントが触っていない＝既存値を保つ）。
+ *
+ * Normalize `show_tag_filter_bar` from the update body to a boolean, or
+ * `undefined` when the client did not send it (= keep the stored value).
+ */
+function parseShowTagFilterBarForUpdate(value: unknown): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === "boolean") return value;
+  throw new HTTPException(400, { message: "Invalid show_tag_filter_bar" });
+}
+
+/**
+ * タグ名フィルタ用の `default_filter_tags` を検証・正規化する。配列要素は
+ * 文字列のみ許容し、トリム＋小文字化後の `__none__` トークンまたは
+ * `TAG_NAME_CHAR_CLASS_STRING` に一致する文字列を期待する。重複は除去し、
+ * 配列長は 0..20 に制限する。
+ *
+ * Validate / normalize `default_filter_tags` on an update body. Tags are
+ * trimmed and lower-cased; each must match the `TAG_NAME_CHAR_CLASS` regex
+ * (or be the special `__none__` token). Duplicates are removed. The array
+ * length is capped at 20 entries. Returns `undefined` when the field was not
+ * sent.
+ */
+function parseDefaultFilterTagsForUpdate(value: unknown): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) {
+    throw new HTTPException(400, { message: "Invalid default_filter_tags" });
+  }
+  if (value.length > 20) {
+    throw new HTTPException(400, { message: "Too many default_filter_tags (max 20)" });
+  }
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") {
+      throw new HTTPException(400, { message: "Invalid default_filter_tags entry" });
+    }
+    const normalized = entry.trim().toLowerCase();
+    if (normalized.length === 0 || normalized.length > 100) {
+      throw new HTTPException(400, { message: "Invalid default_filter_tags entry" });
+    }
+    if (normalized !== "__none__" && !VALID_TAG_NAME_REGEX.test(normalized)) {
+      throw new HTTPException(400, { message: "Invalid default_filter_tags entry" });
+    }
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+/**
+ * `parseDefaultFilterTagsForUpdate` で使うタグ名の文字種パターン。クライアント
+ * 側の `packages/shared/src/tagCharacterClass.ts` および
+ * `services/ydocRenameRewrite.ts` の `TAG_NAME_CHAR_CLASS_STRING` と等価。
+ *
+ * Character-class regex used to validate tag names; mirrors
+ * `TAG_NAME_CHAR_CLASS_STRING` (the source of truth for client/server alike).
+ */
+const TAG_NAME_CHAR_CLASS_STRING = "A-Za-z0-9_\\-぀-ヿ㐀-鿿";
+// `TAG_NAME_CHAR_CLASS_STRING` is a hardcoded constant (never user input).
+// The pattern is a single anchored character class with one quantifier and
+// no nested quantifiers / alternations, so matching is linear in input
+// length. Static-analysis ReDoS warnings on this regex are false positives.
+const VALID_TAG_NAME_REGEX = new RegExp(`^[${TAG_NAME_CHAR_CLASS_STRING}]+$`);
 
 /**
  * `Date | string | null` のいずれで来ても安全に epoch ms に正規化するヘルパー。
@@ -263,6 +331,8 @@ app.put("/:noteId", authRequired, async (c) => {
     visibility?: string;
     edit_permission?: string;
     is_official?: unknown;
+    show_tag_filter_bar?: unknown;
+    default_filter_tags?: unknown;
   }>();
 
   const isOfficial = parseIsOfficialForUpdate(body.is_official);
@@ -279,6 +349,8 @@ app.put("/:noteId", authRequired, async (c) => {
     body.visibility !== undefined ? validateVisibility(body.visibility) : undefined;
   const editPermission =
     body.edit_permission !== undefined ? validateEditPermission(body.edit_permission) : undefined;
+  const showTagFilterBar = parseShowTagFilterBarForUpdate(body.show_tag_filter_bar);
+  const defaultFilterTags = parseDefaultFilterTagsForUpdate(body.default_filter_tags);
 
   const updated = await db
     .update(notes)
@@ -287,6 +359,8 @@ app.put("/:noteId", authRequired, async (c) => {
       visibility,
       editPermission,
       isOfficial: isOfficial !== undefined ? isOfficial : undefined,
+      showTagFilterBar: showTagFilterBar !== undefined ? showTagFilterBar : undefined,
+      defaultFilterTags: defaultFilterTags !== undefined ? defaultFilterTags : undefined,
       updatedAt: new Date(),
     })
     .where(eq(notes.id, noteId))
@@ -298,16 +372,21 @@ app.put("/:noteId", authRequired, async (c) => {
   // Issue #860 Phase 4: visibility / edit_permission の変化は `getNoteRole`
   // の解釈に直結するため、ノート購読者へ sentinel を投げて details / window /
   // members を invalidate させる。title だけの変更でも `noteRowToApi` の値が
-  // 変わるので一律で emit する。
+  // 変わるので一律で emit する。タグフィルタバー設定はアクセス権には影響しない
+  // が、`noteRowToApi` の値は変わるためキャッシュの整合性のために同様に通知する。
   // Issue #860 Phase 4: changes to visibility / edit_permission flip the
   // result of `getNoteRole` for some callers, so notify subscribers to
   // re-evaluate access. Always emit on a successful PUT (even title-only
-  // changes) so the cached note shell does not drift.
+  // changes) so the cached note shell does not drift. Tag-filter-bar fields
+  // don't affect access but still mutate the shell payload, so they
+  // trigger the same notification path for cache freshness.
   if (
     visibility !== undefined ||
     editPermission !== undefined ||
     body.title !== undefined ||
-    isOfficial !== undefined
+    isOfficial !== undefined ||
+    showTagFilterBar !== undefined ||
+    defaultFilterTags !== undefined
   ) {
     publishNoteEvent({ type: "note.permission_changed", note_id: noteId });
   }

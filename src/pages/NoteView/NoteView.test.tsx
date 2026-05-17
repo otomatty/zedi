@@ -24,6 +24,13 @@ vi.mock("react-i18next", () => ({
 
 vi.mock("@/hooks/useNoteQueries", () => ({
   useNote: vi.fn(),
+  useNoteApi: () => ({
+    api: { getNoteTags: vi.fn().mockResolvedValue({ items: [], none_count: 0, total_pages: 0 }) },
+    userId: "user-1",
+    userEmail: "user@example.com",
+    isSignedIn: true,
+    isLoaded: true,
+  }),
   useAddPageToNote: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCopyPersonalPageToNote: () => ({
     mutateAsync: vi.fn().mockResolvedValue({ created: true, page_id: "pg", sort_order: 1 }),
@@ -34,6 +41,32 @@ vi.mock("@/hooks/useNoteQueries", () => ({
   // title-dedup warning. Stub it so the test does not error on
   // undefined-as-function.
   useNoteTitleIndex: () => ({ data: [], isLoading: false }),
+}));
+
+// `useNoteTagAggregation` calls `useNoteApi` internally; we already stub the
+// API there so the hook resolves with an empty aggregation. Mock it directly
+// to keep the test independent of React Query setup.
+vi.mock("@/hooks/useNoteTagAggregation", () => ({
+  useNoteTagAggregation: () => ({
+    items: [],
+    noneCount: 0,
+    totalPages: 0,
+    isLoading: false,
+    isError: false,
+    source: "empty" as const,
+  }),
+}));
+
+// `useTagFilterBarPreference` resolves to disabled by default so the bar does
+// not render in the existing NoteView test fixtures (the note shell does not
+// declare `showTagFilterBar: true`).
+vi.mock("@/hooks/useTagFilterBarPreference", () => ({
+  useTagFilterBarPreference: () => ({
+    enabled: false,
+    noteDefault: false,
+    userOverride: undefined,
+    setOverride: vi.fn(),
+  }),
 }));
 
 vi.mock("@/hooks/usePageQueries", () => ({

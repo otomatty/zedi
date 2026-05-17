@@ -14,6 +14,10 @@ import { getNoteViewPermissions } from "./noteViewHelpers";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteViewHeaderActions } from "./NoteViewHeaderActions";
 import PageGrid from "@/components/page/PageGrid";
+import { TagFilterBar } from "@/components/tagFilterBar";
+import { useNoteTagAggregation } from "@/hooks/useNoteTagAggregation";
+import { useTagFilterBarPreference } from "@/hooks/useTagFilterBarPreference";
+import { useURLTagFilter } from "@/hooks/useURLTagFilter";
 import type { PageSummary } from "@/types/page";
 import { isClipUrlAllowed } from "@/lib/webClipper";
 
@@ -166,9 +170,15 @@ const NoteView: React.FC = () => {
               userRole={access?.role ?? "none"}
             />
           </div>
-          <div className="mt-4">
-            <PageGrid noteId={note.id} canEdit={canEdit} canDeletePage={canDeletePageInGrid} />
-          </div>
+          <NoteViewPageList
+            noteId={note.id}
+            canEdit={canEdit}
+            canDeletePageInGrid={canDeletePageInGrid}
+          />
+          {/* PageGrid 描画は NoteViewPageList 内に閉じ込めて、`useURLTagFilter`
+              の `selected` を `TagFilterBar` と `PageGrid` の両方に同期する。
+              The page list and filter bar live together so the URL-driven
+              selection drives both surfaces in lock-step. */}
         </Container>
       </div>
       {canShowAddPage && (
@@ -180,6 +190,66 @@ const NoteView: React.FC = () => {
         />
       )}
     </ContentWithAIChat>
+  );
+};
+
+/**
+ * ノート文脈のページ一覧 + 上部のタグフィルタバーをまとめたサブコンポーネント。
+ * `useURLTagFilter` で `?tags=` を読み書きし、`TagFilterBar` と `PageGrid` の
+ * 両方に同じ `selected` 状態を流し込む。`useTagFilterBarPreference` で
+ * バーの表示可否を解決し、ノート既定 + ユーザー上書きが両方 false のときは
+ * バー自体をマウントしない（タグ集計 API も呼ばない）。
+ *
+ * Pairs the tag filter bar with the page grid so the URL-driven selection
+ * drives both. The bar is only mounted when {@link useTagFilterBarPreference}
+ * resolves to enabled, which also gates the aggregation fetch.
+ */
+const NoteViewPageList: React.FC<{
+  noteId: string;
+  canEdit: boolean;
+  canDeletePageInGrid: (page: PageSummary) => boolean;
+}> = ({ noteId, canEdit, canDeletePageInGrid }) => {
+  const { enabled: showFilterBar } = useTagFilterBarPreference(noteId);
+  const { selected, setSelected } = useURLTagFilter();
+  const aggregation = useNoteTagAggregation(noteId, { enabled: showFilterBar });
+
+  // バーが非表示のとき、URL に残った `?tags=foo` をそのまま PageGrid に流すと
+  // 「絞り込みが効いているのに UI から解除できない」幽霊フィルタ状態になる
+  // (ノート切替で URL が引き継がれた場合など、PR #897 Codex P1)。バーが
+  // 出ていないときは強制的に `none-selected` 扱いにして、フィルタは UI が
+  // 復活したときだけ機能するように倒す。URL は触らずに残しておくので、
+  // バーを再表示すれば前回の選択が復元される。
+  //
+  // Forwarding the URL-derived selection while the bar is hidden produces a
+  // phantom filter — the page list is constrained but there's no UI control
+  // to clear it (PR #897 Codex P1, e.g. when navigating from another note
+  // that left `?tags=` behind). Treat the filter as `none-selected` whenever
+  // the bar is hidden; we keep the URL untouched so the selection comes back
+  // if the user re-enables the bar.
+  const effectiveTagFilter = showFilterBar ? selected : { kind: "none-selected" as const };
+
+  return (
+    <>
+      {showFilterBar && (
+        <div className="mb-3">
+          <TagFilterBar
+            items={aggregation.items}
+            noneCount={aggregation.noneCount}
+            selected={selected}
+            onChange={setSelected}
+            isLoading={aggregation.isLoading}
+          />
+        </div>
+      )}
+      <div className="mt-4">
+        <PageGrid
+          noteId={noteId}
+          canEdit={canEdit}
+          canDeletePage={canDeletePageInGrid}
+          tagFilter={effectiveTagFilter}
+        />
+      </div>
+    </>
   );
 };
 

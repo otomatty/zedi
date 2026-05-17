@@ -39,6 +39,7 @@ import MembersSection from "./pages/NoteSettings/sections/MembersSection";
 import LinksSection from "./pages/NoteSettings/sections/LinksSection";
 import DomainsSection from "./pages/NoteSettings/sections/DomainsSection";
 import DangerZoneSection from "./pages/NoteSettings/sections/DangerZoneSection";
+import TagFilterBarSection from "./pages/NoteSettings/sections/TagFilterBarSection";
 import Onboarding from "./pages/Onboarding";
 import AIChatHistory from "./pages/AIChatHistory";
 import AIChatLanding from "./pages/AIChatLanding";
@@ -284,6 +285,7 @@ const App = () => (
                         <Route path="members" element={<MembersSection />} />
                         <Route path="links" element={<LinksSection />} />
                         <Route path="domains" element={<DomainsSection />} />
+                        <Route path="filter-bar" element={<TagFilterBarSection />} />
                         <Route path="danger" element={<DangerZoneSection />} />
                       </Route>
                       <Route path="/notes/:noteId/members" element={<LegacyMembersRedirect />} />

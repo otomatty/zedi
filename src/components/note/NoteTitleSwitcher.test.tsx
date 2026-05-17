@@ -82,6 +82,8 @@ function makeNote(overrides: Partial<NoteSummary> & { id: string }): NoteSummary
     isOfficial: overrides.isOfficial ?? false,
     isDefault: overrides.isDefault ?? false,
     viewCount: overrides.viewCount ?? 0,
+    showTagFilterBar: overrides.showTagFilterBar ?? false,
+    defaultFilterTags: overrides.defaultFilterTags ?? [],
     createdAt: overrides.createdAt ?? 0,
     updatedAt: overrides.updatedAt ?? 0,
     isDeleted: overrides.isDeleted ?? false,

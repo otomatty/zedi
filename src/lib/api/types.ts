@@ -329,6 +329,19 @@ export interface NoteListItem {
    */
   is_default?: boolean;
   view_count?: number;
+  /**
+   * オーナーが「`/notes/:noteId` のページ一覧上部にタグフィルタバーを既定表示」
+   * と宣言したかどうか。ユーザー側は localStorage で個別に上書き可能。
+   *
+   * Owner-declared default for showing the tag filter bar on `/notes/:noteId`.
+   * Each user can override via localStorage.
+   */
+  show_tag_filter_bar?: boolean;
+  /**
+   * フィルタバーの既定選択タグ (小文字キー、`__none__` トークンを含み得る)。
+   * Default tags selected on first load (lower-cased keys; may include `__none__`).
+   */
+  default_filter_tags?: string[];
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
@@ -389,10 +402,35 @@ export interface GetNoteResponse {
    */
   is_default?: boolean;
   view_count?: number;
+  /** {@link NoteListItem.show_tag_filter_bar} と同じ。/ See {@link NoteListItem.show_tag_filter_bar}. */
+  show_tag_filter_bar?: boolean;
+  /** {@link NoteListItem.default_filter_tags} と同じ。/ See {@link NoteListItem.default_filter_tags}. */
+  default_filter_tags?: string[];
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
   current_user_role: "owner" | "editor" | "viewer" | "guest";
+}
+
+/**
+ * `GET /api/notes/:noteId/tags` の 1 件分。
+ * Single row from the note tag aggregation endpoint.
+ */
+export interface NoteTagAggregationItem {
+  name: string;
+  name_lower: string;
+  page_count: number;
+  resolved: boolean;
+}
+
+/**
+ * `GET /api/notes/:noteId/tags` のレスポンス全体。
+ * Full response for the note tag aggregation endpoint.
+ */
+export interface NoteTagAggregationResponse {
+  items: NoteTagAggregationItem[];
+  none_count: number;
+  total_pages: number;
 }
 
 /**
