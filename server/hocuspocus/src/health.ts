@@ -138,7 +138,13 @@ export function evaluateHealth(inputs: HealthInputs): HealthPayload {
   // Clamp `idle` to the legal `0..total` window to absorb out-of-range inputs.
   const idleClamped = Math.min(idle, total);
   const active = total - idleClamped;
-  const saturation = max > 0 ? active / max : 0;
+  // `active > max` は pg.Pool の一時的なバーストや設定不整合で起きうるが、saturation の
+  // 公開仕様 (0.0 - 1.0) を逸脱しないように 1.0 で頭打ちにする。`saturated` 判定は
+  // 0.8 閾値で行うのでクランプの影響を受けない。
+  // `active` can temporarily exceed `max` during a `pg.Pool` burst, so clamp
+  // `saturation` to the documented 0..1 range. The `saturated` flag uses the
+  // 0.8 threshold and is unaffected by the clamp.
+  const saturation = max > 0 ? Math.min(1, active / max) : 0;
   const saturated = waiting > 0 || (total > 0 && saturation >= POOL_SATURATION_THRESHOLD);
 
   return {

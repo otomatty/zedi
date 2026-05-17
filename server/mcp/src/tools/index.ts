@@ -61,7 +61,7 @@ export function registerAllTools(server: McpServer, client: ZediClient): void {
     {
       title: "Get page content (read-only)",
       description:
-        "Fetches the rendered plain text (`content_text`) of a single page along with its title, preview, version, and last-modified timestamp. Issue #889 Phase 5 made MCP read-only: this endpoint never returns the Y.Doc bytes, and there is no longer a write counterpart — use the Zedi web/desktop client (Hocuspocus collaborative editor) to mutate pages.",
+        "Fetches the rendered plain text (`content_text`) of a single page along with its title, preview, version, and last-modified timestamp. Issue #889 Phase 5 retired MCP page-body updates: this endpoint never returns Y.Doc bytes and there is no `zedi_update_page_content` counterpart anymore (other mutating MCP tools such as `zedi_create_note` are unaffected). To edit page body content, use the Zedi web/desktop client (Hocuspocus collaborative editor).",
       inputSchema: { page_id: z.string().min(1) },
     },
     async (args) =>

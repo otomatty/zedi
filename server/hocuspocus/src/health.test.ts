@@ -121,6 +121,24 @@ describe("evaluateHealth", () => {
     expect(payload.status).toBe("healthy");
   });
 
+  it("clamps saturation to 1.0 when active exceeds max (burst above pool size)", () => {
+    // `pg.Pool` の一時的なバーストや設定不整合で `active > max` になっても、`saturation`
+    // の公開仕様 (0..1) を逸脱しないこと。`saturated` も当然 true のまま。
+    // Defensive clamp: a burst that pushes `active` above `max` must not leak a
+    // saturation > 1.0 to dashboards, and `saturated` stays true.
+    const payload = evaluateHealth({
+      connections: 0,
+      documents: 0,
+      pool: { totalCount: 12, idleCount: 0, waitingCount: 0 },
+      poolMax: 10,
+      now: NOW,
+    });
+    expect(payload.pool.active).toBe(12);
+    expect(payload.pool.saturation).toBe(1);
+    expect(payload.pool.saturated).toBe(true);
+    expect(payload.status).toBe("degraded");
+  });
+
   it("yields saturation=0 when poolMax is 0 (avoids divide-by-zero)", () => {
     // poolMax を渡し忘れたケースでも例外を投げず、飽和度 0 で degrade させない。
     // A misconfigured poolMax=0 must not throw or trip `degraded`.

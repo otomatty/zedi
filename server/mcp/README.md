@@ -203,9 +203,9 @@ Claude Code の `mcpServers` では、HTTP transport 向け設定を使う。`Au
 | `zedi_create_page` | 新規ページを作成 (Y.Doc は空)。                                                                |
 | `zedi_delete_page` | ページをソフトデリートする。                                                                   |
 
-> Issue #889 Phase 5 で MCP は read-only に縮退しました。ページ本文の更新は Zedi クライアント (Hocuspocus 経由のリアルタイム編集) から行ってください。`zedi_update_page_content` は廃止されました。
+> Issue #889 Phase 5 で MCP からはページ本文の更新ツール (`zedi_update_page_content`) のみが廃止されました。ノート作成・メンバー追加など他の書き込み系ツールは引き続き利用可能です。ページ本文の編集は Zedi クライアント (Hocuspocus 経由のリアルタイム編集) から行ってください。
 >
-> _Issue #889 Phase 5 made MCP read-only. To edit a page body, use the Zedi web/desktop client which writes through Hocuspocus. The retired tool was `zedi_update_page_content`._
+> _Issue #889 Phase 5 retired only the page-body update tool (`zedi_update_page_content`) from the MCP surface. Other mutating tools (note creation, membership, etc.) remain available. To edit a page body, use the Zedi web/desktop client which writes through Hocuspocus._
 
 ### ノート
 
@@ -242,7 +242,7 @@ Claude Code の `mcpServers` では、HTTP transport 向け設定を使う。`Au
 | `zedi_search`   | タイトルと本文で全文検索。`scope: own` or `shared`、`limit` を指定可能。 |
 | `zedi_clip_url` | 公開 URL を Readability で整形し、新規ページとして保存。                 |
 
-計 19 ツール。ツール名の一覧は `src/tools/index.ts` の `ALL_TOOL_NAMES` にも定義済み。
+計 20 ツール。ツール名の一覧は `src/tools/index.ts` の `ALL_TOOL_NAMES` にも定義済み。
 
 ---
 
