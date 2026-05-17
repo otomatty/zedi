@@ -483,12 +483,23 @@ function NotePageEditorEditable({
 
 /**
  * 閲覧専用モードのノートページ本文。共通ツールバーには「変更履歴」「Markdown
- * でエクスポート」「Markdown をコピー」を出すが、削除は出さない。Markdown の
- * ソースは `page.title` / `page.content` をそのまま使う。
+ * でエクスポート」「Markdown をコピー」を出すが、削除は出さない。本文の表示と
+ * Markdown export / copy の両ソースは共有フック `usePagePublicContent`
+ * (`GET /api/pages/:id/public-content`) 由来の `publicContent.title` /
+ * `content_text` を使う。`apiPageToPage` がメタデータの `content` を `""` に
+ * 落とすため `page.content` を読むと export が空になる回帰になっていた
+ * (Codex P1, PR #893)。`NotePagePublicView` も同じフックを使い、TanStack
+ * Query のクエリキーで 1 リクエストに dedup される。
  *
  * Read-only note page body. Surfaces the shared toolbar with history /
- * export / copy actions but omits delete. Markdown export and copy read the
- * saved `page.title` / `page.content` directly.
+ * export / copy actions but omits delete. The visible body and the Markdown
+ * export / copy actions both source their text from the shared
+ * `usePagePublicContent` hook (`GET /api/pages/:id/public-content`) —
+ * specifically `publicContent.title` / `publicContent.content_text` — to
+ * avoid the regression where reading `page.content` produced empty exports
+ * (`apiPageToPage` strips `content` to `""`; Codex P1 review on PR #893).
+ * `NotePagePublicView` consumes the same hook, so TanStack Query dedups the
+ * two consumers into a single network request.
  */
 function NotePageReadOnly({
   page,
