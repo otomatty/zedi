@@ -3,12 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import NotePageView from "./NotePageView";
-import {
-  useNote,
-  useNotePage,
-  useCopyNotePageToPersonal,
-  useNoteApi,
-} from "@/hooks/useNoteQueries";
+import { useNote, useNotePage, useNoteApi, useRemovePageFromNote } from "@/hooks/useNoteQueries";
 import { useAuth } from "@/hooks/useAuth";
 import { AIChatProvider } from "@/contexts/AIChatContext";
 
@@ -16,13 +11,18 @@ const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
 
 // `vi.hoisted` で共有フック用の `vi.fn()` を巻き上げる。`vi.mock` のファクトリは
 // hoisting されてテストスコープの変数を参照できないので、モジュール境界をまたぐ
-// 共有状態はこの方式にする必要がある。`mockToast` を差し込むことで、`handleCopyToPersonal`
-// が `toast({...})` に渡した `action` をテストから検査できるようにする。
+// 共有状態はこの方式にする必要がある。
 // Hoist `vi.fn()` refs so the mock factory (which runs before the test body)
-// can see them. Required because `vi.mock` hoists above normal `const`s. The
-// shared `mockToast` lets tests inspect what `toast({...})` was called with
-// — in particular whether the `action` (toast CTA) was supplied.
-const { mockToast, mockUpdatePageMutateAsync, mockApi, mockSetPageContext } = vi.hoisted(() => ({
+// can see them. Required because `vi.mock` hoists above normal `const`s.
+const {
+  mockToast,
+  mockUpdatePageMutateAsync,
+  mockApi,
+  mockSetPageContext,
+  mockExportMarkdown,
+  mockCopyMarkdown,
+  mockRemoveFromNoteMutate,
+} = vi.hoisted(() => ({
   mockToast: vi.fn(),
   mockUpdatePageMutateAsync: vi.fn().mockResolvedValue({ skipped: false }),
   mockApi: {
@@ -30,6 +30,9 @@ const { mockToast, mockUpdatePageMutateAsync, mockApi, mockSetPageContext } = vi
     putPageContent: vi.fn(),
   },
   mockSetPageContext: vi.fn(),
+  mockExportMarkdown: vi.fn(),
+  mockCopyMarkdown: vi.fn().mockResolvedValue(undefined),
+  mockRemoveFromNoteMutate: vi.fn(),
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -49,7 +52,16 @@ vi.mock("react-router-dom", async (importOriginal) => {
 // real locale data. (CodeRabbit.)
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, fallback?: string) => fallback ?? key,
+    t: (key: string, fallback?: string) => {
+      // `t(key, { title })` のようなオプション引数は無視して生キーを返す。
+      // 既存テストはどれもキー文字列での DOM 引きを前提にしているため、補間後
+      // の文字列を期待しているテストはない。文字列フォールバックはそのまま返す。
+      // Ignore option objects (e.g. `{ title }`) and return the raw key; the
+      // existing assertions consistently match on the i18n key. A second-arg
+      // string fallback (`t(key, "default")`) is passed through verbatim.
+      if (typeof fallback === "string") return fallback;
+      return key;
+    },
   }),
   initReactI18next: { type: "3rdParty", init: () => undefined },
   // Translation 関連の他コンシューマー（dateUtils → @/i18n 経由）が
@@ -68,10 +80,8 @@ vi.mock("@/hooks/useNoteQueries", () => ({
     isSignedIn: true,
     isLoaded: true,
   })),
-  useCopyNotePageToPersonal: vi.fn(() => ({
-    mutateAsync: vi
-      .fn()
-      .mockResolvedValue({ created: true, page_id: "pg-copy", localImported: true }),
+  useRemovePageFromNote: vi.fn(() => ({
+    mutate: mockRemoveFromNoteMutate,
     isPending: false,
   })),
   noteKeys: {
@@ -107,6 +117,29 @@ vi.mock("@/contexts/AIChatContext", () => ({
 
 vi.mock("@/hooks/useCollaboration", () => ({
   useCollaboration: vi.fn(() => ({})),
+}));
+
+vi.mock("@/components/editor/PageEditor/useMarkdownExport", () => ({
+  useMarkdownExport: vi.fn(() => ({
+    handleExportMarkdown: mockExportMarkdown,
+    handleCopyMarkdown: mockCopyMarkdown,
+  })),
+}));
+
+// `PageHistoryModal` は重い依存（yjs / snapshot queries）を引き込むので、テスト
+// 用に「open のときだけ存在を示す要素を出す」軽量モックに差し替える。`pageId`
+// は data-attr で読めるようにして履歴がどのページに対して開いたかを検証できる
+// ようにする。
+// Mock `PageHistoryModal` to avoid pulling in yjs + snapshot queries during
+// this test. The mock renders a marker only while `open` is true and exposes
+// `pageId` so tests can assert the history opened for the correct page.
+vi.mock("@/components/editor/pageHistory/PageHistoryModal", () => ({
+  PageHistoryModal: ({ open, pageId }: { open: boolean; pageId: string }) =>
+    open ? (
+      <div data-testid="page-history-modal" data-page-id={pageId}>
+        history
+      </div>
+    ) : null,
 }));
 
 vi.mock("@/components/layout/Header", () => ({
@@ -174,6 +207,53 @@ vi.mock("@zedi/ui", () => ({
       {children}
     </button>
   ),
+  // ── AlertDialog: `open` のときだけ children を描画する最小モック ──
+  // 削除確認ダイアログのテストで `Action` を直接クリックして mutation を発火
+  // する想定。`onClick` の `preventDefault` も呼ばれるが、ここでは Radix の
+  // 自動 close をシミュレートしないので、production と同じく `onSuccess` /
+  // `onError` 経由でしか閉じない動線を維持できる。
+  //
+  // Minimal AlertDialog mock: render children only while `open`. Tests click
+  // `AlertDialogAction` directly to fire the mutation; we don't simulate Radix
+  // auto-close so the close-on-success / close-on-error contract is exercised.
+  AlertDialog: ({ open, children }: { open?: boolean; children: React.ReactNode }) =>
+    open ? <div data-testid="delete-confirm-dialog">{children}</div> : null,
+  AlertDialogContent: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AlertDialogHeader: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AlertDialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+  AlertDialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
+  AlertDialogFooter: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AlertDialogCancel: ({
+    children,
+    onClick,
+    disabled,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+    disabled?: boolean;
+  }) => (
+    <button type="button" onClick={onClick} disabled={disabled} data-testid="confirm-cancel">
+      {children}
+    </button>
+  ),
+  AlertDialogAction: ({
+    children,
+    onClick,
+    disabled,
+  }: {
+    children: React.ReactNode;
+    onClick?: (e: React.MouseEvent) => void;
+    disabled?: boolean;
+  }) => (
+    <button
+      type="button"
+      onClick={(e) => onClick?.(e)}
+      disabled={disabled}
+      data-testid="confirm-delete"
+    >
+      {children}
+    </button>
+  ),
   useToast: () => ({ toast: mockToast }),
 }));
 
@@ -204,6 +284,13 @@ describe("NotePageView", () => {
     mockUpdatePageMutateAsync.mockResolvedValue({ skipped: false });
     mockApi.getPageContent.mockReset();
     mockApi.putPageContent.mockReset();
+    mockExportMarkdown.mockReset();
+    mockCopyMarkdown.mockReset().mockResolvedValue(undefined);
+    mockRemoveFromNoteMutate.mockReset();
+    vi.mocked(useRemovePageFromNote).mockReturnValue({
+      mutate: mockRemoveFromNoteMutate,
+      isPending: false,
+    } as never);
     vi.mocked(useParams).mockReturnValue({ noteId: "note-1", pageId: "page-1" });
     vi.mocked(useAuth).mockReturnValue({ isSignedIn: true, userId: "user-1" } as never);
     vi.mocked(useNoteApi).mockReturnValue({
@@ -256,15 +343,11 @@ describe("NotePageView", () => {
 
   // ── 共通ツールバー (`PageEditorHeader`) 統合 ─────────────────────
   // Issue #884: NotePageView は `/pages/:id` と同じツールバーを再利用する。
-  // back ボタンは必ず `/notes/:noteId` に戻り、`/home` への fallback には依存
-  // しない。閲覧専用ラベル / 個人取り込みメニューは引き続き出すが、それぞれ
-  // 共通ツールバーの `supplementalRightContent` / `menuItems` 経由で渡される。
+  // back ボタンは必ず `/notes/:noteId` に戻り、`/home` への fallback には依存しない。
   //
   // Issue #884: NotePageView reuses the shared `PageEditorHeader`. Back must
-  // navigate to `/notes/:noteId` (no legacy `/home` fallback). Read-only
-  // badge and the "copy to personal" action still appear, but they now flow
-  // through the toolbar's `supplementalRightContent` / `menuItems` slots.
-  describe("shared toolbar (issue #884)", () => {
+  // navigate to `/notes/:noteId` (no legacy `/home` fallback).
+  describe("shared toolbar (issue #884 / #890)", () => {
     it("back ボタンは /notes/:noteId に遷移する / clicking back navigates to /notes/:noteId", () => {
       vi.mocked(useNote).mockReturnValue({
         note: { id: "note-1" },
@@ -285,7 +368,6 @@ describe("NotePageView", () => {
 
       renderNotePageView();
 
-      // The back button uses aria-label "Back" (from i18n mock fallback).
       const backButton = screen.getByRole("button", { name: "Back" });
       fireEvent.click(backButton);
 
@@ -339,7 +421,9 @@ describe("NotePageView", () => {
       expect(screen.queryByText("閲覧専用")).not.toBeInTheDocument();
     });
 
-    it("note 側未実装の削除アクションを共通ツールバーに露出しない / does not surface the personal-page delete action", () => {
+    // Issue #890: アクションメニューを `/pages/:id` と同じ4項目に揃える。
+    // Issue #890: align the action menu with `/pages/:id` (4 items).
+    it("編集可能時、共通ツールバーに `/pages/:id` と同じ4項目を出す / surfaces the four `/pages/:id` actions when editable", () => {
       vi.mocked(useNote).mockReturnValue({
         note: { id: "note-1" },
         access: { canView: true, canEdit: true },
@@ -359,13 +443,178 @@ describe("NotePageView", () => {
 
       renderNotePageView();
 
-      // `/pages/:id` のツールバーは削除 / Markdown ボタンを露出するが、note 側はまだ未実装。
-      // The `/pages/:id` toolbar exposes delete / Markdown actions, but note pages
-      // don't implement them yet — verify they stay hidden.
+      expect(screen.getByText("editor.pageHistory.menuButton")).toBeInTheDocument();
+      expect(screen.getByText("editor.pageMenu.exportMarkdown")).toBeInTheDocument();
+      expect(screen.getByText("editor.pageMenu.copyMarkdown")).toBeInTheDocument();
+      expect(screen.getByText("editor.pageMenu.deletePage")).toBeInTheDocument();
+      // 旧「個人に取り込み」項目は削除されていることを明示的に検証する。
+      // Explicitly verify the removed "copy to personal" entry is gone.
+      expect(screen.queryByText("notes.copyToPersonal")).not.toBeInTheDocument();
+    });
+
+    it("read-only 時、削除以外の3項目だけを出す / shows history/export/copy but hides delete in read-only mode", () => {
+      vi.mocked(useNote).mockReturnValue({
+        note: { id: "note-1" },
+        access: { canView: true, canEdit: false },
+        source: "local",
+        isLoading: false,
+      } as never);
+      vi.mocked(useNotePage).mockReturnValue({
+        data: {
+          id: "page-1",
+          title: "Read only",
+          content: "{}",
+          ownerUserId: "user-other",
+          noteId: "note-1",
+        },
+        isLoading: false,
+      } as never);
+
+      renderNotePageView();
+
+      expect(screen.getByText("editor.pageHistory.menuButton")).toBeInTheDocument();
+      expect(screen.getByText("editor.pageMenu.exportMarkdown")).toBeInTheDocument();
+      expect(screen.getByText("editor.pageMenu.copyMarkdown")).toBeInTheDocument();
+      // read-only では削除は出さない（権限がないため）。
+      // Delete is hidden in read-only mode (no permission).
       expect(screen.queryByText("editor.pageMenu.deletePage")).not.toBeInTheDocument();
-      expect(screen.queryByText("editor.pageMenu.exportMarkdown")).not.toBeInTheDocument();
-      expect(screen.queryByText("editor.pageMenu.copyMarkdown")).not.toBeInTheDocument();
-      expect(screen.queryByText("editor.pageHistory.menuButton")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("menu actions (issue #890)", () => {
+    function setupEditableRender(overrides?: { canEdit?: boolean; noteId?: string | null }) {
+      const canEdit = overrides?.canEdit ?? true;
+      const noteIdValue = overrides?.noteId ?? "note-1";
+      vi.mocked(useNote).mockReturnValue({
+        note: { id: "note-1" },
+        access: { canView: true, canEdit },
+        source: "local",
+        isLoading: false,
+      } as never);
+      vi.mocked(useNotePage).mockReturnValue({
+        data: {
+          id: "page-1",
+          title: "Note title",
+          content: "Note body",
+          ownerUserId: canEdit ? "user-1" : "user-other",
+          noteId: noteIdValue,
+        },
+        isLoading: false,
+      } as never);
+    }
+
+    it("`変更履歴` をクリックすると `PageHistoryModal` を開く / opens PageHistoryModal on history click", () => {
+      setupEditableRender();
+      renderNotePageView();
+
+      // 開く前は modal 非表示 / modal hidden initially
+      expect(screen.queryByTestId("page-history-modal")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByText("editor.pageHistory.menuButton"));
+
+      const modal = screen.getByTestId("page-history-modal");
+      expect(modal).toBeInTheDocument();
+      expect(modal).toHaveAttribute("data-page-id", "page-1");
+    });
+
+    it("`Markdownでエクスポート` で `handleExportMarkdown` を呼ぶ / invokes handleExportMarkdown on export click", () => {
+      setupEditableRender();
+      renderNotePageView();
+
+      fireEvent.click(screen.getByText("editor.pageMenu.exportMarkdown"));
+
+      expect(mockExportMarkdown).toHaveBeenCalledTimes(1);
+    });
+
+    it("`Markdownをコピー` で `handleCopyMarkdown` を呼ぶ / invokes handleCopyMarkdown on copy click", () => {
+      setupEditableRender();
+      renderNotePageView();
+
+      fireEvent.click(screen.getByText("editor.pageMenu.copyMarkdown"));
+
+      expect(mockCopyMarkdown).toHaveBeenCalledTimes(1);
+    });
+
+    it("`削除` で確認ダイアログを開くがミューテーションは確認後に走る / opens confirm dialog without firing mutation until confirmed", () => {
+      setupEditableRender();
+      renderNotePageView();
+
+      // ダイアログは最初閉じている / dialog starts closed
+      expect(screen.queryByTestId("delete-confirm-dialog")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByText("editor.pageMenu.deletePage"));
+
+      expect(screen.getByTestId("delete-confirm-dialog")).toBeInTheDocument();
+      // 確認前は mutation 未発火 / mutation must not fire pre-confirmation
+      expect(mockRemoveFromNoteMutate).not.toHaveBeenCalled();
+    });
+
+    it("削除成功時に `/notes/:noteId` へ遷移して toast を出す / navigates to /notes/:noteId and toasts on success", () => {
+      setupEditableRender();
+      mockRemoveFromNoteMutate.mockImplementation((_args, options) => {
+        options?.onSuccess?.();
+      });
+      renderNotePageView();
+
+      fireEvent.click(screen.getByText("editor.pageMenu.deletePage"));
+      fireEvent.click(screen.getByTestId("confirm-delete"));
+
+      expect(mockRemoveFromNoteMutate).toHaveBeenCalledWith(
+        { noteId: "note-1", pageId: "page-1" },
+        expect.any(Object),
+      );
+      expect(mockNavigate).toHaveBeenCalledWith("/notes/note-1");
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "common.page.pageDeleted" }),
+      );
+      // 成功後はダイアログを閉じる / dialog closes after success
+      expect(screen.queryByTestId("delete-confirm-dialog")).not.toBeInTheDocument();
+    });
+
+    it("削除失敗時はナビゲートせず destructive toast を出す / does not navigate and surfaces destructive toast on failure", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      setupEditableRender();
+      mockRemoveFromNoteMutate.mockImplementation((_args, options) => {
+        options?.onError?.(new Error("server error"));
+      });
+      renderNotePageView();
+
+      fireEvent.click(screen.getByText("editor.pageMenu.deletePage"));
+      fireEvent.click(screen.getByTestId("confirm-delete"));
+
+      expect(mockRemoveFromNoteMutate).toHaveBeenCalled();
+      expect(mockNavigate).not.toHaveBeenCalledWith("/notes/note-1");
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "common.error",
+          variant: "destructive",
+        }),
+      );
+      consoleError.mockRestore();
+    });
+
+    it("削除キャンセル時はダイアログを閉じて mutation を呼ばない / closes dialog and skips mutation on cancel", () => {
+      setupEditableRender();
+      renderNotePageView();
+
+      fireEvent.click(screen.getByText("editor.pageMenu.deletePage"));
+      expect(screen.getByTestId("delete-confirm-dialog")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("confirm-cancel"));
+
+      expect(screen.queryByTestId("delete-confirm-dialog")).not.toBeInTheDocument();
+      expect(mockRemoveFromNoteMutate).not.toHaveBeenCalled();
+    });
+
+    it("read-only でも `変更履歴` から `PageHistoryModal` を開ける / read-only viewer can still open history", () => {
+      setupEditableRender({ canEdit: false });
+      renderNotePageView();
+
+      fireEvent.click(screen.getByText("editor.pageHistory.menuButton"));
+
+      const modal = screen.getByTestId("page-history-modal");
+      expect(modal).toBeInTheDocument();
+      expect(modal).toHaveAttribute("data-page-id", "page-1");
     });
   });
 
@@ -587,143 +836,5 @@ describe("NotePageView", () => {
         noteId: undefined,
       }),
     );
-  });
-
-  it("shows copy-to-personal action for note-native pages (issue #713 Phase 3)", () => {
-    // `page.noteId === noteId` → ノートネイティブ。サインイン済みなら「個人に取り込み」
-    // を出す。i18n モックは `t(key)` が生キーを返す実装なので、キー文字列で DOM を引く。
-    // A note-native page (`page.noteId === noteId`) surfaces the menu item for
-    // signed-in viewers. `useTranslation` is mocked to echo the key, so we
-    // assert on the raw key string. Issue #713 Phase 3.
-    vi.mocked(useNote).mockReturnValue({
-      note: { id: "note-1" },
-      access: { canView: true, canEdit: false },
-      source: "local",
-      isLoading: false,
-    } as never);
-    vi.mocked(useNotePage).mockReturnValue({
-      data: {
-        id: "page-1",
-        title: "Note-native",
-        content: "{}",
-        ownerUserId: "user-other",
-        noteId: "note-1", // note-native: scope matches current note
-      },
-      isLoading: false,
-    } as never);
-
-    renderNotePageView();
-
-    expect(screen.getByText("notes.copyToPersonal")).toBeInTheDocument();
-  });
-
-  it("hides copy-to-personal action for linked personal pages (Codex P2)", () => {
-    // `page.noteId === null` はノートにリンクされている個人ページ。サーバーは
-    // copy-to-personal を 400 で弾くため、UI からは出さない。
-    // A linked personal page (`page.noteId === null`) would be rejected by the
-    // server (`Page does not belong to this note`), so hide the UI entry to
-    // avoid a guaranteed-fail click. Codex P2.
-    vi.mocked(useNote).mockReturnValue({
-      note: { id: "note-1" },
-      access: { canView: true, canEdit: false },
-      source: "local",
-      isLoading: false,
-    } as never);
-    vi.mocked(useNotePage).mockReturnValue({
-      data: {
-        id: "page-1",
-        title: "Linked personal",
-        content: "{}",
-        ownerUserId: "user-1",
-        noteId: null, // linked personal page
-      },
-      isLoading: false,
-    } as never);
-
-    renderNotePageView();
-
-    expect(screen.queryByText("notes.copyToPersonal")).not.toBeInTheDocument();
-  });
-
-  // ── localImported 分岐: トースト CTA の UX 契約を固定する ──
-  // 「コピーに成功」というサーバー側結果は `localImported` の真偽に関わらず
-  // トーストで出す（ユーザーにとっては成功）。ただし「開く」CTA は IDB に
-  // 新ページが載っている場合（`localImported: true`）にだけ出す — 載っていない
-  // ときに遷移させると `/pages/:id` が次回 sync まで空のローカルを読んで着地に
-  // 失敗するため。ここで両分岐をピン止めし、将来の回帰を検知する。
-  // Pin the toast-CTA UX contract: the success toast fires either way (the
-  // server-side copy did happen), but the "Open" CTA should only appear when
-  // the new page is already in IDB (`localImported: true`). Otherwise
-  // `/pages/:id` would land on a stale-empty local read until the next sync.
-  // These two tests lock down the branch behind `result.localImported`.
-  describe("copy-to-personal toast CTA (issue #713 Phase 3 / CodeRabbit)", () => {
-    function setupNoteNativeRender(mutateResult: {
-      created: boolean;
-      page_id: string;
-      localImported: boolean;
-    }) {
-      vi.mocked(useNote).mockReturnValue({
-        note: { id: "note-1" },
-        access: { canView: true, canEdit: false },
-        source: "local",
-        isLoading: false,
-      } as never);
-      vi.mocked(useNotePage).mockReturnValue({
-        data: {
-          id: "page-1",
-          title: "Note-native",
-          content: "{}",
-          ownerUserId: "user-other",
-          noteId: "note-1",
-        },
-        isLoading: false,
-      } as never);
-      const mutateAsync = vi.fn().mockResolvedValue(mutateResult);
-      vi.mocked(useCopyNotePageToPersonal).mockReturnValue({
-        mutateAsync,
-        isPending: false,
-      } as never);
-      return { mutateAsync };
-    }
-
-    async function clickCopyMenuItem() {
-      const trigger = screen.getByText("notes.copyToPersonal");
-      fireEvent.click(trigger);
-      // handleCopyToPersonal は mutateAsync(...)/toast(...) を連続して呼ぶ
-      // async 関数なので、microtask を 1 周回して resolve を消化させる。
-      // `handleCopyToPersonal` is an async function that awaits mutateAsync
-      // then calls toast(...). Flush a microtask so the toast call lands
-      // before we inspect `mockToast`.
-      await Promise.resolve();
-      await Promise.resolve();
-    }
-
-    it("includes the Open CTA when localImported is true", async () => {
-      setupNoteNativeRender({ created: true, page_id: "pg-copy", localImported: true });
-      renderNotePageView();
-
-      await clickCopyMenuItem();
-
-      expect(mockToast).toHaveBeenCalledTimes(1);
-      const arg = mockToast.mock.calls[0][0] as { title: unknown; action?: unknown };
-      expect(arg.title).toBe("notes.pageCopiedToPersonal");
-      // `localImported: true` のときだけ「開く」CTA 用の React 要素が渡される。
-      // The "Open" CTA element is supplied only when `localImported` is true.
-      expect(arg.action).toBeTruthy();
-    });
-
-    it("omits the Open CTA when localImported is false (IDB write-through skipped)", async () => {
-      setupNoteNativeRender({ created: true, page_id: "pg-copy", localImported: false });
-      renderNotePageView();
-
-      await clickCopyMenuItem();
-
-      expect(mockToast).toHaveBeenCalledTimes(1);
-      const arg = mockToast.mock.calls[0][0] as { title: unknown; action?: unknown };
-      expect(arg.title).toBe("notes.pageCopiedToPersonal");
-      // 書き戻し失敗/スキップ時は CTA なし。次回 sync で `/home` に反映される。
-      // No CTA when the write-through missed; the next sync will reconcile.
-      expect(arg.action).toBeUndefined();
-    });
   });
 });
