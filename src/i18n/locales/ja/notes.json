@@ -221,5 +221,18 @@
   "domainTabCreateFailedInvalid": "ドメインの形式が正しくありません。",
   "domainTabCreateFailedEmpty": "ドメインを入力してください。",
   "domainTabRemoved": "ドメインルールを削除しました",
-  "domainTabRemoveFailed": "ドメインルールの削除に失敗しました"
+  "domainTabRemoveFailed": "ドメインルールの削除に失敗しました",
+  "filterBar": {
+    "ariaLabel": "タグでページを絞り込む",
+    "untaggedChip": "タグなし",
+    "clear": "クリア",
+    "clearAriaLabel": "タグフィルタを解除する"
+  },
+  "filterBarSettings": {
+    "title": "タグフィルタバー",
+    "description": "ページ一覧の上部にハッシュタグの絞り込みバーを表示します。",
+    "showByDefault": "既定で表示する",
+    "showByDefaultHelp": "オフのときは、各メンバーが個別に表示を有効化できます。",
+    "userOverrideHint": "あなたの表示設定は端末ごとに保存されます。"
+  }
 }

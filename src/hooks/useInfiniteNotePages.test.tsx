@@ -106,6 +106,7 @@ describe("useInfiniteNotePages", () => {
       cursor: null,
       limit: 50,
       include: ["preview", "thumbnail"],
+      tags: { kind: "none-selected" },
     });
     expect(result.current.pages).toHaveLength(1);
     expect(result.current.pages[0]?.id).toBe("p1");
@@ -135,6 +136,7 @@ describe("useInfiniteNotePages", () => {
       cursor: null,
       limit: 25,
       include: ["preview"],
+      tags: { kind: "none-selected" },
     });
 
     await act(async () => {
@@ -147,6 +149,7 @@ describe("useInfiniteNotePages", () => {
       cursor: "cursor-abc",
       limit: 25,
       include: ["preview"],
+      tags: { kind: "none-selected" },
     });
     expect(result.current.pages.map((p) => p.id)).toEqual(["p1", "p2"]);
     expect(result.current.hasNextPage).toBe(false);

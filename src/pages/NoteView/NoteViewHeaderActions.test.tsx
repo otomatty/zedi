@@ -39,6 +39,8 @@ const baseNote: Note = {
   isOfficial: false,
   isDefault: false,
   viewCount: 0,
+  showTagFilterBar: false,
+  defaultFilterTags: [],
   createdAt: 0,
   updatedAt: 0,
   isDeleted: false,
