@@ -69,16 +69,18 @@ permissions:
   contents: read
   issues: write
 
-# 同一 sentry_issue_id への並行起動を防ぐ。再来時にも余計に Claude を呼ばないため。
-# Prevent concurrent runs for the same Sentry issue. Avoids spending Anthropic
-# credits twice when the webhook briefly double-fires on the same issue id.
+# 同一 sentry_issue_id で複数 run が積まれたとき、古い run をキャンセルして
+# Anthropic 呼び出しと repository_dispatch の二重課金を避ける。
+#
+# When multiple runs queue for the same `sentry_issue_id`, cancel older runs so
+# we do not pay for duplicate Claude analyses while a newer dispatch waits.
 concurrency:
   group: >-
     analyze-error-${{
       github.event.client_payload.sentry_issue_id ||
       github.event.inputs.sentry_issue_id
     }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   analyze:

@@ -143,8 +143,8 @@ describe("assertPageEditAccess (issue #823)", () => {
     await expect(assertPageEditAccess(asDb(db), PAGE_ID, USER_ID)).resolves.toBeUndefined();
   });
 
-  it("denies non-owner of underlying row when no note role resolves", async () => {
-    const { db } = createMockDb(noRoleChains(USER_ID));
+  it("denies caller without note role when the page row is owned by someone else", async () => {
+    const { db } = createMockDb(noRoleChains(OTHER_USER_ID));
     await expect(assertPageEditAccess(asDb(db), PAGE_ID, USER_ID)).rejects.toMatchObject({
       status: 403,
     });

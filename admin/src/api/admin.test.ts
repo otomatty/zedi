@@ -286,12 +286,18 @@ describe("getApiErrorById", () => {
   });
 
   it("200 なら row を返し、id を URL エンコードする", async () => {
+    const rowNeedsEncoding = {
+      ...sampleErrorRow,
+      id: "550e8400-e29b-41d4-a716-446655440000/with+reserved",
+    };
     vi.mocked(adminFetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: sampleErrorRow }), { status: 200 }),
+      new Response(JSON.stringify({ error: rowNeedsEncoding }), { status: 200 }),
     );
-    const out = await getApiErrorById(sampleErrorRow.id);
-    expect(out).toEqual(sampleErrorRow);
-    expect(adminFetch).toHaveBeenCalledWith(`/api/admin/errors/${sampleErrorRow.id}`);
+    const out = await getApiErrorById(rowNeedsEncoding.id);
+    expect(out).toEqual(rowNeedsEncoding);
+    expect(adminFetch).toHaveBeenCalledWith(
+      `/api/admin/errors/${encodeURIComponent(rowNeedsEncoding.id)}`,
+    );
   });
 });
 

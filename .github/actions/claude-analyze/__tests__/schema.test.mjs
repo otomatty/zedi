@@ -96,7 +96,20 @@ test("parseAndValidate strips Claude's ```json``` fence and prose preamble", () 
 });
 
 test("parseAndValidate throws when no JSON object is present", () => {
-  assert.throws(() => parseAndValidate("nope, no braces here"), /JSON object/);
+  assert.throws(() => parseAndValidate("nope, no braces here"), /valid analysis JSON/i);
+});
+
+test("parseAndValidate finds schema-valid JSON when prose contains stray braces", () => {
+  const payload = {
+    severity: "low",
+    ai_summary: "brace noise tolerated",
+    ai_root_cause: null,
+    ai_suggested_fix: null,
+    ai_suspected_files: null,
+  };
+  const raw = `Here is { "not": "the payload" } the real payload:\n${JSON.stringify(payload)}`;
+  const validated = parseAndValidate(raw);
+  assert.equal(validated.severity, "low");
 });
 
 test("parseAndValidate throws on empty input", () => {

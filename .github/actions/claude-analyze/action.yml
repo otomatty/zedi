@@ -156,11 +156,13 @@ runs:
             break
           fi
           if [ "${http_status}" -ge 400 ] && [ "${http_status}" -lt 500 ]; then
-            echo "::error title=Callback rejected (${http_status})::$(cat /tmp/callback-response.txt)"
+            CALLBACK_ERR_BODY="$(node "${{ github.action_path }}/escapeGithubAnnotation.mjs" /tmp/callback-response.txt)"
+            echo "::error title=Callback rejected (${http_status})::${CALLBACK_ERR_BODY}"
             exit 1
           fi
           if [ "${attempt}" -ge "${max_attempts}" ]; then
-            echo "::error title=Callback failed after ${max_attempts} attempts (${http_status})::$(cat /tmp/callback-response.txt)"
+            CALLBACK_ERR_BODY="$(node "${{ github.action_path }}/escapeGithubAnnotation.mjs" /tmp/callback-response.txt)"
+            echo "::error title=Callback failed after ${max_attempts} attempts (${http_status})::${CALLBACK_ERR_BODY}"
             exit 1
           fi
           attempt=$((attempt + 1))

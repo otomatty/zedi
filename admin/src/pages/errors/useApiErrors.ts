@@ -102,6 +102,26 @@ function mergeRow(prev: GetApiErrorsResponse | null, row: ApiErrorRow): GetApiEr
 }
 
 /**
+ * SSE でフィルタに一致しない更新が来たとき、一覧から該当 ID を落とす。
+ *
+ * Drop a row id from the cached list when an SSE update no longer matches the
+ * active filter (so filtered views do not keep stale rows after status churn).
+ */
+function dropRowById(
+  prev: GetApiErrorsResponse | null,
+  rowId: string,
+): GetApiErrorsResponse | null {
+  if (!prev) return prev;
+  const idx = prev.errors.findIndex((r) => r.id === rowId);
+  if (idx === -1) return prev;
+  return {
+    ...prev,
+    errors: prev.errors.filter((r) => r.id !== rowId),
+    total: Math.max(0, prev.total - 1),
+  };
+}
+
+/**
  * フィルタ条件と SSE で push された行が合致するかを判定する。
  * 合致しないものは UI に出さない（一覧の意味的な整合を保つ）。
  *
@@ -223,7 +243,12 @@ export function useApiErrors(params: UseApiErrorsParams = {}): UseApiErrorsResul
           return;
         }
         const { status: curStatus, severity: curSeverity } = filterRef.current;
-        if (!matchesFilter(row, curStatus, curSeverity)) return;
+        if (!matchesFilter(row, curStatus, curSeverity)) {
+          if (isMountedRef.current) {
+            setData((prev) => dropRowById(prev, row.id));
+          }
+          return;
+        }
         if (isMountedRef.current) {
           setData((prev) => mergeRow(prev, row));
         }

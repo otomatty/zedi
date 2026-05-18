@@ -70,7 +70,15 @@ export function ErrorDetailDialog({
   };
 
   return (
-    <Dialog open={row !== null} onOpenChange={(open) => !open && onClose()}>
+    <Dialog
+      open={row !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          setPendingFor(null);
+          onClose();
+        }
+      }}
+    >
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="break-all">{row.title}</DialogTitle>

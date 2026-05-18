@@ -126,7 +126,7 @@ export function ErrorsContent({
             {t("errors.filters.status")}
           </label>
           <Select
-            value={statusFilter}
+            value={statusFilter === "all" ? ANY : statusFilter}
             onValueChange={(v) => onStatusFilterChange(v === ANY ? "all" : (v as ApiErrorStatus))}
           >
             <SelectTrigger id="errors-filter-status" aria-labelledby="errors-filter-status-label">
@@ -151,7 +151,7 @@ export function ErrorsContent({
             {t("errors.filters.severity")}
           </label>
           <Select
-            value={severityFilter}
+            value={severityFilter === "all" ? ANY : severityFilter}
             onValueChange={(v) =>
               onSeverityFilterChange(v === ANY ? "all" : (v as ApiErrorSeverity))
             }

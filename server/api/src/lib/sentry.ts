@@ -100,6 +100,7 @@ export function scrubSentryEvent(event: ErrorEvent): ErrorEvent {
   if (event.request) {
     event.request = {
       ...event.request,
+      url: scrubRequestUrl(event.request.url),
       headers: scrubShallowRecord(event.request.headers),
       data: scrubDeep(event.request.data, new WeakSet()),
       query_string: scrubQueryStringField(event.request.query_string),
@@ -127,6 +128,35 @@ export function scrubSentryEvent(event: ErrorEvent): ErrorEvent {
     }));
   }
   return event;
+}
+
+/**
+ * SDK が記録するリクエスト URL からクエリと不透明パス成分を落とす。
+ * matched route は `routePath` など別チャネルに載せる前提。
+ *
+ * Strip query strings and redact opaque path segments from the raw URL SDKs
+ * record; structured routing context belongs in `routePath` / extras instead.
+ */
+function scrubRequestUrl(url: unknown): unknown {
+  if (typeof url !== "string" || url.length === 0) return url;
+  try {
+    const u = new URL(url);
+    u.search = "";
+    const segments = u.pathname.split("/").map((seg) => {
+      if (seg.length === 0) return seg;
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg)) {
+        return "[uuid]";
+      }
+      if (/^[A-Za-z0-9._~-]{24,}$/.test(seg)) {
+        return FILTERED;
+      }
+      return seg;
+    });
+    u.pathname = segments.join("/") || "/";
+    return u.toString();
+  } catch {
+    return FILTERED;
+  }
 }
 
 function scrubShallowRecord<T extends Record<string, unknown> | undefined>(input: T): T;
