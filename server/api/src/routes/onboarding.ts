@@ -13,8 +13,8 @@
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq, sql } from "drizzle-orm";
-import { users, userOnboardingStatus } from "../schema/index.js";
+import { and, eq, sql } from "drizzle-orm";
+import { pages, users, userOnboardingStatus } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
 import { insertWelcomePage, retryWelcomePageIfNeeded } from "../lib/welcomePageService.js";
@@ -151,10 +151,29 @@ app.post("/complete", authRequired, async (c) => {
     throw new HTTPException(500, { message: "Failed to record onboarding status" });
   }
 
+  // Issue #889 Phase 3: `/pages/:id` 撤去のため、ウェルカムページ着地 URL
+  // `/notes/:noteId/:pageId` を組み立てる用に noteId を返す。今回新規作成した
+  // 場合は `result.welcome.noteId` を、既に存在していた場合 (`welcome === null`
+  // で `row.welcomePageId` だけある) は pages テーブルから引く。
+  // Issue #889 Phase 3: include `welcome_page_note_id` so the onboarding
+  // client can navigate to `/notes/:noteId/:pageId`. When the welcome page
+  // was created in this call, reuse `result.welcome.noteId`; otherwise look
+  // up the existing page row.
+  let welcomePageNoteId: string | null = result.welcome?.noteId ?? null;
+  if (!welcomePageNoteId && row.welcomePageId) {
+    const existingPage = await db
+      .select({ noteId: pages.noteId })
+      .from(pages)
+      .where(and(eq(pages.id, row.welcomePageId), eq(pages.isDeleted, false)))
+      .limit(1);
+    welcomePageNoteId = existingPage[0]?.noteId ?? null;
+  }
+
   return c.json(
     {
       setup_completed_at: row.setupCompletedAt?.toISOString() ?? null,
       welcome_page_id: row.welcomePageId ?? null,
+      welcome_page_note_id: welcomePageNoteId,
       welcome_page_created_at: row.welcomePageCreatedAt?.toISOString() ?? null,
       welcome_page_locale: result.welcome?.locale ?? null,
     },
@@ -184,9 +203,26 @@ app.get("/status", authRequired, async (c) => {
     .limit(1);
   const row = rows[0];
 
+  // Issue #889 Phase 3: status エンドポイントも welcome_page_id と組で
+  // welcome_page_note_id を返す（クライアントが `/notes/:noteId/:pageId` を
+  // 組み立てるため）。ページが既に削除されていれば null にフォールバック。
+  // Issue #889 Phase 3: surface `welcome_page_note_id` alongside the page id
+  // so clients can build `/notes/:noteId/:pageId`. Falls back to `null` when
+  // the page was deleted.
+  let welcomePageNoteId: string | null = null;
+  if (row?.welcomePageId) {
+    const existingPage = await db
+      .select({ noteId: pages.noteId })
+      .from(pages)
+      .where(and(eq(pages.id, row.welcomePageId), eq(pages.isDeleted, false)))
+      .limit(1);
+    welcomePageNoteId = existingPage[0]?.noteId ?? null;
+  }
+
   return c.json({
     setup_completed_at: row?.setupCompletedAt?.toISOString() ?? null,
     welcome_page_id: row?.welcomePageId ?? null,
+    welcome_page_note_id: welcomePageNoteId,
     welcome_page_created_at: row?.welcomePageCreatedAt?.toISOString() ?? null,
     home_slides_shown_at: row?.homeSlidesShownAt?.toISOString() ?? null,
     auto_create_update_notice: row?.autoCreateUpdateNotice ?? true,

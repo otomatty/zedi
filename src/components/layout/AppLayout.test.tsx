@@ -79,7 +79,7 @@ describe("AppLayout", () => {
     expect(screen.getByTestId("bottom-nav")).toBeInTheDocument();
   });
 
-  it("sets mobile layout CSS variables (--app-header-height: 4rem, --app-bottom-nav-height: 3.5rem)", () => {
+  it("sets mobile layout CSS variables (--app-header-height: 4rem, --app-bottom-nav-height: 4.5rem)", () => {
     vi.mocked(useIsMobile).mockReturnValue(true);
     const { container } = render(
       <AppLayout>
@@ -89,7 +89,7 @@ describe("AppLayout", () => {
     const wrapper = container.firstElementChild as HTMLElement | null;
     const style = wrapper?.getAttribute("style") ?? "";
     expect(style).toMatch(/--app-header-height:\s*4rem/);
-    expect(style).toMatch(/--app-bottom-nav-height:\s*3\.5rem/);
+    expect(style).toMatch(/--app-bottom-nav-height:\s*4\.5rem/);
   });
 
   /**

@@ -8,10 +8,11 @@
  * GET    /:noteId         — ノート詳細取得
  * GET    /                — ユーザーのノート一覧
  */
+import { createHash } from "node:crypto";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq, ne, and, or, desc, asc, sql, inArray } from "drizzle-orm";
-import { notes, notePages, noteMembers, pages, users } from "../../schema/index.js";
+import { eq, ne, and, or, desc, sql, inArray } from "drizzle-orm";
+import { notes, noteMembers, pages, users } from "../../schema/index.js";
 import type { Note } from "../../schema/index.js";
 import { authRequired, authOptional } from "../../middleware/auth.js";
 import type { AppEnv } from "../../types/index.js";
@@ -20,7 +21,6 @@ import type {
   NoteEditPermission,
   NoteMemberRole,
   NoteListApiItem,
-  NotePageApiItem,
   NoteDetailApiResponse,
   DiscoverApiItem,
   DiscoverApiResponse,
@@ -33,6 +33,7 @@ import {
   getActivePageCounts,
   getActiveMemberCounts,
 } from "./helpers.js";
+import { publishNoteEvent } from "../../services/noteEventBroadcaster.js";
 
 const ALLOWED_VISIBILITY = new Set<NoteVisibility>(["private", "public", "unlisted", "restricted"]);
 const ALLOWED_EDIT_PERMISSION = new Set<NoteEditPermission>([
@@ -40,6 +41,19 @@ const ALLOWED_EDIT_PERMISSION = new Set<NoteEditPermission>([
   "members_editors",
   "any_logged_in",
 ]);
+
+/**
+ * `GET /api/notes/:noteId` のレスポンス形状バージョン。ETag に混ぜることで、
+ * サーバ側のレスポンス形状を変えた直後にクライアントが古い `If-None-Match`
+ * を送ってきても 304 で旧 body をキャッシュ再利用させない（Issue #860 Phase 0）。
+ * 形状を変更したら必ずこの値を bump する。
+ *
+ * Response-shape version for `GET /api/notes/:noteId`. Mixed into the ETag so
+ * that when the server's response shape changes, stale `If-None-Match`
+ * validators from clients cannot revive an outdated cached body via 304
+ * (Issue #860 Phase 0). Bump this whenever the wire shape changes.
+ */
+const NOTE_DETAIL_RESPONSE_VERSION = "v4";
 
 function validateVisibility(value: string | undefined): NoteVisibility {
   if (value === undefined) return "private";
@@ -79,6 +93,166 @@ function parseIsOfficialForUpdate(value: unknown): boolean | undefined {
   if (value === undefined) return undefined;
   if (typeof value === "boolean") return value;
   throw new HTTPException(400, { message: "Invalid is_official" });
+}
+
+/**
+ * ノート更新ボディの `show_tag_filter_bar` を真偽値に正規化する。未指定は
+ * `undefined` を返す（クライアントが触っていない＝既存値を保つ）。
+ *
+ * Normalize `show_tag_filter_bar` from the update body to a boolean, or
+ * `undefined` when the client did not send it (= keep the stored value).
+ */
+function parseShowTagFilterBarForUpdate(value: unknown): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === "boolean") return value;
+  throw new HTTPException(400, { message: "Invalid show_tag_filter_bar" });
+}
+
+/**
+ * タグ名フィルタ用の `default_filter_tags` を検証・正規化する。配列要素は
+ * 文字列のみ許容し、トリム＋小文字化後の `__none__` トークンまたは
+ * `TAG_NAME_CHAR_CLASS_STRING` に一致する文字列を期待する。重複は除去し、
+ * 配列長は 0..20 に制限する。
+ *
+ * Validate / normalize `default_filter_tags` on an update body. Tags are
+ * trimmed and lower-cased; each must match the `TAG_NAME_CHAR_CLASS` regex
+ * (or be the special `__none__` token). Duplicates are removed. The array
+ * length is capped at 20 entries. Returns `undefined` when the field was not
+ * sent.
+ */
+function parseDefaultFilterTagsForUpdate(value: unknown): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) {
+    throw new HTTPException(400, { message: "Invalid default_filter_tags" });
+  }
+  if (value.length > 20) {
+    throw new HTTPException(400, { message: "Too many default_filter_tags (max 20)" });
+  }
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") {
+      throw new HTTPException(400, { message: "Invalid default_filter_tags entry" });
+    }
+    const normalized = entry.trim().toLowerCase();
+    if (normalized.length === 0 || normalized.length > 100) {
+      throw new HTTPException(400, { message: "Invalid default_filter_tags entry" });
+    }
+    if (normalized !== "__none__" && !VALID_TAG_NAME_REGEX.test(normalized)) {
+      throw new HTTPException(400, { message: "Invalid default_filter_tags entry" });
+    }
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+/**
+ * `parseDefaultFilterTagsForUpdate` で使うタグ名の文字種パターン。クライアント
+ * 側の `packages/shared/src/tagCharacterClass.ts` および
+ * `services/ydocRenameRewrite.ts` の `TAG_NAME_CHAR_CLASS_STRING` と等価。
+ *
+ * Character-class regex used to validate tag names; mirrors
+ * `TAG_NAME_CHAR_CLASS_STRING` (the source of truth for client/server alike).
+ */
+const TAG_NAME_CHAR_CLASS_STRING = "A-Za-z0-9_\\-぀-ヿ㐀-鿿";
+// `TAG_NAME_CHAR_CLASS_STRING` is a hardcoded constant (never user input).
+// The pattern is a single anchored character class with one quantifier and
+// no nested quantifiers / alternations, so matching is linear in input
+// length. Static-analysis ReDoS warnings on this regex are false positives.
+const VALID_TAG_NAME_REGEX = new RegExp(`^[${TAG_NAME_CHAR_CLASS_STRING}]+$`);
+
+/**
+ * `Date | string | null` のいずれで来ても安全に epoch ms に正規化するヘルパー。
+ * drizzle の `sql<T>` テンプレートタグは型ヒントだけで runtime 変換しないため、
+ * `MAX(pages.updated_at)` のような raw SQL 集約は pg ドライバ次第で
+ * `Date` ではなく ISO 文字列で返ってくることがある (Issue #857 / PR #856 regression)。
+ * SQL 境界側でも `.mapWith()` で Date 化しているが、ここでも defensive に
+ * 受けておくことで将来同種の罠が再発しても 500 を避けられる。
+ *
+ * Normalizes `Date | string | null` to an epoch-ms number. drizzle's
+ * `sql<T>` template tag is a compile-time-only hint and does not coerce
+ * driver values, so raw aggregates like `MAX(pages.updated_at)` can arrive
+ * as ISO strings depending on the pg driver path (Issue #857 / PR #856
+ * regression). The query call site already normalizes via `.mapWith()`,
+ * but accepting strings here too keeps the ETag path resilient against
+ * similar bugs in the future.
+ */
+function toEpochMillis(value: Date | string | null | undefined): number {
+  if (value === null || value === undefined) return 0;
+  const parsed = value instanceof Date ? value : new Date(value);
+  const ms = parsed.getTime();
+  // 不正な文字列 (`new Date("not a date")`) や Invalid Date オブジェクトは
+  // `NaN` を返す。テンプレートリテラルでハッシュに混ぜると "NaN" がそのまま
+  // 文字列として入り、入力が壊れていても "同じ NaN" として ETag が安定して
+  // しまう (= 別の壊れ方を区別できない)。0 に正規化することで `null` と同じ
+  // 扱いになり、少なくとも安全側に倒れる (gemini-code-assist review on #859)。
+  //
+  // Invalid input (e.g. `new Date("bogus")` or an `Invalid Date`) yields
+  // `NaN` from `getTime()`. Embedding it into the template literal would
+  // splice the literal string `"NaN"` into the hash, which silently
+  // collapses *different* malformed inputs into the same digest. Normalize
+  // to 0 so the ETag at least falls back to the `null` branch behavior
+  // (gemini-code-assist review on PR #859).
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
+/**
+ * Note 詳細レスポンス用の weak ETag を生成する。`note.updatedAt` と role に
+ * 加えて、ページの最大 `updated_at` と件数も混ぜることで、`notes.updated_at`
+ * を経由しないページ単体編集（Hocuspocus 経由の本文保存・`PUT /api/pages/:id`
+ * によるタイトル変更・ハード削除）でも ETag が変わるようにする。
+ * weak (`W/...`) を採用するのは、`view_count` のフェイヤアンドフォーゲット
+ * 更新によりレスポンス body が byte-for-byte 一致しないため。
+ *
+ * Generates a weak ETag for note detail responses. The hash mixes
+ * `note.updatedAt`, the resolved role, and a pages-change signal
+ * (`MAX(pages.updated_at) + COUNT(*)`) so that page-only edits which do not
+ * bump `notes.updated_at` (e.g. Hocuspocus-driven content saves, title
+ * renames via `PUT /api/pages/:id`, hard delete) still invalidate the
+ * validator. The ETag is weak (`W/...`) because the fire-and-forget
+ * `view_count` update can shift the response body byte-for-byte even when
+ * the semantically meaningful state has not changed.
+ */
+function makeNoteETag(
+  noteId: string,
+  noteUpdatedAt: Date | string,
+  role: string,
+  pagesMaxUpdatedAt: Date | string | null,
+  pagesCount: number,
+): string {
+  const hash = createHash("sha1")
+    .update(
+      `${NOTE_DETAIL_RESPONSE_VERSION}:${noteId}:${toEpochMillis(noteUpdatedAt)}:${role}:${toEpochMillis(pagesMaxUpdatedAt)}:${pagesCount}`,
+    )
+    .digest("base64url")
+    .slice(0, 22);
+  return `W/"${hash}"`;
+}
+
+/**
+ * RFC 7232 §3.2 準拠の `If-None-Match` 弱比較。`*` ワイルドカード、
+ * カンマ区切り複数値、`W/` プレフィックス（大文字小文字非区別）を
+ * 正しく扱う（PR #856 CodeRabbit nitpick）。
+ *
+ * Weak `If-None-Match` matcher per RFC 7232 §3.2. Handles the `*`
+ * wildcard, comma-separated lists, and case-insensitive `W/` prefix so
+ * spec-compliant clients that normalize or batch validators still hit
+ * the 304 path (PR #856 CodeRabbit nitpick).
+ */
+export function ifNoneMatchMatches(headerValue: string | undefined, currentEtag: string): boolean {
+  if (!headerValue) return false;
+  const trimmed = headerValue.trim();
+  // `*` matches any current representation (RFC 7232 §3.2).
+  if (trimmed === "*") return true;
+  const normalize = (token: string) => token.trim().replace(/^W\//i, "");
+  const target = normalize(currentEtag);
+  if (!target) return false;
+  return headerValue.split(",").some((token) => {
+    const candidate = normalize(token);
+    return candidate.length > 0 && candidate === target;
+  });
 }
 
 const app = new Hono<AppEnv>();
@@ -157,6 +331,8 @@ app.put("/:noteId", authRequired, async (c) => {
     visibility?: string;
     edit_permission?: string;
     is_official?: unknown;
+    show_tag_filter_bar?: unknown;
+    default_filter_tags?: unknown;
   }>();
 
   const isOfficial = parseIsOfficialForUpdate(body.is_official);
@@ -173,6 +349,8 @@ app.put("/:noteId", authRequired, async (c) => {
     body.visibility !== undefined ? validateVisibility(body.visibility) : undefined;
   const editPermission =
     body.edit_permission !== undefined ? validateEditPermission(body.edit_permission) : undefined;
+  const showTagFilterBar = parseShowTagFilterBarForUpdate(body.show_tag_filter_bar);
+  const defaultFilterTags = parseDefaultFilterTagsForUpdate(body.default_filter_tags);
 
   const updated = await db
     .update(notes)
@@ -181,6 +359,8 @@ app.put("/:noteId", authRequired, async (c) => {
       visibility,
       editPermission,
       isOfficial: isOfficial !== undefined ? isOfficial : undefined,
+      showTagFilterBar: showTagFilterBar !== undefined ? showTagFilterBar : undefined,
+      defaultFilterTags: defaultFilterTags !== undefined ? defaultFilterTags : undefined,
       updatedAt: new Date(),
     })
     .where(eq(notes.id, noteId))
@@ -188,6 +368,28 @@ app.put("/:noteId", authRequired, async (c) => {
 
   const updatedNote = updated[0];
   if (!updatedNote) throw new HTTPException(500, { message: "Failed to update note" });
+
+  // Issue #860 Phase 4: visibility / edit_permission の変化は `getNoteRole`
+  // の解釈に直結するため、ノート購読者へ sentinel を投げて details / window /
+  // members を invalidate させる。title だけの変更でも `noteRowToApi` の値が
+  // 変わるので一律で emit する。タグフィルタバー設定はアクセス権には影響しない
+  // が、`noteRowToApi` の値は変わるためキャッシュの整合性のために同様に通知する。
+  // Issue #860 Phase 4: changes to visibility / edit_permission flip the
+  // result of `getNoteRole` for some callers, so notify subscribers to
+  // re-evaluate access. Always emit on a successful PUT (even title-only
+  // changes) so the cached note shell does not drift. Tag-filter-bar fields
+  // don't affect access but still mutate the shell payload, so they
+  // trigger the same notification path for cache freshness.
+  if (
+    visibility !== undefined ||
+    editPermission !== undefined ||
+    body.title !== undefined ||
+    isOfficial !== undefined ||
+    showTagFilterBar !== undefined ||
+    defaultFilterTags !== undefined
+  ) {
+    publishNoteEvent({ type: "note.permission_changed", note_id: noteId });
+  }
   return c.json(noteRowToApi(updatedNote));
 });
 
@@ -197,7 +399,17 @@ app.delete("/:noteId", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  await requireNoteOwner(db, noteId, userId);
+  const note = await requireNoteOwner(db, noteId, userId);
+
+  // デフォルトノート（マイノート）は削除不可。誤操作で個人スペースが消えるのを
+  // 防ぐ。再作成は `ensureDefaultNote` で可能だがリンク・履歴は失われるため
+  // 拒否する。Issue: 「ホーム廃止 → /notes/me 着地」スレッド参照。
+  // The default note ("マイノート") is non-deletable — losing it would destroy
+  // the user's personal space. `ensureDefaultNote` could re-create one, but
+  // links and history would be gone, so we reject deletion outright.
+  if (note.isDefault) {
+    throw new HTTPException(400, { message: "Default note cannot be deleted" });
+  }
 
   await db
     .update(notes)
@@ -293,64 +505,98 @@ app.get("/:noteId", authOptional, async (c) => {
   if (!note) throw new HTTPException(404, { message: "Note not found" });
   if (!role) throw new HTTPException(403, { message: "Forbidden" });
 
-  if (role !== "owner") {
-    await db
-      .update(notes)
-      .set({ viewCount: sql`${notes.viewCount} + 1` })
-      .where(eq(notes.id, noteId));
+  // ページ側の変更（コンテンツ編集・タイトル変更・追加・削除）を ETag に反映
+  // するため、active なページの MAX(updated_at) と件数を 1 クエリで集約する。
+  // Phase 3 で追加した `(note_id, updated_at DESC) WHERE is_deleted = false`
+  // 部分インデックスにより、これは index-only で済む軽量クエリ。
+  //
+  // Aggregate `MAX(updated_at)` and `COUNT(*)` over active pages so the ETag
+  // captures page-level mutations that do not bump `notes.updated_at`
+  // (Hocuspocus-driven content edits, title renames via
+  // `PUT /api/pages/:id`, hard delete). The partial composite index added
+  // in Phase 3 lets Postgres resolve this from the index alone, keeping the
+  // cost negligible.
+  const pagesSignalRows = await db
+    .select({
+      // drizzle の `sql<Date | null>\`...\`` は型ヒントだけで、raw SQL 集約 (typed
+      // column ではない式) の戻り値に decoder を持たない。pg ドライバ経路次第で
+      // `timestamptz` の集約値が ISO 文字列のまま返ってくることがあり、その場合
+      // 下流の `makeNoteETag` で `.getTime()` が落ちて 500 になる (Issue #857)。
+      // `.mapWith()` で境界側で Date | null に強制正規化する。
+      //
+      // `sql<Date | null>` is a compile-time-only hint and drizzle has no decoder
+      // for raw aggregate expressions, so the pg driver can hand the result back
+      // as an ISO string (Issue #857 / PR #856 regression). `.mapWith()` coerces
+      // the driver value to `Date | null` at the query boundary.
+      maxUpdatedAt: sql<Date | null>`MAX(${pages.updatedAt})`.mapWith((value): Date | null => {
+        if (value === null || value === undefined) return null;
+        return value instanceof Date ? value : new Date(value as string);
+      }),
+      count: sql<number>`COUNT(*)::int`,
+    })
+    .from(pages)
+    .where(and(eq(pages.noteId, noteId), eq(pages.isDeleted, false)));
+  const pagesSignal = pagesSignalRows[0] ?? { maxUpdatedAt: null, count: 0 };
+
+  const etag = makeNoteETag(
+    note.id,
+    note.updatedAt,
+    role,
+    pagesSignal.maxUpdatedAt,
+    pagesSignal.count,
+  );
+  c.header("ETag", etag);
+  c.header("Cache-Control", "private, must-revalidate");
+  c.header("Vary", "Cookie");
+
+  // クライアントが前回受け取った ETag を `If-None-Match` で送ってきていれば、
+  // body・viewCount・pages クエリをまるごとスキップする（Issue #853）。
+  // 304 経路では viewCount も更新しない: 「画面を実際に取得した」のは body を
+  // 受け取ったときに限るという解釈で、ETag を安定させる効果もある。
+  //
+  // When the client sends back a matching `If-None-Match`, short-circuit with
+  // 304 and skip both the `view_count` update and the pages query (Issue
+  // #853). Treating "fetched" as "received a body" keeps the counter
+  // semantically meaningful and keeps the ETag stable longer.
+  const ifNoneMatch = c.req.header("If-None-Match");
+  if (ifNoneMatchMatches(ifNoneMatch, etag)) {
+    return c.body(null, 304);
   }
 
-  const pagesResult = await db
-    .select({
-      id: pages.id,
-      ownerId: pages.ownerId,
-      noteId: pages.noteId,
-      sourcePageId: pages.sourcePageId,
-      title: pages.title,
-      contentPreview: pages.contentPreview,
-      thumbnailUrl: pages.thumbnailUrl,
-      sourceUrl: pages.sourceUrl,
-      createdAt: pages.createdAt,
-      updatedAt: pages.updatedAt,
-      isDeleted: pages.isDeleted,
-      sortOrder: notePages.sortOrder,
-      addedByUserId: notePages.addedByUserId,
-      addedAt: notePages.createdAt,
-    })
-    .from(notePages)
-    .innerJoin(pages, eq(notePages.pageId, pages.id))
-    .where(
-      and(eq(notePages.noteId, noteId), eq(notePages.isDeleted, false), eq(pages.isDeleted, false)),
-    )
-    .orderBy(asc(notePages.sortOrder));
+  // 非オーナーのアクセスごとに `view_count` をインクリメントするが、UPDATE は
+  // レスポンスをブロックしないよう投げっぱなしにする（Issue #849）。失敗時は
+  // ログのみで継続し、Discover の並び替えに使うカウンタは最終的に整合する。
+  //
+  // Increment `view_count` on every non-owner visit, but fire-and-forget the
+  // UPDATE so it does not add a DB round trip to the response (Issue #849).
+  // Errors are logged and swallowed; the counter that backs Discover's sort
+  // converges eventually.
+  if (role !== "owner") {
+    void db
+      .update(notes)
+      .set({ viewCount: sql`${notes.viewCount} + 1` })
+      .where(eq(notes.id, noteId))
+      .catch((error) => {
+        console.error(`[api] noteViewCountUpdateFailed noteId=${noteId}`, error);
+      });
+  }
 
+  // Issue #860 Phase 6: ノートシェルから `pages[]` を撤去した。一覧表示は
+  // Phase 1 で導入した `GET /api/notes/:noteId/pages` (cursor pagination)、
+  // wiki link / AI chat scope のような全ページタイトルが必要な経路は
+  // Phase 6 で追加した `GET /api/notes/:noteId/page-titles` を使う。
+  // ETag に混ぜる pages signal は引き続き上で集約しているため、ページ単体
+  // 編集でもノート ETag は変わる（304 経路の正しさを維持）。
+  //
+  // Issue #860 Phase 6: drops `pages[]` from the note-shell response. The
+  // visible list now uses the Phase 1 cursor-paginated `/pages` window
+  // endpoint, while full-set consumers (wiki-link resolver, AI-chat scope)
+  // use the Phase 6 `/page-titles` endpoint. The ETag still mixes in the
+  // pages signal aggregate above so single-page edits invalidate the note
+  // shell validator (preserving 304 correctness).
   const response: NoteDetailApiResponse = {
     ...noteRowToApi(note),
     current_user_role: role,
-    pages: pagesResult.map(
-      (p): NotePageApiItem => ({
-        id: p.id,
-        owner_id: p.ownerId,
-        // `note_id` は「リンクされた個人ページ」か「ノートネイティブページ」かを
-        // 区別する。note-native だけに有効なアクション（例: 「個人に取り込み」）
-        // をクライアント側で出し分けるため、Phase 3 から明示的に返す。
-        // Surface `note_id` so clients can distinguish linked personal pages
-        // (null) from note-native pages (non-null). Phase 3 needs this to gate
-        // note-native-only actions such as "copy to personal".
-        note_id: p.noteId,
-        source_page_id: p.sourcePageId,
-        title: p.title,
-        content_preview: p.contentPreview,
-        thumbnail_url: p.thumbnailUrl,
-        source_url: p.sourceUrl,
-        created_at: p.createdAt,
-        updated_at: p.updatedAt,
-        is_deleted: p.isDeleted,
-        sort_order: p.sortOrder,
-        added_by_user_id: p.addedByUserId,
-        added_at: p.addedAt,
-      }),
-    ),
   };
 
   return c.json(response);

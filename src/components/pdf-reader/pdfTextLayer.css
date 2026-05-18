@@ -1,0 +1,48 @@
+/*
+ * pdf.js の TextLayer が生成する span を canvas 上に重ねるための最小限の CSS。
+ *
+ * Minimal CSS rules required to position the spans rendered by pdf.js'
+ * `TextLayer` correctly over the page canvas. Extracted from
+ * `pdfjs-dist/web/pdf_viewer.css` — only the rules we actually use are kept
+ * here (selection, span placement, transparent text). The selection-handle
+ * variants are omitted; we let the browser draw the default highlight under
+ * the transparent text glyphs.
+ *
+ * Phase 1 では canvas に "見える描画" を任せ、TextLayer は "選択可能なテキスト" を
+ * 担当する。span は透明だが、ブラウザの Selection API ではちゃんと範囲が取れる。
+ */
+.textLayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 2;
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.textLayer span.markedContent {
+  top: 0;
+  height: 0;
+}
+
+.textLayer span[role="img"] {
+  user-select: none;
+  cursor: default;
+}
+
+.textLayer ::selection {
+  background: rgb(0 0 255 / 0.25);
+}

@@ -16,6 +16,7 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { pages } from "../schema/pages.js";
 import { pageContents } from "../schema/pageContents.js";
 import type { Database } from "../types/index.js";
+import { ensureDefaultNote } from "./defaultNoteService.js";
 
 /**
  * A single page entry as it appears in the index.
@@ -234,6 +235,13 @@ export const INDEX_PAGE_TITLE = "__index__";
 export interface PersistIndexResult {
   /** Page ID of the `__index__` page (created or updated). / `__index__` ページ ID */
   pageId: string;
+  /**
+   * Owning note id of the `__index__` page. Returned so the client can build
+   * `/notes/:noteId/:pageId` after Issue #889 Phase 3 retired `/pages/:id`.
+   * 所属ノート ID。Issue #889 Phase 3 で `/pages/:id` を撤去したため、クライアント
+   * が `/notes/:noteId/:pageId` を組み立てる用に返す。
+   */
+  noteId: string;
   /** Whether a new page row was created. / 新規作成されたか */
   created: boolean;
   /** Built document. / 生成したドキュメント */
@@ -260,7 +268,7 @@ export async function rebuildIndexForOwner(
 
   const result = await db.transaction(async (tx) => {
     const [existing] = await tx
-      .select({ id: pages.id })
+      .select({ id: pages.id, noteId: pages.noteId })
       .from(pages)
       .where(
         and(
@@ -273,6 +281,7 @@ export async function rebuildIndexForOwner(
       .limit(1);
 
     let pageId: string;
+    let noteId: string;
     let created: boolean;
     if (existing) {
       await tx
@@ -280,6 +289,7 @@ export async function rebuildIndexForOwner(
         .set({ title: INDEX_PAGE_TITLE, updatedAt: now })
         .where(eq(pages.id, existing.id));
       pageId = existing.id;
+      noteId = existing.noteId;
       created = false;
     } else {
       // Partial unique index (`idx_pages_unique_special_kind_per_owner`) protects
@@ -290,24 +300,27 @@ export async function rebuildIndexForOwner(
       // try/catch alone cannot recover without an explicit SAVEPOINT).
       // 並行再構築で SELECT を両方通過した場合、生の一意制約違反は tx を失敗状態に
       // するため、ON CONFLICT DO NOTHING + 再 SELECT で勝者行を採用する。
+      const defaultNote = await ensureDefaultNote(tx, ownerId);
       const inserted = await tx
         .insert(pages)
         .values({
           ownerId,
+          noteId: defaultNote.id,
           title: INDEX_PAGE_TITLE,
           specialKind: "__index__",
           createdAt: now,
           updatedAt: now,
         })
         .onConflictDoNothing()
-        .returning({ id: pages.id });
+        .returning({ id: pages.id, noteId: pages.noteId });
       const newRow = inserted[0];
       if (newRow) {
         pageId = newRow.id;
+        noteId = newRow.noteId;
         created = true;
       } else {
         const [winner] = await tx
-          .select({ id: pages.id })
+          .select({ id: pages.id, noteId: pages.noteId })
           .from(pages)
           .where(
             and(
@@ -321,6 +334,7 @@ export async function rebuildIndexForOwner(
           throw new Error("Failed to insert or locate __index__ page");
         }
         pageId = winner.id;
+        noteId = winner.noteId;
         created = false;
       }
     }
@@ -338,7 +352,7 @@ export async function rebuildIndexForOwner(
         set: { contentText: document.markdown, updatedAt: now },
       });
 
-    return { pageId, created };
+    return { pageId, noteId, created };
   });
 
   return { ...result, document };

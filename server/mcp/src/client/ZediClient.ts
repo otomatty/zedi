@@ -69,21 +69,34 @@ export interface ListPagesParams {
   scope?: "own" | "shared";
 }
 
-/** ページ本文 (Y.Doc) / Page Y.Doc content. */
+/**
+ * ページ本文 (読み取り専用) / Page content (read-only).
+ *
+ * Issue #889 Phase 5 で MCP は Hocuspocus を経由せず、`GET /api/pages/:id/public-content`
+ * から `content_text` のみを取得する。Y.Doc バイト列は意図的に含めず、MCP 側で
+ * 編集セッションを開始できないようにしている。バックエンドの公開エンドポイント
+ * （`server/api/src/routes/pages.ts` の `GET /:id/public-content`）と shape を揃える。
+ *
+ * Issue #889 Phase 5 makes the MCP client read-only. The shape mirrors the
+ * `GET /api/pages/:id/public-content` REST endpoint, which deliberately omits
+ * the Y.Doc bytes so MCP cannot accidentally start an editing session.
+ */
 export interface PageContent {
-  ydoc_state: string;
+  /** ページ ID / Page ID. */
+  id: string;
+  /** ページタイトル。空ページや未設定では `null`。 Page title; `null` when unset. */
+  title: string | null;
+  /** Y.Doc から抽出した本文プレーンテキスト。未保存なら `null`。
+   *  Plain text rendered from the persisted Y.Doc; `null` when never saved. */
+  content_text: string | null;
+  /** ページ一覧プレビュー用の短いテキスト。Short preview text used by list views. */
+  content_preview: string | null;
+  /** 楽観ロック用バージョン。`page_contents` 未作成時は 0。
+   *  Optimistic-lock version; 0 when no `page_contents` row exists yet. */
   version: number;
-  content_text?: string | null;
-  updated_at?: string;
-}
-
-/** ページ本文更新の入力 / Input for updating page content. */
-export interface UpdatePageContentInput {
-  ydoc_state: string;
-  expected_version: number;
-  content_text?: string;
-  content_preview?: string;
-  title?: string;
+  /** 最終更新 (ISO 文字列)。`page_contents` が無ければ `pages.updated_at` を返す。
+   *  Last-modified timestamp (ISO); falls back to `pages.updated_at` when content is missing. */
+  updated_at: string;
 }
 
 // ── Notes ───────────────────────────────────────────────────────────────────
@@ -218,12 +231,18 @@ export interface ZediClient {
    * List the caller's pages — own only or own + shared via notes — ordered by `updated_at DESC`.
    */
   listPages(params?: ListPagesParams): Promise<PageListItem[]>;
-  /** ページ本文 (Y.Doc) を取得する。Get page Y.Doc content. */
+  /**
+   * ページ本文を読み取り専用で取得する。Issue #889 Phase 5 以降、MCP は Y.Doc バイト列を
+   * 受け取らず、`GET /api/pages/:id/public-content` から `content_text` のみを取り出す。
+   * private / restricted ノートに対して role が解決しない呼び出し元には 403 が返る。
+   *
+   * Read-only page accessor. After Issue #889 Phase 5, MCP no longer ferries
+   * Y.Doc bytes; the underlying endpoint serves rendered text only and gates
+   * private/restricted notes via `getNoteRole` (403 when no role resolves).
+   */
   getPageContent(pageId: string): Promise<PageContent>;
   /** 新規ページを作成する。Create a new page. */
   createPage(input: CreatePageInput): Promise<PageRow>;
-  /** ページ本文を更新する (楽観的ロック)。Update page content with optimistic lock. */
-  updatePageContent(pageId: string, input: UpdatePageContentInput): Promise<{ version: number }>;
   /** ページを論理削除する。Soft-delete a page. */
   deletePage(pageId: string): Promise<{ id: string; deleted: boolean }>;
 

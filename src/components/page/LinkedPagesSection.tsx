@@ -73,10 +73,13 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
   if (!hasAnyLinks) return null;
 
   /**
-   *
+   * リンクされたページへ遷移する。PageCard には `noteId` が含まれているので
+   * `/notes/:noteId/:pageId` を直接組み立てられる（Issue #889 Phase 3）。
+   * Navigate to a linked page. `PageCard` carries `noteId`, so we can build
+   * `/notes/:noteId/:pageId` directly (Issue #889 Phase 3).
    */
-  const handlePageClick = (id: string) => {
-    navigate(`/pages/${id}`);
+  const handlePageClick = (id: string, noteId: string) => {
+    navigate(`/notes/${noteId}/${id}`);
   };
 
   /**
@@ -89,7 +92,7 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
        *
        */
       const newPage = await createPageMutation.mutateAsync({ title });
-      navigate(`/pages/${newPage.id}`, { flushSync: true });
+      navigate(`/notes/${newPage.noteId}/${newPage.id}`, { flushSync: true });
     } catch (error) {
       console.error("Failed to create page:", error);
     }

@@ -110,7 +110,7 @@ jobs:
           VITE_POLAR_PRO_MONTHLY_PRODUCT_ID: ${{ vars.POLAR_MONTHLY_ID }}
           VITE_POLAR_PRO_YEARLY_PRODUCT_ID: ${{ vars.POLAR_YEARLY_ID }}
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

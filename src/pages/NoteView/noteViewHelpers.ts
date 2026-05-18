@@ -11,16 +11,15 @@ export type { NotePageSummary } from "@/hooks/useNoteQueries";
 export function getNoteViewPermissions(
   access:
     | {
+        canView?: boolean;
         canEdit?: boolean;
-        canAddPage?: boolean;
         canManageMembers?: boolean;
       }
     | undefined,
   noteSource: string,
-) {
+): { canView: boolean; canEdit: boolean; canManageMembers: boolean } {
+  const canView = Boolean(access?.canView);
   const canEdit = Boolean(access?.canEdit && noteSource === "local");
-  const canAddPage = Boolean(access?.canAddPage);
-  const canShowAddPage = canEdit || canAddPage;
   const canManageMembers = Boolean(access?.canManageMembers && noteSource === "local");
-  return { canEdit, canAddPage, canShowAddPage, canManageMembers };
+  return { canView, canEdit, canManageMembers };
 }

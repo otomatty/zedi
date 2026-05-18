@@ -10,9 +10,9 @@ import { describe, it, expect } from "vitest";
 import { PRIMARY_NAV_ITEMS, isPrimaryNavActive } from "./navigationItems";
 
 describe("PRIMARY_NAV_ITEMS", () => {
-  it("exposes Home, Notes, and AI as the canonical primary entries", () => {
+  it("exposes My Note, Notes, and AI as the canonical primary entries", () => {
     const paths = PRIMARY_NAV_ITEMS.map((item) => item.path);
-    expect(paths).toEqual(["/home", "/notes", "/ai"]);
+    expect(paths).toEqual(["/notes/me", "/notes", "/ai"]);
   });
 
   it("assigns an i18n key and an icon component to every entry", () => {
@@ -35,15 +35,20 @@ describe("PRIMARY_NAV_ITEMS", () => {
     const ai = PRIMARY_NAV_ITEMS.find((item) => item.path === "/ai");
     expect(ai?.matchPaths).toEqual(["/ai", "/ai/:conversationId", "/ai/history"]);
   });
+
+  it("uses nav.myNote for the default-note entry", () => {
+    const myNote = PRIMARY_NAV_ITEMS.find((item) => item.path === "/notes/me");
+    expect(myNote?.i18nKey).toBe("nav.myNote");
+  });
 });
 
 describe("isPrimaryNavActive", () => {
-  const homeItem = PRIMARY_NAV_ITEMS.find((item) => item.path === "/home");
+  const myNoteItem = PRIMARY_NAV_ITEMS.find((item) => item.path === "/notes/me");
   const notesItem = PRIMARY_NAV_ITEMS.find((item) => item.path === "/notes");
   const aiItem = PRIMARY_NAV_ITEMS.find((item) => item.path === "/ai");
 
-  if (!homeItem || !notesItem || !aiItem) {
-    throw new Error("PRIMARY_NAV_ITEMS must include /home, /notes, and /ai");
+  if (!myNoteItem || !notesItem || !aiItem) {
+    throw new Error("PRIMARY_NAV_ITEMS must include /notes/me, /notes, and /ai");
   }
 
   it("returns true when any matchPath matches the current pathname", () => {
@@ -53,8 +58,10 @@ describe("isPrimaryNavActive", () => {
   });
 
   it("falls back to an exact path match when matchPaths is not provided", () => {
-    expect(isPrimaryNavActive(homeItem, "/home")).toBe(true);
-    expect(isPrimaryNavActive(homeItem, "/home/anything")).toBe(false);
+    expect(isPrimaryNavActive(myNoteItem, "/notes/me")).toBe(true);
+    // 任意のノート詳細ページではマイノートタブを点灯させない（issue #825）。
+    // Do not activate the My Note tab on arbitrary note detail pages.
+    expect(isPrimaryNavActive(myNoteItem, "/notes/some-other-id")).toBe(false);
   });
 
   it("treats /notes/discover as part of the Notes section", () => {
@@ -63,7 +70,7 @@ describe("isPrimaryNavActive", () => {
   });
 
   it("returns false for unrelated pathnames", () => {
-    expect(isPrimaryNavActive(homeItem, "/notes")).toBe(false);
+    expect(isPrimaryNavActive(myNoteItem, "/notes")).toBe(false);
     expect(isPrimaryNavActive(aiItem, "/settings")).toBe(false);
   });
 });

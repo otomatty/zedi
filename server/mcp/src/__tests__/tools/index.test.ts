@@ -26,7 +26,6 @@ function createMockClient(): ZediClient {
     listPages: vi.fn(),
     getPageContent: vi.fn(),
     createPage: vi.fn(),
-    updatePageContent: vi.fn(),
     deletePage: vi.fn(),
     listNotes: vi.fn(),
     getNote: vi.fn(),
@@ -95,7 +94,6 @@ describe("ALL_TOOL_NAMES", () => {
       "zedi_list_pages",
       "zedi_get_page",
       "zedi_create_page",
-      "zedi_update_page_content",
       "zedi_delete_page",
       "zedi_list_notes",
       "zedi_get_note",
@@ -115,6 +113,22 @@ describe("ALL_TOOL_NAMES", () => {
     ];
     for (const name of required) {
       expect(ALL_TOOL_NAMES).toContain(name);
+    }
+  });
+
+  it("does not re-introduce retired write tools (read-only contract after #889 Phase 5)", () => {
+    // Issue #889 Phase 5 で MCP は read-only に縮退した。Hocuspocus を経由しない
+    // Y.Doc 書き込み (`zedi_update_page_content`) を将来うっかり戻さないよう、
+    // 仕様として "retired" のリストを CI で固定する。書き込み機能を再導入する場合は
+    // この list から名前を外し、Hocuspocus 経由で安全に書ける形を別 issue で設計する。
+    //
+    // After Issue #889 Phase 5 the MCP surface is read-only. This guard makes a
+    // future regression — silently re-adding `zedi_update_page_content` — fail
+    // CI. Bringing back write access requires both removing the entry here and
+    // a new design that routes through Hocuspocus.
+    const retired = ["zedi_update_page_content"];
+    for (const name of retired) {
+      expect(ALL_TOOL_NAMES).not.toContain(name);
     }
   });
 });

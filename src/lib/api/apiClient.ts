@@ -7,14 +7,14 @@ import type {
   SyncPagesResponse,
   PostSyncPagesBody,
   PostSyncPagesResponse,
-  PageContentResponse,
-  PutPageContentBody,
+  PagePublicContentResponse,
+  UpdatePageMetadataBody,
+  UpdatePageMetadataResponse,
   CreatePageBody,
   CreatePageResponse,
-  CopyPersonalPageToNoteResponse,
-  CopyNotePageToPersonalResponse,
   SearchSharedResponse,
   NoteListItem,
+  MyNoteResponse,
   GetNoteResponse,
   NoteMemberItem,
   DiscoverResponse,
@@ -31,7 +31,13 @@ import type {
   InviteLinkRow,
   DomainAccessRow,
   CreateDomainAccessBody,
+  NotePageWindowInclude,
+  NotePageWindowResponse,
+  NotePageTitleIndexResponse,
+  NoteTagAggregationResponse,
 } from "./types";
+import type { SelectedTags } from "@/types/tagFilter";
+import { serializeTagsParam } from "@/lib/noteTagFilterBar/urlTagsCodec";
 
 export type { NoteListItem };
 
@@ -116,12 +122,25 @@ function unwrapEnvelope<T>(data: unknown): T {
   return data as T;
 }
 
-async function request<T>(
+/**
+ * URL・ヘッダ・`RequestInit` の組み立てを集約するヘルパ。
+ * `request` / `requestOptionalAuth` / `getNoteWithCache` で共通化することで、
+ * 認証クッキーやヘッダの取り扱いが一箇所に揃う（PR #856 Gemini HIGH review）。
+ *
+ * Centralizes URL + headers + `RequestInit` construction so every fetch in
+ * this client agrees on `credentials`, `Content-Type`, query handling, and
+ * the new `If-None-Match` opt-in (see PR #856 Gemini HIGH review).
+ */
+function buildRequestInit(
   method: string,
   path: string,
   baseUrl: string,
-  options: { body?: unknown; query?: Record<string, string> } = {},
-): Promise<T> {
+  options: {
+    body?: unknown;
+    query?: Record<string, string>;
+    ifNoneMatch?: string;
+  },
+): { url: string; init: RequestInit } {
   const base = baseUrl.replace(/\/$/, "");
   const url = new URL(
     path.startsWith("/") ? path : `/${path}`,
@@ -130,25 +149,41 @@ async function request<T>(
   if (options.query) {
     Object.entries(options.query).forEach(([k, v]) => url.searchParams.set(k, v));
   }
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (options.ifNoneMatch) headers["If-None-Match"] = options.ifNoneMatch;
   const init: RequestInit = { method, headers, credentials: "include" };
   if (options.body !== undefined) {
     init.body = JSON.stringify(options.body);
   }
+  return { url: url.toString(), init };
+}
+
+/**
+ * `fetch` のネットワーク例外を `ApiError(NETWORK_ERROR)` に揃えるラッパ。
+ * Wraps `fetch` so connection-level failures surface as `ApiError(NETWORK_ERROR)`.
+ */
+async function safeFetch(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (networkError) {
+    throw new ApiError(
+      `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
+      0,
+      "NETWORK_ERROR",
+    );
+  }
+}
+
+async function request<T>(
+  method: string,
+  path: string,
+  baseUrl: string,
+  options: { body?: unknown; query?: Record<string, string> } = {},
+): Promise<T> {
+  const { url, init } = buildRequestInit(method, path, baseUrl, options);
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    let res: Response;
-    try {
-      res = await fetch(url.toString(), init);
-    } catch (networkError) {
-      throw new ApiError(
-        `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
-        0,
-        "NETWORK_ERROR",
-      );
-    }
+    const res = await safeFetch(url, init);
 
     if (res.status === 503 && attempt < MAX_RETRIES) {
       const retryAfterSec = parseInt(res.headers.get("Retry-After") ?? "", 10);
@@ -174,35 +209,51 @@ async function requestOptionalAuth<T>(
   baseUrl: string,
   options: { body?: unknown; query?: Record<string, string> } = {},
 ): Promise<T> {
-  const base = baseUrl.replace(/\/$/, "");
-  const url = new URL(
-    path.startsWith("/") ? path : `/${path}`,
-    base || (typeof window !== "undefined" ? window.location.origin : "http://localhost"),
-  );
-  if (options.query) {
-    Object.entries(options.query).forEach(([k, v]) => url.searchParams.set(k, v));
-  }
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const init: RequestInit = { method, headers, credentials: "include" };
-  if (options.body !== undefined) {
-    init.body = JSON.stringify(options.body);
-  }
-  let res: Response;
-  try {
-    res = await fetch(url.toString(), init);
-  } catch (networkError) {
-    throw new ApiError(
-      `Network error: ${networkError instanceof Error ? networkError.message : "Failed to fetch"}`,
-      0,
-      "NETWORK_ERROR",
-    );
-  }
+  const { url, init } = buildRequestInit(method, path, baseUrl, options);
+  const res = await safeFetch(url, init);
   const text = await res.text();
   const data = parseResponseText(text, res.status);
   if (!res.ok) {
     throwOnErrorResponse(data, res);
   }
   return unwrapEnvelope<T>(data);
+}
+
+/**
+ * `requestOptionalAuth` の ETag 対応版。`If-None-Match` を載せ、`304 Not
+ * Modified` のときは body を読まずに `{ notModified: true }` を返す。`fetch`
+ * の組み立てとネットワーク例外ハンドリングは `buildRequestInit` /
+ * `safeFetch` で共有するので、認証や `Content-Type` の振る舞いが
+ * 通常パスとずれない（PR #856 Gemini HIGH review）。
+ *
+ * ETag-aware sibling of `requestOptionalAuth`. Sends `If-None-Match` and
+ * short-circuits on `304 Not Modified` so the empty body is never fed to
+ * `JSON.parse`. Shares `buildRequestInit` / `safeFetch` with the standard
+ * path so auth / `Content-Type` / network error semantics stay in lockstep
+ * (see PR #856 Gemini HIGH review).
+ */
+async function requestOptionalAuthConditional<T>(
+  method: string,
+  path: string,
+  baseUrl: string,
+  options: { body?: unknown; query?: Record<string, string>; ifNoneMatch?: string } = {},
+): Promise<{ notModified: boolean; data: T | null; etag: string | null }> {
+  const { url, init } = buildRequestInit(method, path, baseUrl, options);
+  const res = await safeFetch(url, init);
+  const etag = res.headers.get("ETag");
+  if (res.status === 304) {
+    return { notModified: true, data: null, etag };
+  }
+  const text = await res.text();
+  const data = parseResponseText(text, res.status);
+  if (!res.ok) {
+    throwOnErrorResponse(data, res);
+  }
+  return {
+    notModified: false,
+    data: unwrapEnvelope<T>(data),
+    etag,
+  };
 }
 
 /**
@@ -240,16 +291,67 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return req<PostSyncPagesResponse>("POST", "/api/sync/pages", { body });
     },
 
-    /** GET /api/pages/:id/content — ydoc_state (base64), version. 404 if no content. */
-    async getPageContent(pageId: string): Promise<PageContentResponse> {
-      return req<PageContentResponse>("GET", `/api/pages/${encodeURIComponent(pageId)}/content`);
+    /**
+     * `GET /api/pages/:pageId` — 単一ページのメタデータを返す（issue #860
+     * Phase 6 で追加）。Phase 6 で `GET /api/notes/:noteId` から `pages[]`
+     * を撤去したため、`useNotePage` のような単一ページ metadata の経路は
+     * このルートに切り替わる。`authOptional` なので、公開 / unlisted ノート
+     * 配下のページは未ログインの guest からも取得できる。
+     *
+     * Single-page metadata fetch (issue #860 Phase 6). Phase 6 dropped
+     * `pages[]` from the note shell, so consumers that previously read a
+     * page's owner / source url / etc. through that array now go through
+     * this route. The endpoint is `authOptional`, so guests can read pages
+     * of public / unlisted notes.
+     *
+     * Returns `null` when the page is missing or soft-deleted (404 from the
+     * server). Other errors propagate as `ApiError`.
+     */
+    async getPage(pageId: string): Promise<unknown> {
+      try {
+        return await reqOptionalAuth<unknown>("GET", `/api/pages/${encodeURIComponent(pageId)}`);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) return null;
+        throw err;
+      }
     },
 
-    /** PUT /api/pages/:id/content — upload Y.Doc state. Optional version for optimistic lock. */
-    async putPageContent(pageId: string, body: PutPageContentBody): Promise<{ version: number }> {
-      return req<{ version: number }>("PUT", `/api/pages/${encodeURIComponent(pageId)}/content`, {
+    /**
+     * `PUT /api/pages/:id` — タイトル等のメタデータだけを更新する。
+     * Issue #889 で `local` モードと旧 `GET/PUT /api/pages/:id/content` を撤去した
+     * 結果、Y.Doc は Hocuspocus が一括で扱い、本ルートが REST 経由のタイトル /
+     * メタデータ更新の唯一の正規経路となった。サインインユーザーの編集権限が前提。
+     *
+     * `PUT /api/pages/:id` updates page metadata only (title,
+     * content_preview). Issue #889 retired the `local` mode and the legacy
+     * `GET/PUT /api/pages/:id/content` round-trip; Hocuspocus now owns the
+     * Y.Doc state exclusively, so this is the canonical REST entry point for
+     * title / metadata updates.
+     */
+    async updatePageMetadata(
+      pageId: string,
+      body: UpdatePageMetadataBody,
+    ): Promise<UpdatePageMetadataResponse> {
+      return req<UpdatePageMetadataResponse>("PUT", `/api/pages/${encodeURIComponent(pageId)}`, {
         body,
       });
+    },
+
+    /**
+     * `GET /api/pages/:id/public-content` — 読み取り専用のページ本文を取得する。
+     * `Y.Doc` バイト列は返さず、`content_text` と派生情報だけを返す。ゲスト
+     * （public / unlisted ノートの未認証読者）や viewer ロールの読み取り
+     * 専用 UI から使う。
+     *
+     * `GET /api/pages/:id/public-content` returns the rendered plain text of a
+     * page. Use this from read-only views (guests on public/unlisted notes or
+     * signed-in viewer-role members) instead of opening a Hocuspocus session.
+     */
+    async getPagePublicContent(pageId: string): Promise<PagePublicContentResponse> {
+      return reqOptionalAuth<PagePublicContentResponse>(
+        "GET",
+        `/api/pages/${encodeURIComponent(pageId)}/public-content`,
+      );
     },
 
     /** POST /api/pages — create page. Returns created page (snake_case). */
@@ -296,9 +398,50 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return req<NoteListItem[]>("GET", "/api/notes");
     },
 
+    /**
+     * GET /api/notes/me — return the caller's default note ("マイノート").
+     * If one does not exist yet (e.g. brand-new account) the server creates
+     * it on the fly. Used by the `/notes/me` landing page to resolve the
+     * note id for a redirect into `/notes/:noteId`.
+     *
+     * GET /api/notes/me — 呼び出し元のデフォルトノート（マイノート）を返す。
+     * 未作成ならサーバが idempotent に作成する。`/notes/me` ランディングが
+     * 最初に叩いて、解決した note id へリダイレクトする。
+     */
+    async getMyNote(): Promise<MyNoteResponse> {
+      return req<MyNoteResponse>("GET", "/api/notes/me");
+    },
+
     /** GET /api/notes/:id — note detail (auth optional; public/unlisted viewable by guests). */
     async getNote(noteId: string): Promise<GetNoteResponse> {
       return reqOptionalAuth<GetNoteResponse>("GET", `/api/notes/${encodeURIComponent(noteId)}`);
+    },
+
+    /**
+     * GET /api/notes/:id with conditional ETag support (Issue #853).
+     *
+     * Send `ifNoneMatch` to opt into 304 short-circuiting. The server responds
+     * with 304 (no body) when the cached representation is still fresh; the
+     * caller is expected to reuse its cached payload in that case.
+     *
+     * `GET /api/notes/:id` を ETag 条件付きで叩く（Issue #853）。
+     * `ifNoneMatch` を渡すと未変更時は 304（body 無し）が返り、呼び出し側は
+     * 自前のキャッシュを使い回すことで body 転送を省略できる。
+     */
+    async getNoteWithCache(
+      noteId: string,
+      options: { ifNoneMatch?: string } = {},
+    ): Promise<{
+      notModified: boolean;
+      data: GetNoteResponse | null;
+      etag: string | null;
+    }> {
+      return requestOptionalAuthConditional<GetNoteResponse>(
+        "GET",
+        `/api/notes/${encodeURIComponent(noteId)}`,
+        baseUrl,
+        { ifNoneMatch: options.ifNoneMatch },
+      );
     },
 
     /** GET /api/notes/discover — public notes list (auth optional). */
@@ -314,6 +457,93 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
           offset: String(opts?.offset ?? 0),
         },
       });
+    },
+
+    /**
+     * `GET /api/notes/:noteId/pages` — keyset cursor pagination で一覧を取得する
+     * 軽量ノートページ window 経路（issue #860 Phase 1）。`include` で
+     * `content_preview` / `thumbnail_url` の同梱を要求する。`cursor` を
+     * 省略すると先頭から取得し、レスポンスの `next_cursor` を次回呼び出しに
+     * そのまま渡す。`next_cursor` が `null` なら末尾まで読み切った状態。
+     * `authOptional` なので、公開 / unlisted ノートは未ログインでも取得できる。
+     *
+     * Keyset-paginated window of a note's pages (issue #860 Phase 1). Echo the
+     * previous response's `next_cursor` back into `cursor` for the next page;
+     * a `null` `next_cursor` means the end has been reached. `include` opts
+     * the heavy `content_preview` / `thumbnail_url` columns back into the row.
+     * The endpoint is `authOptional`, so guests can browse public / unlisted
+     * notes without sign-in.
+     */
+    async getNotePages(
+      noteId: string,
+      params: {
+        cursor?: string | null;
+        limit?: number;
+        include?: ReadonlyArray<NotePageWindowInclude>;
+        tags?: SelectedTags;
+      } = {},
+    ): Promise<NotePageWindowResponse> {
+      const query: Record<string, string> = {};
+      if (params.cursor) query.cursor = params.cursor;
+      if (params.limit !== undefined) query.limit = String(params.limit);
+      if (params.include && params.include.length > 0) {
+        // 重複トークンは集合化して落とす。サーバ側は未知トークンを無視するが、
+        // URL を簡潔に保つためクライアントでも先に正規化する。
+        // De-duplicate include tokens; the server tolerates unknown values but
+        // keeping the query string tidy avoids confusing log entries.
+        const tokens = Array.from(new Set(params.include));
+        query.include = tokens.join(",");
+      }
+      if (params.tags) {
+        // `serializeTagsParam` は none-selected で null を返すので param 自体を
+        // 省略する。`__none__` や `tags=a,b` の URL 形は codec が決める。
+        // Skip the param when the filter is `none-selected`; the codec
+        // encodes `__none__` / `tags=a,b` consistently with the front-end URL.
+        const serialized = serializeTagsParam(params.tags);
+        if (serialized) query.tags = serialized;
+      }
+      return reqOptionalAuth<NotePageWindowResponse>(
+        "GET",
+        `/api/notes/${encodeURIComponent(noteId)}/pages`,
+        { query },
+      );
+    },
+
+    /**
+     * `GET /api/notes/:noteId/tags` — タグフィルタバー用の集計を取得する。
+     * `authOptional` なので公開 / unlisted ノートは未ログインでも呼べる。
+     *
+     * Fetch the tag aggregation for the filter bar. `authOptional`, so
+     * public / unlisted notes are reachable without sign-in.
+     */
+    async getNoteTags(noteId: string): Promise<NoteTagAggregationResponse> {
+      return reqOptionalAuth<NoteTagAggregationResponse>(
+        "GET",
+        `/api/notes/${encodeURIComponent(noteId)}/tags`,
+      );
+    },
+
+    /**
+     * `GET /api/notes/:noteId/page-titles` — ノート配下の全ページの id /
+     * title / is_deleted / updated_at だけを返す軽量タイトルインデックス
+     * （issue #860 Phase 6）。`/pages` の cursor pagination とは異なり
+     * 「全タイトルが必要」な consumer 専用で、payload を最小限に抑えるため
+     * preview / thumbnail / source_url 等は含めない。`authOptional` なので、
+     * 公開 / unlisted ノートは未ログインでも取得できる。
+     *
+     * Lightweight title-index for a note (issue #860 Phase 6). Returns only
+     * `id / title / is_deleted / updated_at` for every active page, with no
+     * preview / thumbnail / source_url, so consumers that need the *complete*
+     * title set (wiki-link resolver, AI-chat scope sync, add-dialog dedup)
+     * can fetch the whole list cheaply even on huge notes. The endpoint is
+     * `authOptional`, so guests can browse public / unlisted notes without
+     * sign-in.
+     */
+    async getNotePageTitles(noteId: string): Promise<NotePageTitleIndexResponse> {
+      return reqOptionalAuth<NotePageTitleIndexResponse>(
+        "GET",
+        `/api/notes/${encodeURIComponent(noteId)}/page-titles`,
+      );
     },
 
     /** GET /api/notes/:id/members — list members. */
@@ -335,7 +565,22 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     /** PUT /api/notes/:id — update note (owner only). */
     async updateNote(
       noteId: string,
-      body: { title?: string; visibility?: string; edit_permission?: string },
+      body: {
+        title?: string;
+        visibility?: string;
+        edit_permission?: string;
+        /**
+         * オーナーが既定でタグフィルタバーを表示するか。ユーザー側は localStorage
+         * で個別に上書き可能。
+         * Owner-side default for showing the filter bar; users can override locally.
+         */
+        show_tag_filter_bar?: boolean;
+        /**
+         * フィルタバーの既定選択タグ（小文字キー、`__none__` を含み得る）。
+         * Default tags selected on first load (lower-cased; may include `__none__`).
+         */
+        default_filter_tags?: string[];
+      },
     ): Promise<NoteListItem> {
       return req<NoteListItem>("PUT", `/api/notes/${encodeURIComponent(noteId)}`, { body });
     },
@@ -364,51 +609,6 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return req(
         "DELETE",
         `/api/notes/${encodeURIComponent(noteId)}/pages/${encodeURIComponent(pageId)}`,
-      );
-    },
-
-    /**
-     * `POST /api/notes/:noteId/pages/copy-from-personal/:pageId`
-     *
-     * 個人ページをコピーして、指定ノート配下のノートネイティブページを新規作成する。
-     * 元の個人ページは `/home` に残り、新しいコピーだけがノートに出る (issue #713 Phase 3)。
-     *
-     * Copy a personal page into the given note as a fresh note-native page.
-     * The original stays on the caller's `/home`; only the copy surfaces
-     * inside the note. See issue #713 Phase 3.
-     */
-    async copyPersonalPageToNote(
-      noteId: string,
-      sourcePageId: string,
-    ): Promise<CopyPersonalPageToNoteResponse> {
-      return req<CopyPersonalPageToNoteResponse>(
-        "POST",
-        `/api/notes/${encodeURIComponent(noteId)}/pages/copy-from-personal/${encodeURIComponent(
-          sourcePageId,
-        )}`,
-      );
-    },
-
-    /**
-     * `POST /api/notes/:noteId/pages/:pageId/copy-to-personal`
-     *
-     * ノートネイティブページをコピーして、呼び出し元の個人ページを新規作成する。
-     * 元のノートページはノート内に残り、コピーだけが呼び出し元の `/home` に加わる。
-     * ノート脱退後もコピーは残る (issue #713 Phase 3)。
-     *
-     * Copy a note-native page into the caller's personal pages. The original
-     * note page stays in the note; only the copy lands on `/home`, and it
-     * survives any later change in note membership. See issue #713 Phase 3.
-     */
-    async copyNotePageToPersonal(
-      noteId: string,
-      sourcePageId: string,
-    ): Promise<CopyNotePageToPersonalResponse> {
-      return req<CopyNotePageToPersonalResponse>(
-        "POST",
-        `/api/notes/${encodeURIComponent(noteId)}/pages/${encodeURIComponent(
-          sourcePageId,
-        )}/copy-to-personal`,
       );
     },
 
@@ -639,6 +839,14 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     }): Promise<{
       setup_completed_at: string | null;
       welcome_page_id: string | null;
+      /**
+       * Owning note id of the welcome page. Issue #889 Phase 3 で `/pages/:id`
+       * を撤去したため、クライアントは `/notes/:noteId/:pageId` に着地させる。
+       *
+       * Owning note id paired with `welcome_page_id` so the client can build
+       * `/notes/:noteId/:pageId` after Issue #889 Phase 3 retired `/pages/:id`.
+       */
+      welcome_page_note_id: string | null;
       welcome_page_created_at: string | null;
       welcome_page_locale: "ja" | "en" | null;
     }> {
@@ -656,6 +864,13 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
     async getOnboardingStatus(): Promise<{
       setup_completed_at: string | null;
       welcome_page_id: string | null;
+      /**
+       * Issue #889 Phase 3: `completeOnboarding` の説明を参照。`welcome_page_id`
+       * と組で `/notes/:noteId/:pageId` を組み立てるためのノート ID。
+       * Issue #889 Phase 3: see `completeOnboarding` doc — paired with
+       * `welcome_page_id` to build the `/notes/:noteId/:pageId` URL.
+       */
+      welcome_page_note_id: string | null;
       welcome_page_created_at: string | null;
       home_slides_shown_at: string | null;
       auto_create_update_notice: boolean;

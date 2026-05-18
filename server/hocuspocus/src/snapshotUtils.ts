@@ -1,14 +1,20 @@
 /**
- * スナップショット自動保存ユーティリティ（hocuspocus 用）
+ * スナップショット自動保存ユーティリティ（hocuspocus 用）。
  * Auto-snapshot utility for the hocuspocus server.
  *
- * ⚠️ API 側にも同様のスナップショット作成ロジックがあります:
- *   - server/api/src/services/snapshotService.ts
- * 定数やpruning SQLを変更する場合は、必ず両方を同時に更新してください。
+ * Issue #889 Phase 4 で `local` コラボレーションモードと
+ * `GET/PUT /api/pages/:id/content` を廃止した結果、本文編集はすべて
+ * Hocuspocus 経由になった。それに伴い API 側にあった `maybeCreateSnapshot`
+ * の二重実装は撤去され、自動スナップショット作成のロジックは本ファイルが
+ * 唯一の実装となる。API 側 (`server/api/src/routes/pageSnapshots.ts`) で残って
+ * いるのは復元時の保持上限プルーニングのみ。
  *
- * ⚠️ A similar snapshot creation logic exists on the API side:
- *   - server/api/src/services/snapshotService.ts
- * When changing constants or pruning SQL, always update both files.
+ * Issue #889 Phase 4 retired the `local` collaboration mode along with
+ * `GET/PUT /api/pages/:id/content`, so all edits now flow through
+ * Hocuspocus. The API-side duplicate of `maybeCreateSnapshot` has been
+ * deleted; this file is now the sole owner of the auto-snapshot path. The
+ * API side keeps only retention-limit pruning for the restore route in
+ * `server/api/src/routes/pageSnapshots.ts`.
  */
 import type { PoolClient } from "pg";
 
@@ -37,11 +43,6 @@ export const MAX_SNAPSHOTS_PER_PAGE = 100;
  *
  * Snapshots created via hocuspocus have `created_by = NULL`.
  * `created_by IS NULL` indicates an auto-save by the hocuspocus server.
- *
- * ⚠️ API 側にも同様のロジックがあります（server/api/src/services/snapshotService.ts）。
- *   インターバル判定や pruning SQL を変更する場合は両方を更新してください。
- * ⚠️ A similar logic exists on the API side (server/api/src/services/snapshotService.ts).
- *   When changing interval checks or pruning SQL, update both.
  */
 export async function maybeCreateSnapshot(
   client: PoolClient,

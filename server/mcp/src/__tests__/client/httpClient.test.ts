@@ -116,17 +116,52 @@ describe("HttpZediClient request shaping", () => {
     expect((init as RequestInit).body).toBe(JSON.stringify({ title: "Hello" }));
   });
 
-  it("updatePageContent sends PUT to /api/pages/:id/content", async () => {
-    fetchMock.mockResolvedValueOnce(makeJsonResponse(200, { version: 7 }));
-    const result = await client.updatePageContent("p1", {
-      ydoc_state: "BASE64STATE",
-      expected_version: 6,
-      content_text: "hi",
+  it("getPageContent sends GET to /api/pages/:id/public-content with Bearer token", async () => {
+    // Issue #889 Phase 5: read-only エンドポイントに乗り換えたため、URL とレスポンス shape を固定する。
+    // Issue #889 Phase 5: locked to the read-only endpoint; URL + shape are part of the public contract.
+    fetchMock.mockResolvedValueOnce(
+      makeJsonResponse(200, {
+        id: "p1",
+        title: "Hello",
+        content_text: "Hello world",
+        content_preview: "Hello",
+        version: 7,
+        updated_at: "2026-05-16T10:00:00.000Z",
+      }),
+    );
+    const content = await client.getPageContent("p1");
+    expect(content).toEqual({
+      id: "p1",
+      title: "Hello",
+      content_text: "Hello world",
+      content_preview: "Hello",
+      version: 7,
+      updated_at: "2026-05-16T10:00:00.000Z",
     });
-    expect(result.version).toBe(7);
     const [url, init] = callArgs(fetchMock as unknown as Mock);
-    expect(url).toBe(`${BASE}/api/pages/p1/content`);
-    expect((init as RequestInit).method).toBe("PUT");
+    expect(url).toBe(`${BASE}/api/pages/p1/public-content`);
+    expect((init as RequestInit).method).toBe("GET");
+    expect((init as RequestInit).body).toBeUndefined();
+    const headers = new Headers((init as RequestInit).headers);
+    expect(headers.get("Authorization")).toBe(`Bearer ${TOKEN}`);
+  });
+
+  it("getPageContent URL-encodes the page id (defense against odd characters)", async () => {
+    // page_id に予期せぬ文字が来ても URL を壊さないこと。
+    // URL encoding must guard against unexpected characters in `page_id`.
+    fetchMock.mockResolvedValueOnce(
+      makeJsonResponse(200, {
+        id: "p/1?x",
+        title: null,
+        content_text: null,
+        content_preview: null,
+        version: 0,
+        updated_at: "2026-05-16T10:00:00.000Z",
+      }),
+    );
+    await client.getPageContent("p/1?x");
+    const url = callArgs(fetchMock as unknown as Mock)[0] as string;
+    expect(url).toBe(`${BASE}/api/pages/${encodeURIComponent("p/1?x")}/public-content`);
   });
 
   it("deletePage sends DELETE to /api/pages/:id", async () => {

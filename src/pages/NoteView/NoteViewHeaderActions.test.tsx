@@ -1,61 +1,33 @@
 /**
- * NoteViewHeaderActions のロール別表示テスト (#675)。
- * Tests for the role-based visibility of the share entry point in the note
- * view header (#675 follow-up to the share modal V1).
+ * NoteViewHeaderActions: ノート画面のヘッダー右上アクション。
  *
- * 観点 / Coverage:
- *   - Owner: ドロップダウン（共有 + 設定）が表示される
- *   - Editor / Viewer (signed-in, canView): 共有ボタンのみが表示される
- *   - Guest: 未ログインならヒント、サインイン済み public/unlisted guest は共有導線なし
- *   - canView=false: 何もレンダリングしない
+ * 共有モーダル廃止後は `/notes/:id/settings/*` へのエントリポイントとして
+ * 機能する。Issue #675 の精神 (editor / viewer にもアクセス透明性を) を
+ * 満たすため、ロール別に異なるアイコン / リンク先を提示する。
+ *
+ * テストの観点 / Coverage:
+ *   - Owner: 歯車アイコン → `/notes/:id/settings`
+ *   - Editor: 共有閲覧アイコン → `/notes/:id/settings/members` (read-only)
+ *   - Viewer (canView=true): 共有閲覧アイコン → `/notes/:id/settings/visibility`
+ *   - Guest / canView=false: 何もレンダリングしない
+ *
+ * Header-right actions on the note page. Renders a role-aware entry point
+ * into `/notes/:id/settings/*`. Owners get a gear icon to general settings,
+ * editors and viewers get a read-only "view share settings" icon landing on
+ * the most relevant section for their role.
  */
 import React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NoteViewHeaderActions } from "./NoteViewHeaderActions";
 import type { Note, NoteAccessRole } from "@/types/note";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, opts?: Record<string, unknown>) =>
-      opts
-        ? `${key}(${Object.entries(opts)
-            .map(([k, v]) => `${k}=${String(v)}`)
-            .join(",")})`
-        : key,
+    t: (key: string) => key,
     i18n: { language: "ja" },
   }),
-}));
-
-vi.mock("@zedi/ui", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@zedi/ui")>();
-  return {
-    ...actual,
-    useToast: () => ({ toast: vi.fn() }),
-  };
-});
-
-vi.mock("@/hooks/useNoteQueries", () => ({
-  useNoteMembers: vi.fn(() => ({ data: [], isLoading: false })),
-}));
-
-// 共有モーダルは別テストでカバー済み。ここは「呼ばれたか」だけ気にする。
-// `userRole` のフォールバックはコンポーネント本体の最小権限既定値 (`"none"`) と
-// 揃え、呼び出し側で渡し漏れがあった場合に回帰として顕在化させる (#794 review)。
-//
-// The share modal has its own test suite — stub it here to keep this file
-// focused on the entry-point UI. The fallback for `userRole` mirrors the
-// component's least-privilege default (`"none"`) so a missing-prop regression
-// surfaces in tests instead of being silently promoted to owner UI.
-vi.mock("./ShareModal/NoteShareModal", () => ({
-  NoteShareModal: ({ open, userRole }: { open: boolean; userRole?: NoteAccessRole }) =>
-    open ? (
-      <div data-testid="note-share-modal" data-user-role={userRole ?? "none"}>
-        ShareModal
-      </div>
-    ) : null,
 }));
 
 const baseNote: Note = {
@@ -65,92 +37,61 @@ const baseNote: Note = {
   visibility: "private",
   editPermission: "owner_only",
   isOfficial: false,
+  isDefault: false,
   viewCount: 0,
+  showTagFilterBar: false,
+  defaultFilterTags: [],
   createdAt: 0,
   updatedAt: 0,
   isDeleted: false,
 };
 
 function renderActions(props: Partial<React.ComponentProps<typeof NoteViewHeaderActions>> = {}) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  // 既定値は最小権限の `"none"`。各テストはエレベートしたロールを明示的に渡す。
-  // Default to least-privilege `"none"`; tests opt into elevated roles
-  // explicitly so a missing override surfaces as an obvious test failure
-  // instead of silently rendering owner UI.
   const merged = {
     note: baseNote,
-    canManageMembers: true,
-    isSignedIn: true,
-    canView: true,
-    userRole: "none" as const,
+    canManageMembers: false,
+    canView: false,
+    userRole: "none" as NoteAccessRole,
     ...props,
   };
   return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <NoteViewHeaderActions {...merged} />
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <NoteViewHeaderActions {...merged} />
+    </MemoryRouter>,
   );
 }
 
-describe("NoteViewHeaderActions — role-based visibility (#675)", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe("NoteViewHeaderActions", () => {
+  it("owner には設定ページへ遷移する歯車アイコンを表示する", () => {
+    renderActions({ canManageMembers: true, canView: true, userRole: "owner" });
+    const link = screen.getByRole("link", { name: "notes.openSettings" });
+    expect(link).toHaveAttribute("href", "/notes/note-1/settings");
   });
 
-  it("owner は MoreHorizontal ドロップダウンを表示（共有 + 設定リンクへの導線）", () => {
-    renderActions({ canManageMembers: true, userRole: "owner" });
-    expect(screen.getByRole("button", { name: "notes.openActions" })).toBeInTheDocument();
-    // 共有ボタン単体は出さない（ドロップダウン経由でアクセス）
-    // No standalone share button — owner accesses Share via the dropdown.
-    expect(screen.queryByRole("button", { name: "notes.shareAria" })).not.toBeInTheDocument();
+  it("editor には共有閲覧アイコンを表示し、members セクションへリンクする", () => {
+    renderActions({ canManageMembers: false, canView: true, userRole: "editor" });
+    const link = screen.getByRole("link", { name: "notes.openShareSettingsReadOnly" });
+    expect(link).toHaveAttribute("href", "/notes/note-1/settings/members");
+    // owner 向けの歯車アイコンは出ない
+    expect(screen.queryByRole("link", { name: "notes.openSettings" })).not.toBeInTheDocument();
   });
 
-  it("editor は単独の共有ボタンを表示しドロップダウンは出さない", () => {
-    renderActions({ canManageMembers: false, userRole: "editor" });
-    expect(screen.getByRole("button", { name: "notes.shareAria" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "notes.openActions" })).not.toBeInTheDocument();
+  it("viewer には共有閲覧アイコンを表示し、visibility セクションへリンクする", () => {
+    renderActions({ canManageMembers: false, canView: true, userRole: "viewer" });
+    const link = screen.getByRole("link", { name: "notes.openShareSettingsReadOnly" });
+    expect(link).toHaveAttribute("href", "/notes/note-1/settings/visibility");
   });
 
-  it("viewer は単独の共有ボタンを表示する（公開設定を read-only で見せるため）", () => {
-    renderActions({ canManageMembers: false, userRole: "viewer" });
-    expect(screen.getByRole("button", { name: "notes.shareAria" })).toBeInTheDocument();
-  });
-
-  it("editor の共有ボタン押下で userRole がモーダルへ伝播する", () => {
-    // クリック経路で `userRole` が NoteShareModal に渡り続けていることを担保。
-    // ロールマトリックス全体を支える接続点なので、回帰検知用に明示的に確認する。
-    // Click-path regression guard: ensures the editor's role keeps flowing into
-    // NoteShareModal so the read-only matrix is not silently bypassed.
-    renderActions({ canManageMembers: false, userRole: "editor" });
-    fireEvent.click(screen.getByRole("button", { name: "notes.shareAria" }));
-    expect(screen.getByTestId("note-share-modal")).toHaveAttribute("data-user-role", "editor");
-  });
-
-  it("サインイン済み guest は共有ボタンを表示しない", () => {
+  it("canView=false の guest には何もレンダリングしない", () => {
     const { container } = renderActions({
       canManageMembers: false,
-      isSignedIn: true,
-      canView: true,
+      canView: false,
       userRole: "guest",
     });
-    expect(screen.queryByRole("button", { name: "notes.shareAria" })).not.toBeInTheDocument();
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("未ログイン (canView=true, isSignedIn=false) はログインヒントを表示する", () => {
-    renderActions({
-      canManageMembers: false,
-      isSignedIn: false,
-      canView: true,
-      userRole: "guest",
-    });
-    expect(screen.getByText("notes.loginToPost")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "notes.shareAria" })).not.toBeInTheDocument();
-  });
-
-  it("canView=false の場合は何もレンダリングしない", () => {
+  it("canView=false の none (未ログイン) には何もレンダリングしない", () => {
     const { container } = renderActions({
       canManageMembers: false,
       canView: false,

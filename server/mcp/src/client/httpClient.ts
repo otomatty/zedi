@@ -17,7 +17,6 @@ import type {
   PageContent,
   PageListItem,
   ListPagesParams,
-  UpdatePageContentInput,
   CreateNoteInput,
   UpdateNoteInput,
   NoteRow,
@@ -167,21 +166,22 @@ export class HttpZediClient implements ZediClient {
 
   /** {@inheritDoc ZediClient.getPageContent} */
   getPageContent(pageId: string): Promise<PageContent> {
-    return this.request<PageContent>("GET", `/api/pages/${encodeURIComponent(pageId)}/content`);
+    // Issue #889 Phase 5: `GET /api/pages/:id/content` を廃止したので、Y.Doc バイト列を
+    // 返さない `public-content` エンドポイントを叩く。`authOptional` + `getNoteRole`
+    // でサーバ側が認可するため、MCP の Bearer トークンはそのまま付けて構わない。
+    // Issue #889 Phase 5: `GET /api/pages/:id/content` was retired, so we hit
+    // the Y.Doc-free `public-content` endpoint. Server-side `authOptional` +
+    // `getNoteRole` handles authorization, so we can forward the MCP bearer
+    // token unchanged.
+    return this.request<PageContent>(
+      "GET",
+      `/api/pages/${encodeURIComponent(pageId)}/public-content`,
+    );
   }
 
   /** {@inheritDoc ZediClient.createPage} */
   createPage(input: CreatePageInput): Promise<PageRow> {
     return this.request<PageRow>("POST", "/api/pages", input);
-  }
-
-  /** {@inheritDoc ZediClient.updatePageContent} */
-  updatePageContent(pageId: string, input: UpdatePageContentInput): Promise<{ version: number }> {
-    return this.request<{ version: number }>(
-      "PUT",
-      `/api/pages/${encodeURIComponent(pageId)}/content`,
-      input,
-    );
   }
 
   /** {@inheritDoc ZediClient.deletePage} */

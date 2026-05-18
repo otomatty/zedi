@@ -40,21 +40,30 @@ export const pages = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     /**
-     * 所属ノート ID。NULL は個人ページ、値ありはそのノートに所属するノート
-     * ネイティブページ。ノートネイティブページは個人ホーム（`note_id IS NULL`
-     * フィルタ）には現れず、ノート削除時に `ON DELETE CASCADE` で一緒に消える。
-     * Issue #713 を参照。
+     * 所属ノート ID。すべてのページはちょうど 1 つのノートに属する（Issue #823）。
+     * ユーザーの「個人スペース」はデフォルトノート（`notes.is_default`）のページ群。
      *
-     * Owning note ID. NULL means a personal page; a non-null value identifies
-     * a note-native page that lives only inside that note. Personal-home
-     * queries filter on `note_id IS NULL`, and note deletion cascades to
-     * note-native pages. See issue #713.
+     * Owning note ID. Every page belongs to exactly one note (issue #823). A
+     * user's personal space is the page set under their default note.
      */
-    noteId: uuid("note_id").references(() => notes.id, { onDelete: "cascade" }),
+    noteId: uuid("note_id")
+      .notNull()
+      .references(() => notes.id, { onDelete: "cascade" }),
     sourcePageId: uuid("source_page_id"),
     title: text("title"),
     contentPreview: text("content_preview"),
     thumbnailUrl: text("thumbnail_url"),
+    /**
+     * 紐づく `thumbnail_objects.id`。ページ削除時にこの ID を辿って S3
+     * オブジェクトと DB 行を GC する。サムネイル無しページや古いページは
+     * NULL のまま。FK は持たない（GC は API 経路で明示的に扱う方針）。
+     *
+     * Reference to `thumbnail_objects.id`. DELETE /pages/:id uses this to
+     * garbage-collect the S3 blob and DB row. NULL when the page has no
+     * thumbnail or predates this column. No FK by design — see
+     * `drizzle/0021_add_pages_thumbnail_object_id.sql`.
+     */
+    thumbnailObjectId: uuid("thumbnail_object_id"),
     sourceUrl: text("source_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -92,12 +101,51 @@ export const pages = pgTable(
     index("idx_pages_owner_special_kind").on(table.ownerId, table.specialKind),
     index("idx_pages_owner_kind").on(table.ownerId, table.kind),
     /**
-     * Lookup of pages owned by a particular note (and an efficient predicate
-     * for "personal pages only" via `note_id IS NULL` / `IS NOT NULL`).
-     * 特定のノートに所属するページの引きと、`note_id IS NULL`/`IS NOT NULL` の
-     * 部分述語に効くインデックス。
+     * `thumbnail_object_id` 引きインデックス。DELETE /pages/:id で
+     * thumbnail GC を実行する際の小さな確認クエリでも有効。
+     *
+     * Lookup index for `thumbnail_object_id`. Used by the small confirmation
+     * query in DELETE /pages/:id when garbage-collecting thumbnails.
+     */
+    index("idx_pages_thumbnail_object_id").on(table.thumbnailObjectId),
+    /**
+     * Lookup of pages by owning note (`pages.note_id`).
+     * 所属ノート別のページ引き用インデックス。
      */
     index("idx_pages_note_id").on(table.noteId),
+    /**
+     * `GET /api/notes/:id` のページ列挙クエリ
+     * (`WHERE note_id = $1 AND is_deleted = false ORDER BY updated_at DESC`)
+     * 専用の部分複合インデックス。ソフト削除行を除外してインデックスサイズを
+     * 最小化しつつ、ノート単位のソートをインメモリではなくインデックススキャン
+     * で解決する。Issue #850。
+     *
+     * Partial composite index that backs the page listing in
+     * `GET /api/notes/:id`
+     * (`WHERE note_id = $1 AND is_deleted = false ORDER BY updated_at DESC`).
+     * Excluding soft-deleted rows keeps the index small and lets the
+     * note-scoped sort run as an index scan instead of an in-memory sort.
+     * Issue #850.
+     */
+    index("idx_pages_note_active_updated")
+      .on(table.noteId, table.updatedAt.desc())
+      .where(sql`${table.isDeleted} = false`),
+    /**
+     * `GET /api/notes/:noteId/pages` (Issue #860 Phase 1) の keyset cursor
+     * pagination 用部分複合インデックス。
+     * `ORDER BY updated_at DESC, id DESC` を index-only でスキャンし、
+     * `(updated_at, id)` 二値の cursor 突合（`updated_at = $1 AND id < $2` の
+     * tie-break 経路）も index 内で解決できるよう、`id DESC` まで含める。
+     *
+     * Partial composite index that backs the keyset cursor pagination on
+     * `GET /api/notes/:noteId/pages` (Issue #860 Phase 1). Extending the
+     * existing `(note_id, updated_at DESC)` order with `id DESC` lets the
+     * `(updated_at, id)` tie-break predicate stay inside the index instead
+     * of falling back to a heap re-check / sort.
+     */
+    index("idx_pages_note_active_updated_id")
+      .on(table.noteId, table.updatedAt.desc(), table.id.desc())
+      .where(sql`${table.isDeleted} = false`),
     /**
      * オーナーごとに有効なウェルカムページは最大 1 件であることを担保する部分
      * ユニーク index。`welcomePageService.insertWelcomePage` の `onConflictDoNothing`

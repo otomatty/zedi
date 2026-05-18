@@ -1,135 +1,233 @@
 /**
  * ノートページ管理ルート
  *
- * POST   /:noteId/pages                               — ページ追加（リンク or タイトル新規）
- * POST   /:noteId/pages/copy-from-personal/:pageId    — 個人ページをノートにコピー
- * POST   /:noteId/pages/:pageId/copy-to-personal      — ノートページを個人にコピー
- * DELETE /:noteId/pages/:pageId                       — ページ削除
- * PUT    /:noteId/pages                               — ページ並び替え
- * GET    /:noteId/pages                               — ノートのページ一覧
+ * POST   /:noteId/pages                               — ノート配下にページ新規作成（タイトル）
+ * DELETE /:noteId/pages/:pageId                       — ページ削除（所属ノート一致時）
+ * PUT    /:noteId/pages                               — 並び替え noop（Issue #823、`updated_at` 順を使用）
+ * GET    /:noteId/pages                               — ノートのページ一覧（keyset cursor pagination, Issue #860 Phase 1）
+ *
+ * Issue #823 で `copy-from-personal` / `copy-to-personal` と `page_id` リンク経路は削除。
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq, and, asc, sql } from "drizzle-orm";
-import { notes, notePages, pages, pageContents } from "../../schema/index.js";
-import { authRequired } from "../../middleware/auth.js";
-import type { AppEnv, Database } from "../../types/index.js";
+import { eq, and, or, lt, desc, sql } from "drizzle-orm";
+import { notes, pages } from "../../schema/index.js";
+import { authRequired, authOptional } from "../../middleware/auth.js";
+import type { AppEnv } from "../../types/index.js";
+import type { NotePageWindowItem, NotePageWindowResponse } from "./types.js";
 import { getNoteRole, canEdit } from "./helpers.js";
+import { publishNoteEvent } from "../../services/noteEventBroadcaster.js";
+import { pageRowToWindowItem } from "./eventHelpers.js";
+
+/**
+ * `GET /api/notes/:noteId/pages` の最大ページサイズ。issue #860 Phase 1 で 100 件
+ * を上限とする。デフォルトは {@link DEFAULT_PAGES_LIMIT}。
+ *
+ * Maximum page size for `GET /api/notes/:noteId/pages` (issue #860 Phase 1).
+ * Default page size is {@link DEFAULT_PAGES_LIMIT}.
+ */
+const MAX_PAGES_LIMIT = 100;
+const DEFAULT_PAGES_LIMIT = 50;
+
+/**
+ * keyset cursor の中身。`(updated_at, id)` の組で `ORDER BY updated_at DESC, id DESC`
+ * を一意に進める。`updatedAt` はマイクロ秒精度を保つため、JS の `Date.toISOString()`
+ * ではなく PostgreSQL 側で `to_char(... at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
+ * 経由で組み立てた文字列（例: `2026-05-13T12:34:56.123456Z`）をそのまま保持し、
+ * 比較時は `::timestamptz` にキャストし直す。pg ドライバ経由で `Date` に
+ * 変換するとミリ秒に丸まるため、`defaultNow()` 由来の行を取りこぼす（issue #860
+ * Phase 1 の gemini-code-assist / codex レビュー）。
+ *
+ * Cursor payload encoding `(updated_at, id)`. `updatedAt` stores the
+ * Postgres-formatted ISO string with microsecond precision
+ * (`YYYY-MM-DDTHH24:MI:SS.USZ`) rather than `Date.toISOString()`, because the
+ * pg driver collapses `timestamptz` values down to JS millisecond `Date`s and
+ * would otherwise skip rows that share a millisecond but differ in
+ * microseconds (e.g. consecutive `defaultNow()` inserts). Comparisons cast
+ * the stored string back via `::timestamptz` so the round-trip is lossless
+ * (Issue #860 Phase 1; gemini-code-assist + chatgpt-codex review on #865).
+ */
+interface PagesCursor {
+  /**
+   * Postgres-formatted ISO timestamp string with microsecond precision
+   * (`YYYY-MM-DDTHH24:MI:SS.USZ`) from the last returned row's `updated_at`.
+   */
+  updatedAt: string;
+  /** UUID of the last returned page. */
+  id: string;
+}
+
+/**
+ * RFC 4122 系の UUID 文字列を許容する正規表現。pg の `uuid` カラムへ流す前に
+ * cursor 由来の `id` を検証して、`22P02` (invalid_text_representation) 経由の
+ * 500 を避けるため使う（issue #860 Phase 1 / coderabbitai review on #865）。
+ *
+ * Permissive RFC 4122 UUID matcher used to gate cursor `id` before it
+ * reaches the pg `uuid` column, so malformed values fall out as a
+ * deterministic 400 instead of a `22P02` 500 (Issue #860 Phase 1;
+ * coderabbitai review on PR #865).
+ */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Encodes a {@link PagesCursor} as opaque base64url JSON. The exact encoding
+ * is an implementation detail; clients must echo it back verbatim.
+ *
+ * {@link PagesCursor} を不透明な base64url JSON にエンコードする。形式は
+ * 実装詳細であり、クライアントは受け取った値をそのまま echo する。
+ */
+function encodePagesCursor(cursor: PagesCursor): string {
+  const json = JSON.stringify(cursor);
+  return Buffer.from(json, "utf8").toString("base64url");
+}
+
+/**
+ * Decodes a client-provided cursor. Returns `null` for an empty / malformed
+ * input so the route can fall back to "no cursor" semantics; throws 400 when
+ * the decoded shape is wrong, since that means the client built a cursor it
+ * does not own.
+ *
+ * クライアント由来の cursor をデコードする。空 / 壊れた入力は `null` を返し、
+ * 「cursor 無し」と同じ扱いに倒す。デコードできたが形が違う場合は 400 を投げる
+ * （他経路で組み立てた cursor をそのまま流す誤用を弾く）。
+ */
+function decodePagesCursor(raw: string | undefined): PagesCursor | null {
+  if (!raw || raw.length === 0) return null;
+  let decoded: string;
+  try {
+    decoded = Buffer.from(raw, "base64url").toString("utf8");
+  } catch {
+    return null;
+  }
+  if (!decoded) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const updatedAtRaw = (parsed as { updatedAt?: unknown }).updatedAt;
+  const idRaw = (parsed as { id?: unknown }).id;
+  if (typeof updatedAtRaw !== "string" || typeof idRaw !== "string") {
+    throw new HTTPException(400, { message: "Invalid cursor" });
+  }
+  // `updatedAt` は微小精度の ISO 文字列を保持するが、JS の `Date` parser は
+  // マイクロ秒を捨てるため、ここでは「`Date` が解釈可能か」だけを軽く確認する。
+  // 厳密な範囲チェックは pg 側の `::timestamptz` キャストに委ねる。
+  //
+  // `updatedAt` keeps a microsecond-precision ISO string, but JS `Date` only
+  // parses to milliseconds. We use it as a cheap sanity check; the real
+  // validation happens in Postgres via `::timestamptz` at query time.
+  const ts = new Date(updatedAtRaw);
+  if (Number.isNaN(ts.getTime())) {
+    throw new HTTPException(400, { message: "Invalid cursor" });
+  }
+  // cursor.id は最終的に pg の `uuid` カラム比較に流れる。不正値だと pg が
+  // `22P02` で 500 を返してしまうため、ここで UUID 形式を強制して 400 に倒す。
+  //
+  // The decoded `id` will be compared against pg's `uuid` column. Anything
+  // that does not look like a UUID would surface as a `22P02` 500, so reject
+  // it deterministically as 400 here.
+  if (!UUID_PATTERN.test(idRaw)) {
+    throw new HTTPException(400, { message: "Invalid cursor" });
+  }
+  return { updatedAt: updatedAtRaw, id: idRaw };
+}
+
+/**
+ * Parses and clamps the `limit` query parameter for the page-window endpoint.
+ *
+ * 1..{@link MAX_PAGES_LIMIT} の範囲に収まる limit を返す。未指定や不正値の場合は
+ * {@link DEFAULT_PAGES_LIMIT} にフォールバックする。
+ */
+function parsePagesLimit(raw: string | undefined): number {
+  if (raw === undefined) return DEFAULT_PAGES_LIMIT;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_PAGES_LIMIT;
+  return Math.min(parsed, MAX_PAGES_LIMIT);
+}
+
+/**
+ * `?include=preview,thumbnail` をフラグセットに正規化する。未知トークンは
+ * 無視する（将来追加する場合に古いクライアントが 400 で落ちないように）。
+ *
+ * Normalizes `?include=preview,thumbnail` to a flag set. Unknown tokens are
+ * ignored so old clients keep working when new tokens are added later.
+ */
+function parsePagesInclude(raw: string | undefined): { preview: boolean; thumbnail: boolean } {
+  if (!raw) return { preview: false, thumbnail: false };
+  const tokens = new Set(
+    raw
+      .split(",")
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t.length > 0),
+  );
+  return {
+    preview: tokens.has("preview"),
+    thumbnail: tokens.has("thumbnail"),
+  };
+}
+
+/**
+ * `/notes/:noteId/pages?tags=...` のタグフィルタに使う最大要素数。クライアント
+ * 側 (`urlTagsCodec.MAX_TAGS`) と整合させる。
+ *
+ * Cap on the number of tags accepted in `?tags=`, matching the client-side
+ * `urlTagsCodec.MAX_TAGS` constant.
+ */
+const MAX_TAGS_FILTER = 20;
+
+/**
+ * `?tags=` URL クエリのパース結果。
+ *
+ * - `null`: パラメータ無し or 空文字 — フィルタを適用しない。
+ * - `{ kind: 'tags' }`: 小文字キーの OR フィルタ。
+ * - `{ kind: 'untagged-only' }`: `__none__` トークン — タグ無しページのみ。
+ *
+ * Parsed `?tags=` value:
+ * - `null` for no filter
+ * - `{ kind: 'tags' }` for a lower-cased OR list
+ * - `{ kind: 'untagged-only' }` for the `__none__` token
+ */
+export type TagsFilter = { kind: "tags"; tags: string[] } | { kind: "untagged-only" } | null;
+
+/**
+ * `?tags=` を {@link TagsFilter} へ正規化する。クライアント側 codec
+ * (`urlTagsCodec.parseTagsParam`) と同じ規則: トリム・小文字化・重複排除・
+ * `MAX_TAGS_FILTER` で切り詰め。`__none__` が混ざれば untagged-only。要素 0
+ * なら `null` を返してフィルタ無し扱い。不正値で 500 になるのを避けるため、
+ * 文字列長や形が外れたものは静かに無視する (URL 経由の壊れた値で 400 を
+ * 出してエラー画面に飛ばしたくないため)。
+ *
+ * Mirror of `urlTagsCodec.parseTagsParam` for server-side use. Lenient: malformed
+ * tokens are silently dropped so a stale or broken URL doesn't 400 the
+ * listing endpoint. Returns `null` to mean "no filter".
+ */
+function parseTagsFilter(raw: string | undefined): TagsFilter {
+  if (raw === undefined || raw === null) return null;
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  const tokens = trimmed
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0 && t.length <= 100);
+  if (tokens.length === 0) return null;
+  if (tokens.some((t) => t === "__none__")) return { kind: "untagged-only" };
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const token of tokens) {
+    const key = token.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(key);
+    if (normalized.length >= MAX_TAGS_FILTER) break;
+  }
+  if (normalized.length === 0) return null;
+  return { kind: "tags", tags: normalized };
+}
 
 const app = new Hono<AppEnv>();
-
-/**
- * コピー時に引き継ぐページメタデータのサブセット。
- * Source-page metadata subset that copy endpoints duplicate into the new row.
- */
-interface CopyablePageMetadata {
-  title: string | null;
-  contentPreview: string | null;
-  thumbnailUrl: string | null;
-  sourceUrl: string | null;
-}
-
-/**
- * コピーで作られた新ページ行をレスポンスに載せるときの形。クライアントは
- * これを IndexedDB に書き戻して `/home` に即反映する（`copy-to-personal`）。
- * Shape of a copied page row in copy endpoint responses. Clients write it
- * through to IndexedDB so the new page surfaces on `/home` without waiting
- * for the next sync.
- */
-interface CopiedPageApiItem {
-  id: string;
-  owner_id: string;
-  note_id: string | null;
-  source_page_id: string | null;
-  title: string | null;
-  content_preview: string | null;
-  thumbnail_url: string | null;
-  source_url: string | null;
-  created_at: string;
-  updated_at: string;
-  is_deleted: boolean;
-}
-
-/**
- * ページ行と `page_contents` を新しい `pages` 行へコピーする共通ヘルパー。
- *
- * `copy-from-personal`（個人 → ノート）と `copy-to-personal`（ノート → 個人）の
- * 両エンドポイントで共有する。呼び出し側でスコープ判定とソース取得を済ませ、
- * ここでは「新しい行を作る」部分だけに責務を絞る。`page_contents` がない
- * （= 初回保存前の）ソースはスキップし、コピー先の初回保存時に通常ルートで
- * 作成させる。新しい行は `RETURNING *` で取り出してレスポンスに載せられる
- * 形で返すので、クライアントはサーバー再問い合わせなしにローカルストレージへ
- * 書き戻せる。
- *
- * Shared helper that clones the page row + `page_contents` into a brand new
- * `pages` row. Shared between `copy-from-personal` and `copy-to-personal` so
- * the two endpoints stop duplicating this block. The caller handles
- * authorization / source fetching; this helper only performs the insert. If
- * the source has no `page_contents` row (never saved), that step is skipped
- * and the destination creates its own row on first save via the usual PUT
- * content path. The helper returns the full new row so endpoints can include
- * it in the response and clients can write through to local storage without
- * a follow-up round trip. See issue #713 Phase 3.
- */
-async function copyPageRowWithContent(
-  tx: Database,
-  params: {
-    ownerId: string;
-    /** `null` で個人ページ、UUID でそのノートのノートネイティブページ */
-    destinationNoteId: string | null;
-    sourcePageId: string;
-    sourceMetadata: CopyablePageMetadata;
-  },
-): Promise<{ pageId: string; page: CopiedPageApiItem }> {
-  const inserted = await tx
-    .insert(pages)
-    .values({
-      ownerId: params.ownerId,
-      noteId: params.destinationNoteId,
-      sourcePageId: params.sourcePageId,
-      title: params.sourceMetadata.title ?? null,
-      contentPreview: params.sourceMetadata.contentPreview ?? null,
-      thumbnailUrl: params.sourceMetadata.thumbnailUrl ?? null,
-      sourceUrl: params.sourceMetadata.sourceUrl ?? null,
-    })
-    .returning();
-
-  const newPage = inserted[0];
-  if (!newPage) throw new HTTPException(500, { message: "Failed to create page" });
-  const newPageId = newPage.id;
-
-  const sourceContent = await tx
-    .select({ ydocState: pageContents.ydocState, contentText: pageContents.contentText })
-    .from(pageContents)
-    .where(eq(pageContents.pageId, params.sourcePageId))
-    .limit(1);
-
-  const contentRow = sourceContent[0];
-  if (contentRow) {
-    await tx.insert(pageContents).values({
-      pageId: newPageId,
-      ydocState: contentRow.ydocState,
-      version: 1,
-      contentText: contentRow.contentText ?? null,
-    });
-  }
-
-  const pageApi: CopiedPageApiItem = {
-    id: newPage.id,
-    owner_id: newPage.ownerId,
-    note_id: newPage.noteId,
-    source_page_id: newPage.sourcePageId,
-    title: newPage.title,
-    content_preview: newPage.contentPreview,
-    thumbnail_url: newPage.thumbnailUrl,
-    source_url: newPage.sourceUrl,
-    created_at: newPage.createdAt.toISOString(),
-    updated_at: newPage.updatedAt.toISOString(),
-    is_deleted: newPage.isDeleted,
-  };
-
-  return { pageId: newPageId, page: pageApi };
-}
 
 // ── POST /:noteId/pages ─────────────────────────────────────────────────────
 app.post("/:noteId/pages", authRequired, async (c) => {
@@ -152,282 +250,64 @@ app.post("/:noteId/pages", authRequired, async (c) => {
   }>();
 
   const rawPageId = body.page_id ?? body.pageId;
-  const pageId =
+  const hasPageId =
     typeof rawPageId === "string" && rawPageId.trim() !== "" ? rawPageId.trim() : undefined;
+  if (hasPageId) {
+    throw new HTTPException(400, {
+      message: "page_id linking is removed (issue #823). Create a page with title only.",
+    });
+  }
+
   const title =
     typeof body.title === "string" && body.title.trim() !== "" ? body.title.trim() : undefined;
 
-  if (!pageId && body.title !== undefined && title === undefined) {
+  if (body.title !== undefined && title === undefined) {
     throw new HTTPException(400, { message: "title must be a non-empty string" });
   }
-  if (!pageId && !title) {
-    throw new HTTPException(400, { message: "page_id or title is required" });
+  if (!title) {
+    throw new HTTPException(400, { message: "title is required" });
   }
 
-  let targetPageId: string;
-  let sortOrder: number;
-
-  if (pageId) {
-    const result = await db.transaction(async (tx) => {
-      const page = await tx
-        .select({ id: pages.id, ownerId: pages.ownerId, noteId: pages.noteId })
-        .from(pages)
-        .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
-        .limit(1);
-
-      const firstPage = page[0];
-      if (!firstPage) throw new HTTPException(404, { message: "Page not found" });
-      if (firstPage.ownerId !== userId) throw new HTTPException(403, { message: "Forbidden" });
-      // 既にノートネイティブのページ（別ノートに所属）を `page_id` 経由で別ノートに
-      // リンクできてしまうと、`/api/pages/:id/content` の認可は元ノート側のロールで
-      // 解決されるため、リンク先メンバーから見ると「リストには出るが開けない」
-      // 壊れたカードになる。Phase 1 では個人ページ（`note_id IS NULL`）のみリンク可。
-      // ノート間の取り込みは Phase 3 で導入予定の copy エンドポイントで扱う。
-      //
-      // Reject note-native pages in the `page_id` linking path. If we let a page
-      // already scoped to note A be linked into note B, then `/api/pages/:id/content`
-      // still authorizes via the original `pages.note_id` → note B members would see
-      // a tile they cannot open (403). In Phase 1 only personal pages
-      // (`note_id IS NULL`) are linkable; cross-note adoption arrives with the
-      // Phase 3 copy endpoint. See issue #713.
-      if (firstPage.noteId !== null) {
-        throw new HTTPException(400, {
-          message: "Only personal pages can be linked via page_id",
-        });
-      }
-      const resolvedPageId = firstPage.id;
-
-      const maxOrder = await tx
-        .select({ max: sql<number>`COALESCE(MAX(${notePages.sortOrder}), 0)` })
-        .from(notePages)
-        .where(and(eq(notePages.noteId, noteId), eq(notePages.isDeleted, false)));
-
-      const order = body.sort_order ?? (maxOrder[0]?.max ?? 0) + 1;
-
-      await tx
-        .insert(notePages)
-        .values({
-          noteId,
-          pageId: resolvedPageId,
-          addedByUserId: userId,
-          sortOrder: order,
-        })
-        .onConflictDoUpdate({
-          target: [notePages.noteId, notePages.pageId],
-          set: {
-            isDeleted: false,
-            sortOrder: order,
-            updatedAt: new Date(),
-          },
-        });
-
-      await tx.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
-      return { sortOrder: order };
-    });
-    sortOrder = result.sortOrder;
-  } else {
-    const result = await db.transaction(async (tx) => {
-      // 「タイトルだけで新規作成」経路はノートネイティブページを直接作る。
-      // `note_id` を埋めることで個人ホーム (note_id IS NULL フィルタ) には現れず、
-      // ノート削除時に ON DELETE CASCADE で一緒に消える。Issue #713 を参照。
-      //
-      // The "create from title" path generates a note-native page directly.
-      // Setting `note_id` keeps it out of the personal-home listing
-      // (`note_id IS NULL` filter) and lets ON DELETE CASCADE remove it
-      // alongside the note. See issue #713.
-      const created = await tx
-        .insert(pages)
-        .values({
-          ownerId: userId,
-          noteId,
-          title: title ?? null,
-        })
-        .returning();
-
-      const newPage = created[0];
-      if (!newPage) throw new HTTPException(500, { message: "Failed to create page" });
-      const newPageId = newPage.id;
-
-      const maxOrder = await tx
-        .select({ max: sql<number>`COALESCE(MAX(${notePages.sortOrder}), 0)` })
-        .from(notePages)
-        .where(and(eq(notePages.noteId, noteId), eq(notePages.isDeleted, false)));
-
-      const order = body.sort_order ?? (maxOrder[0]?.max ?? 0) + 1;
-
-      await tx
-        .insert(notePages)
-        .values({
-          noteId,
-          pageId: newPageId,
-          addedByUserId: userId,
-          sortOrder: order,
-        })
-        .onConflictDoUpdate({
-          target: [notePages.noteId, notePages.pageId],
-          set: {
-            isDeleted: false,
-            sortOrder: order,
-            updatedAt: new Date(),
-          },
-        });
-
-      await tx.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
-      return { sortOrder: order };
-    });
-    sortOrder = result.sortOrder;
-  }
-
-  return c.json({ added: true, sort_order: sortOrder });
-});
-
-// ── POST /:noteId/pages/copy-from-personal/:pageId ──────────────────────────
-// 個人ページ（`pages.note_id IS NULL`）をコピーし、指定ノート配下のノート
-// ネイティブページ（`note_id = :noteId`, `source_page_id = :pageId`）を作る。
-// 元ページは個人 /home に残り、新しいコピーだけがノートに出る。Issue #713 Phase 3。
-//
-// Copy a personal page (`pages.note_id IS NULL`) into the note as a fresh
-// note-native page (`note_id = :noteId`, `source_page_id = :pageId`). The
-// original stays on the caller's /home; only the copy lives inside the note.
-// See issue #713 Phase 3.
-app.post("/:noteId/pages/copy-from-personal/:pageId", authRequired, async (c) => {
-  const noteId = c.req.param("noteId");
-  const sourcePageId = c.req.param("pageId");
-  const userId = c.get("userId");
-  const userEmail = c.get("userEmail");
-  const db = c.get("db");
-
-  const { role, note } = await getNoteRole(noteId, userId, userEmail, db);
-  if (!note) throw new HTTPException(404, { message: "Note not found" });
-  if (!role || !canEdit(role, note)) {
-    throw new HTTPException(403, { message: "Forbidden" });
-  }
-
-  const result = await db.transaction(async (tx) => {
-    const sourceRows = await tx
-      .select({
-        id: pages.id,
-        ownerId: pages.ownerId,
-        noteId: pages.noteId,
-        title: pages.title,
-        contentPreview: pages.contentPreview,
-        thumbnailUrl: pages.thumbnailUrl,
-        sourceUrl: pages.sourceUrl,
+  const created = await db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(pages)
+      .values({
+        ownerId: userId,
+        noteId,
+        title,
       })
-      .from(pages)
-      .where(and(eq(pages.id, sourcePageId), eq(pages.isDeleted, false)))
-      .limit(1);
+      .returning();
 
-    const source = sourceRows[0];
-    if (!source) throw new HTTPException(404, { message: "Source page not found" });
-    // 個人ページのみコピー元に許す。他人の個人ページや、すでにノートネイティブな
-    // ページは Phase 3 の「個人 → ノート」スコープ外（別ノートからの取り込みは別 API）。
-    // Only the caller's own personal page can be the source for
-    // copy-from-personal. Cross-note adoption needs a different endpoint.
-    if (source.ownerId !== userId) {
-      throw new HTTPException(403, { message: "Forbidden" });
-    }
-    if (source.noteId !== null) {
-      throw new HTTPException(400, { message: "Source page must be a personal page" });
-    }
-
-    const { pageId: newPageId, page: newPage } = await copyPageRowWithContent(tx, {
-      ownerId: userId,
-      destinationNoteId: noteId,
-      sourcePageId: source.id,
-      sourceMetadata: source,
-    });
-
-    const maxOrder = await tx
-      .select({ max: sql<number>`COALESCE(MAX(${notePages.sortOrder}), 0)` })
-      .from(notePages)
-      .where(and(eq(notePages.noteId, noteId), eq(notePages.isDeleted, false)));
-
-    const order = (maxOrder[0]?.max ?? 0) + 1;
-
-    await tx.insert(notePages).values({
-      noteId,
-      pageId: newPageId,
-      addedByUserId: userId,
-      sortOrder: order,
-    });
+    const newPage = inserted[0];
+    if (!newPage) throw new HTTPException(500, { message: "Failed to create page" });
 
     await tx.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
+    return newPage;
+  });
 
-    return { pageId: newPageId, sortOrder: order, page: newPage };
+  // Issue #860 Phase 4: ノートを購読中のクライアント全員に `page.added` を配信
+  // し、各 client の `useInfiniteNotePages` キャッシュへ直接 prepend させる
+  // ことで、window 全体の refetch を避ける。emit は DB tx 完了後に限り、
+  // 失敗時の整合性ずれを防ぐ。`publishNoteEvent` 自身は throw しないので
+  // try/catch は不要。
+  //
+  // Issue #860 Phase 4: notify every SSE subscriber for this note so the
+  // client can prepend the new page into its `useInfiniteNotePages` cache
+  // without refetching the whole window. The publish happens strictly after
+  // the transaction commits — emitting inside the tx could leak an event
+  // for a page that never lands. `publishNoteEvent` swallows listener
+  // failures internally, so no try/catch is needed here.
+  publishNoteEvent({
+    type: "page.added",
+    note_id: noteId,
+    page: pageRowToWindowItem(created),
   });
 
   return c.json({
     created: true,
-    page_id: result.pageId,
-    sort_order: result.sortOrder,
-    page: result.page,
+    page_id: created.id,
+    sort_order: 0,
   });
-});
-
-// ── POST /:noteId/pages/:pageId/copy-to-personal ────────────────────────────
-// ノートネイティブページ（`pages.note_id = :noteId`）の内容をコピーして
-// 呼び出し元の個人ページ（`note_id = NULL`, `source_page_id = :pageId`）を作る。
-// 元ページはノートに残り、コピーだけが個人 /home に出る。脱退後もコピーは残る。
-// Issue #713 Phase 3。
-//
-// Copy a note-native page (`pages.note_id = :noteId`) into the caller's
-// personal pages as a fresh row (`note_id = NULL`, `source_page_id = :pageId`).
-// The original stays in the note; only the copy lands on the caller's /home,
-// and the copy survives if the caller later leaves the note. See issue #713.
-app.post("/:noteId/pages/:pageId/copy-to-personal", authRequired, async (c) => {
-  const noteId = c.req.param("noteId");
-  const sourcePageId = c.req.param("pageId");
-  const userId = c.get("userId");
-  const userEmail = c.get("userEmail");
-  const db = c.get("db");
-
-  // 呼び出し元がノートを閲覧できることを確認する。`role` が解決できれば
-  // owner / member / domain / guest のいずれかに該当し、対応する個人コピーの
-  // 作成を許可する。`getNoteRole` 内部で `findActiveNoteById` まで引くので
-  // note 存在チェックを兼ねる。
-  //
-  // Verify the caller can read this note (any resolved role — owner / member /
-  // domain / guest — is sufficient to take a personal copy). `getNoteRole`
-  // internally hits `findActiveNoteById`, which doubles as the 404 guard.
-  const { role, note } = await getNoteRole(noteId, userId, userEmail, db);
-  if (!note) throw new HTTPException(404, { message: "Note not found" });
-  if (!role) throw new HTTPException(403, { message: "Forbidden" });
-
-  const result = await db.transaction(async (tx) => {
-    const sourceRows = await tx
-      .select({
-        id: pages.id,
-        noteId: pages.noteId,
-        title: pages.title,
-        contentPreview: pages.contentPreview,
-        thumbnailUrl: pages.thumbnailUrl,
-        sourceUrl: pages.sourceUrl,
-      })
-      .from(pages)
-      .where(and(eq(pages.id, sourcePageId), eq(pages.isDeleted, false)))
-      .limit(1);
-
-    const source = sourceRows[0];
-    if (!source) throw new HTTPException(404, { message: "Source page not found" });
-    // URL のノート ID と実際のページ所属が食い違う場合は拒否する。これによって、
-    // 別ノートのページ ID を使ってこのノートの閲覧権で取り込もうとする行為を封じる。
-    // Reject if the URL note and the page's own note diverge. Otherwise a caller
-    // with access to note A could pass a page id from note B and launder its
-    // contents into their personal /home.
-    if (source.noteId !== noteId) {
-      throw new HTTPException(400, { message: "Page does not belong to this note" });
-    }
-
-    return copyPageRowWithContent(tx, {
-      ownerId: userId,
-      destinationNoteId: null,
-      sourcePageId: source.id,
-      sourceMetadata: source,
-    });
-  });
-
-  return c.json({ created: true, page_id: result.pageId, page: result.page });
 });
 
 // ── DELETE /:noteId/pages/:pageId ───────────────────────────────────────────
@@ -444,20 +324,6 @@ app.delete("/:noteId/pages/:pageId", authRequired, async (c) => {
     throw new HTTPException(403, { message: "Forbidden" });
   }
 
-  // ノートからページを外す。ノートネイティブページ（`pages.note_id = noteId`）の場合は
-  // `note_pages` の論理削除だけだと `pages` 行が残り、`/api/pages/:id/content` などが
-  // ノートロール経由で引き続き認可してしまう（孤児化）。同一トランザクション内で
-  // `pages` 自体も論理削除して整合性を保つ。
-  // 個人ページ（`pages.note_id IS NULL`）のリンク解除は従来どおり `note_pages` だけを
-  // 落とし、ページ自体は所有者の個人 /home に残す。
-  //
-  // Detach a page from a note. For note-native pages
-  // (`pages.note_id = noteId`), tombstoning only `note_pages` would leave the
-  // `pages` row alive and still authorized via the note role on
-  // `/api/pages/:id/content`, etc. Soft-delete the `pages` row in the same
-  // transaction so the orphan goes away. For personal pages (`note_id IS NULL`)
-  // we still only drop the link row so the page stays on the owner's /home.
-  // See issue #713.
   await db.transaction(async (tx) => {
     const pageRow = await tx
       .select({ id: pages.id, noteId: pages.noteId })
@@ -465,26 +331,32 @@ app.delete("/:noteId/pages/:pageId", authRequired, async (c) => {
       .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
       .limit(1);
 
-    await tx
-      .update(notePages)
-      .set({ isDeleted: true, updatedAt: new Date() })
-      .where(and(eq(notePages.noteId, noteId), eq(notePages.pageId, pageId)));
-
     const page = pageRow[0];
-    if (page && page.noteId === noteId) {
-      await tx
-        .update(pages)
-        .set({ isDeleted: true, updatedAt: new Date() })
-        .where(eq(pages.id, pageId));
+    if (!page) throw new HTTPException(404, { message: "Page not found" });
+    if (page.noteId !== noteId) {
+      throw new HTTPException(400, { message: "Page does not belong to this note" });
     }
+
+    await tx
+      .update(pages)
+      .set({ isDeleted: true, updatedAt: new Date() })
+      .where(eq(pages.id, pageId));
 
     await tx.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
   });
 
+  // Issue #860 Phase 4: 削除をノート購読者へ通知。client は cache から
+  // 該当 id を取り除くだけで済む（全 window refetch は不要）。tx 完了後に
+  // emit する。
+  // Issue #860 Phase 4: notify SSE subscribers so they can drop the page id
+  // from their cached windows without refetching. Emitted after the
+  // transaction commits to avoid announcing a delete that gets rolled back.
+  publishNoteEvent({ type: "page.deleted", note_id: noteId, page_id: pageId });
+
   return c.json({ removed: true });
 });
 
-// ── PUT /:noteId/pages (reorder) ────────────────────────────────────────────
+// ── PUT /:noteId/pages (reorder noop) ───────────────────────────────────────
 app.put("/:noteId/pages", authRequired, async (c) => {
   const noteId = c.req.param("noteId");
   const userId = c.get("userId");
@@ -505,22 +377,34 @@ app.put("/:noteId/pages", authRequired, async (c) => {
     throw new HTTPException(400, { message: "page_ids array is required" });
   }
 
-  for (let i = 0; i < body.page_ids.length; i++) {
-    const pageId = body.page_ids[i];
-    if (!pageId) continue;
-    await db
-      .update(notePages)
-      .set({ sortOrder: i, updatedAt: new Date() })
-      .where(and(eq(notePages.noteId, noteId), eq(notePages.pageId, pageId)));
-  }
-
+  // Issue #823: sort order lives on `pages.updated_at` only; ignore payload.
   await db.update(notes).set({ updatedAt: new Date() }).where(eq(notes.id, noteId));
 
   return c.json({ reordered: true });
 });
 
 // ── GET /:noteId/pages ──────────────────────────────────────────────────────
-app.get("/:noteId/pages", authRequired, async (c) => {
+/**
+ * Lists pages under a note as a keyset-paginated window (Issue #860 Phase 1).
+ *
+ * Query parameters:
+ *   - `cursor`  Opaque base64url cursor returned in `next_cursor` of the
+ *               previous response. Omit on the first call.
+ *   - `limit`   1..{@link MAX_PAGES_LIMIT} (default {@link DEFAULT_PAGES_LIMIT}).
+ *   - `include` Comma-separated optional fields. `preview` requests
+ *               `content_preview`, `thumbnail` requests `thumbnail_url`.
+ *               Unrecognized tokens are ignored.
+ *
+ * Authentication is `authOptional` plus role resolution via
+ * {@link getNoteRole}; public / unlisted notes are reachable by `guest`
+ * callers without sign-in. Private / restricted notes still 403 for guests.
+ *
+ * ノート配下のページを keyset cursor pagination で返す（Issue #860 Phase 1）。
+ * `authOptional` + `getNoteRole` の組み合わせにより、公開 / unlisted ノートでは
+ * 未ログインの guest でもページ一覧を取得できる。`content_preview` /
+ * `thumbnail_url` は `?include=` で明示的に要求された場合のみセットされる。
+ */
+app.get("/:noteId/pages", authOptional, async (c) => {
   const noteId = c.req.param("noteId");
   const userId = c.get("userId");
   const userEmail = c.get("userEmail");
@@ -530,24 +414,155 @@ app.get("/:noteId/pages", authRequired, async (c) => {
   if (!note) throw new HTTPException(404, { message: "Note not found" });
   if (!role) throw new HTTPException(403, { message: "Forbidden" });
 
-  const result = await db
-    .select({
-      page_id: notePages.pageId,
-      sort_order: notePages.sortOrder,
-      added_by: notePages.addedByUserId,
-      page_title: pages.title,
-      page_content_preview: pages.contentPreview,
-      page_thumbnail_url: pages.thumbnailUrl,
-      page_updated_at: pages.updatedAt,
-    })
-    .from(notePages)
-    .innerJoin(pages, eq(notePages.pageId, pages.id))
-    .where(
-      and(eq(notePages.noteId, noteId), eq(notePages.isDeleted, false), eq(pages.isDeleted, false)),
-    )
-    .orderBy(asc(notePages.sortOrder));
+  const limit = parsePagesLimit(c.req.query("limit"));
+  const cursor = decodePagesCursor(c.req.query("cursor"));
+  const include = parsePagesInclude(c.req.query("include"));
+  const tagsFilter = parseTagsFilter(c.req.query("tags"));
 
-  return c.json({ pages: result });
+  // keyset 条件: `(updated_at, id)` を `(c.updatedAt, c.id)` より小さい組に絞る。
+  // `ORDER BY updated_at DESC, id DESC` と同じ向きで進めるため、
+  // `updated_at < cursor.updatedAt OR (updated_at = cursor.updatedAt AND id < cursor.id)`
+  // を使う。cursor の `updatedAt` は pg 側でマイクロ秒精度の ISO 文字列として
+  // 保存しているため、比較側でも JS Date を介さず `::timestamptz` キャストで突合
+  // し、ms 切り捨てによる行の取りこぼしを防ぐ（gemini-code-assist / codex on PR #865）。
+  // `limit + 1` 件取得して、超過したら `next_cursor` を発行する。
+  //
+  // Keyset predicate paired with `ORDER BY updated_at DESC, id DESC`. The
+  // cursor's `updatedAt` is the Postgres-formatted microsecond ISO string,
+  // so comparisons cast it back via `::timestamptz` to keep microsecond
+  // precision end-to-end (avoiding the JS `Date` truncation flagged by
+  // gemini-code-assist + codex on PR #865). Fetching `limit + 1` rows lets
+  // us emit `next_cursor` without a separate count query.
+  const whereClauses = [eq(pages.noteId, noteId), eq(pages.isDeleted, false)];
+
+  // タグフィルタ (`?tags=`) を WHERE 句に AND で足す。`untagged-only` は
+  // `links` / `ghost_links` どちらにも `link_type='tag'` の出辺が無いページに
+  // 絞り込む。通常の OR フィルタは `links → target.title` または
+  // `ghost_links.link_text` のいずれかが選択タグに含まれるページに絞る。
+  // 小文字キーで突合し、`pages.title` 側も `LOWER(...)` で比較する。
+  //
+  // Apply `?tags=` as an additional WHERE predicate on top of the keyset
+  // pagination. `untagged-only` keeps only pages with zero `link_type='tag'`
+  // edges in both tables. The OR list matches pages whose tag edge points at
+  // a page title in the set or whose ghost-link text is in the set, all
+  // compared case-insensitively against the lower-cased tags.
+  if (tagsFilter) {
+    if (tagsFilter.kind === "untagged-only") {
+      // 削除済みタグページへのリンクは untagged 判定で「無い」ものとして扱う。
+      // OR フィルタ側は `t.is_deleted = false` で削除済みを除外しているため、
+      // ここで `t.is_deleted = false` の JOIN を付けないと「削除済みタグページ
+      // のみ参照するページ」が通常タグにも `__none__` にもマッチせず消えて
+      // しまう (PR #897 Codex P2)。
+      //
+      // Ignore links whose target is soft-deleted when deciding "untagged":
+      // the OR-tag path already filters `t.is_deleted = false`, so without
+      // this `JOIN ... t.is_deleted = false` a page that only references
+      // tombstoned tag pages would match neither real tags nor `__none__`
+      // (PR #897 Codex P2).
+      whereClauses.push(sql`NOT EXISTS (
+        SELECT 1 FROM links l
+        JOIN pages t ON t.id = l.target_id AND t.is_deleted = false
+        WHERE l.source_id = ${pages.id} AND l.link_type = 'tag'
+      )`);
+      whereClauses.push(sql`NOT EXISTS (
+        SELECT 1 FROM ghost_links gl WHERE gl.source_page_id = ${pages.id} AND gl.link_type = 'tag'
+      )`);
+    } else {
+      const tagsParam = sql`${tagsFilter.tags}::text[]`;
+      whereClauses.push(sql`(
+        EXISTS (
+          SELECT 1 FROM links l
+          JOIN pages t ON t.id = l.target_id
+          WHERE l.source_id = ${pages.id}
+            AND l.link_type = 'tag'
+            AND t.is_deleted = false
+            AND LOWER(t.title) = ANY(${tagsParam})
+        )
+        OR EXISTS (
+          SELECT 1 FROM ghost_links gl
+          WHERE gl.source_page_id = ${pages.id}
+            AND gl.link_type = 'tag'
+            AND LOWER(gl.link_text) = ANY(${tagsParam})
+        )
+      )`);
+    }
+  }
+
+  if (cursor) {
+    const cursorTsSql = sql`${cursor.updatedAt}::timestamptz`;
+    // drizzle の `or()` は要素が空配列のとき undefined を返す型だが、ここでは
+    // 必ず 2 つ渡しているため undefined は来ない。型を絞るため明示的に分岐する。
+    //
+    // `or()` here always receives two operands, but its return type is
+    // `SQL | undefined`. Use an explicit `if` to keep TypeScript happy
+    // without resorting to a non-null assertion.
+    const keysetPredicate = or(
+      lt(pages.updatedAt, cursorTsSql),
+      and(eq(pages.updatedAt, cursorTsSql), lt(pages.id, cursor.id)),
+    );
+    if (keysetPredicate) {
+      whereClauses.push(keysetPredicate);
+    }
+  }
+
+  // `updatedAtIso` は cursor を組み立てるためだけに pg 側で
+  // マイクロ秒精度の ISO 文字列を生成して持ち帰る。pg ドライバ経由で
+  // 受け取る `updated_at` は JS Date に丸まる（ms 精度）ため、それだけでは
+  // 同一ミリ秒で別マイクロ秒の行を取りこぼす（gemini-code-assist / codex
+  // on PR #865）。
+  //
+  // `updatedAtIso` ships the microsecond-precision ISO string built by
+  // Postgres so the cursor never loses precision. The `updated_at` field
+  // returned via the pg driver collapses to a JS `Date` (millisecond), which
+  // would silently skip rows that share a millisecond but differ in
+  // microseconds (gemini-code-assist + codex on PR #865).
+  const rows = await db
+    .select({
+      id: pages.id,
+      ownerId: pages.ownerId,
+      noteId: pages.noteId,
+      sourcePageId: pages.sourcePageId,
+      title: pages.title,
+      contentPreview: pages.contentPreview,
+      thumbnailUrl: pages.thumbnailUrl,
+      sourceUrl: pages.sourceUrl,
+      createdAt: pages.createdAt,
+      updatedAt: pages.updatedAt,
+      updatedAtIso: sql<string>`to_char(${pages.updatedAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+      isDeleted: pages.isDeleted,
+    })
+    .from(pages)
+    .where(and(...whereClauses))
+    .orderBy(desc(pages.updatedAt), desc(pages.id))
+    .limit(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const visible = hasMore ? rows.slice(0, limit) : rows;
+  const last = visible[visible.length - 1];
+  const nextCursor =
+    hasMore && last
+      ? encodePagesCursor({
+          updatedAt: last.updatedAtIso,
+          id: last.id,
+        })
+      : null;
+
+  const items: NotePageWindowItem[] = visible.map((p) => ({
+    id: p.id,
+    owner_id: p.ownerId,
+    note_id: p.noteId,
+    source_page_id: p.sourcePageId,
+    title: p.title,
+    content_preview: include.preview ? (p.contentPreview ?? null) : null,
+    thumbnail_url: include.thumbnail ? (p.thumbnailUrl ?? null) : null,
+    source_url: p.sourceUrl,
+    created_at: p.createdAt,
+    updated_at: p.updatedAt,
+    is_deleted: p.isDeleted,
+  }));
+
+  const response: NotePageWindowResponse = { items, next_cursor: nextCursor };
+  return c.json(response);
 });
 
 export default app;

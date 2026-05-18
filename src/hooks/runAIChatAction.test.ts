@@ -47,7 +47,7 @@ describe("runAIChatAction — create", () => {
   });
 
   it("create-page: creates empty page and navigates with pendingChatPageGeneration state", async () => {
-    const createPageMutateAsync = vi.fn().mockResolvedValue({ id: "new-page-1" });
+    const createPageMutateAsync = vi.fn().mockResolvedValue({ id: "new-page-1", noteId: "note-1" });
     const navigate = vi.fn();
     const messages: ChatMessage[] = [{ id: "1", role: "user", content: "hello", timestamp: 1 }];
     const deps = baseDeps({ createPageMutateAsync, navigate, messages });
@@ -64,7 +64,7 @@ describe("runAIChatAction — create", () => {
       title: "Wiki Topic",
       content: "",
     });
-    expect(navigate).toHaveBeenCalledWith("/pages/new-page-1", {
+    expect(navigate).toHaveBeenCalledWith("/notes/note-1/new-page-1", {
       state: {
         pendingChatPageGeneration: {
           outline: "- A\n- B",
@@ -77,8 +77,8 @@ describe("runAIChatAction — create", () => {
   it("create-multiple-pages: navigates to first created id with first page outline", async () => {
     const createPageMutateAsync = vi
       .fn()
-      .mockResolvedValueOnce({ id: "p1" })
-      .mockResolvedValueOnce({ id: "p2" });
+      .mockResolvedValueOnce({ id: "p1", noteId: "note-1" })
+      .mockResolvedValueOnce({ id: "p2", noteId: "note-1" });
     const navigate = vi.fn();
     const deps = baseDeps({
       createPageMutateAsync,
@@ -97,7 +97,7 @@ describe("runAIChatAction — create", () => {
     });
 
     expect(createPageMutateAsync).toHaveBeenCalledTimes(2);
-    expect(navigate).toHaveBeenCalledWith("/pages/p1", {
+    expect(navigate).toHaveBeenCalledWith("/notes/note-1/p1", {
       state: {
         pendingChatPageGeneration: {
           outline: "- o1",
@@ -110,8 +110,8 @@ describe("runAIChatAction — create", () => {
   it("create-multiple-pages: uses first non-empty outline when first page content is empty", async () => {
     const createPageMutateAsync = vi
       .fn()
-      .mockResolvedValueOnce({ id: "p1" })
-      .mockResolvedValueOnce({ id: "p2" });
+      .mockResolvedValueOnce({ id: "p1", noteId: "note-1" })
+      .mockResolvedValueOnce({ id: "p2", noteId: "note-1" });
     const navigate = vi.fn();
     const deps = baseDeps({
       createPageMutateAsync,
@@ -129,7 +129,7 @@ describe("runAIChatAction — create", () => {
       reason: "multi",
     });
 
-    expect(navigate).toHaveBeenCalledWith("/pages/p1", {
+    expect(navigate).toHaveBeenCalledWith("/notes/note-1/p1", {
       state: {
         pendingChatPageGeneration: {
           outline: "- from-second",

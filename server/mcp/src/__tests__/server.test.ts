@@ -22,7 +22,6 @@ function createMockClient(): ZediClient {
     listPages: vi.fn(),
     getPageContent: vi.fn(),
     createPage: vi.fn(),
-    updatePageContent: vi.fn(),
     deletePage: vi.fn(),
     listNotes: vi.fn(),
     getNote: vi.fn(),
@@ -177,23 +176,37 @@ describe("createMcpServer", () => {
     });
   });
 
-  it("zedi_update_page_content includes expected_version", async () => {
-    vi.mocked(mockClient.updatePageContent).mockResolvedValue({ version: 5 });
+  it("zedi_get_page returns the read-only PageContent shape (no ydoc_state)", async () => {
+    // Issue #889 Phase 5: read-only MCP では Y.Doc バイト列を返さない。`public-content`
+    // と shape を合わせて `id / title / content_text / content_preview / version / updated_at`
+    // を必ず公開し、`ydoc_state` が混入しないことを CI で固定する。
+    // Issue #889 Phase 5: lock the public PageContent shape so a regression
+    // that re-introduces Y.Doc bytes via MCP fails CI.
+    vi.mocked(mockClient.getPageContent).mockResolvedValue({
+      id: "p1",
+      title: "Hello",
+      content_text: "Hello world",
+      content_preview: "Hello",
+      version: 7,
+      updated_at: "2026-05-16T10:00:00.000Z",
+    });
     const result = await mcpClient.callTool({
-      name: "zedi_update_page_content",
-      arguments: {
-        page_id: "p1",
-        ydoc_state: "BASE64",
-        expected_version: 4,
-        content_text: "x",
-      },
+      name: "zedi_get_page",
+      arguments: { page_id: "p1" },
     });
     expect(result.isError).toBeFalsy();
-    expect(mockClient.updatePageContent).toHaveBeenCalledWith("p1", {
-      ydoc_state: "BASE64",
-      expected_version: 4,
-      content_text: "x",
+    expect(mockClient.getPageContent).toHaveBeenCalledWith("p1");
+    const content = result.content as Array<{ type: string; text?: string }>;
+    const parsed = JSON.parse(content[0]?.text ?? "") as Record<string, unknown>;
+    expect(parsed).toEqual({
+      id: "p1",
+      title: "Hello",
+      content_text: "Hello world",
+      content_preview: "Hello",
+      version: 7,
+      updated_at: "2026-05-16T10:00:00.000Z",
     });
+    expect(parsed).not.toHaveProperty("ydoc_state");
   });
 
   it("converts ZediApiError into an isError result", async () => {

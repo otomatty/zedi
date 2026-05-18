@@ -41,7 +41,6 @@ interface StoredPage {
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
-  ydoc_state: string;
   content_text: string | null;
   version: number;
 }
@@ -88,13 +87,12 @@ function buildMockApi(): Hono {
       created_at: now,
       updated_at: now,
       is_deleted: false,
-      ydoc_state: "",
       content_text: null,
       version: 0,
     };
     pages.set(id, page);
-    // PageRow の形だけを返す (ydoc_state / version は別エンドポイント) /
-    // Return only the PageRow shape; ydoc_state / version live on the content endpoint.
+    // PageRow の形だけを返す (本文は public-content エンドポイントから取得)。
+    // Return only the PageRow shape; rendered text lives on the public-content endpoint.
     return c.json({
       id: page.id,
       owner_id: page.owner_id,
@@ -109,42 +107,22 @@ function buildMockApi(): Hono {
     });
   });
 
-  app.get("/api/pages/:id/content", (c) => {
+  // Issue #889 Phase 5: MCP は read-only `public-content` エンドポイントから本文を取得する。
+  // Y.Doc バイト列はサーバ側でも意図的に返さない。
+  // Issue #889 Phase 5: MCP reads page bodies via the read-only `public-content`
+  // endpoint. Y.Doc bytes are intentionally omitted server-side as well.
+  app.get("/api/pages/:id/public-content", (c) => {
     const id = c.req.param("id");
     const page = pages.get(id);
     if (!page || page.is_deleted) return c.json({ message: "not found" }, 404);
     return c.json({
-      ydoc_state: page.ydoc_state,
-      version: page.version,
+      id: page.id,
+      title: page.title,
       content_text: page.content_text,
+      content_preview: page.content_preview,
+      version: page.version,
       updated_at: page.updated_at,
     });
-  });
-
-  app.put("/api/pages/:id/content", async (c) => {
-    const id = c.req.param("id");
-    const page = pages.get(id);
-    if (!page || page.is_deleted) return c.json({ message: "not found" }, 404);
-    const body = (await c.req.json().catch(() => ({}))) as {
-      ydoc_state?: unknown;
-      expected_version?: unknown;
-      content_text?: unknown;
-      content_preview?: unknown;
-      title?: unknown;
-    };
-    if (typeof body.ydoc_state !== "string" || typeof body.expected_version !== "number") {
-      return c.json({ message: "invalid body" }, 400);
-    }
-    if (body.expected_version !== page.version) {
-      return c.json({ message: "version conflict" }, 409);
-    }
-    page.ydoc_state = body.ydoc_state;
-    if (typeof body.content_text === "string") page.content_text = body.content_text;
-    if (typeof body.content_preview === "string") page.content_preview = body.content_preview;
-    if (typeof body.title === "string") page.title = body.title;
-    page.version += 1;
-    page.updated_at = new Date().toISOString();
-    return c.json({ version: page.version });
   });
 
   app.delete("/api/pages/:id", (c) => {
@@ -234,7 +212,7 @@ describe("stdio MCP roundtrip", () => {
     expect(parsed.email).toBe("test@example.com");
   });
 
-  it("create -> get -> update -> delete page roundtrip via stdio", async () => {
+  it("create -> get -> delete page roundtrip via stdio (MCP is read-only after #889 Phase 5)", async () => {
     const created = await client.callTool({
       name: "zedi_create_page",
       arguments: { title: "E2E Page", content_preview: "preview" },
@@ -248,47 +226,36 @@ describe("stdio MCP roundtrip", () => {
     const pageId = createdParsed.id;
     expect(pageId).toMatch(/^page-/);
 
+    // Issue #889 Phase 5: 取得は read-only `public-content` 経路。Y.Doc バイト列は
+    // 含まれず、`id / title / content_text / content_preview / version / updated_at`
+    // のみが返る。
+    // Issue #889 Phase 5: reads flow through the read-only `public-content`
+    // endpoint, which never exposes the Y.Doc bytes.
     const got = await client.callTool({
       name: "zedi_get_page",
       arguments: { page_id: pageId },
     });
     expect(got.isError).toBeFalsy();
     const gotParsed = JSON.parse((got.content as Array<{ text?: string }>)[0]?.text ?? "") as {
+      id: string;
+      title: string | null;
+      content_text: string | null;
+      content_preview: string | null;
       version: number;
-      ydoc_state: string;
+      updated_at: string;
     };
+    expect(gotParsed.id).toBe(pageId);
+    expect(gotParsed.title).toBe("E2E Page");
+    expect(gotParsed.content_text).toBeNull();
+    expect(gotParsed.content_preview).toBe("preview");
     expect(gotParsed.version).toBe(0);
-    expect(gotParsed.ydoc_state).toBe("");
+    expect(gotParsed).not.toHaveProperty("ydoc_state");
 
-    const updated = await client.callTool({
-      name: "zedi_update_page_content",
-      arguments: {
-        page_id: pageId,
-        ydoc_state: "BASE64-STATE",
-        expected_version: 0,
-        content_text: "hello world",
-      },
-    });
-    expect(updated.isError).toBeFalsy();
-    const updatedParsed = JSON.parse(
-      (updated.content as Array<{ text?: string }>)[0]?.text ?? "",
-    ) as { version: number };
-    expect(updatedParsed.version).toBe(1);
-
-    // 楽観ロック: 古い expected_version を渡すと 409 → isError として届くこと。
-    // Optimistic locking: stale expected_version surfaces as an isError result.
-    const conflicted = await client.callTool({
-      name: "zedi_update_page_content",
-      arguments: {
-        page_id: pageId,
-        ydoc_state: "BASE64-STATE-2",
-        expected_version: 0,
-        content_text: "stale",
-      },
-    });
-    expect(conflicted.isError).toBe(true);
-    const conflictedText = (conflicted.content as Array<{ text?: string }>)[0]?.text ?? "";
-    expect(conflictedText).toContain("HTTP 409");
+    // Issue #889 Phase 5 で MCP 経由のページ更新ツールは廃止された。
+    // Issue #889 Phase 5 retired the page-update tool from the MCP surface.
+    const tools = await client.listTools();
+    const toolNames = tools.tools.map((t) => t.name);
+    expect(toolNames).not.toContain("zedi_update_page_content");
 
     const deleted = await client.callTool({
       name: "zedi_delete_page",

@@ -66,8 +66,13 @@ describe("POST /api/onboarding/complete", () => {
   };
 
   it("returns 200 with normalized state when display_name and locale are valid", async () => {
+    // Issue #889 Phase 3 で `WelcomePageCreationResult` に noteId が追加され、
+    // POST レスポンスにも `welcome_page_note_id` が含まれる。
+    // Issue #889 Phase 3 added `noteId` to `WelcomePageCreationResult` and
+    // `welcome_page_note_id` to the response.
     mockInsertWelcomePage.mockResolvedValue({
       pageId: "page-welcome-1",
+      noteId: "note-default-1",
       locale: "ja",
     });
     // tx.update(users), tx.insert(userOnboardingStatus), tx.select() の 3 回。
@@ -88,11 +93,13 @@ describe("POST /api/onboarding/complete", () => {
     const body = (await res.json()) as {
       setup_completed_at: string | null;
       welcome_page_id: string | null;
+      welcome_page_note_id: string | null;
       welcome_page_created_at: string | null;
       welcome_page_locale: string | null;
     };
     expect(body.setup_completed_at).toBe("2026-04-01T00:00:00.000Z");
     expect(body.welcome_page_id).toBe("page-welcome-1");
+    expect(body.welcome_page_note_id).toBe("note-default-1");
     expect(body.welcome_page_locale).toBe("ja");
 
     // insertWelcomePage は trim 後の値ではなく正規化された locale を受け取る。
@@ -106,7 +113,7 @@ describe("POST /api/onboarding/complete", () => {
     // のフォールバックがあるため）。ここでは "ja" にフォールバックされた結果を再現する。
     // The real service always returns locale: "ja" | "en" because resolveWelcomePageLocale
     // falls back to "ja" when requested is null. Mirror that real shape here.
-    mockInsertWelcomePage.mockResolvedValue({ pageId: "p", locale: "ja" });
+    mockInsertWelcomePage.mockResolvedValue({ pageId: "p", noteId: "n", locale: "ja" });
     const { app } = createTestApp([undefined, undefined, [finalRow]]);
 
     const res = await app.request("/api/onboarding/complete", {
@@ -188,16 +195,29 @@ describe("POST /api/onboarding/complete", () => {
 
   it("preserves existing welcome page fields when insertWelcomePage returns null", async () => {
     // service が null を返すのは「ウェルカムページが既に存在する」シグナル。
-    // この場合、既存レコードの welcome_page_id を COALESCE で保持する。
+    // この場合、既存レコードの welcome_page_id を COALESCE で保持する。Issue
+    // #889 Phase 3 で `welcome_page_note_id` も返すようになり、null 返却パスでは
+    // `pages` 行を引いて noteId をレスポンスに含める。
     // A null result means the welcome page already exists (idempotent path);
-    // the existing row's welcome_page_id is preserved via COALESCE.
+    // the existing row's welcome_page_id is preserved via COALESCE. Issue
+    // #889 Phase 3 also reads `pages.note_id` to populate the new
+    // `welcome_page_note_id` field on the response.
     mockInsertWelcomePage.mockResolvedValue(null);
     const rowWithExistingWelcome = {
       setupCompletedAt: new Date("2026-04-01T00:00:00Z"),
       welcomePageId: "page-existing-1",
       welcomePageCreatedAt: new Date("2026-03-31T00:00:00Z"),
     };
-    const { app } = createTestApp([undefined, undefined, [rowWithExistingWelcome]]);
+    // tx.update, tx.insert, tx.select、最後にハンドラ側の db.select() で
+    // pages.note_id を引く 4 回ぶんを mock する。
+    // tx.update, tx.insert, tx.select inside the transaction, plus the
+    // outer db.select() looking up `pages.note_id` for the response.
+    const { app } = createTestApp([
+      undefined,
+      undefined,
+      [rowWithExistingWelcome],
+      [{ noteId: "note-existing-1" }],
+    ]);
 
     const res = await app.request("/api/onboarding/complete", {
       method: "POST",
@@ -208,6 +228,7 @@ describe("POST /api/onboarding/complete", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.welcome_page_id).toBe("page-existing-1");
+    expect(body.welcome_page_note_id).toBe("note-existing-1");
     expect(body.welcome_page_created_at).toBe("2026-03-31T00:00:00.000Z");
     // welcome_page_locale は service から読むため、null 返却時は null になる。
     // welcome_page_locale comes from the service result; null result → null locale.
@@ -227,7 +248,12 @@ describe("GET /api/onboarding/status", () => {
       homeSlidesShownAt: new Date("2026-04-02T00:00:00Z"),
       autoCreateUpdateNotice: false,
     };
-    const { app } = createTestApp([[row]]);
+    // Issue #889 Phase 3: status エンドポイントは welcome_page_id を持つ行に
+    // 対して pages.note_id を引く。1 回目は onboarding 行、2 回目は noteId。
+    // Issue #889 Phase 3: when a welcome_page_id exists, the handler looks
+    // up `pages.note_id` for `welcome_page_note_id`. Mock the row first,
+    // then the noteId lookup.
+    const { app } = createTestApp([[row], [{ noteId: "note-1" }]]);
 
     const res = await app.request("/api/onboarding/status", {
       headers: authHeaders(),
@@ -238,6 +264,7 @@ describe("GET /api/onboarding/status", () => {
     expect(body).toEqual({
       setup_completed_at: "2026-04-01T00:00:00.000Z",
       welcome_page_id: "page-1",
+      welcome_page_note_id: "note-1",
       welcome_page_created_at: "2026-04-01T00:00:00.000Z",
       home_slides_shown_at: "2026-04-02T00:00:00.000Z",
       auto_create_update_notice: false,
@@ -250,6 +277,10 @@ describe("GET /api/onboarding/status", () => {
 
   it("returns nulls and auto_create_update_notice=true when no row exists", async () => {
     mockRetryWelcomePageIfNeeded.mockResolvedValue(undefined);
+    // welcome_page_id が null の場合は pages テーブルへの追加クエリは発火しない
+    // ので、status クエリ 1 回ぶんだけ mock する。
+    // No pages lookup when `welcomePageId` is null, so a single empty
+    // result is enough.
     const { app } = createTestApp([[]]);
 
     const res = await app.request("/api/onboarding/status", {
@@ -261,6 +292,7 @@ describe("GET /api/onboarding/status", () => {
     expect(body).toEqual({
       setup_completed_at: null,
       welcome_page_id: null,
+      welcome_page_note_id: null,
       welcome_page_created_at: null,
       home_slides_shown_at: null,
       auto_create_update_notice: true,

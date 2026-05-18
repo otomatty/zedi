@@ -245,8 +245,17 @@ function PromoteToWikiDialogBody({
         ),
       );
 
-      const firstCreated = created.find((p): p is NonNullable<typeof p> => p != null);
-      if (!firstCreated?.id) throw new Error("no pages created");
+      // Issue #889 Phase 3: 遷移先は `/notes/:noteId/:pageId` のため、`id` と
+      // `noteId` の両方が揃ったページのみ "successful" として扱う。`noteId`
+      // 欠落時は不正な URL を組み立ててしまうので作成失敗扱いにする。
+      // Issue #889 Phase 3: the canonical landing route is
+      // `/notes/:noteId/:pageId`, so both `id` and `noteId` must be present.
+      // Treat a missing `noteId` as a failed creation rather than navigating
+      // to `/notes/undefined/...`.
+      const firstCreated = created.find(
+        (p): p is NonNullable<typeof p> => p != null && Boolean(p.id) && Boolean(p.noteId),
+      );
+      if (!firstCreated) throw new Error("no pages created");
 
       const firstEntity = selectedEntities[created.indexOf(firstCreated)];
       const pending: PendingChatPageGenerationState = {
@@ -257,7 +266,10 @@ function PromoteToWikiDialogBody({
       };
       toast({ title: t("aiChat.notifications.promoteSuccess") });
       onClose();
-      navigate(`/pages/${firstCreated.id}`, {
+      // Issue #889 Phase 3: `/pages/:id` 撤去のため `/notes/:noteId/:pageId` に遷移。
+      // Issue #889 Phase 3: route to `/notes/:noteId/:pageId` after `/pages/:id`
+      // was retired.
+      navigate(`/notes/${firstCreated.noteId}/${firstCreated.id}`, {
         state: { pendingChatPageGeneration: pending },
       });
     } catch {

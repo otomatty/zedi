@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import { Popover, PopoverAnchor } from "@zedi/ui";
 import { Input } from "@zedi/ui";
 import { useGlobalSearchContext } from "@/contexts/GlobalSearchContext";
+import type { GlobalSearchResultItem } from "@/hooks/useGlobalSearch";
 import { useGlobalSearchShortcut } from "@/hooks/useGlobalSearchShortcut";
 import { HeaderSearchDropdownContent } from "./HeaderSearchDropdownContent";
 import { cn } from "@zedi/ui";
@@ -15,10 +16,10 @@ interface SearchKeyDownParams {
   totalItems: number;
   activeIndex: number;
   itemCount: number;
-  searchResults: Array<{ pageId: string; noteId?: string }>;
+  searchResults: GlobalSearchResultItem[];
   setActiveIndex: (value: number | ((prev: number) => number)) => void;
   closeDropdown: () => void;
-  onSelectItem: (pageId: string, noteId?: string) => void;
+  onSelectItem: (item: GlobalSearchResultItem) => void;
   handleSearchSubmit: () => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
 }
@@ -65,7 +66,7 @@ function handleSearchKeyDown(
         handleSearchSubmit();
       } else if (activeIndex >= 0 && activeIndex < itemCount) {
         const item = searchResults[activeIndex];
-        if (item) onSelectItem(item.pageId, item.noteId);
+        if (item) onSelectItem(item);
       }
       break;
     }
@@ -81,61 +82,25 @@ function handleSearchKeyDown(
  *
  */
 export function HeaderSearchBar() {
-  /**
-   *
-   */
   const { query, setQuery, searchResults, hasQuery, handleSelect, handleSearchSubmit } =
     useGlobalSearchContext();
 
-  /**
-   *
-   */
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  /**
-   *
-   */
   const [activeIndex, setActiveIndex] = useState(-1);
-  /**
-   *
-   */
   const inputRef = useRef<HTMLInputElement>(null);
-  /**
-   *
-   */
   const listRef = useRef<HTMLUListElement>(null);
-  /**
-   *
-   */
   const footerRef = useRef<HTMLButtonElement>(null);
 
-  /**
-   *
-   */
   const handleShortcutFocus = useCallback(() => {
     inputRef.current?.focus();
     inputRef.current?.select();
   }, []);
   useGlobalSearchShortcut(handleShortcutFocus);
 
-  /**
-   *
-   */
   const showResults = hasQuery && searchResults.length > 0;
-  /**
-   *
-   */
   const showEmpty = hasQuery && searchResults.length === 0;
-  /**
-   *
-   */
   const hasContent = showResults || showEmpty;
-  /**
-   *
-   */
   const itemCount = showResults ? searchResults.length : 0;
-  /**
-   *
-   */
   const totalItems = hasQuery ? itemCount + 1 : itemCount;
 
   useEffect(() => {
@@ -151,45 +116,30 @@ export function HeaderSearchBar() {
     if (activeIndex === itemCount) {
       footerRef.current?.scrollIntoView({ block: "nearest" });
     } else {
-      /**
-       *
-       */
       const items = listRef.current?.querySelectorAll("[role='option']");
       items?.[activeIndex]?.scrollIntoView({ block: "nearest" });
     }
   }, [activeIndex, itemCount]);
 
-  /**
-   *
-   */
   const closeDropdown = useCallback(() => {
     setDropdownOpen(false);
     setActiveIndex(-1);
   }, []);
 
-  /**
-   *
-   */
   const onSelectItem = useCallback(
-    (pageId: string, noteId?: string) => {
-      handleSelect(pageId, noteId);
+    (item: GlobalSearchResultItem) => {
+      handleSelect(item);
       closeDropdown();
     },
     [handleSelect, closeDropdown],
   );
 
-  /**
-   *
-   */
   const getOptionId = useCallback(
     (index: number) =>
       index === itemCount ? "header-search-footer" : `header-search-option-${index}`,
     [itemCount],
   );
 
-  /**
-   *
-   */
   const activeDescendant = activeIndex >= 0 ? getOptionId(activeIndex) : undefined;
 
   return (

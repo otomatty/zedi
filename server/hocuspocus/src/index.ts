@@ -9,13 +9,35 @@ import {
   warnDevAuthBypassOnce,
 } from "./dev-auth-bypass.js";
 import { buildContentPreview, extractTextFromYXml } from "./extractPlainTextFromYXml.js";
+import { evaluateHealth } from "./health.js";
+import {
+  canEditFromRole,
+  resolveNoteRole,
+  type DomainFacts,
+  type MemberFact,
+  type NoteAccessFacts,
+} from "./pageEditPermission.js";
 import { maybeCreateSnapshot } from "./snapshotUtils.js";
+import { applyWikiLinkMarksToYDoc } from "./ydocWikiLinkNormalizer.js";
 
 const PORT = parseInt(process.env.PORT || "1234", 10);
 const REDIS_URL = process.env.REDIS_URL;
 const DATABASE_URL = process.env.DATABASE_URL;
 const API_INTERNAL_URL = process.env.API_INTERNAL_URL;
 const INTERNAL_SECRET = process.env.BETTER_AUTH_SECRET?.trim();
+
+/**
+ * Postgres プールの最大同時接続数。`pg.Pool` は `max` を public フィールドとして
+ * 公開していないため、コンストラクタに渡した値と `/health` で参照する値を本定数で
+ * 共有する。Railway 上の Hocuspocus は単一インスタンス想定なのでここで上限を直接
+ * 表現する。
+ *
+ * Pool size shared between `pg.Pool({ max })` and the `/health` snapshot.
+ * `pg.Pool` does not expose `max` publicly, so we keep the source of truth
+ * here. Hocuspocus runs as a single Railway replica, so this directly caps
+ * total live Postgres clients.
+ */
+const PG_POOL_MAX = 10;
 
 /** Cached env reads for auth paths (avoid repeated `process.env` lookups). / 認証経路用に env を一度だけ読む */
 const NODE_ENV = process.env.NODE_ENV;
@@ -48,7 +70,7 @@ function getPool(): Pool {
   }
   pgPool = new Pool({
     connectionString: DATABASE_URL,
-    max: 10,
+    max: PG_POOL_MAX,
     idleTimeoutMillis: 30000,
   });
   return pgPool;
@@ -62,24 +84,32 @@ function isAuthorizedInternalRequest(req: IncomingMessage): boolean {
 async function verifySession(
   token: string,
 ): Promise<{ userId: string; email?: string; name?: string } | null> {
-  if (!API_INTERNAL_URL) return null;
+  if (!token.trim()) return null;
+  const client = await getPool().connect();
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    const response = await fetch(`${API_INTERNAL_URL}/api/auth/get-session`, {
-      headers: { cookie: `better-auth.session_token=${token}` },
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    if (!response.ok) return null;
-    const data = (await response.json()) as {
-      user?: { id: string; email?: string; name?: string };
-    };
-    if (!data.user?.id) return null;
-    return { userId: data.user.id, email: data.user.email, name: data.user.name };
+    const result = await client.query<{
+      user_id: string;
+      email: string | null;
+      name: string | null;
+    }>(
+      `
+        SELECT s.user_id, u.email, u.name
+        FROM "session" s
+        JOIN "user" u ON u.id = s.user_id
+        WHERE s.token = $1
+          AND s.expires_at > NOW()
+        LIMIT 1
+      `,
+      [token],
+    );
+    const row = result.rows[0];
+    if (!row?.user_id) return null;
+    return { userId: row.user_id, email: row.email ?? undefined, name: row.name ?? undefined };
   } catch (err) {
     console.error("[Auth] Session verification failed:", err);
     return null;
+  } finally {
+    client.release();
   }
 }
 
@@ -94,69 +124,149 @@ async function getCurrentUserById(client: PoolClient, userId: string): Promise<D
 }
 
 /**
- * Allows edit when user is owner; when editor member and `edit_permission` is not
- * `owner_only`; or when the user has no membership row and the note allows
- * `any_logged_in` guests (`public` / `unlisted`). Viewer members are not guests.
- * Matches API `getNoteRole` → `canEdit`.
+ * `email` のドメイン部を小文字で返す。形式が不正な場合は `null`。
+ * `note_domain_access` 突合用なので、API 側 `extractEmailDomain` と同じく
+ * 末尾の `@` 以降だけを抽出し、空ドメインや `@` の位置不正は弾く。
  *
- * オーナー、または `edit_permission` が `owner_only` 以外のときの編集メンバー、
- * またはメンバー行がなく `any_logged_in` かつ `public`/`unlisted` のゲスト（閲覧メンバーは含めない）。
- * API の getNoteRole → canEdit と整合。
+ * Lower-cased email domain (after the last `@`), or `null` for malformed
+ * inputs. Mirrors the API's `extractEmailDomain` so domain-rule lookups
+ * agree with REST endpoints.
  */
-async function canEditNotePage(client: PoolClient, pageId: string, user: DbUser): Promise<boolean> {
-  const result = await client.query(
+function extractEmailDomain(email: string | undefined | null): string | null {
+  if (typeof email !== "string") return null;
+  const atIndex = email.lastIndexOf("@");
+  if (atIndex <= 0 || atIndex === email.length - 1) return null;
+  const domain = email
+    .slice(atIndex + 1)
+    .trim()
+    .toLowerCase();
+  return domain.length === 0 ? null : domain;
+}
+
+interface PageNoteRow {
+  pageDeleted: boolean;
+  noteId: string | null;
+  noteFound: boolean;
+  note: NoteAccessFacts | null;
+}
+
+/**
+ * `pages` 行と所属ノートを 1 クエリで取得する。Issue #823 以降ページは必ず
+ * `note_id` を持つので、`pages` を起点に `notes` を LEFT JOIN し、ページ削除済み
+ * 状態とノートの基本属性を一度に拾う。
+ *
+ * Fetch the page row and its owning note in one round-trip. After issue #823
+ * every `pages` row carries a `note_id`, so we start from `pages` and
+ * `LEFT JOIN notes` to surface both the soft-delete flag and the note's
+ * authorization fields together.
+ */
+async function fetchPageNoteState(client: PoolClient, pageId: string): Promise<PageNoteRow | null> {
+  const result = await client.query<{
+    page_deleted: boolean;
+    note_id: string | null;
+    note_deleted: boolean | null;
+    owner_id: string | null;
+    visibility: string | null;
+    edit_permission: string | null;
+  }>(
     `
-      SELECT 1
-      FROM note_pages np
-      JOIN notes n
-        ON n.id = np.note_id
-       AND n.is_deleted = FALSE
-      LEFT JOIN note_members nm
-        ON nm.note_id = np.note_id
-       AND nm.member_email = $3
-       AND nm.is_deleted = FALSE
-       AND nm.status = 'accepted'
-      WHERE np.page_id = $1
-        AND np.is_deleted = FALSE
-        AND (
-          n.owner_id = $2
-          OR (
-            nm.role = 'editor'
-            AND COALESCE(n.edit_permission, 'owner_only') <> 'owner_only'
-          )
-          OR (
-            nm.note_id IS NULL
-            AND COALESCE(n.edit_permission, 'owner_only') = 'any_logged_in'
-            AND n.visibility IN ('public', 'unlisted')
-          )
-        )
+      SELECT
+        p.is_deleted        AS page_deleted,
+        n.id                AS note_id,
+        n.is_deleted        AS note_deleted,
+        n.owner_id,
+        n.visibility,
+        n.edit_permission
+      FROM pages p
+      LEFT JOIN notes n ON n.id = p.note_id
+      WHERE p.id = $1
       LIMIT 1
     `,
-    [pageId, user.id, user.email],
-  );
-  return result.rows.length > 0;
-}
-
-async function pageBelongsToAnyNote(client: PoolClient, pageId: string): Promise<boolean> {
-  const result = await client.query(
-    "SELECT 1 FROM note_pages WHERE page_id = $1 AND is_deleted = FALSE LIMIT 1",
     [pageId],
   );
-  return result.rows.length > 0;
+  const row = result.rows[0];
+  if (!row) return null;
+
+  if (
+    row.note_id === null ||
+    row.note_deleted === null ||
+    row.note_deleted === true ||
+    row.owner_id === null ||
+    row.visibility === null ||
+    row.edit_permission === null
+  ) {
+    return {
+      pageDeleted: row.page_deleted,
+      noteId: row.note_id,
+      noteFound: false,
+      note: null,
+    };
+  }
+
+  return {
+    pageDeleted: row.page_deleted,
+    noteId: row.note_id,
+    noteFound: true,
+    note: {
+      ownerId: row.owner_id,
+      visibility: row.visibility as NoteAccessFacts["visibility"],
+      editPermission: row.edit_permission as NoteAccessFacts["editPermission"],
+    },
+  };
 }
 
-async function isPersonalPageOwner(
+async function fetchAcceptedMember(
   client: PoolClient,
-  pageId: string,
-  userId: string,
-): Promise<boolean> {
-  const result = await client.query(
-    "SELECT 1 FROM pages WHERE id = $1 AND owner_id = $2 AND is_deleted = FALSE LIMIT 1",
-    [pageId, userId],
+  noteId: string,
+  emailLower: string,
+): Promise<MemberFact> {
+  const result = await client.query<{ role: "viewer" | "editor" }>(
+    `
+      SELECT role
+      FROM note_members
+      WHERE note_id = $1
+        AND LOWER(member_email) = $2
+        AND is_deleted = FALSE
+        AND status = 'accepted'
+      LIMIT 1
+    `,
+    [noteId, emailLower],
   );
-  return result.rows.length > 0;
+  const row = result.rows[0];
+  return row ? { role: row.role } : null;
 }
 
+async function fetchDomainRules(
+  client: PoolClient,
+  noteId: string,
+  emailLower: string,
+): Promise<DomainFacts> {
+  const domain = extractEmailDomain(emailLower);
+  if (!domain) return { rules: [] };
+  const result = await client.query<{ role: "viewer" | "editor" }>(
+    `
+      SELECT role
+      FROM note_domain_access
+      WHERE note_id = $1
+        AND domain = $2
+        AND is_deleted = FALSE
+    `,
+    [noteId, domain],
+  );
+  return { rules: result.rows.map((r) => ({ role: r.role })) };
+}
+
+/**
+ * Hocuspocus 認証用の編集権限チェック。すべてのページが `pages.note_id` で
+ * ちょうど 1 件のノートに所属する前提（Issue #823 / migration `0023`）で、
+ * API 側 `assertPageEditAccess` と同じ意味論（owner → member → domain rule →
+ * guest）でロールを解決し、`canEdit` で編集可否を判定する。
+ *
+ * Permission gate for the Hocuspocus `onAuthenticate` hook. After
+ * issue #823 every page is anchored to exactly one note via `pages.note_id`,
+ * so we resolve the role on that note (owner → member → domain → guest) and
+ * call `canEditFromRole`, matching the REST `assertPageEditAccess` contract.
+ */
 async function assertEditPermission(pageId: string, userId: string): Promise<void> {
   const client = await getPool().connect();
   try {
@@ -165,20 +275,38 @@ async function assertEditPermission(pageId: string, userId: string): Promise<voi
       throw new Error("User not found");
     }
 
-    if (await canEditNotePage(client, pageId, currentUser)) {
-      return;
+    const pageNote = await fetchPageNoteState(client, pageId);
+    if (!pageNote || pageNote.pageDeleted) {
+      throw new Error("Page not found");
+    }
+    if (!pageNote.noteFound || !pageNote.note || !pageNote.noteId) {
+      throw new Error("Note not found");
     }
 
-    const isShared = await pageBelongsToAnyNote(client, pageId);
-    if (isShared) {
+    const note = pageNote.note;
+    const noteId = pageNote.noteId;
+
+    // owner はそれだけで編集可。owner 判定で短絡することで、member / domain の
+    // 追加クエリを大半のケースでスキップできる（自分のデフォルトノート上では
+    // この経路を必ず通る）。
+    // Owner shortcut keeps the common case (editing in your own default note)
+    // down to a single round-trip.
+    if (note.ownerId === currentUser.id) return;
+
+    const [member, domain] = await Promise.all([
+      fetchAcceptedMember(client, noteId, currentUser.email),
+      fetchDomainRules(client, noteId, currentUser.email),
+    ]);
+
+    const role = resolveNoteRole(
+      note,
+      { userId: currentUser.id, emailLower: currentUser.email },
+      member,
+      domain,
+    );
+    if (!canEditFromRole(role, note)) {
       throw new Error("Forbidden");
     }
-
-    if (await isPersonalPageOwner(client, pageId, currentUser.id)) {
-      return;
-    }
-
-    throw new Error("Forbidden");
   } finally {
     client.release();
   }
@@ -196,6 +324,29 @@ async function loadDocumentFromDb(pageId: string): Promise<Y.Doc> {
     if (row?.ydoc_state) {
       Y.applyUpdate(doc, new Uint8Array(row.ydoc_state));
     }
+
+    // Issue #880 Phase B リグレッション対応: 未 mark の `[[Title]]` プレーンテキスト
+    // を本サーバ側で `wikiLink` mark に昇格させる。クライアント側で同等処理を
+    // 行っていた `applyWikiLinkMarksToEditor` を撤去し、y-prosemirror の同期
+    // 境界条件（lib0 `unexpectedCase`）を二度と踏まないようにする。
+    // `marksApplied > 0` のときは Hocuspocus の onStoreDocument が自然に拾って
+    // 保存するので、ここでは Y.Doc を変更するだけで永続化はトリガしない。
+    // 失敗してもベストエフォートでログに残し、ロード自体は継続する。
+    //
+    // Issue #880 Phase B regression fix: promote unmarked `[[Title]]` plain
+    // text to `wikiLink` marks server-side so the client never triggers the
+    // y-prosemirror `unexpectedCase` boundary case via `addMark` on synced
+    // docs. When `marksApplied > 0` the resulting Y.Doc update flows through
+    // Hocuspocus' normal save path. Best-effort: load proceeds even on error.
+    try {
+      const { marksApplied } = applyWikiLinkMarksToYDoc(doc);
+      if (marksApplied > 0) {
+        console.log(`[WikiLinkNormalize] page=${pageId} marksApplied=${marksApplied}`);
+      }
+    } catch (error) {
+      console.error(`[WikiLinkNormalize] Failed for page=${pageId}:`, error);
+    }
+
     return doc;
   } finally {
     client.release();
@@ -247,6 +398,78 @@ async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> 
     console.error(`[Snapshot] Failed to create auto-snapshot for page ${pageId}:`, error);
   } finally {
     snapshotClient.release();
+  }
+
+  // Issue #880 Phase C: 本文保存後に API 経由でリンクグラフ (links / ghost_links)
+  // を再構築する。本処理は内部 HTTP 呼び出しのベストエフォートで、失敗しても
+  // 本文保存の成功には影響させない。
+  // Issue #880 Phase C: rebuild outgoing edges (links / ghost_links) via the
+  // API's internal endpoint after persisting the document. Best-effort — a
+  // failure does not roll back the content save.
+  void triggerGraphSync(pageId).catch((error) => {
+    console.error(`[GraphSync] Failed to trigger graph sync for page ${pageId}:`, error);
+  });
+}
+
+/**
+ * `API_INTERNAL_URL` の末尾スラッシュを取り除いた origin を返す。
+ * Resolves the API origin used for internal calls. Returns `null` when the
+ * variable is unset so the caller can skip silently in dev.
+ */
+function getApiInternalOrigin(): string | null {
+  const raw = process.env.API_INTERNAL_URL?.trim();
+  if (!raw) return null;
+  return raw.replace(/\/+$/, "");
+}
+
+/** HTTP timeout for the API graph-sync call (ms). / API グラフ同期 HTTP のタイムアウト (ms) */
+const API_GRAPH_SYNC_TIMEOUT_MS = 2500;
+
+/**
+ * `POST /api/internal/pages/:id/graph-sync` を呼び出して、保存済み Y.Doc から
+ * リンクグラフを再構築させる。ネットワーク失敗・タイムアウトは握りつぶす
+ * （呼び出し元はベストエフォートで呼ぶ）。
+ *
+ * Call the API's internal graph-sync endpoint so it rebuilds outgoing edges
+ * from the just-persisted Y.Doc. Network failures / timeouts are swallowed
+ * because the caller treats this as best-effort.
+ */
+async function triggerGraphSync(pageId: string): Promise<void> {
+  const baseUrl = getApiInternalOrigin();
+  const secret = INTERNAL_SECRET;
+  if (!baseUrl || !secret) {
+    // dev: ログだけ残してスキップ。production では起動時に API_INTERNAL_URL
+    // が未設定だと起動拒否しているため、ここに来るのは dev か設定ミス。
+    // Dev: log + skip. In production the server already refuses to start
+    // without `API_INTERNAL_URL`, so this branch is dev-only or misconfig.
+    const missing = [baseUrl ? null : "API_INTERNAL_URL", secret ? null : "BETTER_AUTH_SECRET"]
+      .filter((v): v is string => v !== null)
+      .join(", ");
+    console.warn(`[GraphSync] Skipped for page ${pageId}: missing env var(s): ${missing}`);
+    return;
+  }
+
+  const url = `${baseUrl}/api/internal/pages/${encodeURIComponent(pageId)}/graph-sync`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_GRAPH_SYNC_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "x-internal-secret": secret },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      console.warn(`[GraphSync] HTTP ${response.status} for page ${pageId}`);
+    }
+  } catch (error) {
+    clearTimeout(timeoutId);
+    const name = error instanceof Error ? error.name : "";
+    if (name === "AbortError") {
+      console.warn(`[GraphSync] Timed out for page ${pageId}`);
+      return;
+    }
+    console.warn(`[GraphSync] Request failed for page ${pageId}:`, error);
   }
 }
 
@@ -438,18 +661,28 @@ hocuspocusServer.httpServer.on("request", (req: IncomingMessage, res: ServerResp
 });
 
 async function handleHttpRequestFallback(requestUrl: URL, res: ServerResponse): Promise<void> {
-  // ヘルスチェックエンドポイント
+  // ヘルスチェックエンドポイント。Issue #889 Phase 5 で `connections` / `documents`
+  // に加えて Postgres プールの飽和度も返すよう拡張した。ステータス自体は
+  // Railway の `restartPolicy` が拾えるよう常に HTTP 200 にし、`status` フィールド
+  // (`healthy` / `degraded`) で外部監視がアラートを上げる想定。
+  //
+  // `/health` returns connection / document counts and Postgres pool
+  // saturation. HTTP status stays 200 so Railway never restarts purely on
+  // pool pressure; external monitors page on `status !== "healthy"`.
   if (requestUrl.pathname === "/health" || requestUrl.pathname === "/") {
+    const pool = pgPool;
+    const payload = evaluateHealth({
+      connections: hocuspocus.getConnectionsCount(),
+      documents: hocuspocus.getDocumentsCount(),
+      pool: {
+        totalCount: pool?.totalCount ?? 0,
+        idleCount: pool?.idleCount ?? 0,
+        waitingCount: pool?.waitingCount ?? 0,
+      },
+      poolMax: PG_POOL_MAX,
+    });
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(
-      JSON.stringify({
-        status: "healthy",
-        service: "zedi-hocuspocus",
-        timestamp: new Date().toISOString(),
-        connections: hocuspocus.getConnectionsCount(),
-        documents: hocuspocus.getDocumentsCount(),
-      }),
-    );
+    res.end(JSON.stringify(payload));
     return;
   }
 

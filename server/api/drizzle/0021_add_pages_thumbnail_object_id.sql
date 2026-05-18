@@ -1,0 +1,24 @@
+-- Add `pages.thumbnail_object_id` so a page row can be linked to its
+-- corresponding `thumbnail_objects` row. Used by DELETE /api/pages/:id to
+-- garbage-collect the S3 object + DB row when a page is deleted, rather than
+-- letting orphaned thumbnails accumulate against the user's storage quota.
+--
+-- ページ行と `thumbnail_objects` 行を紐づける `pages.thumbnail_object_id` を
+-- 追加する。DELETE /api/pages/:id の際にここを辿って S3 オブジェクトと
+-- thumbnail_objects 行を GC するために使う。これが無いと削除済みページの
+-- サムネイルが永久に残り、ユーザーのストレージ枠を圧迫してしまう。
+--
+-- The column is nullable so existing rows (and pages without thumbnails) are
+-- valid. We intentionally do NOT add a foreign-key constraint: the thumbnail
+-- lifecycle is owner-scoped and managed explicitly by the API layer, and
+-- adding a FK would either force ON DELETE SET NULL (still leaks S3 objects)
+-- or ON DELETE CASCADE (deletes a row from outside the API path, leaving the
+-- S3 object orphaned in the opposite direction).
+--
+-- 既存行および「サムネイル無しのページ」を許容するため NULL 可とし、外部キー
+-- 制約はあえて設けない。FK で SET NULL にしても S3 オブジェクトは残るし、
+-- CASCADE にすると API 経路外で消えて S3 側がオーファンになる。GC は API で
+-- 明示的に取り扱う。
+ALTER TABLE "pages" ADD COLUMN IF NOT EXISTS "thumbnail_object_id" uuid;
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_pages_thumbnail_object_id" ON "pages" ("thumbnail_object_id");

@@ -16,7 +16,6 @@ export {
 } from "./userOnboardingStatus.js";
 export {
   notes,
-  notePages,
   noteMembers,
   noteInvitations,
   noteInviteLinks,
@@ -24,8 +23,6 @@ export {
   noteDomainAccess,
   type Note,
   type NewNote,
-  type NotePage,
-  type NewNotePage,
   type NoteMember,
   type NewNoteMember,
   type NoteInvitation,
@@ -74,8 +71,24 @@ export {
   type NewThumbnailObject,
 } from "./thumbnails.js";
 export { adminAuditLogs, type AdminAuditLog, type NewAdminAuditLog } from "./auditLogs.js";
-export { sources, type Source, type NewSource } from "./sources.js";
+export {
+  apiErrors,
+  type ApiError,
+  type NewApiError,
+  type ApiErrorSeverity,
+  type ApiErrorStatus,
+  type ApiErrorSuspectedFile,
+} from "./apiErrors.js";
+export { sources, type Source, type NewSource, type PdfSourceMetadata } from "./sources.js";
 export { pageSources, type PageSource, type NewPageSource } from "./pageSources.js";
+export {
+  pdfHighlights,
+  PDF_HIGHLIGHT_COLORS,
+  type PdfHighlight,
+  type NewPdfHighlight,
+  type PdfHighlightRect,
+  type PdfHighlightColor,
+} from "./pdfHighlights.js";
 export {
   lintFindings,
   type LintFinding,
@@ -97,7 +110,6 @@ export {
   accountRelations,
   pagesRelations,
   notesRelations,
-  notePagesRelations,
   noteMembersRelations,
   noteInvitationsRelations,
   noteInviteLinksRelations,
@@ -113,6 +125,7 @@ export {
   aiMonthlyUsageRelations,
   sourcesRelations,
   pageSourcesRelations,
+  pdfHighlightsRelations,
   lintFindingsRelations,
   activityLogRelations,
 } from "./relations.js";

@@ -3,6 +3,7 @@
   "savedAt": "{{relative}}に保存",
   "startWritingPlaceholder": "思考を書き始める...",
   "titlePlaceholder": "タイトル",
+  "collaborationLoading": "エディタを読み込み中",
   "pageMenu": {
     "exportMarkdown": "Markdownでエクスポート",
     "copyMarkdown": "Markdownをコピー",
@@ -250,6 +251,9 @@
     "loginRequiredDescription": "再度ログインしてください",
     "thumbnailSaveFailed": "サムネイルの保存に失敗しました",
     "thumbnailSaveFailedDescription": "コンテンツはそのまま取り込みます。",
+    "quotaExceeded": "ストレージの容量上限に達しました",
+    "quotaExceededDescription": "サムネイルを保存できないため、取り込みを中止しました。Pro にアップグレードすると保存容量が拡張されます。",
+    "upgradeCta": "アップグレード",
     "tip": "💡 対応していないページもあります。著作権にご注意ください。",
     "cancel": "キャンセル",
     "importing": "取り込み中...",

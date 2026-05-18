@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import * as Y from "yjs";
 import { CollaborationManager } from "./CollaborationManager";
 
 const mockYDocOn = vi.fn();
@@ -112,44 +111,10 @@ describe("CollaborationManager", () => {
     });
   });
 
-  describe("setPageTitle and saveToApi", () => {
-    it("includes title in PUT /content JSON body when setPageTitle was called", async () => {
-      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-      vi.stubGlobal("fetch", fetchMock);
-
-      vi.mocked(Y.encodeStateAsUpdate).mockReturnValueOnce(new Uint8Array([1, 2, 3, 4]));
-
-      const manager = new CollaborationManager("page-abc", "user-1", "Test User", mockGetAuthToken);
-      manager.setPageTitle("Synced Title");
-      manager.flushSave();
-
-      await vi.waitFor(() => {
-        const putCall = fetchMock.mock.calls.find(
-          (call) =>
-            typeof call[0] === "string" &&
-            String(call[0]).includes("/content") &&
-            (call[1] as RequestInit | undefined)?.method === "PUT",
-        );
-        expect(putCall).toBeDefined();
-      });
-
-      const putCall = fetchMock.mock.calls.find(
-        (call) =>
-          typeof call[0] === "string" &&
-          String(call[0]).includes("/content") &&
-          (call[1] as RequestInit | undefined)?.method === "PUT",
-      );
-      const body = putCall?.[1]?.body as string;
-      const parsed = JSON.parse(body) as {
-        title?: string;
-        ydoc_state?: string;
-        content_text?: string;
-      };
-      expect(parsed.title).toBe("Synced Title");
-      expect(parsed).toHaveProperty("ydoc_state");
-      expect(parsed).toHaveProperty("content_text");
-
-      vi.unstubAllGlobals();
-    });
-  });
+  // Issue #889 Phase 3: `local` モード（REST 経由の Y.Doc 保存）を撤去したため、
+  // `setPageTitle` / `flushSave` / `saveToApi` も削除された。Hocuspocus 経由の
+  // タイトル保存は `PUT /api/pages/:id` メタデータルートで別途扱う。
+  // Issue #889 Phase 3 removed the legacy `local` REST sync path (and
+  // `setPageTitle` / `flushSave` / `saveToApi` along with it). Title saves go
+  // through the metadata-only `PUT /api/pages/:id` route in `NotePageView` now.
 });

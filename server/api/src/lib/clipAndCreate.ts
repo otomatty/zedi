@@ -15,6 +15,7 @@ import { pages, pageContents } from "../schema/index.js";
 import type * as schema from "../schema/index.js";
 import { buildArticleSchema, extractArticleFromUrl } from "./articleExtractor.js";
 import type { AIProviderType, TokenUsage } from "../types/index.js";
+import { ensureDefaultNote } from "../services/defaultNoteService.js";
 
 const YDOC_FRAGMENT = "default";
 
@@ -84,10 +85,12 @@ export async function clipAndCreate(input: ClipAndCreateInput): Promise<ClipAndC
   const ydocBase64 = Buffer.from(ydocState).toString("base64");
 
   const result = await db.transaction(async (tx) => {
+    const defaultNote = await ensureDefaultNote(tx, userId);
     const [page] = await tx
       .insert(pages)
       .values({
         ownerId: userId,
+        noteId: defaultNote.id,
         title: article.title,
         contentPreview: article.contentText || null,
         sourceUrl: article.finalUrl,

@@ -26,18 +26,24 @@ app.post("/", authRequired, rateLimit(), async (c) => {
   }
 
   try {
-    const { imageUrl } = await commitImage(
+    const { imageUrl, objectId } = await commitImage(
       userId,
       body.sourceUrl.trim(),
       body.fallbackUrl?.trim(),
       db,
     );
-    return c.json({ imageUrl, provider: "s3" as const });
+    return c.json({ imageUrl, objectId, provider: "s3" as const });
   } catch (err) {
     if (err instanceof Error && err.message === "STORAGE_QUOTA_EXCEEDED") {
-      throw new HTTPException(413, {
-        message: "ストレージの容量制限に達しました。不要な画像を削除してください。",
-      });
+      // クライアントは `code` を見てアップグレード誘導 UI を出す。
+      // The client looks at `code` to surface the upgrade-plan prompt.
+      return c.json(
+        {
+          code: "STORAGE_QUOTA_EXCEEDED" as const,
+          message: "ストレージの容量制限に達しました。不要な画像を削除してください。",
+        },
+        413,
+      );
     }
     console.error("Thumbnail commit failed:", err);
     throw new HTTPException(502, {

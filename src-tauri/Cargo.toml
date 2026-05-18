@@ -24,6 +24,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["sync", "time", "macros", "rt-multi-thread"] }
 uuid = { version = "1", features = ["v4"] }
+# SHA-256 over local PDF bytes (issue otomatty/zedi#389).
+# ローカル PDF のバイト列ハッシュに使う（otomatty/zedi#389）。
+sha2 = "0.10"
 
 [profile.dev]
 incremental = true

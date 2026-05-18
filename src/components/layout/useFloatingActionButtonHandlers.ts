@@ -8,6 +8,9 @@ import { useTranslation } from "react-i18next";
 import { useCreatePage } from "@/hooks/usePageQueries";
 import { useAddPageToNote } from "@/hooks/useNoteQueries";
 import { useToast } from "@zedi/ui";
+import { deleteCommittedThumbnail } from "@/lib/thumbnailCommit";
+import { getThumbnailApiBaseUrl } from "@/components/editor/TiptapEditor/thumbnailApiHelpers";
+import type { Page } from "@/types/page";
 import type { FABMenuOption } from "./FABMenu";
 
 /** FAB の作成・クリップ・画像ダイアログ制御用オプション。Options for FAB create/clip/image dialog handlers. */
@@ -21,14 +24,6 @@ export interface UseFloatingActionButtonHandlersOptions {
    * `/notes/:noteId/:pageId` instead of the standalone `/pages/:id`.
    */
   noteId?: string;
-  /**
-   * 既存ページをノートへ追加するアクション。FAB に「既存のページを追加」
-   * メニュー項目が表示されている場合に呼び出される。
-   *
-   * Action to attach an existing page to the current note. Invoked when the
-   * user selects the "Add existing page" entry from the FAB menu.
-   */
-  onAddExistingPage?: () => void;
 }
 
 /** FAB ハンドラ hook の戻り値。Return type of useFloatingActionButtonHandlers. */
@@ -39,6 +34,9 @@ export interface UseFloatingActionButtonHandlersResult {
     content: string,
     sourceUrl: string,
     thumbnailUrl?: string | null,
+    /** Persisted thumbnail object id from /api/thumbnail/commit (used for GC). */
+    /** /api/thumbnail/commit が返すサムネイル ID（削除時 GC に使う）。 */
+    thumbnailObjectId?: string | null,
   ) => Promise<void>;
   handleImageCreated: (
     imageUrl: string,
@@ -54,8 +52,7 @@ export interface UseFloatingActionButtonHandlersResult {
 export function useFloatingActionButtonHandlers(
   options: UseFloatingActionButtonHandlersOptions,
 ): UseFloatingActionButtonHandlersResult {
-  const { createNewPage, setIsWebClipperOpen, setIsImageDialogOpen, noteId, onAddExistingPage } =
-    options;
+  const { createNewPage, setIsWebClipperOpen, setIsImageDialogOpen, noteId } = options;
   const { t } = useTranslation();
   const navigate = useNavigate();
   const createPageMutation = useCreatePage();
@@ -64,27 +61,48 @@ export function useFloatingActionButtonHandlers(
 
   /**
    * 作成済みページをノートに紐づけ、ノート配下のパスに遷移する。
-   * Link the created page to the current note (if any) and navigate into it.
+   * Issue #889 Phase 3 で `/pages/:id` を廃止。`noteId` プロップが渡されている
+   * 場合は明示再紐づけ（ノートビューの FAB 経路）→`/notes/:noteId/:pageId`、
+   * 未指定時はサーバが返す `newPage.noteId`（呼び出し元のデフォルトノート）
+   * 配下へ遷移する。紐づけに失敗してもページ自体は作成済みなので、デフォルト
+   * ノート配下にフォールバック遷移し、ユーザーが孤立ページに辿り着けるよう
+   * にする（toast には「指定ノートへの追加に失敗」と明示）。
+   *
+   * Link the freshly-created page to the current note (if any) and navigate
+   * to it. After Issue #889 Phase 3 retired `/pages/:id`, callers always land
+   * on `/notes/:noteId/:pageId`: either the explicit `noteId` prop (after a
+   * successful re-link) or the page's own `noteId` (the caller's default
+   * note). On re-link failure the page itself was still created, so we fall
+   * back to the default-note URL and surface a toast that calls out the
+   * actual failure (attaching to the requested note) instead of stranding
+   * the user.
    */
   const linkAndNavigate = useCallback(
-    async (pageId: string, navState?: Record<string, unknown>): Promise<void> => {
-      if (noteId) {
+    async (newPage: Page, navState?: Record<string, unknown>): Promise<void> => {
+      if (noteId && noteId !== newPage.noteId) {
         try {
-          await addPageToNoteMutation.mutateAsync({ noteId, pageId });
+          await addPageToNoteMutation.mutateAsync({ noteId, pageId: newPage.id });
         } catch (error) {
-          // 紐づけ失敗時はスタンドアロンページとして遷移させ、ユーザー操作を止めない。
-          // If linking fails, fall back to the standalone page so the user
-          // can still see and edit their newly created page.
           console.error("Failed to attach page to note:", error);
-          navigate(`/pages/${pageId}`, navState ? { state: navState } : undefined);
+          toast({
+            title: t("common.attachPageToNoteFailed"),
+            variant: "destructive",
+          });
+          navigate(
+            `/notes/${newPage.noteId}/${newPage.id}`,
+            navState ? { state: navState } : undefined,
+          );
           return;
         }
-        navigate(`/notes/${noteId}/${pageId}`, navState ? { state: navState } : undefined);
+        navigate(`/notes/${noteId}/${newPage.id}`, navState ? { state: navState } : undefined);
         return;
       }
-      navigate(`/pages/${pageId}`, navState ? { state: navState } : undefined);
+      navigate(
+        `/notes/${newPage.noteId}/${newPage.id}`,
+        navState ? { state: navState } : undefined,
+      );
     },
-    [addPageToNoteMutation, navigate, noteId],
+    [addPageToNoteMutation, navigate, noteId, toast, t],
   );
 
   const handleMenuSelect = useCallback(
@@ -98,9 +116,6 @@ export function useFloatingActionButtonHandlers(
           break;
         case "image":
           setIsImageDialogOpen(true);
-          break;
-        case "addExisting":
-          onAddExistingPage?.();
           break;
         case "template":
           toast({
@@ -116,26 +131,52 @@ export function useFloatingActionButtonHandlers(
           break;
       }
     },
-    [createNewPage, setIsWebClipperOpen, setIsImageDialogOpen, onAddExistingPage, toast, t],
+    [createNewPage, setIsWebClipperOpen, setIsImageDialogOpen, toast, t],
   );
 
   const handleWebClipped = useCallback(
-    async (title: string, content: string, sourceUrl: string, thumbnailUrl?: string | null) => {
+    async (
+      title: string,
+      content: string,
+      sourceUrl: string,
+      thumbnailUrl?: string | null,
+      thumbnailObjectId?: string | null,
+    ) => {
+      let newPage: Awaited<ReturnType<typeof createPageMutation.mutateAsync>>;
       try {
-        const newPage = await createPageMutation.mutateAsync({
+        newPage = await createPageMutation.mutateAsync({
           title,
           content,
           sourceUrl,
           thumbnailUrl,
+          thumbnailObjectId,
         });
-        await linkAndNavigate(newPage.id, { initialContent: content });
       } catch (error) {
+        // ページ作成が失敗すると、直前にコミット済みのサムネイルを参照する行が
+        // どこにも残らず、永久にユーザーのストレージ枠を圧迫する。ベストエフォート
+        // で `DELETE /api/thumbnail/serve/:id` を叩いてオーファンを回収してから、
+        // 呼び出し元（submit hook）に失敗を伝播させる。submit hook 側はダイアログを
+        // 開いたままにしてリトライを許可する。
+        //
+        // If page creation fails after a thumbnail commit, the committed
+        // thumbnail row would otherwise be unreferenced and silently keep
+        // counting against the user's storage quota forever. Best-effort
+        // delete to roll it back, then rethrow so the submit hook can keep
+        // the dialog open and let the user retry.
+        if (thumbnailObjectId) {
+          const baseUrl = getThumbnailApiBaseUrl();
+          if (baseUrl) {
+            await deleteCommittedThumbnail(thumbnailObjectId, { baseUrl });
+          }
+        }
         console.error("Failed to create page from URL:", error);
         toast({
           title: t("common.createPageFailed"),
           variant: "destructive",
         });
+        throw error;
       }
+      await linkAndNavigate(newPage, { initialContent: content });
     },
     [createPageMutation, linkAndNavigate, toast, t],
   );
@@ -164,7 +205,7 @@ export function useFloatingActionButtonHandlers(
           title: "",
           content,
         });
-        await linkAndNavigate(newPage.id);
+        await linkAndNavigate(newPage);
       } catch (error) {
         console.error("Failed to create page from image:", error);
         toast({

@@ -59,9 +59,9 @@ export function registerAllTools(server: McpServer, client: ZediClient): void {
   server.registerTool(
     "zedi_get_page",
     {
-      title: "Get page content",
+      title: "Get page content (read-only)",
       description:
-        "Fetches the Y.Doc state and content_text for a single page. Use this to read a page's body.",
+        "Fetches the rendered plain text (`content_text`) of a single page along with its title, preview, version, and last-modified timestamp. Issue #889 Phase 5 retired MCP page-body updates: this endpoint never returns Y.Doc bytes and there is no `zedi_update_page_content` counterpart anymore (other mutating MCP tools such as `zedi_create_note` are unaffected). To edit page body content, use the Zedi web/desktop client (Hocuspocus collaborative editor).",
       inputSchema: { page_id: z.string().min(1) },
     },
     async (args) =>
@@ -88,28 +88,6 @@ export function registerAllTools(server: McpServer, client: ZediClient): void {
       wrapToolHandler(async (input) => {
         const page = await client.createPage(input);
         return jsonResult(page);
-      }, args),
-  );
-
-  server.registerTool(
-    "zedi_update_page_content",
-    {
-      title: "Update page content",
-      description:
-        "Updates a page's Y.Doc state with optimistic locking. `expected_version` must match the current version on the server.",
-      inputSchema: {
-        page_id: z.string().min(1),
-        ydoc_state: z.string().min(1),
-        expected_version: z.number().int().nonnegative(),
-        content_text: z.string().optional(),
-        content_preview: z.string().optional(),
-        title: z.string().optional(),
-      },
-    },
-    async (args) =>
-      wrapToolHandler(async ({ page_id, ...rest }) => {
-        const result = await client.updatePageContent(page_id, rest);
-        return jsonResult(result);
       }, args),
   );
 
@@ -388,7 +366,6 @@ export const ALL_TOOL_NAMES = [
   "zedi_list_pages",
   "zedi_get_page",
   "zedi_create_page",
-  "zedi_update_page_content",
   "zedi_delete_page",
   "zedi_list_notes",
   "zedi_get_note",

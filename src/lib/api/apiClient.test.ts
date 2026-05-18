@@ -149,7 +149,7 @@ describe("apiClient", () => {
       const client = createApiClient({ getToken, baseUrl: "https://api.test.example.com" });
 
       try {
-        await client.getPageContent("missing");
+        await client.getPagePublicContent("missing");
         expect.fail("Expected ApiError");
       } catch (err) {
         expect(err).toBeInstanceOf(ApiError);
@@ -297,7 +297,7 @@ describe("apiClient", () => {
 
       const client = createApiClient({ baseUrl: "https://api.test.example.com" });
 
-      await expect(client.getPageContent("x")).rejects.toMatchObject({
+      await expect(client.getPagePublicContent("x")).rejects.toMatchObject({
         status: 418,
         message: "I'm a teapot",
       });
@@ -594,6 +594,45 @@ describe("apiClient", () => {
       expect(result.results).toEqual([]);
     });
 
+    it("getMyNote sends GET to /api/notes/me and returns the parsed note (issue #825)", async () => {
+      // フロントの `/notes/me` ランディングはこのレスポンスから `id` を読み取り、
+      // `/notes/:noteId` にリダイレクトするため、エンドポイント・メソッド・
+      // 返却形状の 3 点を契約として固定する。
+      // The `/notes/me` landing depends on this method to resolve the default
+      // note id, so lock the URL, HTTP method, and response shape here.
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              id: "note-default-1",
+              owner_id: "user-1",
+              title: "user のノート",
+              visibility: "private",
+              edit_permission: "owner_only",
+              is_official: false,
+              is_default: true,
+              view_count: 0,
+              created_at: "2026-01-01T00:00:00.000Z",
+              updated_at: "2026-01-01T00:00:00.000Z",
+              is_deleted: false,
+            }),
+          ),
+        headers: new Headers(),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ getToken, baseUrl: "https://api.test.example.com" });
+      const result = await client.getMyNote();
+
+      expect(result.id).toBe("note-default-1");
+      expect(result.is_default).toBe(true);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://api.test.example.com/api/notes/me");
+      expect(init.method).toBe("GET");
+    });
+
     it("deletePage sends DELETE request", async () => {
       const fetchMock = vi.fn().mockResolvedValue({
         ok: true,
@@ -610,122 +649,208 @@ describe("apiClient", () => {
       const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       expect(init.method).toBe("DELETE");
     });
+  });
 
-    it("copyPersonalPageToNote POSTs to /api/notes/:noteId/pages/copy-from-personal/:pageId (issue #713 Phase 3)", async () => {
-      // レスポンスには `page` (SyncPageItem) が必ず同梱される想定。
-      // `useCopyPersonalPageToNote` は invalidate しかしないが、API 契約として
-      // `page` を落とすとフロント全般（sync 契約変更を含む）に波及するため、
-      // テストで明示的に返却形状を固定する。
-      // Lock the response envelope shape: clients rely on `page` being present
-      // (`useCopyPersonalPageToNote` uses it indirectly via cache keys tied to
-      // `note_id`), so a regression that drops the field should fail here.
-      const copiedPage = {
-        id: "pg-new",
-        owner_id: "user-1",
-        note_id: "note-1",
-        source_page_id: "pg-src",
-        title: "Copied",
-        content_preview: "preview",
-        thumbnail_url: null,
-        source_url: null,
-        created_at: "2026-04-23T00:00:00.000Z",
-        updated_at: "2026-04-23T00:00:00.000Z",
-        is_deleted: false,
-      };
-      const fetchMock = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        text: () =>
-          Promise.resolve(
-            JSON.stringify({
-              ok: true,
-              data: { created: true, page_id: "pg-new", sort_order: 3, page: copiedPage },
-            }),
-          ),
-        headers: new Headers(),
-      });
+  // ── getNoteWithCache (ETag / 304, Issue #853) ────────────────────────
+  describe("getNoteWithCache", () => {
+    it("sends If-None-Match and returns { notModified: true, data: null } for 304", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: false,
+          status: 304,
+          body: "",
+          headers: new Headers({ ETag: 'W/"abc123"' }),
+        }),
+      );
       vi.stubGlobal("fetch", fetchMock);
 
       const client = createApiClient({ baseUrl: "https://api.test.example.com" });
-      const result = await client.copyPersonalPageToNote("note-1", "pg-src");
+      const result = await client.getNoteWithCache("note-1", { ifNoneMatch: 'W/"abc123"' });
 
-      expect(result).toMatchObject({ created: true, page_id: "pg-new", sort_order: 3 });
-      // `page` 本体も検証する（envelope unwrapping でフィールドが落ちないこと）。
-      // Assert the page payload round-trips through envelope unwrapping intact.
-      expect(result.page).toEqual(copiedPage);
-      expect(result.page.note_id).toBe("note-1");
-      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-      expect(url).toBe(
-        "https://api.test.example.com/api/notes/note-1/pages/copy-from-personal/pg-src",
-      );
-      expect(init.method).toBe("POST");
-      // `id` 引数の encodeURIComponent を検証（パスインジェクション対策）。
-      // Verifies encodeURIComponent on ids (path-injection guard).
-      const result2 = await client.copyPersonalPageToNote("note/weird", "pg src");
-      const [url2] = fetchMock.mock.calls[1] as [string, RequestInit];
-      expect(url2).toBe(
-        "https://api.test.example.com/api/notes/note%2Fweird/pages/copy-from-personal/pg%20src",
-      );
-      expect(result2.created).toBe(true);
+      expect(result.notModified).toBe(true);
+      expect(result.data).toBeNull();
+      expect(result.etag).toBe('W/"abc123"');
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect((init.headers as Record<string, string>)["If-None-Match"]).toBe('W/"abc123"');
     });
 
-    it("copyNotePageToPersonal POSTs to /api/notes/:noteId/pages/:pageId/copy-to-personal (issue #713 Phase 3)", async () => {
-      // `useCopyNotePageToPersonal` は `result.page` を IDB へ書き戻すため、
-      // API が `page` を返し切ることを契約として固定する（回帰防止）。
-      // Lock the response contract: `useCopyNotePageToPersonal` writes
-      // `result.page` through to IndexedDB, so dropping the field here would
-      // break `/home` reflection — this test catches that regression.
-      const copiedPage = {
-        id: "pg-c",
+    it("returns parsed body and ETag header on 200", async () => {
+      const noteBody = {
+        id: "note-1",
         owner_id: "user-1",
-        note_id: null,
-        source_page_id: "pg-note-native",
-        title: "Copied",
-        content_preview: "preview",
-        thumbnail_url: null,
-        source_url: null,
-        created_at: "2026-04-23T00:00:00.000Z",
-        updated_at: "2026-04-23T00:00:00.000Z",
+        title: "T",
+        visibility: "private",
+        edit_permission: "owner_only",
+        is_official: false,
+        view_count: 0,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
         is_deleted: false,
+        current_user_role: "owner",
+        pages: [],
       };
-      const fetchMock = vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        text: () =>
-          Promise.resolve(
-            JSON.stringify({
-              ok: true,
-              data: { created: true, page_id: "pg-c", page: copiedPage },
-            }),
-          ),
-        headers: new Headers(),
-      });
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: true,
+          status: 200,
+          body: JSON.stringify(noteBody),
+          headers: new Headers({ ETag: 'W/"fresh"' }),
+        }),
+      );
       vi.stubGlobal("fetch", fetchMock);
 
       const client = createApiClient({ baseUrl: "https://api.test.example.com" });
-      const result = await client.copyNotePageToPersonal("note-a", "pg-note-native");
+      const result = await client.getNoteWithCache("note-1");
 
-      expect(result).toMatchObject({ created: true, page_id: "pg-c" });
-      // 個人スコープへのコピーなので `note_id` は null であること。
-      // Personal-scope copy → `note_id` must be null.
-      expect(result.page).toEqual(copiedPage);
-      expect(result.page.note_id).toBeNull();
-      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-      expect(url).toBe(
-        "https://api.test.example.com/api/notes/note-a/pages/pg-note-native/copy-to-personal",
-      );
-      expect(init.method).toBe("POST");
+      expect(result.notModified).toBe(false);
+      expect(result.data).toMatchObject({ id: "note-1", current_user_role: "owner" });
+      expect(result.etag).toBe('W/"fresh"');
+    });
 
-      // 予約文字（`/` / 空白）を含む ID もパスセグメントとして encodeURIComponent
-      // される（copyPersonalPageToNote 側と同じパスインジェクション対策）。
-      // Reserved characters (`/`, space) in IDs must be encodeURIComponent'd
-      // per segment — mirrors the guard already asserted for copyPersonalPageToNote.
-      const result2 = await client.copyNotePageToPersonal("note/weird", "pg src");
-      const [url2] = fetchMock.mock.calls[1] as [string, RequestInit];
-      expect(url2).toBe(
-        "https://api.test.example.com/api/notes/note%2Fweird/pages/pg%20src/copy-to-personal",
+    it("does not include If-None-Match when no ETag is provided", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: true,
+          status: 200,
+          body: JSON.stringify({
+            id: "note-1",
+            owner_id: "user-1",
+            title: "T",
+            visibility: "private",
+            edit_permission: "owner_only",
+            is_official: false,
+            view_count: 0,
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-01-01T00:00:00Z",
+            is_deleted: false,
+            current_user_role: "owner",
+            pages: [],
+          }),
+          headers: new Headers(),
+        }),
       );
-      expect(result2.created).toBe(true);
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      await client.getNoteWithCache("note-1");
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect((init.headers as Record<string, string>)["If-None-Match"]).toBeUndefined();
+    });
+  });
+
+  // ── getNotePages (keyset cursor pagination, Issue #860 Phase 1/3) ──────────
+  describe("getNotePages", () => {
+    function emptyWindowBody() {
+      return JSON.stringify({ items: [], next_cursor: null });
+    }
+
+    it("omits cursor / limit / include query params when not supplied", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: true,
+          status: 200,
+          body: emptyWindowBody(),
+          headers: new Headers(),
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      await client.getNotePages("note-1");
+
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const parsed = new URL(url);
+      expect(parsed.pathname).toBe("/api/notes/note-1/pages");
+      expect(parsed.searchParams.has("cursor")).toBe(false);
+      expect(parsed.searchParams.has("limit")).toBe(false);
+      expect(parsed.searchParams.has("include")).toBe(false);
+    });
+
+    it("encodes cursor, limit, and include as query params", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: true,
+          status: 200,
+          body: emptyWindowBody(),
+          headers: new Headers(),
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      await client.getNotePages("note-1", {
+        cursor: "cursor-abc",
+        limit: 25,
+        include: ["preview", "thumbnail"],
+      });
+
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get("cursor")).toBe("cursor-abc");
+      expect(parsed.searchParams.get("limit")).toBe("25");
+      // 順序はクライアント側で `sort` していないため、`include` の出力順は入力順に従う。
+      // The client does not sort `include` tokens, so the value preserves call order.
+      expect(parsed.searchParams.get("include")).toBe("preview,thumbnail");
+    });
+
+    it("deduplicates repeated include tokens", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: true,
+          status: 200,
+          body: emptyWindowBody(),
+          headers: new Headers(),
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      await client.getNotePages("note-1", {
+        include: ["preview", "preview", "thumbnail"],
+      });
+
+      const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+      const parsed = new URL(url);
+      expect(parsed.searchParams.get("include")).toBe("preview,thumbnail");
+    });
+
+    it("returns the parsed { items, next_cursor } body", async () => {
+      const body = {
+        items: [
+          {
+            id: "p1",
+            owner_id: "u1",
+            note_id: "note-1",
+            source_page_id: null,
+            title: "Page 1",
+            content_preview: "preview",
+            thumbnail_url: null,
+            source_url: null,
+            created_at: "2026-05-13T00:00:00.000000Z",
+            updated_at: "2026-05-13T00:00:00.000000Z",
+            is_deleted: false,
+          },
+        ],
+        next_cursor: "next-cursor",
+      };
+      const fetchMock = vi.fn().mockResolvedValue(
+        mockResponse({
+          ok: true,
+          status: 200,
+          body: JSON.stringify(body),
+          headers: new Headers(),
+        }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      const result = await client.getNotePages("note-1");
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]?.id).toBe("p1");
+      expect(result.next_cursor).toBe("next-cursor");
     });
   });
 });

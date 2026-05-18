@@ -1,51 +1,79 @@
 /**
  * E2E: Web Clipper clipUrl flow (Chrome extension integration).
- * clipUrl 付き起動 → WebClipperDialog 自動 open → URL プリフィル確認
+ * `/notes/me?clipUrl=...` 経由（issue #826）、および旧 `/home?clipUrl=...`
+ * 経由（互換層）の双方で WebClipperDialog が自動 open し、URL がプリフィル
+ * されることを検証する。
+ *
+ * E2E coverage for the Chrome-extension clip hand-off. After issue #826 the
+ * canonical entry point is `/notes/me?clipUrl=...`; the legacy
+ * `/home?clipUrl=...` URL must keep working as a query-preserving redirect
+ * until the extension itself is updated (issue #829).
  */
 import { test, expect } from "./auth-mock";
 
 test.describe("Web Clipper clipUrl flow", () => {
   test.setTimeout(60000);
 
-  test("should auto-open Web Clipper dialog with clipUrl prefilled", async ({
+  test("auto-opens the dialog with clipUrl prefilled when hitting /notes/me directly", async ({
     page,
-    helpers: _helpers,
   }) => {
     const clipUrl = "https://example.com/article";
     await page.goto(
-      `/home?${new URLSearchParams({ clipUrl, from: "chrome-extension" }).toString()}`,
+      `/notes/me?${new URLSearchParams({ clipUrl, from: "chrome-extension" }).toString()}`,
     );
     await page.waitForLoadState("networkidle");
 
-    // With mock auth (VITE_E2E_TEST), user is signed in; dialog should auto-open
+    // With mock auth (VITE_E2E_TEST), the user is signed in; the dialog should
+    // auto-open after `/notes/me` resolves to `/notes/:noteId?clipUrl=...`.
+    // モック認証（VITE_E2E_TEST）ではサインイン済みなので、`/notes/me` が
+    // `/notes/:noteId?clipUrl=...` に解決された後にダイアログが自動で開く。
     const dialog = page.getByRole("dialog").filter({ hasText: /URL.*取り込み|Import from URL/i });
     await expect(dialog).toBeVisible({ timeout: 10000 });
 
-    // URL input should be prefilled
+    // URL input should be prefilled.
+    // URL 入力欄には clipUrl がプリフィルされる。
     const urlInput = page.getByPlaceholder(/URL.*入力|Enter URL/i);
     await expect(urlInput).toBeVisible();
     await expect(urlInput).toHaveValue(clipUrl);
   });
 
-  test("should not open dialog for invalid clipUrl", async ({ page }) => {
-    const invalidUrl = "chrome://extensions";
-    await page.goto(`/home?${new URLSearchParams({ clipUrl: invalidUrl }).toString()}`);
+  test("legacy /home?clipUrl=... still forwards to /notes/me and auto-opens the dialog", async ({
+    page,
+  }) => {
+    const clipUrl = "https://example.com/legacy";
+    await page.goto(
+      `/home?${new URLSearchParams({ clipUrl, from: "chrome-extension" }).toString()}`,
+    );
     await page.waitForLoadState("networkidle");
 
-    // Dialog should not auto-open for invalid URL
+    // /home preserves search params and redirects to /notes/me, which then
+    // resolves to /notes/:noteId?clipUrl=... — the dialog should still open.
+    // /home は search params を保ったまま /notes/me にリダイレクトし、その後
+    // /notes/:noteId?clipUrl=... に解決されるため、ダイアログは開き続ける。
+    const dialog = page.getByRole("dialog").filter({ hasText: /URL.*取り込み|Import from URL/i });
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+    const urlInput = page.getByPlaceholder(/URL.*入力|Enter URL/i);
+    await expect(urlInput).toHaveValue(clipUrl);
+  });
+
+  test("does not open the dialog when clipUrl fails the URL policy", async ({ page }) => {
+    const invalidUrl = "chrome://extensions";
+    await page.goto(`/notes/me?${new URLSearchParams({ clipUrl: invalidUrl }).toString()}`);
+    await page.waitForLoadState("networkidle");
+
+    // Invalid URLs are stripped at /notes/me; the dialog must stay closed.
+    // 無効な URL は /notes/me で剥がされるため、ダイアログは閉じたままになる。
     const dialog = page.getByRole("dialog").filter({ hasText: /URL.*取り込み|Import from URL/i });
     await expect(dialog).not.toBeVisible();
   });
 
-  test("should open Web Clipper with clipUrl prefilled when from param is omitted", async ({
+  test("opens the dialog with clipUrl prefilled even when from= param is omitted", async ({
     page,
-    helpers: _helpers,
   }) => {
     const clipUrl = "https://example.com/page";
-    await page.goto(`/home?${new URLSearchParams({ clipUrl }).toString()}`);
+    await page.goto(`/notes/me?${new URLSearchParams({ clipUrl }).toString()}`);
     await page.waitForLoadState("networkidle");
 
-    // With mock auth, user is signed in; dialog should open even without from=chrome-extension
     const dialog = page.getByRole("dialog").filter({ hasText: /URL.*取り込み|Import from URL/i });
     await expect(dialog).toBeVisible({ timeout: 10000 });
     const urlInput = page.getByPlaceholder(/URL.*入力|Enter URL/i);

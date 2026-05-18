@@ -164,4 +164,53 @@ describe("commitImage — BETTER_AUTH_URL handling", () => {
     expect(imageUrl.startsWith("https://zedi.example.com/api/thumbnail/serve/")).toBe(true);
     expect(imageUrl.startsWith("https://zedi.example.com//")).toBe(false);
   });
+
+  it("imageUrl と objectId のペアを返し、両者が一致する / returns matching imageUrl and objectId", async () => {
+    setBaseEnv();
+
+    const { commitImage } = await importCommitService();
+    const db = makeDbMock("free", 10 * 1024 * 1024, 0) as never;
+
+    const { imageUrl, objectId } = await commitImage(TEST_USER_ID, DATA_URI, undefined, db);
+
+    expect(objectId).toMatch(/^[0-9a-f-]+$/);
+    expect(imageUrl.endsWith(`/api/thumbnail/serve/${objectId}`)).toBe(true);
+  });
+
+  it("クォータ未シードでも 100MB のフォールバックでアップロードできる / accepts upload using 100MB fallback when quota table is unseeded", async () => {
+    setBaseEnv();
+
+    const { commitImage } = await importCommitService();
+    // クォータ行が無い（rows[] = []）状態を再現する。
+    // Simulate the unseeded `thumbnail_tier_quotas` table.
+    const db = new Proxy(
+      {},
+      {
+        get(_, prop: string) {
+          return () => {
+            const chain = (final: unknown): unknown =>
+              new Proxy(
+                {},
+                {
+                  get(_t, p: string) {
+                    if (p === "then") {
+                      return (resolve?: (v: unknown) => unknown) =>
+                        Promise.resolve(final).then(resolve);
+                    }
+                    return () => chain(final);
+                  },
+                },
+              );
+            if (prop === "select") return chain([]);
+            if (prop === "insert") return chain([]);
+            return chain([]);
+          };
+        },
+      },
+    ) as never;
+
+    await expect(commitImage(TEST_USER_ID, DATA_URI, undefined, db)).resolves.toMatchObject({
+      objectId: expect.stringMatching(/^[0-9a-f-]+$/),
+    });
+  });
 });

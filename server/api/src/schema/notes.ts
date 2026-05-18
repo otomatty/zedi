@@ -7,15 +7,23 @@ import {
   integer,
   primaryKey,
   index,
+  uniqueIndex,
   unique,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { users } from "./users.js";
-import { pages } from "./pages.js";
 
-export /**
+/**
+ * ノート（複数ページのまとまり）。
+ * 各ユーザーには `is_default = true` のデフォルトノートが 1 件だけ存在する
+ * （旧来の「個人ページ」概念の置き換え）。タイトルは `<users.name>のノート`。
  *
+ * Note (a collection of pages). Every user owns exactly one default note
+ * (`is_default = true`) titled `<users.name>のノート`. The default note
+ * replaces the previous "personal pages" concept; deletion is rejected at the
+ * API layer (`routes/notes/crud.ts`).
  */
-const notes = pgTable(
+export const notes = pgTable(
   "notes",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -33,6 +41,39 @@ const notes = pgTable(
       .default("owner_only"),
     isOfficial: boolean("is_official").notNull().default(false),
     viewCount: integer("view_count").notNull().default(0),
+    /**
+     * ユーザーごとに 1 件存在するデフォルトノート（マイノート）であることを示す。
+     * 部分ユニーク index `idx_notes_unique_default_per_owner` により有効な
+     * デフォルトは 1 ユーザーにつき 1 件のみ。削除拒否はアプリ層で行う。
+     *
+     * Marks the user's single default note ("マイノート"). The partial unique
+     * index `idx_notes_unique_default_per_owner` keeps at most one live default
+     * per owner; the delete guard lives in the API layer.
+     */
+    isDefault: boolean("is_default").notNull().default(false),
+    /**
+     * ノートのオーナーが「`/notes/:noteId` のページ一覧上部にタグフィルタバーを
+     * 既定で表示する」と宣言する真偽値。ユーザーは localStorage で個別に上書き
+     * できる (`zedi-note-filter-preferences`)。
+     *
+     * Owner-declared default for showing the tag filter bar above the page
+     * list on `/notes/:noteId`. Individual users can override it via
+     * localStorage (`zedi-note-filter-preferences`).
+     */
+    showTagFilterBar: boolean("show_tag_filter_bar").notNull().default(false),
+    /**
+     * フィルタバーの既定選択タグ (小文字キー)。空配列は「既定では何も選択しない」、
+     * `['__none__']` は「タグなしページのみ」を既定にする。URL の `?tags=` が
+     * 指定されていればそちらが優先される。
+     *
+     * Default tag selection (lower-cased keys) for the filter bar. An empty
+     * array means "select nothing by default"; `['__none__']` defaults to
+     * "untagged pages only". The URL `?tags=` always wins over this default.
+     */
+    defaultFilterTags: text("default_filter_tags")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     isDeleted: boolean("is_deleted").default(false).notNull(),
@@ -42,58 +83,22 @@ const notes = pgTable(
     index("idx_notes_visibility").on(table.visibility),
     index("idx_notes_edit_permission").on(table.editPermission),
     index("idx_notes_is_official").on(table.isOfficial),
+    /**
+     * 1 ユーザーにつき有効なデフォルトノートは 1 件のみ。
+     * At most one live default note per owner.
+     */
+    uniqueIndex("idx_notes_unique_default_per_owner")
+      .on(table.ownerId)
+      .where(sql`${table.isDefault} = true AND ${table.isDeleted} = false`),
   ],
 );
 
-/**
- *
- */
+/** Select type for the notes table. / notes テーブルの SELECT 型。 */
 export type Note = typeof notes.$inferSelect;
-/**
- *
- */
+/** Insert type for the notes table. / notes テーブルの INSERT 型。 */
 export type NewNote = typeof notes.$inferInsert;
 
-export /**
- *
- */
-const notePages = pgTable(
-  "note_pages",
-  {
-    noteId: uuid("note_id")
-      .notNull()
-      .references(() => notes.id, { onDelete: "cascade" }),
-    pageId: uuid("page_id")
-      .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
-    addedByUserId: text("added_by_user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    sortOrder: integer("sort_order").notNull().default(0),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-    isDeleted: boolean("is_deleted").default(false).notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.noteId, table.pageId] }),
-    index("idx_note_pages_note_id").on(table.noteId),
-    index("idx_note_pages_page_id").on(table.pageId),
-  ],
-);
-
-/**
- *
- */
-export type NotePage = typeof notePages.$inferSelect;
-/**
- *
- */
-export type NewNotePage = typeof notePages.$inferInsert;
-
-export /**
- *
- */
-const noteMembers = pgTable(
+export const noteMembers = pgTable(
   "note_members",
   {
     noteId: uuid("note_id")
@@ -207,7 +212,7 @@ export const noteInviteLinks = pgTable(
       .default("viewer"),
     createdByUserId: text("created_by_user_id")
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "cascade" }),
     /** 有効期限（必須、無期限リンクは作れない） / Expiration (required; no forever links) */
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     /** 利用上限。null は無制限 / Max redemptions; null means unlimited */
@@ -253,7 +258,7 @@ export const noteInviteLinkRedemptions = pgTable(
       .references(() => noteInviteLinks.id, { onDelete: "cascade" }),
     redeemedByUserId: text("redeemed_by_user_id")
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "cascade" }),
     /** 受諾時点のメールアドレス（監査用） / Email at the time of redemption */
     redeemedEmail: text("redeemed_email").notNull(),
     redeemedAt: timestamp("redeemed_at", { withTimezone: true }).defaultNow().notNull(),
@@ -261,6 +266,13 @@ export const noteInviteLinkRedemptions = pgTable(
   (table) => [
     unique("uq_note_invite_link_redemptions_link_user").on(table.linkId, table.redeemedByUserId),
     index("idx_note_invite_link_redemptions_link").on(table.linkId),
+    // `redeemed_by_user_id` 単体のインデックス。`(link_id, redeemed_by_user_id)` の
+    // 複合ユニークでは先頭列でない当列を引けず、`ON DELETE CASCADE` 時の
+    // ユーザー削除でシーケンシャルスキャンになるのを避ける。
+    // Standalone index on `redeemed_by_user_id`; the composite unique above
+    // cannot serve queries that filter only by this column, so cascade
+    // deletes from `user` would otherwise sequential-scan this table.
+    index("idx_note_invite_link_redemptions_user").on(table.redeemedByUserId),
   ],
 );
 

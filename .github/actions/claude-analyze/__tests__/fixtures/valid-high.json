@@ -1,0 +1,17 @@
+{
+  "severity": "high",
+  "ai_summary": "Database migration failed mid-flight, leaving rows with NULL note_id and breaking page lookups.",
+  "ai_root_cause": "Migration 0042 added a NOT NULL constraint without backfilling. Existing rows pre-dating the migration have NULL and the SELECT path crashes.",
+  "ai_suggested_fix": "Backfill note_id from pages.owner_id where NULL, then re-apply the NOT NULL constraint in a follow-up migration.",
+  "ai_suspected_files": [
+    {
+      "path": "server/api/drizzle/0042_add_note_id.sql",
+      "reason": "Introduced the NOT NULL constraint without a backfill step.",
+      "line": 12
+    },
+    {
+      "path": "server/api/src/services/pageService.ts",
+      "reason": "SELECT path that throws when note_id is NULL."
+    }
+  ]
+}

@@ -79,7 +79,7 @@ const createWrapper = () => {
 describe("useAIChatActions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCreatePageMutateAsync.mockResolvedValue({ id: "new-page-id" });
+    mockCreatePageMutateAsync.mockResolvedValue({ id: "new-page-id", noteId: "note-1" });
     mockUpdatePageMutateAsync.mockResolvedValue(undefined);
     mockSyncLinks.mockResolvedValue(undefined);
   });
@@ -110,7 +110,7 @@ describe("useAIChatActions", () => {
       title: "New Page",
       content: "Content",
     });
-    expect(mockNavigate).toHaveBeenCalledWith("/pages/new-page-id");
+    expect(mockNavigate).toHaveBeenCalledWith("/notes/note-1/new-page-id");
   });
 
   it("append-to-page without pageContext shows pageContextRequired toast", async () => {

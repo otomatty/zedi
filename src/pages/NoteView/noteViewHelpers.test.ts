@@ -15,30 +15,12 @@ describe("getNoteViewPermissions", () => {
     });
   });
 
-  describe("canAddPage", () => {
-    it("returns true when access.canAddPage is true regardless of noteSource", () => {
-      expect(getNoteViewPermissions({ canAddPage: true }, "local").canAddPage).toBe(true);
-      expect(getNoteViewPermissions({ canAddPage: true }, "remote").canAddPage).toBe(true);
-      expect(getNoteViewPermissions({ canAddPage: false }, "local").canAddPage).toBe(false);
-      expect(getNoteViewPermissions(undefined, "local").canAddPage).toBe(false);
-    });
-  });
-
-  describe("canShowAddPage", () => {
-    it("returns true when canEdit OR canAddPage (either permits showing add-page UI)", () => {
-      expect(
-        getNoteViewPermissions({ canEdit: true, canAddPage: false }, "local").canShowAddPage,
-      ).toBe(true);
-      expect(
-        getNoteViewPermissions({ canEdit: false, canAddPage: true }, "local").canShowAddPage,
-      ).toBe(true);
-      expect(
-        getNoteViewPermissions({ canEdit: true, canAddPage: true }, "local").canShowAddPage,
-      ).toBe(true);
-      expect(
-        getNoteViewPermissions({ canEdit: false, canAddPage: false }, "local").canShowAddPage,
-      ).toBe(false);
-      expect(getNoteViewPermissions({ canAddPage: true }, "remote").canShowAddPage).toBe(true);
+  describe("canView", () => {
+    it("returns true when access.canView is true regardless of noteSource", () => {
+      expect(getNoteViewPermissions({ canView: true }, "local").canView).toBe(true);
+      expect(getNoteViewPermissions({ canView: true }, "remote").canView).toBe(true);
+      expect(getNoteViewPermissions({ canView: false }, "local").canView).toBe(false);
+      expect(getNoteViewPermissions(undefined, "local").canView).toBe(false);
     });
   });
 

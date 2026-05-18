@@ -13,7 +13,7 @@ import {
   useParams,
 } from "react-router-dom";
 import Landing from "./pages/Landing";
-import Home from "./pages/Home";
+import NoteMeRedirect from "./pages/NoteMeRedirect";
 import Notes from "./pages/Notes";
 import NotesDiscover from "./pages/NotesDiscover";
 import OfficialGuidePlaceholder from "./pages/OfficialGuidePlaceholder";
@@ -22,7 +22,7 @@ import AuthCallback from "./pages/AuthCallback";
 import ExtensionAuth from "./pages/ExtensionAuth";
 import ExtensionAuthCallback from "./pages/ExtensionAuthCallback";
 import McpAuthorize from "./pages/McpAuthorize";
-import PageEditorPage from "./pages/PageEditor";
+import PdfReaderPage from "./pages/pdfKnowledge/PdfReaderPage";
 import Settings from "./pages/Settings";
 import WikiSchemaPage from "./pages/WikiSchemaPage";
 import IndexPage from "./pages/IndexPage";
@@ -33,7 +33,13 @@ import NotFound from "./pages/NotFound";
 import NoteView from "./pages/NoteView";
 import NotePageView from "./pages/NotePageView";
 import NoteSettings from "./pages/NoteSettings";
-import NoteMembers from "./pages/NoteMembers";
+import GeneralSection from "./pages/NoteSettings/sections/GeneralSection";
+import VisibilitySection from "./pages/NoteSettings/sections/VisibilitySection";
+import MembersSection from "./pages/NoteSettings/sections/MembersSection";
+import LinksSection from "./pages/NoteSettings/sections/LinksSection";
+import DomainsSection from "./pages/NoteSettings/sections/DomainsSection";
+import DangerZoneSection from "./pages/NoteSettings/sections/DangerZoneSection";
+import TagFilterBarSection from "./pages/NoteSettings/sections/TagFilterBarSection";
 import Onboarding from "./pages/Onboarding";
 import AIChatHistory from "./pages/AIChatHistory";
 import AIChatLanding from "./pages/AIChatLanding";
@@ -60,24 +66,51 @@ function LegacyAIChatConversationRedirect() {
 }
 
 /**
- * Redirect singular `/page/:id` to plural `/pages/:id` while preserving search/hash.
- * 旧パス `/page/:id` を複数形 `/pages/:id` にリダイレクト（search/hash は保持）。
+ * Redirect legacy `/home` to `/notes/me`, preserving search and hash.
+ * Chrome 拡張（`/home?clipUrl=...&from=chrome-extension`）など、`/home` を直接
+ * 叩いてくる旧クライアントを救済するため、クエリ・ハッシュをそのまま転送する
+ * （issue #826）。
+ *
+ * Forwards `/home?<query>#<hash>` to `/notes/me?<query>#<hash>` so legacy
+ * Chrome-extension hand-offs (e.g. `/home?clipUrl=...`) keep working until the
+ * extension itself is updated to call `/notes/me` directly (issue #826).
  */
-function LegacyPageRedirect() {
-  const { id } = useParams<{ id: string }>();
+function LegacyHomeRedirect() {
   const { search, hash } = useLocation();
-  return <Navigate to={`/pages/${id}${search}${hash}`} replace />;
+  return <Navigate to={`/notes/me${search}${hash}`} replace />;
 }
 
 /**
  * Redirect singular `/note/:noteId` (and sub-routes) to plural `/notes/:noteId/...`.
  * 旧パス `/note/:noteId` 系を複数形 `/notes/:noteId/...` にリダイレクト。
+ *
+ * `suffix === "members"` は新仕様で `/notes/:id/settings/members` 配下に
+ * 統合済みなので、設定画面のメンバーセクションへ転送する。
+ *
+ * `suffix === "members"` is folded into the settings layout under
+ * `/notes/:id/settings/members`, so the redirect targets that subroute.
  */
 function LegacyNoteRedirect({ suffix }: { suffix?: "settings" | "members" }) {
   const { noteId } = useParams<{ noteId: string }>();
   const { search, hash } = useLocation();
-  const tail = suffix ? `/${suffix}` : "";
+  const tail =
+    suffix === "members" ? "/settings/members" : suffix === "settings" ? "/settings" : "";
   return <Navigate to={`/notes/${noteId}${tail}${search}${hash}`} replace />;
+}
+
+/**
+ * Redirect the legacy standalone `/notes/:noteId/members` page to the
+ * settings subroute `/notes/:noteId/settings/members`. Preserves search /
+ * hash so any deep-linked filters keep working.
+ *
+ * 旧 `/notes/:noteId/members` ページを `/notes/:noteId/settings/members` に
+ * リダイレクト。search / hash はそのまま転送するので、メンバー一覧への
+ * ディープリンクは引き続き動作する。
+ */
+function LegacyMembersRedirect() {
+  const { noteId } = useParams<{ noteId: string }>();
+  const { search, hash } = useLocation();
+  return <Navigate to={`/notes/${noteId}/settings/members${search}${hash}`} replace />;
 }
 
 /**
@@ -156,8 +189,40 @@ const App = () => (
                         so every page gets the common Header + primary nav + user menu + AI dock.
                         共通 AppLayout（ヘッダー + 機能ナビ + ユーザーメニュー + AI ドック）でラップ。 */}
                     <Route element={<AppShellRoute />}>
-                      {/* Home and PageEditor: available without login (local-only mode) */}
-                      <Route path="/home" element={<Home />} />
+                      {/*
+                          `/notes/me` — landing that resolves the caller's default
+                          note via `GET /api/notes/me` and redirects to
+                          `/notes/:noteId` (issue #825). Auth-required: guests are
+                          bounced through `ProtectedRoute` so the API call never
+                          gets a 401.
+                          `/notes/me`: `GET /api/notes/me` でデフォルトノート ID を
+                          解決し、`/notes/:noteId` に 1 段リダイレクトする
+                          （issue #825）。未ログインは `ProtectedRoute` でサイン
+                          インに飛ばし、API が 401 を返さないようにする。
+                       */}
+                      <Route
+                        path="/notes/me"
+                        element={
+                          <ProtectedRoute>
+                            <NoteMeRedirect />
+                          </ProtectedRoute>
+                        }
+                      />
+                      {/*
+                          Legacy `/home` — redirect to `/notes/me` so existing
+                          bookmarks, browser extensions, and external links keep
+                          working (issue #825 acceptance criteria). Search and
+                          hash are preserved by `LegacyHomeRedirect`, which is
+                          required so the Chrome-extension `clipUrl` hand-off
+                          (`/home?clipUrl=...`) keeps round-tripping through
+                          `/notes/me?clipUrl=...` (issue #826).
+                          旧 `/home`: 既存のブックマーク / 拡張 / 外部リンク救済
+                          のため `/notes/me` にリダイレクトする（issue #825）。
+                          `LegacyHomeRedirect` で search / hash を保持し、Chrome
+                          拡張の `/home?clipUrl=...` ハンドオフを `/notes/me`
+                          経由でも動作させる（issue #826）。
+                       */}
+                      <Route path="/home" element={<LegacyHomeRedirect />} />
                       <Route path="/ai/history" element={<AIChatHistory />} />
                       <Route path="/ai/:conversationId" element={<AIChatDetail />} />
                       <Route path="/ai" element={<AIChatLanding />} />
@@ -183,10 +248,11 @@ const App = () => (
                           ページのリンクが 404 にならないよう URL を確保する。 */}
                       <Route path="/notes/official-guide" element={<OfficialGuidePlaceholder />} />
                       <Route path="/notes" element={<Notes />} />
-                      <Route path="/pages/:id" element={<PageEditorPage />} />
-                      {/* Legacy singular path — redirect to plural.
-                          旧単数形パス — 複数形にリダイレクト。 */}
-                      <Route path="/page/:id" element={<LegacyPageRedirect />} />
+                      {/* PDF 知識化ビューア (issue otomatty/zedi#389).
+                          Web から開いた場合は `PdfReaderUnsupported` を表示。
+                          PDF knowledge viewer; web falls back to the
+                          desktop-only placeholder. */}
+                      <Route path="/sources/:sourceId/pdf" element={<PdfReaderPage />} />
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/wiki-schema" element={<WikiSchemaPage />} />
                       <Route path="/index" element={<IndexPage />} />
@@ -202,8 +268,27 @@ const App = () => (
                       />
                       <Route path="/donate" element={<Donate />} />
                       <Route path="/notes/:noteId" element={<NoteView />} />
-                      <Route path="/notes/:noteId/settings" element={<NoteSettings />} />
-                      <Route path="/notes/:noteId/members" element={<NoteMembers />} />
+                      {/* Settings は `/notes/:noteId/settings/*` のネスト構造。
+                          各セクションは <Outlet /> 経由で描画され、共通レイアウト
+                          （サイドナビ + ヘッダー）は `NoteSettings` が提供する。
+                          旧 `/notes/:noteId/members` は `/settings/members` に統合。
+
+                          Settings is nested: `/notes/:noteId/settings/*` shares
+                          the `NoteSettings` layout (sidebar + header) and each
+                          subroute renders into its `<Outlet />`. The legacy
+                          `/notes/:noteId/members` page redirects into the
+                          `members` subroute below for URL backward compat. */}
+                      <Route path="/notes/:noteId/settings" element={<NoteSettings />}>
+                        <Route index element={<Navigate to="general" replace />} />
+                        <Route path="general" element={<GeneralSection />} />
+                        <Route path="visibility" element={<VisibilitySection />} />
+                        <Route path="members" element={<MembersSection />} />
+                        <Route path="links" element={<LinksSection />} />
+                        <Route path="domains" element={<DomainsSection />} />
+                        <Route path="filter-bar" element={<TagFilterBarSection />} />
+                        <Route path="danger" element={<DangerZoneSection />} />
+                      </Route>
+                      <Route path="/notes/:noteId/members" element={<LegacyMembersRedirect />} />
                       <Route path="/notes/:noteId/:pageId" element={<NotePageView />} />
                       {/* Legacy path — redirect `/notes/:noteId/pages/:pageId` to
                           the shorter `/notes/:noteId/:pageId`.

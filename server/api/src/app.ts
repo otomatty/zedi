@@ -18,6 +18,7 @@ import searchRoutes from "./routes/search.js";
 import mediaRoutes from "./routes/media.js";
 import clipRoutes from "./routes/clip.js";
 import ingestRoutes from "./routes/ingest.js";
+import pdfSourcesRoutes from "./routes/pdfSources.js";
 import wikiSchemaRoutes from "./routes/wikiSchema.js";
 import extRoutes from "./routes/ext.js";
 import mcpRoutes from "./routes/mcp.js";
@@ -34,11 +35,14 @@ import thumbGenerateRoutes from "./routes/thumbnail/imageGenerate.js";
 import thumbCommitRoutes from "./routes/thumbnail/commit.js";
 import thumbServeRoutes from "./routes/thumbnail/serve.js";
 import webhookPolarRoutes from "./routes/webhooks/polar.js";
+import webhookSentryRoutes from "./routes/webhooks/sentry.js";
+import webhookGithubAiCallbackRoutes from "./routes/webhooks/githubAiCallback.js";
 import checkoutRoutes from "./routes/checkout.js";
 import subscriptionManageRoutes from "./routes/subscriptionManage.js";
 import lintRoutes from "./routes/lint.js";
 import activityRoutes from "./routes/activity.js";
 import onboardingRoutes from "./routes/onboarding.js";
+import internalRoutes from "./routes/internal.js";
 
 /**
  * Creates and configures the Hono API app (routes, CORS, etc.).
@@ -98,6 +102,20 @@ export function createApp(): Hono<AppEnv> {
   // Webhook (no JWT auth — uses Standard Webhooks signature)
   app.route("/api/webhooks/polar", webhookPolarRoutes);
 
+  // Sentry Internal Integration webhook (HMAC-SHA256 via Client Secret)
+  // Sentry Internal Integration の webhook（Client Secret による HMAC 署名検証）
+  app.route("/api/webhooks/sentry", webhookSentryRoutes);
+
+  // GitHub Actions AI 解析結果コールバック (Epic #616 Phase 2 / issue #805)
+  // GitHub App の installation token を Authorization ヘッダで受け取り、
+  // GitHub API 越しに検証してから `api_errors` 行に AI 解析結果を書き戻す。
+  //
+  // GitHub Actions AI analysis callback (Epic #616 Phase 2 / issue #805).
+  // Authentication: GitHub App installation tokens validated via the GitHub
+  // API. Mounted outside the admin gate because the workflow has no user
+  // session.
+  app.route("/api/webhooks/github/ai-result", webhookGithubAiCallbackRoutes);
+
   // Checkout & Customer Portal
   app.route("/api", checkoutRoutes);
 
@@ -107,6 +125,10 @@ export function createApp(): Hono<AppEnv> {
   // Onboarding wizard completion + status
   // セットアップウィザード完了・状況取得
   app.route("/api/onboarding", onboardingRoutes);
+
+  // Internal-only endpoints for service-to-service calls (Hocuspocus → API).
+  // 内部サービス間専用エンドポイント (Hocuspocus → API)。x-internal-secret 必須。
+  app.route("/api/internal", internalRoutes);
 
   // Pages
   app.route("/api/pages", pageRoutes);
@@ -137,6 +159,12 @@ export function createApp(): Hono<AppEnv> {
 
   // Ingest (LLM Wiki pattern, P1)
   app.route("/api/ingest", ingestRoutes);
+
+  // Local PDF sources + highlights (issue otomatty/zedi#389).
+  // PDF binaries never reach the server — only hashes / page counts / highlights.
+  // ローカル PDF のソース行とハイライト (issue otomatty/zedi#389)。
+  // PDF バイナリ自体はサーバに渡さず、ハッシュ・ページ数・ハイライトのみを扱う。
+  app.route("/api/sources", pdfSourcesRoutes);
 
   // Wiki Schema (P3 — user-defined wiki "constitution")
   app.route("/api/wiki-schema", wikiSchemaRoutes);

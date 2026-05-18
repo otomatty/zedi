@@ -1,4 +1,12 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+  type QueryFunctionContext,
+} from "@tanstack/react-query";
 import { useAuth, useUser } from "@/hooks/useAuth";
 import { createApiClient } from "@/lib/api";
 import type {
@@ -6,14 +14,39 @@ import type {
   GetNoteResponse,
   NoteMemberItem,
   DiscoverResponse,
-  CopyNotePageToPersonalResponse,
+  NotePageWindowInclude,
+  NotePageWindowItem,
+  NotePageWindowResponse,
 } from "@/lib/api/types";
 import type { Note, NoteAccess, NoteMember, NoteMemberRole } from "@/types/note";
 import type { Page, PageSummary } from "@/types/page";
-import { pageKeys, useRepository } from "@/hooks/usePageQueries";
+import type { SelectedTags } from "@/types/tagFilter";
+import { serializeTagsParam } from "@/lib/noteTagFilterBar/urlTagsCodec";
 
 /** Page in a note with who added it (for canDeletePage). */
 export type NotePageSummary = PageSummary & { addedByUserId: string };
+
+/**
+ * `useNoteTitleIndex` が返す軽量タイトル行（issue #860 Phase 6）。
+ * wiki link の解決・AI chat scope sync・追加 dialog の重複判定など、
+ * ノート全ページの「タイトル文字列だけ」を完全集合として必要とする経路で
+ * 使うため、`PageSummary` 全体ではなく id / title / isDeleted / updatedAt
+ * の 4 フィールドだけを返す。
+ *
+ * Lightweight title row returned by {@link useNoteTitleIndex} (issue #860
+ * Phase 6). Carries only the four fields the full-set consumers actually
+ * read, so the entry stays small even on notes with thousands of pages.
+ */
+export interface NotePageTitle {
+  /** Page id (UUID). */
+  id: string;
+  /** Page title; empty string when the page has no title yet. */
+  title: string;
+  /** Soft-delete flag from the source row; consumers exclude tombstones from autocomplete. */
+  isDeleted: boolean;
+  /** Epoch milliseconds derived from `pages.updated_at`. */
+  updatedAt: number;
+}
 
 /**
  * Note 関連クエリ・ミューテーションで共有する React Query キー群。
@@ -24,14 +57,106 @@ export const noteKeys = {
   lists: () => [...noteKeys.all, "list"] as const,
   list: (userId: string, userEmail?: string) =>
     [...noteKeys.lists(), userId, userEmail ?? ""] as const,
+  /**
+   * `GET /api/notes/me` のキー。`/notes/me` ランディングがデフォルトノート ID を
+   * 解決する際に使う（issue #825）。userId 単位でキャッシュし、別アカウントへの
+   * 切り替え時は別キーになるようにする。
+   *
+   * Cache key for `GET /api/notes/me`. Used by the `/notes/me` landing page to
+   * resolve the default note id (issue #825). Keyed per `userId` so account
+   * switches do not bleed cache.
+   */
+  myNote: (userId: string) => [...noteKeys.all, "me", userId] as const,
   details: () => [...noteKeys.all, "detail"] as const,
   detail: (noteId: string, userId?: string, userEmail?: string) =>
     [...noteKeys.details(), noteId, userId ?? "", userEmail ?? ""] as const,
+  /**
+   * `noteId` 配下のすべての detail エントリ（任意の `userId` / `userEmail`）に
+   * 一致するプレフィックスキー。`invalidateQueries` のターゲットとして使う。
+   * Issue #848 で `useNotePages` を `useNote` と同じキーに統一した結果、
+   * 旧 `pageList(noteId)` 無効化はこちらに置き換えられる。
+   *
+   * Prefix key matching every detail entry for `noteId` regardless of caller
+   * `userId` / `userEmail`. Used as the `invalidateQueries` target after
+   * mutations that change the page list. Issue #848 collapsed `useNotePages`
+   * onto the same key as `useNote`, so the old `pageList(noteId)` invalidator
+   * is replaced by this one.
+   */
+  detailsByNoteId: (noteId: string) => [...noteKeys.details(), noteId] as const,
   publicList: (sort: string, limit: number, offset: number) =>
     [...noteKeys.all, "public", sort, limit, offset] as const,
   pages: () => [...noteKeys.all, "pages"] as const,
-  pageList: (noteId: string) => [...noteKeys.pages(), noteId] as const,
   page: (noteId: string, pageId: string) => [...noteKeys.pages(), noteId, pageId] as const,
+  /**
+   * `useInfiniteNotePages` の queryKey ファクトリ。`useNote` 系の detail キーとは
+   * 別系統で持ち、include トークンと pageSize までキーに含めることで、同一
+   * ノートでも異なる include / pageSize で同居できるようにする（issue #860
+   * Phase 3）。
+   *
+   * Query-key factory for `useInfiniteNotePages`. Kept separate from the
+   * `useNote` detail key so the windowed list does not collide with the legacy
+   * shell payload. `include` and `pageSize` are part of the key so different
+   * call sites can co-exist without cross-contaminating cached pages
+   * (issue #860 Phase 3).
+   */
+  pagesWindow: (
+    noteId: string,
+    userId: string,
+    userEmail: string | undefined,
+    include: ReadonlyArray<NotePageWindowInclude>,
+    pageSize: number,
+    tagFilter: SelectedTags = { kind: "none-selected" },
+  ) =>
+    [
+      ...noteKeys.pages(),
+      "window",
+      noteId,
+      userId,
+      userEmail ?? "",
+      [...include].sort().join(","),
+      pageSize,
+      // タグフィルタの正規化文字列を queryKey に混ぜることで、フィルタが変わると
+      // React Query が別 query 扱いし、既存 InfiniteData と混ざらない。
+      // Folding the serialized filter into the key forces React Query to treat
+      // each filter as a distinct query, preventing stale `InfiniteData`
+      // windows from polluting the next filter state.
+      serializeTagsParam(tagFilter) ?? "",
+    ] as const,
+  /**
+   * `noteId` 配下のすべての window エントリ（任意の include / pageSize / 認証
+   * プリンシパル）にマッチするプレフィックスキー。Mutation 後の
+   * `invalidateQueries` ターゲットに使う。
+   *
+   * Prefix key matching every window entry for a note regardless of include
+   * tokens, page size, or auth principal. Used as the invalidation target
+   * after mutations that change the note's page list.
+   */
+  pagesWindowByNoteId: (noteId: string) => [...noteKeys.pages(), "window", noteId] as const,
+  /**
+   * `useNoteTitleIndex` の queryKey ファクトリ。`useNote` 系の detail キー
+   * とも `useInfiniteNotePages` の window キーとも独立して持つ。認証
+   * プリンシパルでキーを分けるのは、role が変わると `/page-titles` の ETag
+   * が変わるため（同じ noteId でも owner と guest は別 cache）。
+   *
+   * Query-key factory for `useNoteTitleIndex` (issue #860 Phase 6). Kept
+   * separate from both the `useNote` detail key and the
+   * `useInfiniteNotePages` window key. The auth principal is part of the
+   * key because the server's title-index ETag is role-aware (owner /
+   * editor / guest get distinct validators for the same note id).
+   */
+  titleIndex: (noteId: string, userId: string, userEmail: string | undefined) =>
+    [...noteKeys.all, "title-index", noteId, userId, userEmail ?? ""] as const,
+  /**
+   * Prefix key matching every title-index entry for `noteId` regardless of
+   * auth principal. Used by SSE event handlers to patch all variants of the
+   * cached title index after a `page.added` / `page.deleted` event.
+   *
+   * `noteId` 配下のすべての title-index エントリ（任意の認証プリンシパル）
+   * に一致するプレフィックスキー。SSE イベントハンドラが
+   * `page.added` / `page.deleted` 後にキャッシュを差分更新する際の
+   * `setQueriesData` ターゲットに使う。
+   */
+  titleIndexByNoteId: (noteId: string) => [...noteKeys.all, "title-index", noteId] as const,
   members: () => [...noteKeys.all, "members"] as const,
   memberList: (noteId: string) => [...noteKeys.members(), noteId] as const,
 };
@@ -50,7 +175,10 @@ function apiNoteToNote(item: {
   visibility: string;
   edit_permission?: string;
   is_official?: boolean;
+  is_default?: boolean;
   view_count?: number;
+  show_tag_filter_bar?: boolean;
+  default_filter_tags?: string[];
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
@@ -62,7 +190,10 @@ function apiNoteToNote(item: {
     visibility: item.visibility as Note["visibility"],
     editPermission: (item.edit_permission as Note["editPermission"]) ?? "owner_only",
     isOfficial: item.is_official ?? false,
+    isDefault: item.is_default ?? false,
     viewCount: item.view_count ?? 0,
+    showTagFilterBar: item.show_tag_filter_bar ?? false,
+    defaultFilterTags: Array.isArray(item.default_filter_tags) ? [...item.default_filter_tags] : [],
     createdAt: parseTs(item.created_at),
     updatedAt: parseTs(item.updated_at),
     isDeleted: item.is_deleted,
@@ -107,8 +238,6 @@ function buildAccessFromApi(
   const isGuest = currentUserRole === "guest";
   const canView = isOwner || isEditor || isViewer || isGuest;
   const canEdit = isOwner || isEditor;
-  const canAddPage =
-    canEdit || (note.editPermission === "any_logged_in" && canView && Boolean(userId));
   const canManageMembers = isOwner;
   const canDeletePage = (addedByUserId: string) => {
     if (isOwner) return true;
@@ -121,24 +250,44 @@ function buildAccessFromApi(
     editPermission: note.editPermission,
     canView,
     canEdit,
-    canAddPage,
     canManageMembers,
     canDeletePage,
   };
 }
 
-function apiPageToPageSummary(p: GetNoteResponse["pages"][0]): PageSummary {
+/**
+ * `GET /api/pages/:pageId` の snake_case レスポンス行（issue #860 Phase 6 で
+ * 追加した単一ページメタデータ取得経路）。`useNotePage` などが consume する。
+ *
+ * Snake-case row returned by `GET /api/pages/:pageId`, the single-page
+ * metadata route added in Phase 6 of issue #860. Consumed by `useNotePage`
+ * and any other caller that needs a single page's metadata without going
+ * through the (removed) note-shell `pages[]` array.
+ */
+interface ApiPageMetadataRow {
+  id: string;
+  owner_id: string;
+  note_id: string;
+  source_page_id: string | null;
+  title: string | null;
+  content_preview: string | null;
+  thumbnail_url: string | null;
+  source_url: string | null;
+  created_at: string;
+  updated_at: string;
+  is_deleted: boolean;
+}
+
+function apiPageToPageSummary(p: ApiPageMetadataRow): PageSummary {
   return {
     id: p.id,
     ownerUserId: p.owner_id,
-    // Phase 3 でサーバー側が `note_id` を返すようになった（issue #713）。
-    // `null` ならこのノートにリンクされているだけの個人ページ、値ありなら
-    // ノートネイティブ。note-native 限定の UI（「個人に取り込み」など）は
-    // これを見て出し分ける。
-    // Phase 3 surfaced `note_id` on the server (issue #713). `null` means a
-    // linked personal page; a non-null value means a note-native page.
-    // Note-native-only UI (e.g. "copy to personal") gates on this.
-    noteId: p.note_id ?? null,
+    // Issue #823 でデフォルトノートが導入され、ページは必ずいずれかのノートに
+    // 所属するようになったため `note_id` は常に非 null（issue #825 で
+    // フロント型も non-null に揃えた）。
+    // After issue #823 every page belongs to exactly one note, so `note_id`
+    // is always present (issue #825 also tightened the frontend type).
+    noteId: p.note_id,
     title: p.title ?? "",
     contentPreview: p.content_preview ?? undefined,
     thumbnailUrl: p.thumbnail_url ?? undefined,
@@ -149,7 +298,7 @@ function apiPageToPageSummary(p: GetNoteResponse["pages"][0]): PageSummary {
   };
 }
 
-function apiPageToPage(p: GetNoteResponse["pages"][0]): Page {
+function apiPageToPage(p: ApiPageMetadataRow): Page {
   return {
     ...apiPageToPageSummary(p),
     content: "",
@@ -221,24 +370,215 @@ export function useNotes() {
   };
 }
 
+/**
+ * デフォルトノート解決 hook の実行オプション。
+ *
+ * Runtime options for the default-note resolver hook.
+ */
+export interface UseMyNoteOptions {
+  /**
+   * クエリ実行を追加で制御する。オンボーディング中など、副作用のある
+   * default note 解決を遅らせたい画面で利用する。
+   *
+   * Additional query gate for screens that need to defer the side-effecting
+   * default-note resolution, such as the setup wizard redirect path.
+   */
+  enabled?: boolean;
+}
+
+/**
+ * デフォルトノート（マイノート）の ID を解決するフック。`GET /api/notes/me`
+ * を呼び、未作成ならサーバ側で idempotent に作成された ID を受け取る。
+ * `/notes/me` ランディング（`NoteMeRedirect`）がこの hook を使ってリダイレクト
+ * 先の `noteId` を決める。Issue #825。
+ *
+ * Resolves the caller's default note ("マイノート") id. Hits
+ * `GET /api/notes/me`, which idempotently creates one when missing. The
+ * `/notes/me` landing page (`NoteMeRedirect`) consumes the resolved `noteId`
+ * to issue the single-step redirect to `/notes/:noteId`. Issue #825.
+ */
+export function useMyNote(options: UseMyNoteOptions = {}) {
+  const { api, userId, isLoaded, isSignedIn } = useNoteApi();
+  const shouldResolve = options.enabled ?? true;
+
+  const query = useQuery({
+    queryKey: noteKeys.myNote(userId),
+    queryFn: () => api.getMyNote(),
+    // 認証必須: 未ログインで叩くと 401 が返るため、サインイン後にのみ実行する。
+    // Auth-only: the endpoint returns 401 for guests, so gate on `isSignedIn`.
+    enabled: isLoaded && isSignedIn && shouldResolve,
+    // ID は同一セッションでは変わらないため、再取得頻度を低く保つ。
+    // The id is stable for the session, so keep refetches conservative.
+    staleTime: 1000 * 60 * 5,
+  });
+
+  return query;
+}
+
 type UseNoteOptions = { allowRemote?: boolean };
+
+/**
+ * `useNote` / `useNotePages` が `GET /api/notes/:id` を叩く際に再利用する
+ * 直近 ETag を覚えておくモジュールスコープのキャッシュ（Issue #853）。
+ * 認証プリンシパルでキーを分けているのは、同じ noteId でもロールが
+ * 変われば ETag も変わるため。React Query 本体のキャッシュとは別に持つ
+ * 理由は、queryFn の中から軽量に参照したい + 304 時のフォールバックを
+ * シンプルにするため。
+ *
+ * Map の挿入順保証を利用した LRU バウンディングで、長時間セッションでも
+ * 際限なくエントリが積み上がらないようにする（上限を超えたら最古を捨てる、
+ * PR #856 Gemini medium review）。
+ *
+ * Module-scoped cache for the most-recent ETag seen for each
+ * `GET /api/notes/:id` request (Issue #853). Keyed by note id + auth
+ * principal so a role change invalidates the cached validator. Kept
+ * separate from React Query's query cache so the `queryFn` can both read
+ * and write without going through the (potentially stale) query data
+ * snapshot, and so the 304 fallback path stays straightforward.
+ *
+ * Bounded via LRU eviction (using `Map`'s insertion-order guarantee) so a
+ * long browsing session does not accumulate unbounded entries (PR #856
+ * Gemini medium review).
+ */
+const NOTE_ETAG_CACHE_MAX_ENTRIES = 64;
+const noteEtagCache = new Map<string, string>();
+
+function noteEtagKey(noteId: string, userId: string, userEmail: string | undefined): string {
+  return `${noteId}:${userId}:${userEmail ?? ""}`;
+}
+
+/** LRU read: bump the entry to most-recently-used by re-inserting it. */
+function noteEtagCacheGet(key: string): string | undefined {
+  const value = noteEtagCache.get(key);
+  if (value === undefined) return undefined;
+  noteEtagCache.delete(key);
+  noteEtagCache.set(key, value);
+  return value;
+}
+
+/** LRU write: insert as most-recently-used, evict oldest if over capacity. */
+function noteEtagCacheSet(key: string, value: string): void {
+  if (noteEtagCache.has(key)) noteEtagCache.delete(key);
+  noteEtagCache.set(key, value);
+  if (noteEtagCache.size > NOTE_ETAG_CACHE_MAX_ENTRIES) {
+    const oldest = noteEtagCache.keys().next().value;
+    if (oldest !== undefined) noteEtagCache.delete(oldest);
+  }
+}
+
+/** Test-only helper. ETag キャッシュをクリアする。 */
+export function __resetNoteEtagCacheForTesting(): void {
+  noteEtagCache.clear();
+}
+
+/**
+ * `useNote` / `useNotePages` の共通 queryFn ファクトリ。
+ * `If-None-Match` を載せて `getNoteWithCache` を呼び、304 が返れば
+ * React Query キャッシュ上の前回レスポンスをそのまま返す。
+ *
+ * Shared `queryFn` factory for `useNote` / `useNotePages`. Sends
+ * `If-None-Match` and, on a 304 response, returns the previously cached
+ * `GetNoteResponse` straight from the React Query cache so consumers see
+ * the same object reference (skipping unnecessary `select` re-runs).
+ */
+function makeNoteQueryFn(
+  noteId: string,
+  api: ReturnType<typeof createApiClient>,
+  userId: string,
+  userEmail: string | undefined,
+) {
+  return async (ctx: QueryFunctionContext<readonly unknown[]>): Promise<GetNoteResponse> => {
+    const etagKey = noteEtagKey(noteId, userId, userEmail);
+    const ifNoneMatch = noteEtagCacheGet(etagKey);
+    const result = await api.getNoteWithCache(noteId, { ifNoneMatch });
+
+    if (result.notModified) {
+      const cached = ctx.client.getQueryData<GetNoteResponse>(ctx.queryKey);
+      if (cached) return cached;
+      // 304 だがローカルキャッシュが消えている場合（タブ間で QueryCache が
+      // 別、永続化されていない、等）はサーバ側 ETag だけ拾って再フェッチする。
+      // 304 without a local cache (e.g. fresh tab, no persistence) — refetch
+      // unconditionally to recover.
+      const fresh = await api.getNoteWithCache(noteId);
+      if (fresh.etag) noteEtagCacheSet(etagKey, fresh.etag);
+      if (!fresh.data) {
+        throw new Error("Server returned 304 twice without a cached body");
+      }
+      return fresh.data;
+    }
+
+    if (result.etag) noteEtagCacheSet(etagKey, result.etag);
+    if (!result.data) {
+      throw new Error("Unexpected null body on 200 response from /api/notes/:id");
+    }
+    return result.data;
+  };
+}
+
+/**
+ * `useNote` / `useNotePages` 共通の `placeholderData` ファクトリ。
+ * `noteId` をまたぐ遷移では前ノートの結果を残して白画面を回避するが、
+ * 認証コンテキスト (`userId` / `userEmail`) が変化する遷移
+ * （ログアウト・別アカウントへの切替）では前ユーザーのデータを残さない
+ * よう `undefined` を返す。Issue #855 review (Codex P1)。
+ *
+ * Shared `placeholderData` factory for `useNote` and `useNotePages`. The
+ * previous result is preserved across `noteId` transitions to avoid the
+ * blank loading state, but it is discarded when the auth principal
+ * (`userId` / `userEmail`) changes (sign-out, account switch) so a private
+ * note that becomes inaccessible stops rendering the previous user's data
+ * mid-transition.
+ */
+function notePlaceholderDataIfSamePrincipal(userId: string, userEmail: string | undefined) {
+  const currentEmail = userEmail ?? "";
+  return (
+    previousData: GetNoteResponse | undefined,
+    previousQuery?: { queryKey: readonly unknown[] },
+  ): GetNoteResponse | undefined => {
+    if (!previousData || !previousQuery) return undefined;
+    const key = previousQuery.queryKey;
+    // `noteKeys.detail(noteId, userId, userEmail)` produces
+    // [..., noteId, userId, userEmail]; the principal lives in the last two
+    // slots regardless of any future prefix changes.
+    if (key.length < 2) return undefined;
+    const prevUserId = key[key.length - 2];
+    const prevUserEmail = key[key.length - 1];
+    return prevUserId === userId && prevUserEmail === currentEmail ? previousData : undefined;
+  };
+}
 
 /**
  * 単一の Note とアクセス権情報を取得するフック。
  * Hook that fetches a single Note alongside the caller's access context.
+ *
+ * `useNotePages` と同じ `queryKey` / `queryFn` を共有し、`select` で
+ * `{ note, access }` を導出する。これにより `GET /api/notes/:id` の
+ * 重複フェッチが回避される（Issue #848）。
+ *
+ * Shares the `queryKey` / `queryFn` with `useNotePages` and derives
+ * `{ note, access }` via `select`. This dedupes `GET /api/notes/:id` so the
+ * heavy JSON is fetched only once per note (Issue #848).
  */
 export function useNote(noteId: string, _options?: UseNoteOptions) {
   const { api, userId, userEmail, isLoaded, isSignedIn } = useNoteApi();
 
   const query = useQuery({
     queryKey: noteKeys.detail(noteId, userId, userEmail),
-    queryFn: async (): Promise<NoteWithAccess> => {
-      const res = await api.getNote(noteId);
+    queryFn: makeNoteQueryFn(noteId, api, userId, userEmail),
+    enabled: isLoaded && !!noteId,
+    // 別ノートへ遷移しても前ノートのデータを残し、白画面を回避する。ただし
+    // ログアウト・アカウント切替時に前ユーザーのデータを引き継がないよう、
+    // `userId` / `userEmail` が同一の場合に限って placeholder を返す。
+    //
+    // Keep showing the previous note while fetching the next one to avoid the
+    // blank loading state, gated on a matching auth principal so logout /
+    // account switches do not carry the previous user's data forward.
+    placeholderData: notePlaceholderDataIfSamePrincipal(userId, userEmail),
+    select: (res): NoteWithAccess => {
       const note = apiNoteToNote(res);
       const access = buildAccessFromApi(note, res.current_user_role, userId);
       return { note, access };
     },
-    enabled: isLoaded && !!noteId,
   });
 
   const noteWithAccess = query.data ?? null;
@@ -268,32 +608,263 @@ export function usePublicNotes(sort: "updated" | "popular" = "updated", limit = 
 }
 
 /**
- * 指定ノートに含まれるページ一覧（ノート画面用）を取得するフック。
- * Hook that fetches pages belonging to the given note for the note view.
+ * `useNoteTitleIndex` のオプション。
+ *
+ * Options for {@link useNoteTitleIndex}.
  */
-export function useNotePages(
-  noteId: string,
-  _source?: "local" | "remote",
-  enabled: boolean = true,
-) {
-  const { api, isLoaded } = useNoteApi();
+export interface UseNoteTitleIndexOptions {
+  /**
+   * フェッチ抑止用ゲート。`noteId` が空文字、または wiki link / AI chat
+   * scope のような遅延起動 UI で「必要になるまで叩かない」場合に `false` を渡す。
+   *
+   * Suppress the fetch entirely. Pass `false` when `noteId` is empty or when
+   * a lazy-start UI (wiki-link autocomplete, AI chat scope) does not need
+   * the title set yet.
+   */
+  enabled?: boolean;
+}
+
+/**
+ * ノート配下の全ページのタイトルインデックスを取得するフック（issue #860 Phase 6）。
+ *
+ * Phase 6 で `GET /api/notes/:noteId` から `pages[]` を撤去するのに合わせて、
+ * wiki link / AI chat scope / 重複判定など「ノート全ページのタイトルだけ」を
+ * 完全集合として必要とする経路向けに専用 fetch を切り出した。サーバの
+ * `GET /api/notes/:noteId/page-titles` 経路を叩き、`id / title / isDeleted /
+ * updatedAt` の最小 payload を返す。サーバ順 (`updated_at DESC, id DESC`)
+ * を保ったまま flatten した {@link NotePageTitle} 配列を返す。
+ *
+ * Hook that fetches every page title in a note (issue #860 Phase 6).
+ *
+ * Phase 6 dropped `pages[]` from the note shell, so this hook is the
+ * replacement path for consumers that need the *complete* title set:
+ * wiki-link resolution, AI-chat scope sync, and add-dialog dedup. Hits
+ * `GET /api/notes/:noteId/page-titles` and returns a flat array of
+ * {@link NotePageTitle} preserving the server order (`updated_at DESC,
+ * id DESC`). The payload omits preview / thumbnail / source_url to keep
+ * the fetch cheap even on huge notes.
+ */
+export function useNoteTitleIndex(noteId: string, options: UseNoteTitleIndexOptions = {}) {
+  const { api, userId, userEmail, isLoaded } = useNoteApi();
+  const enabled = (options.enabled ?? true) && isLoaded && !!noteId;
 
   return useQuery({
-    queryKey: noteKeys.pageList(noteId),
-    queryFn: async (): Promise<NotePageSummary[]> => {
-      const res = await api.getNote(noteId);
-      return res.pages.map((p) => ({
-        ...apiPageToPageSummary(p),
-        addedByUserId: p.added_by_user_id,
+    queryKey: noteKeys.titleIndex(noteId, userId, userEmail),
+    queryFn: async (): Promise<NotePageTitle[]> => {
+      const res = await api.getNotePageTitles(noteId);
+      return res.items.map((p) => ({
+        id: p.id,
+        title: p.title,
+        isDeleted: p.is_deleted,
+        updatedAt: parseTs(p.updated_at),
       }));
     },
-    enabled: enabled && isLoaded && !!noteId,
+    enabled,
   });
 }
 
 /**
+ * `useInfiniteNotePages` のデフォルト 1 ページサイズ（issue #860 Phase 3）。
+ * サーバ側上限 ({@link MAX_PAGES_LIMIT}) と整合させる。
+ *
+ * Default page size for `useInfiniteNotePages` (issue #860 Phase 3). Aligned
+ * with the server-side cap defined in
+ * `server/api/src/routes/notes/pages.ts` (`MAX_PAGES_LIMIT = 100`).
+ */
+export const DEFAULT_INFINITE_NOTE_PAGES_SIZE = 50;
+
+/**
+ * `useInfiniteNotePages` のデフォルト include。一覧カード描画には preview と
+ * thumbnail が必要なため、両方とも要求する。
+ *
+ * Default `include` set for `useInfiniteNotePages`. The grid cards render the
+ * head preview and the thumbnail, so both extras are requested.
+ */
+const DEFAULT_INFINITE_NOTE_PAGES_INCLUDE: ReadonlyArray<NotePageWindowInclude> = [
+  "preview",
+  "thumbnail",
+];
+
+/**
+ * `useInfiniteNotePages` のオプション。
+ *
+ * Options for {@link useInfiniteNotePages}.
+ */
+export interface UseInfiniteNotePagesOptions {
+  /**
+   * 取得する追加フィールド。デフォルトでは `preview` と `thumbnail` の両方を
+   * 要求する。サーバは未指定トークンを無視するため、将来追加された値も後方
+   * 互換に渡せる。
+   *
+   * Optional extra fields to request via `?include=`. Defaults to both
+   * `preview` and `thumbnail`. The server silently drops unknown tokens, so
+   * passing future values stays backward compatible.
+   */
+  include?: ReadonlyArray<NotePageWindowInclude>;
+  /**
+   * 1 ページあたりの取得件数（1..100）。省略時は {@link DEFAULT_INFINITE_NOTE_PAGES_SIZE}。
+   *
+   * Items per request (1..100). Defaults to
+   * {@link DEFAULT_INFINITE_NOTE_PAGES_SIZE}.
+   */
+  pageSize?: number;
+  /**
+   * 取得を抑止するゲート。`noteId` がまだ確定していない、もしくは権限判定が
+   * 終わるまで遅らせたい呼び出し側で使う。
+   *
+   * Gate to suppress fetching, e.g. while `noteId` is still being resolved or
+   * before the caller has confirmed view permission.
+   */
+  enabled?: boolean;
+  /**
+   * タグフィルタバー由来の `?tags=` フィルタ。`none-selected` を渡したときは
+   * パラメータを付けずに全件取得する。値を変えると React Query は別 query
+   * 扱いし、既存 InfiniteData は破棄される。
+   *
+   * Tag filter bar selection. `none-selected` fetches everything (no param);
+   * changing the filter spawns a new React Query so prior `InfiniteData` is
+   * not reused.
+   */
+  tagFilter?: SelectedTags;
+}
+
+/**
+ * `NotePageWindowItem`（snake_case の API 行）を `NotePageSummary`（camelCase の
+ * フロント型）に正規化する。ISO 文字列の timestamp は `parseTs` で ms に
+ * 落とし、`addedByUserId` には `owner_id` を流す（issue #823 以降ページ
+ * オーナー＝追加者と等価で、サーバ window レスポンスも legacy
+ * `added_by_user_id` を返さないため）。
+ *
+ * Maps a `NotePageWindowItem` (snake_case API row) to the camelCase
+ * `NotePageSummary` consumed by the grid. ISO timestamps go through
+ * `parseTs` to millisecond integers, and `addedByUserId` is populated from
+ * `owner_id` since after issue #823 page owner ≡ adder and the windowed
+ * response no longer carries the legacy `added_by_user_id` field.
+ */
+function notePageWindowItemToSummary(p: NotePageWindowItem): NotePageSummary {
+  return {
+    id: p.id,
+    ownerUserId: p.owner_id,
+    noteId: p.note_id,
+    title: p.title ?? "",
+    contentPreview: p.content_preview ?? undefined,
+    thumbnailUrl: p.thumbnail_url ?? undefined,
+    sourceUrl: p.source_url ?? undefined,
+    createdAt: parseTs(p.created_at),
+    updatedAt: parseTs(p.updated_at),
+    isDeleted: p.is_deleted,
+    // issue #823 以降「ページを追加した人」 ≒ ページの owner。
+    // After issue #823 the page owner is effectively the "adder", so reuse
+    // `owner_id` to keep the `addedByUserId` slot populated for delete-guard UX.
+    addedByUserId: p.owner_id,
+  };
+}
+
+/**
+ * ノート配下のページ一覧を keyset cursor pagination で段階取得するフック
+ * （issue #860 Phase 3）。サーバの `GET /api/notes/:noteId/pages` 経路に
+ * 対応し、`fetchNextPage()` で `next_cursor` を辿る。React Query の
+ * `useInfiniteQuery` を使うので、UI 側は仮想スクロールの末尾検知から
+ * 続きを要求するだけで済む。
+ *
+ * 戻り値の `pages` は全 window をフラット化した {@link NotePageSummary} 配列
+ * （サーバ順 `updated_at DESC, id DESC` を維持）。`hasNextPage` /
+ * `isFetchingNextPage` は仮想スクロール側で「これ以上要求しない」「重複呼び
+ * 出しを抑止する」ためにそのまま使う。
+ *
+ * Step-paginated infinite query for a note's page list (issue #860 Phase 3).
+ * Wraps `GET /api/notes/:noteId/pages` and threads the opaque `next_cursor`
+ * back into the next request via `useInfiniteQuery`. UI consumers can flip
+ * the `pages` array directly into a virtualized list and trigger
+ * `fetchNextPage()` when the visible window approaches the tail.
+ *
+ * Returned `pages` is the flattened, server-ordered (`updated_at DESC,
+ * id DESC`) array of {@link NotePageSummary}. `hasNextPage` /
+ * `isFetchingNextPage` are surfaced so the caller can debounce repeated
+ * tail-trigger fetches.
+ */
+export function useInfiniteNotePages(noteId: string, options: UseInfiniteNotePagesOptions = {}) {
+  const { api, userId, userEmail, isLoaded } = useNoteApi();
+  const include = options.include ?? DEFAULT_INFINITE_NOTE_PAGES_INCLUDE;
+  const pageSize = options.pageSize ?? DEFAULT_INFINITE_NOTE_PAGES_SIZE;
+  const tagFilter: SelectedTags = options.tagFilter ?? { kind: "none-selected" };
+  const enabled = (options.enabled ?? true) && isLoaded && !!noteId;
+
+  const query = useInfiniteQuery<
+    NotePageWindowResponse,
+    Error,
+    InfiniteData<NotePageWindowResponse, string | null>,
+    readonly unknown[],
+    string | null
+  >({
+    queryKey: noteKeys.pagesWindow(noteId, userId, userEmail, include, pageSize, tagFilter),
+    queryFn: async (ctx): Promise<NotePageWindowResponse> => {
+      const cursor = ctx.pageParam ?? null;
+      return api.getNotePages(noteId, {
+        cursor,
+        limit: pageSize,
+        include,
+        tags: tagFilter,
+      });
+    },
+    enabled,
+    // 先頭リクエストは cursor 無し。サーバが `next_cursor: null` を返したら
+    // `getNextPageParam` は `undefined` を返して infinite query が終端を認識する。
+    // First request has no cursor; once the server returns `next_cursor: null`
+    // we report `undefined` to mark the end of the list to React Query.
+    initialPageParam: null,
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
+  });
+
+  // `select` を使わずに導出してメモ化する。`useInfiniteQuery` の `select` は
+  // 各 page を変換するか、全体を変換するか型が複雑になりやすいので、
+  // ここでは導出値だけ `useMemo` で計算する。
+  // Derive the flattened summary list outside `select` to keep the generic
+  // types simple; `useInfiniteQuery` re-runs the selector on every cache
+  // update, so wrapping the work in `useMemo` keeps render churn bounded.
+  const flattened = useMemo<NotePageSummary[]>(() => {
+    if (!query.data) return [];
+    const out: NotePageSummary[] = [];
+    for (const window of query.data.pages) {
+      for (const item of window.items) {
+        out.push(notePageWindowItemToSummary(item));
+      }
+    }
+    return out;
+  }, [query.data]);
+
+  return {
+    /** Flattened, server-ordered page summaries across all fetched windows. */
+    pages: flattened,
+    /** Raw infinite-query pages, exposed for advanced callers that need cursor state. */
+    rawPages: query.data?.pages ?? [],
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isFetchingNextPage: query.isFetchingNextPage,
+    hasNextPage: query.hasNextPage,
+    fetchNextPage: query.fetchNextPage,
+    refetch: query.refetch,
+    error: query.error,
+  };
+}
+
+/**
  * ノート内の単一ページ（noteId + pageId）を取得するフック。
- * Hook that fetches a single page within a note by noteId + pageId.
+ *
+ * Issue #860 Phase 6 で `GET /api/notes/:noteId` から `pages[]` を撤去した
+ * のに合わせて、`GET /api/pages/:pageId` 経路（同じく Phase 6 で追加）に
+ * 移行した。ノート所属チェックはサーバ側 `getNoteRole(pages.note_id)` で
+ * 行うため、`noteId` パラメータはレスポンスの `noteId` と整合するかの
+ * クライアント側ガードとしてのみ使う。一致しない場合は `null` を返して、
+ * 呼び出し側 (`NotePageView`) が「ページが見つからなかった」分岐に倒れる。
+ *
+ * Hook that fetches a single page's metadata. Issue #860 Phase 6 migrated
+ * this away from the (now-removed) `pages[]` slice on the note shell to
+ * the dedicated `GET /api/pages/:pageId` route added in the same phase.
+ * The route already enforces note-role-based view access; the local
+ * `noteId` parameter is kept only as a client-side guard so that a stale
+ * URL pointing at a page that has moved to another note resolves to
+ * `null` instead of silently rendering the wrong page.
  */
 export function useNotePage(
   noteId: string,
@@ -301,16 +872,41 @@ export function useNotePage(
   _source?: "local" | "remote",
   enabled: boolean = true,
 ) {
-  const { api, isLoaded, isSignedIn } = useNoteApi();
+  // coderabbitai review on PR #868: `GET /api/pages/:pageId` は Phase 6 で
+  // `authOptional` + `getNoteRole` に切り替わっているため、未ログインの
+  // guest でも公開 / unlisted ノートのページを読める。hook 側で `isSignedIn`
+  // を `enabled` に混ぜると、せっかくサーバが許可した経路をクライアントが
+  // 自分で塞いでしまう。サインインゲートを外し、`getNoteRole` がサーバ側で
+  // 唯一の権限判定であるという契約に揃える。
+  //
+  // PR #868 review (coderabbitai): `GET /api/pages/:pageId` is `authOptional`
+  // + `getNoteRole` since Phase 6, so guests can read pages on public /
+  // unlisted notes. Gating the hook on `isSignedIn` would slam shut a route
+  // the server explicitly opens; drop it and let `getNoteRole` remain the
+  // single source of permission truth.
+  const { api, isLoaded } = useNoteApi();
 
   return useQuery({
     queryKey: noteKeys.page(noteId, pageId),
     queryFn: async (): Promise<Page | null> => {
-      const res = await api.getNote(noteId);
-      const p = res.pages.find((x) => x.id === pageId);
-      return p ? apiPageToPage(p) : null;
+      const p = (await api.getPage(pageId)) as ApiPageMetadataRow | null;
+      if (!p) return null;
+      // 旧経路 (`api.getNote(noteId).pages.find(...)`) は noteId 越境を物理的に
+      // 弾けたので、新経路でも同等のセーフティを残す。サーバ側の access check
+      // は通っても、URL の `noteId` と実際の `pages.note_id` が食い違うのは
+      // ページ移動後の古い URL を踏んだケース。`null` を返してビューを
+      // "page not found" にフォールバックさせる。
+      //
+      // The previous `pages.find(...)` path implicitly enforced "page must
+      // belong to this note id". Preserve that guard explicitly here: a stale
+      // URL that survived a cross-note move would still pass server access
+      // (the user sees the page in its new note), but the consumer expects a
+      // page belonging to *this* note id. Return `null` so the caller falls
+      // back to its "not found" branch instead of rendering a mismatched page.
+      if (p.note_id !== noteId) return null;
+      return apiPageToPage(p);
     },
-    enabled: enabled && isLoaded && isSignedIn && !!noteId && !!pageId,
+    enabled: enabled && isLoaded && !!noteId && !!pageId,
   });
 }
 
@@ -363,8 +959,15 @@ export function useCreateNote() {
 }
 
 /**
- * ノートの title / visibility / editPermission を更新するミューテーションフック。
- * Mutation hook for updating a note's title / visibility / editPermission.
+ * ノートの title / visibility / editPermission およびタグフィルタバー設定を
+ * 更新するミューテーションフック。`showTagFilterBar` / `defaultFilterTags` は
+ * オーナーが既定値を管理するためのフィールドで、ユーザーは localStorage で
+ * 上書きできる（フックは扱わない）。
+ *
+ * Mutation hook for updating note attributes, including the owner-side
+ * defaults for the tag filter bar (`showTagFilterBar` / `defaultFilterTags`).
+ * Per-user filter-bar overrides live in localStorage and are not touched
+ * here.
  */
 export function useUpdateNote() {
   const { api } = useNoteApi();
@@ -376,12 +979,19 @@ export function useUpdateNote() {
       updates,
     }: {
       noteId: string;
-      updates: Partial<Pick<Note, "title" | "visibility" | "editPermission">>;
+      updates: Partial<
+        Pick<
+          Note,
+          "title" | "visibility" | "editPermission" | "showTagFilterBar" | "defaultFilterTags"
+        >
+      >;
     }) => {
       await api.updateNote(noteId, {
         title: updates.title,
         visibility: updates.visibility,
         edit_permission: updates.editPermission,
+        show_tag_filter_bar: updates.showTagFilterBar,
+        default_filter_tags: updates.defaultFilterTags,
       });
       return { noteId, updates };
     },
@@ -434,112 +1044,14 @@ export function useAddPageToNote() {
       await api.addNotePage(noteId, { pageId, title });
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });
+      queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(variables.noteId) });
       queryClient.invalidateQueries({ queryKey: noteKeys.details() });
-    },
-  });
-}
-
-/**
- * 個人ページをコピーしてノートネイティブページを作るミューテーションフック (issue #713 Phase 3)。
- * 元の個人ページは `/home` に残り、新しいコピーだけがノートに出る。
- *
- * Mutation hook that copies a personal page into a note as a fresh
- * note-native page. The original stays on `/home`; only the copy surfaces
- * inside the note. See issue #713 Phase 3.
- */
-export function useCopyPersonalPageToNote() {
-  const { api } = useNoteApi();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ noteId, sourcePageId }: { noteId: string; sourcePageId: string }) => {
-      return api.copyPersonalPageToNote(noteId, sourcePageId);
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });
-      queryClient.invalidateQueries({ queryKey: noteKeys.details() });
-    },
-  });
-}
-
-/**
- * ノートネイティブページをコピーして個人ページにするミューテーションフック (issue #713 Phase 3)。
- * 元のノートページはノートに残り、コピーだけが呼び出し元の `/home` に加わる。
- *
- * Mutation hook that copies a note-native page into the caller's personal
- * pages. The source stays in the note; only the copy lands on `/home`.
- * See issue #713 Phase 3.
- */
-export function useCopyNotePageToPersonal() {
-  const { api, userId } = useNoteApi();
-  const { getRepository } = useRepository();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({
-      noteId,
-      sourcePageId,
-    }: {
-      noteId: string;
-      sourcePageId: string;
-    }): Promise<CopyNotePageToPersonalResponse & { localImported: boolean }> => {
-      const result = await api.copyNotePageToPersonal(noteId, sourcePageId);
-      // Codex P1 対応: `/home` は IndexedDB を直接読む（React Query の裏に adapter
-      // がいる）ので、単にキャッシュ無効化しても新ページは現れない。サーバーが
-      // 返した `result.page`（SyncPageItem）を IDB に書き戻し、その成否を
-      // `localImported` フラグで呼び出し側に返す。失敗は non-fatal（次回 sync で
-      // 拾われる）だが、呼び出し側が「いま開く」のような即時遷移 CTA を出すか
-      // どうかをこのフラグで切り替えられる。
-      //
-      // `/home` reads directly from IndexedDB via the storage adapter, so
-      // invalidating React Query alone would just re-read stale IDB. Write the
-      // server response through to IDB and report whether it stuck, so callers
-      // can gate an immediate-navigation CTA (e.g. toast "Open") on local
-      // success. A write-through miss is non-fatal — the next sync pass will
-      // still reconcile `/home` — but the UI should not promise an instant
-      // jump to a page the local store does not yet have.
-      // (Issue #713 Phase 3, Codex P1 / CodeRabbit follow-up.)
-      let localImported = false;
-      try {
-        const repo = await getRepository();
-        const imported = await repo.importPersonalPageFromApi(result.page);
-        if (imported) {
-          localImported = true;
-        } else {
-          // `importPersonalPageFromApi` は個人ページ（`note_id: null`）以外を
-          // 防御的に拒否して `null` を返す。通常ルートでは copy-to-personal の
-          // サーバー応答は必ず個人ページなのでここを通らないが、契約ドリフト
-          // （例: サーバーが誤って `note_id` を埋めた）を早期に検知できるよう
-          // 警告を残す。成功扱いは維持し、UI は `localImported` で分岐する。
-          //
-          // Defensive guard: the helper returns `null` for non-personal rows.
-          // In a healthy flow this never fires — logged as a contract canary.
-          console.warn(
-            "[useCopyNotePageToPersonal] Server returned a non-personal page; skipped IDB write-through:",
-            result.page,
-          );
-        }
-      } catch (error) {
-        console.warn(
-          "[useCopyNotePageToPersonal] Failed to write copied page to IndexedDB:",
-          error,
-        );
-      }
-      return { ...result, localImported };
-    },
-    onSuccess: () => {
-      // 書き戻しが終わってから無効化するので、`usePagesSummary` などの再取得で
-      // 新ページが確実に並ぶ（ネットワーク状況に依存しない即時反映）。
-      // We invalidate after the write-through, so any refetch from
-      // `usePagesSummary` etc. picks up the new row deterministically.
-      if (userId) {
-        queryClient.invalidateQueries({ queryKey: pageKeys.list(userId) });
-        queryClient.invalidateQueries({ queryKey: pageKeys.summary(userId) });
-        queryClient.invalidateQueries({ queryKey: pageKeys.byTitles(userId) });
-      } else {
-        queryClient.invalidateQueries({ queryKey: pageKeys.all });
-      }
+      // issue #860 Phase 3: 新規ページは window の先頭に来るので、すべての
+      // include / pageSize 組合せをまとめて再フェッチさせる。
+      // Issue #860 Phase 3: invalidate every windowed cache for this note so
+      // the newly created page shows up at the top regardless of include /
+      // pageSize variant.
+      queryClient.invalidateQueries({ queryKey: noteKeys.pagesWindowByNoteId(variables.noteId) });
     },
   });
 }
@@ -557,8 +1069,11 @@ export function useRemovePageFromNote() {
       await api.removeNotePage(noteId, pageId);
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: noteKeys.pageList(variables.noteId) });
+      queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(variables.noteId) });
       queryClient.invalidateQueries({ queryKey: noteKeys.details() });
+      // issue #860 Phase 3: 削除後の window を再フェッチする。
+      // Issue #860 Phase 3: refresh the windowed infinite cache after deletion.
+      queryClient.invalidateQueries({ queryKey: noteKeys.pagesWindowByNoteId(variables.noteId) });
     },
   });
 }

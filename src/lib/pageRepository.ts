@@ -8,6 +8,15 @@ import type { Page, PageSummary, Link, GhostLink, LinkType } from "@/types/page"
 export interface CreatePageOptions {
   sourceUrl?: string | null;
   thumbnailUrl?: string | null;
+  /**
+   * `thumbnail_objects.id` を紐づけて作成する場合に指定する。Web Clipper など
+   * からのクリップで `/api/thumbnail/commit` 経由で保存したサムネイルを指す。
+   * ページ削除時の GC で参照される。
+   *
+   * Linked `thumbnail_objects.id` (committed via `/api/thumbnail/commit`). Used
+   * by DELETE /api/pages/:id to GC the corresponding S3 object and DB row.
+   */
+  thumbnailObjectId?: string | null;
 }
 
 /**

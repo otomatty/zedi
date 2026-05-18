@@ -30,6 +30,7 @@ export function createMockNote(overrides: Record<string, unknown> = {}) {
     visibility: "private",
     editPermission: "owner_only",
     isOfficial: false,
+    isDefault: false,
     viewCount: 0,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-01T00:00:00Z"),
@@ -43,6 +44,7 @@ export function createMockPageRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "page-test-001",
     ownerId: TEST_USER_ID,
+    noteId: "note-test-001",
     sourcePageId: null,
     title: "Test Page",
     contentPreview: "Preview content...",
@@ -51,23 +53,6 @@ export function createMockPageRow(overrides: Record<string, unknown> = {}) {
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-01T00:00:00Z"),
     isDeleted: false,
-    sortOrder: 0,
-    addedByUserId: TEST_USER_ID,
-    addedAt: new Date("2026-01-01T00:00:00Z"),
-    ...overrides,
-  };
-}
-
-/** テスト用ページ一覧行のデフォルト / Default mock page list row */
-export function createMockPageListRow(overrides: Record<string, unknown> = {}) {
-  return {
-    page_id: "page-test-001",
-    sort_order: 0,
-    added_by: TEST_USER_ID,
-    page_title: "Test Page",
-    page_content_preview: "Preview...",
-    page_thumbnail_url: null,
-    page_updated_at: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
   };
 }

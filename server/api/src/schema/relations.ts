@@ -3,7 +3,6 @@ import { users, session, account } from "./users.js";
 import { pages } from "./pages.js";
 import {
   notes,
-  notePages,
   noteMembers,
   noteInvitations,
   noteInviteLinks,
@@ -18,6 +17,7 @@ import { subscriptions } from "./subscriptions.js";
 import { aiUsageLogs, aiMonthlyUsage } from "./aiModels.js";
 import { sources } from "./sources.js";
 import { pageSources } from "./pageSources.js";
+import { pdfHighlights } from "./pdfHighlights.js";
 import { lintFindings } from "./lintFindings.js";
 import { activityLog } from "./activityLog.js";
 
@@ -75,7 +75,10 @@ const pagesRelations = relations(pages, ({ one, many }) => ({
     fields: [pages.id],
     references: [pageContents.pageId],
   }),
-  notePages: many(notePages),
+  note: one(notes, {
+    fields: [pages.noteId],
+    references: [notes.id],
+  }),
   snapshots: many(pageSnapshots),
   media: many(media),
   outgoingLinks: many(links, { relationName: "sourceLinks" }),
@@ -91,35 +94,14 @@ const notesRelations = relations(notes, ({ one, many }) => ({
     fields: [notes.ownerId],
     references: [users.id],
   }),
-  notePages: many(notePages),
+  pages: many(pages),
   noteMembers: many(noteMembers),
   noteInvitations: many(noteInvitations),
   noteInviteLinks: many(noteInviteLinks),
   noteDomainAccess: many(noteDomainAccess),
 }));
 
-export /**
- *
- */
-const notePagesRelations = relations(notePages, ({ one }) => ({
-  note: one(notes, {
-    fields: [notePages.noteId],
-    references: [notes.id],
-  }),
-  page: one(pages, {
-    fields: [notePages.pageId],
-    references: [pages.id],
-  }),
-  addedBy: one(users, {
-    fields: [notePages.addedByUserId],
-    references: [users.id],
-  }),
-}));
-
-export /**
- *
- */
-const noteMembersRelations = relations(noteMembers, ({ one }) => ({
+export const noteMembersRelations = relations(noteMembers, ({ one }) => ({
   note: one(notes, {
     fields: [noteMembers.noteId],
     references: [notes.id],
@@ -305,6 +287,26 @@ export const sourcesRelations = relations(sources, ({ one, many }) => ({
     references: [users.id],
   }),
   citations: many(pageSources),
+  highlights: many(pdfHighlights),
+}));
+
+/**
+ * `pdf_highlights` のリレーション定義。所有者・ソース・派生ページに繋がる。
+ * Relations for `pdf_highlights`: owner, source, and (optional) derived page.
+ */
+export const pdfHighlightsRelations = relations(pdfHighlights, ({ one }) => ({
+  owner: one(users, {
+    fields: [pdfHighlights.ownerId],
+    references: [users.id],
+  }),
+  source: one(sources, {
+    fields: [pdfHighlights.sourceId],
+    references: [sources.id],
+  }),
+  derivedPage: one(pages, {
+    fields: [pdfHighlights.derivedPageId],
+    references: [pages.id],
+  }),
 }));
 
 /**

@@ -14,7 +14,14 @@
         "src/lib/claudeCode/index.ts",
         "src/lib/agentSlashCommands/index.ts"
       ],
-      "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "e2e/**/*.{ts,tsx}"]
+      "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "e2e/**/*.{ts,tsx}"],
+      "ignore": [
+        "src/pages/Home.tsx",
+        "src/components/page/PageGrid.tsx",
+        "src/components/page/PageCard.tsx",
+        "src/components/page/EmptyState.tsx",
+        "src/hooks/useSeedData.ts"
+      ]
     },
     "admin": {
       "project": ["src/**/*.{ts,tsx}"]

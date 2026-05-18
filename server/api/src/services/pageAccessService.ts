@@ -3,19 +3,17 @@
  * Shared page access authorization service.
  */
 import { HTTPException } from "hono/http-exception";
-import { eq, and, sql } from "drizzle-orm";
-import { pages, users, notes, notePages, noteMembers } from "../schema/index.js";
+import { eq, and } from "drizzle-orm";
+import { pages, users } from "../schema/index.js";
 import type { Database } from "../types/index.js";
 import { getNoteRole, canEdit } from "../routes/notes/helpers.js";
 
 /**
- * ページの種別と所有情報。`noteId` が非 null の場合はノートネイティブページ
- * （`pages.note_id` がそのノートを指している）。
+ * ページの種別と所有情報。Issue #823 以降 `noteId` は常に非 null。
  *
- * Page kind and ownership info. `noteId !== null` means a note-native page
- * whose `pages.note_id` references that note. See issue #713.
+ * Page kind and ownership info. After issue #823 `noteId` is always set.
  */
-type PageOwnership = { id: string; ownerId: string; noteId: string | null };
+type PageOwnership = { id: string; ownerId: string; noteId: string };
 
 async function getPageOwnership(db: Database, pageId: string): Promise<PageOwnership> {
   const page = await db
@@ -26,7 +24,7 @@ async function getPageOwnership(db: Database, pageId: string): Promise<PageOwner
 
   const pageRow = page[0];
   if (!pageRow) throw new HTTPException(404, { message: "Page not found" });
-  return pageRow;
+  return pageRow as PageOwnership;
 }
 
 async function getUserEmailLowercase(db: Database, userId: string): Promise<string> {
@@ -44,23 +42,15 @@ async function getUserEmailLowercase(db: Database, userId: string): Promise<stri
 /**
  * ページへの閲覧権限を確認する。
  *
- * - 個人ページ (`pages.note_id IS NULL`): 所有者本人、または当該ページが
- *   `note_pages` 経由で登録されているノートの受諾済みメンバー / ノート所有者
- * - ノートネイティブページ (`pages.note_id IS NOT NULL`): そのノートに対する
- *   ロール解決（owner / member / domain / public guest）が成立すれば閲覧可。
- *   `pages.ownerId` の一致では許可しない（脱退後に閲覧権が残るのを防ぐ）
+ * すべてのページは `pages.note_id` でノートに所属する。閲覧はそのノートに対する
+ * `getNoteRole` が成立すれば可。`pages.ownerId` の一致だけでは許可しない（脱退後に
+ * 閲覧権が残るのを防ぐ）。
  *
- * Verify the user can view the page.
+ * Verify the user can view the page. Every page belongs to a note via
+ * `pages.note_id`; the caller needs any resolved note role on that note.
+ * Owning the `pages` row alone is intentionally NOT enough.
  *
- * - Personal page (`pages.note_id IS NULL`): owner of the page row, an accepted
- *   member of any note this page is attached to via `note_pages`, or the owner
- *   of such a note
- * - Note-native page (`pages.note_id IS NOT NULL`): caller must resolve to a
- *   role (owner / member / domain / public guest) on that note. Owning the
- *   underlying `pages` row is intentionally NOT enough — that would let a
- *   removed member keep reading after leaving the note.
- *
- * See issue #713.
+ * See issue #823.
  */
 export async function assertPageViewAccess(
   db: Database,
@@ -69,82 +59,19 @@ export async function assertPageViewAccess(
 ): Promise<void> {
   const pageRow = await getPageOwnership(db, pageId);
 
-  if (pageRow.noteId) {
-    const userEmail = await getUserEmailLowercase(db, userId);
-    const { role } = await getNoteRole(pageRow.noteId, userId, userEmail, db);
-    if (!role) throw new HTTPException(403, { message: "Forbidden" });
-    return;
-  }
-
-  // 個人ページ：オーナーは常にアクセス可
-  // Personal page: owner always has access
-  if (pageRow.ownerId === userId) return;
-
   const userEmail = await getUserEmailLowercase(db, userId);
-
-  // ページが属するノートを取得し、そのノートのメンバーかチェック
-  // Find notes this page belongs to and verify user is a member
-  const noteMembership = await db
-    .select({ noteId: notePages.noteId })
-    .from(notePages)
-    .innerJoin(notes, and(eq(notes.id, notePages.noteId), eq(notes.isDeleted, false)))
-    .innerJoin(
-      noteMembers,
-      and(
-        eq(noteMembers.noteId, notePages.noteId),
-        // 大文字小文字を区別せずに突合する。`getUserEmailLowercase` で正規化済み
-        // のメールに対し、DB 側でも `LOWER(...)` を適用して旧来データや手動挿入
-        // で大文字混じりの行を取りこぼさない。`helpers.ts` の `getNoteRole` と
-        // 同じ慣用に揃える。
-        //
-        // Match case-insensitively. `getUserEmailLowercase` already lower-cases
-        // the input; apply `LOWER(...)` on the column too so legacy or manually
-        // inserted mixed-case rows still match. Mirrors `getNoteRole` in
-        // `helpers.ts`.
-        sql`LOWER(${noteMembers.memberEmail}) = ${userEmail}`,
-        eq(noteMembers.isDeleted, false),
-        eq(noteMembers.status, "accepted"),
-      ),
-    )
-    .where(and(eq(notePages.pageId, pageId), eq(notePages.isDeleted, false)))
-    .limit(1);
-
-  if (noteMembership[0]) return;
-
-  // ノートオーナーは通常 `note_members` 行を持たないため、linked personal page でも
-  // `note_pages -> notes.owner_id` 経路で閲覧を許可する。Issue #713 / PR #719 review.
-  // Note owners usually do not have a `note_members` row. Allow linked personal
-  // pages through the `note_pages -> notes.owner_id` path too.
-  const noteOwnership = await db
-    .select({ noteId: notePages.noteId })
-    .from(notePages)
-    .innerJoin(
-      notes,
-      and(eq(notes.id, notePages.noteId), eq(notes.ownerId, userId), eq(notes.isDeleted, false)),
-    )
-    .where(and(eq(notePages.pageId, pageId), eq(notePages.isDeleted, false)))
-    .limit(1);
-
-  if (noteOwnership[0]) return;
-
-  throw new HTTPException(403, { message: "Forbidden" });
+  const { role } = await getNoteRole(pageRow.noteId, userId, userEmail, db);
+  if (!role) throw new HTTPException(403, { message: "Forbidden" });
 }
 
 /**
  * ページへの編集権限を確認する。
  *
- * - 個人ページ (`pages.note_id IS NULL`): 所有者本人のみ
- * - ノートネイティブページ (`pages.note_id IS NOT NULL`): そのノートに対する
- *   ロールと `note.editPermission` を `canEdit` で評価
+ * 所属ノートに対するロールと `note.editPermission` を `canEdit` で評価する。
  *
- * Verify the user can edit the page.
+ * Verify the user can edit via `canEdit(role, note)` on the owning note.
  *
- * - Personal page (`pages.note_id IS NULL`): owner only
- * - Note-native page (`pages.note_id IS NOT NULL`): role on that note must
- *   pass `canEdit(role, note)` (owner / editor with note permissions / public
- *   guest under `any_logged_in` rules)
- *
- * See issue #713.
+ * See issue #823.
  */
 export async function assertPageEditAccess(
   db: Database,
@@ -153,17 +80,10 @@ export async function assertPageEditAccess(
 ): Promise<void> {
   const pageRow = await getPageOwnership(db, pageId);
 
-  if (pageRow.noteId) {
-    const userEmail = await getUserEmailLowercase(db, userId);
-    const { role, note } = await getNoteRole(pageRow.noteId, userId, userEmail, db);
-    if (!note) throw new HTTPException(404, { message: "Note not found" });
-    if (!role || !canEdit(role, note)) {
-      throw new HTTPException(403, { message: "Forbidden" });
-    }
-    return;
-  }
-
-  if (pageRow.ownerId !== userId) {
+  const userEmail = await getUserEmailLowercase(db, userId);
+  const { role, note } = await getNoteRole(pageRow.noteId, userId, userEmail, db);
+  if (!note) throw new HTTPException(404, { message: "Note not found" });
+  if (!role || !canEdit(role, note)) {
     throw new HTTPException(403, { message: "Forbidden" });
   }
 }

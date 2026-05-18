@@ -1,0 +1,4 @@
+{
+  "severity": "critical",
+  "ai_summary": "Severity is not one of the allowed enum values."
+}

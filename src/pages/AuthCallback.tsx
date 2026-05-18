@@ -1,7 +1,8 @@
 /**
  * OAuth callback page.
  * Better Auth handles the code exchange server-side; this page simply waits
- * for the session to become available and then redirects to /home.
+ * for the session to become available and then redirects to `/notes/me`
+ * (the post-`/home` default landing introduced by issue #825).
  * セッションが取得できない場合はタイムアウト後にエラー表示し、サインインへ戻れるようにする。
  */
 import { useEffect, useState, useRef } from "react";
@@ -9,8 +10,17 @@ import { useTranslation } from "react-i18next";
 import { useSession } from "@/lib/auth/authClient";
 
 const SESSION_WAIT_TIMEOUT_MS = 15_000;
-/** 認証後に許可されるリダイレクトパス（CodeQL: オープンリダイレクト防止）。Allowed post-auth redirect paths (CodeQL: avoid open redirect). */
-const ALLOWED_RETURN_PATHS = ["/home", "/invite", "/mcp/authorize"] as const;
+/**
+ * 認証後に許可されるリダイレクトパス（CodeQL: オープンリダイレクト防止）。
+ * `/home` は issue #825 で廃止され、新しい既定ランディングは `/notes/me`。
+ * 旧 `/home` ブックマーク救済のため引き続きリストには残し、ルート側で
+ * `/notes/me` へ内部リダイレクトする。
+ *
+ * Allowed post-auth redirect paths (CodeQL: avoid open redirect). `/home` is
+ * retired (issue #825); the new default is `/notes/me`. `/home` stays in the
+ * list so legacy bookmarks resolve correctly via the in-app redirect route.
+ */
+const ALLOWED_RETURN_PATHS = ["/notes/me", "/home", "/invite", "/mcp/authorize"] as const;
 
 /**
  * 許可する「動的セグメントを 1 つ持つパス」のプレフィックス。`/invite-links/:token`
@@ -28,7 +38,7 @@ const ALLOWED_RETURN_PREFIXES = ["/invite-links/"] as const;
  * Validates returnTo and returns a safe redirect target; pathname comes only from allowlist constant (CodeQL).
  */
 function getSafeReturnTarget(returnTo: string | null): string {
-  if (!returnTo?.startsWith("/") || returnTo.startsWith("//")) return "/home";
+  if (!returnTo?.startsWith("/") || returnTo.startsWith("//")) return "/notes/me";
   try {
     const parsed = new URL(returnTo, "http://dummy");
     const exact = ALLOWED_RETURN_PATHS.find((p) => p === parsed.pathname);
@@ -46,9 +56,9 @@ function getSafeReturnTarget(returnTo: string | null): string {
       const safeRest = encodeURIComponent(decodeURIComponent(rest));
       return prefix + safeRest + (parsed.search ?? "") + (parsed.hash ?? "");
     }
-    return "/home";
+    return "/notes/me";
   } catch {
-    return "/home";
+    return "/notes/me";
   }
 }
 

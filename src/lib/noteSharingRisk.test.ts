@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   isPublicAnyLoggedInCombo,
+  isShareableVisibility,
+  shouldConfirmDefaultNotePublicSave,
   shouldConfirmPublicAnyLoggedInSave,
 } from "@/lib/noteSharingRisk";
 
@@ -52,6 +54,41 @@ describe("noteSharingRisk", () => {
       expect(
         shouldConfirmPublicAnyLoggedInSave("unlisted", "any_logged_in", "public", "any_logged_in"),
       ).toBe(false);
+    });
+  });
+
+  describe("isShareableVisibility", () => {
+    it("returns true only for public / unlisted", () => {
+      expect(isShareableVisibility("public")).toBe(true);
+      expect(isShareableVisibility("unlisted")).toBe(true);
+      expect(isShareableVisibility("private")).toBe(false);
+      expect(isShareableVisibility("restricted")).toBe(false);
+    });
+  });
+
+  describe("shouldConfirmDefaultNotePublicSave", () => {
+    it("is false when the note is not the default note", () => {
+      expect(shouldConfirmDefaultNotePublicSave(false, "public", "private")).toBe(false);
+      expect(shouldConfirmDefaultNotePublicSave(false, "unlisted", "private")).toBe(false);
+    });
+
+    it("is false when the next visibility is private or restricted", () => {
+      expect(shouldConfirmDefaultNotePublicSave(true, "private", "private")).toBe(false);
+      expect(shouldConfirmDefaultNotePublicSave(true, "restricted", "private")).toBe(false);
+    });
+
+    it("is true when default note transitions from non-shareable to public/unlisted", () => {
+      expect(shouldConfirmDefaultNotePublicSave(true, "public", "private")).toBe(true);
+      expect(shouldConfirmDefaultNotePublicSave(true, "unlisted", "private")).toBe(true);
+      expect(shouldConfirmDefaultNotePublicSave(true, "public", "restricted")).toBe(true);
+      expect(shouldConfirmDefaultNotePublicSave(true, "unlisted", "restricted")).toBe(true);
+    });
+
+    it("is false when default note is already public or unlisted (re-save)", () => {
+      expect(shouldConfirmDefaultNotePublicSave(true, "public", "public")).toBe(false);
+      expect(shouldConfirmDefaultNotePublicSave(true, "unlisted", "unlisted")).toBe(false);
+      expect(shouldConfirmDefaultNotePublicSave(true, "public", "unlisted")).toBe(false);
+      expect(shouldConfirmDefaultNotePublicSave(true, "unlisted", "public")).toBe(false);
     });
   });
 });

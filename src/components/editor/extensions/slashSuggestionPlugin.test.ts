@@ -28,7 +28,21 @@ const schema = new Schema({
       content: "text*",
       toDOM: () => ["p", 0],
     },
+    code_block: {
+      group: "block",
+      content: "text*",
+      code: true,
+      defining: true,
+      marks: "",
+      toDOM: () => ["pre", ["code", 0]],
+    },
     text: { group: "inline" },
+  },
+  marks: {
+    code: {
+      code: true,
+      toDOM: () => ["code", 0],
+    },
   },
 });
 
@@ -59,6 +73,30 @@ function makeState(text: string, plugin: Plugin): EditorState {
   const state = EditorState.create({ doc, schema, plugins: [plugin] });
   // 段落内末尾にキャレットを置く: pos 1 が段落 open、pos 1+text.length が末尾。
   // Place the caret at the end of the paragraph (pos 1 + text length).
+  const tr = state.tr.setSelection(TextSelection.create(state.doc, 1 + text.length));
+  return state.apply(tr);
+}
+
+/**
+ * Inline `code` mark over full paragraph text; caret at end (matches tag plugin tests).
+ * 段落全文にインライン `code` を掛け、キャレットを末尾へ。
+ */
+function makeInlineCodeState(text: string, plugin: Plugin): EditorState {
+  const codeMark = schema.marks.code.create();
+  const doc = schema.node("doc", null, [
+    schema.node("paragraph", null, text ? [schema.text(text, [codeMark])] : []),
+  ]);
+  const state = EditorState.create({ doc, schema, plugins: [plugin] });
+  const tr = state.tr.setSelection(TextSelection.create(state.doc, 1 + text.length));
+  return state.apply(tr);
+}
+
+/** Caret at end of text inside a `code_block`. / code_block 内末尾にキャレット */
+function makeCodeBlockState(text: string, plugin: Plugin): EditorState {
+  const doc = schema.node("doc", null, [
+    schema.node("code_block", null, text ? [schema.text(text)] : []),
+  ]);
+  const state = EditorState.create({ doc, schema, plugins: [plugin] });
   const tr = state.tr.setSelection(TextSelection.create(state.doc, 1 + text.length));
   return state.apply(tr);
 }
@@ -139,6 +177,51 @@ describe("slashSuggestionPlugin — non-trigger inputs", () => {
     const state = makeState("plain text", plugin);
     const pluginState = slashSuggestionPluginKey.getState(state);
     expect(pluginState?.active).toBe(false);
+  });
+
+  it("does not activate when `/` follows a literal backtick (opening `` ` ``)", () => {
+    // Markdown がコードマーク化する前でも直前が `\s` ではないのでトリガしない。
+    // Before closing backticks, `/` is not after (^|\s); regression for phase (A).
+    const plugin = getPlugin();
+    const state = makeState("`/analyze", plugin);
+    expect(slashSuggestionPluginKey.getState(state)?.active).toBe(false);
+  });
+});
+
+describe("slashSuggestionPlugin — code suppression", () => {
+  it("does not activate inside an inline `code` mark", () => {
+    const plugin = getPlugin();
+    const state = makeInlineCodeState("/analyze", plugin);
+    expect(slashSuggestionPluginKey.getState(state)?.active).toBe(false);
+  });
+
+  it("does not activate inside a code_block", () => {
+    const plugin = getPlugin();
+    const state = makeCodeBlockState("/analyze", plugin);
+    expect(slashSuggestionPluginKey.getState(state)?.active).toBe(false);
+  });
+
+  it("does not notify subscribers when inactive inside inline code", () => {
+    const onStateChange = vi.fn();
+    const plugin = getPlugin(onStateChange);
+    makeInlineCodeState("/run", plugin);
+    expect(onStateChange).not.toHaveBeenCalled();
+  });
+
+  it("closes an active suggestion when paragraph text gains inline code marks", () => {
+    const onStateChange = vi.fn();
+    const plugin = getPlugin(onStateChange);
+
+    let state = makeState("/foo", plugin);
+    expect(slashSuggestionPluginKey.getState(state)?.active).toBe(true);
+    onStateChange.mockClear();
+
+    const codeMark = schema.marks.code.create();
+    const tr = state.tr.replaceWith(1, 5, schema.text("/foo", [codeMark]));
+    state = state.apply(tr);
+    expect(slashSuggestionPluginKey.getState(state)?.active).toBe(false);
+    expect(onStateChange).toHaveBeenCalledTimes(1);
+    expect(onStateChange).toHaveBeenCalledWith(slashSuggestionPluginKey.getState(state));
   });
 });
 

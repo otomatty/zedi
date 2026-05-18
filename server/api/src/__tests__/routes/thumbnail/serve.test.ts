@@ -1,13 +1,23 @@
 /**
- * DELETE /api/thumbnail/serve/:id のストレージ→DB 削除順序テスト。
- * Tests for storage-first deletion ordering in DELETE /api/thumbnail/serve/:id.
+ * DELETE /api/thumbnail/serve/:id のレスポンス契約テスト。
+ * Tests for the DELETE /api/thumbnail/serve/:id response contract.
+ *
+ * ルートは共通 GC サービス `deleteThumbnailObject` に委譲し、結果を
+ * HTTP ステータスへマッピングする (200 / 404 / 409)。GC の内部順序や TOCTOU は
+ * サービス側のテスト (`__tests__/services/thumbnailGcService.test.ts`) で検証する。
+ *
+ * The route delegates to the shared `deleteThumbnailObject` service and
+ * maps the discriminated outcome to HTTP status codes (200/404/409).
+ * Internal ordering and TOCTOU semantics live in the service-level tests
+ * (`__tests__/services/thumbnailGcService.test.ts`).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../../types/index.js";
 
-const { mockS3Send } = vi.hoisted(() => ({
+const { mockS3Send, mockDeleteThumbnailObject } = vi.hoisted(() => ({
   mockS3Send: vi.fn(),
+  mockDeleteThumbnailObject: vi.fn(),
 }));
 
 vi.mock("../../../middleware/auth.js", () => ({
@@ -48,6 +58,10 @@ vi.mock("@aws-sdk/client-s3", () => {
   };
 });
 
+vi.mock("../../../services/thumbnailGcService.js", () => ({
+  deleteThumbnailObject: (...args: unknown[]) => mockDeleteThumbnailObject(...args),
+}));
+
 import { Hono } from "hono";
 import serveRoutes from "../../../routes/thumbnail/serve.js";
 import { createMockDb } from "../../createMockDb.js";
@@ -56,39 +70,26 @@ const TEST_USER_ID = "user-test-123";
 const ATTACKER_ID = "attacker-456";
 const OBJECT_ID = "thumb-uuid-001";
 
-function createServeApp(dbResults: unknown[]) {
-  const mockDb = createMockDb(dbResults);
+function createServeApp() {
+  const mockDb = createMockDb([]);
   const app = new Hono<AppEnv>();
   app.use("*", async (c, next) => {
     c.set("db", mockDb.db as unknown as AppEnv["Variables"]["db"]);
     await next();
   });
   app.route("/api/thumbnail/serve", serveRoutes);
-  return { app, chains: mockDb.chains };
+  return { app };
 }
 
 beforeEach(() => {
   mockS3Send.mockReset();
+  mockDeleteThumbnailObject.mockReset();
 });
 
-describe("DELETE /api/thumbnail/serve/:id — DB-first deletion order", () => {
-  // media.ts と同様、SELECT と DELETE の TOCTOU 窓で他者の S3 オブジェクトを
-  // 誤削除しないよう、DB 削除が 1 行返した場合のみ S3 に触る。
-  //
-  // Mirrors the media delete pattern: the DB row is removed first under an
-  // ownership-scoped WHERE, and S3 is only touched after DELETE returns a row.
-  const s3Key = `thumbnails/${TEST_USER_ID}/${OBJECT_ID}.jpg`;
-  const thumbRow = {
-    id: OBJECT_ID,
-    userId: TEST_USER_ID,
-    s3Key,
-    sizeBytes: 1024,
-    createdAt: new Date(),
-  };
-
-  it("deletes DB row before storage object when both succeed", async () => {
-    mockS3Send.mockResolvedValueOnce({});
-    const { app, chains } = createServeApp([[thumbRow], [{ s3Key }]]);
+describe("DELETE /api/thumbnail/serve/:id", () => {
+  it("returns 200 when the GC service deletes the object", async () => {
+    mockDeleteThumbnailObject.mockResolvedValueOnce("deleted");
+    const { app } = createServeApp();
 
     const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
       method: "DELETE",
@@ -96,62 +97,16 @@ describe("DELETE /api/thumbnail/serve/:id — DB-first deletion order", () => {
     });
 
     expect(res.status).toBe(200);
-    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
-    expect(deleteCalls).toHaveLength(1);
-    expect(mockS3Send).toHaveBeenCalledTimes(1);
+    expect(mockDeleteThumbnailObject).toHaveBeenCalledTimes(1);
+    // ルートは objectId と呼び出し元 userId をそのまま渡す。
+    // The route forwards the path objectId and the caller's userId.
+    expect(mockDeleteThumbnailObject.mock.calls[0]?.[0]).toBe(OBJECT_ID);
+    expect(mockDeleteThumbnailObject.mock.calls[0]?.[1]).toBe(TEST_USER_ID);
   });
 
-  it("returns 404 without touching storage when DB delete matches no rows (TOCTOU)", async () => {
-    // SELECT 後に userId が変わったか並行削除された。S3 は触らない。
-    // Ownership changed after SELECT (or a concurrent DELETE won); skip S3.
-    const { app, chains } = createServeApp([[thumbRow], []]);
-
-    const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
-      method: "DELETE",
-      headers: { "x-test-user-id": TEST_USER_ID },
-    });
-
-    expect(res.status).toBe(404);
-    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
-    expect(deleteCalls).toHaveLength(1);
-    expect(mockS3Send).not.toHaveBeenCalled();
-  });
-
-  it("still returns 200 when storage delete fails with unexpected error (orphan logged)", async () => {
-    // DB 行は既に削除済み。S3 失敗は孤立オブジェクトとして残すのみで 200 を返す。
-    // DB row is gone; a post-DB S3 failure is logged for sweeping — API returns 200.
-    mockS3Send.mockRejectedValueOnce(new Error("network down"));
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const { app } = createServeApp([[thumbRow], [{ s3Key }]]);
-
-    const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
-      method: "DELETE",
-      headers: { "x-test-user-id": TEST_USER_ID },
-    });
-
-    expect(res.status).toBe(200);
-    expect(consoleErrorSpy).toHaveBeenCalled();
-    consoleErrorSpy.mockRestore();
-  });
-
-  it("returns 200 when storage reports NoSuchKey (idempotent, DB already deleted)", async () => {
-    mockS3Send.mockRejectedValueOnce({
-      name: "NoSuchKey",
-      $metadata: { httpStatusCode: 404 },
-    });
-    const { app } = createServeApp([[thumbRow], [{ s3Key }]]);
-
-    const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
-      method: "DELETE",
-      headers: { "x-test-user-id": TEST_USER_ID },
-    });
-
-    expect(res.status).toBe(200);
-    expect(mockS3Send).toHaveBeenCalledTimes(1);
-  });
-
-  it("returns 404 when DB row is missing or belongs to another user (no storage call)", async () => {
-    const { app, chains } = createServeApp([[]]);
+  it("returns 404 when the GC service reports 'not_found'", async () => {
+    mockDeleteThumbnailObject.mockResolvedValueOnce("not_found");
+    const { app } = createServeApp();
 
     const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
       method: "DELETE",
@@ -159,19 +114,36 @@ describe("DELETE /api/thumbnail/serve/:id — DB-first deletion order", () => {
     });
 
     expect(res.status).toBe(404);
-    const deleteCalls = chains.filter((c) => c.startMethod === "delete");
-    expect(deleteCalls).toHaveLength(0);
-    expect(mockS3Send).not.toHaveBeenCalled();
   });
 
-  it("returns 401 without auth header", async () => {
-    const { app } = createServeApp([[thumbRow]]);
+  it("returns 409 when a live page still references the thumbnail (issue #820 guard)", async () => {
+    // ライブページが `thumbnail_object_id` で参照しているサムネイルは
+    // クライアント rollback の誤発火から守るため削除を拒否する。
+    //
+    // Refuses to delete a thumbnail that a non-deleted page row still
+    // references — protects against phantom client rollbacks that would
+    // otherwise strip a live page of its thumbnail.
+    mockDeleteThumbnailObject.mockResolvedValueOnce("referenced");
+    const { app } = createServeApp();
+
+    const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
+      method: "DELETE",
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/referenced/i);
+  });
+
+  it("returns 401 without auth header and never calls the GC service", async () => {
+    const { app } = createServeApp();
 
     const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
       method: "DELETE",
     });
 
     expect(res.status).toBe(401);
-    expect(mockS3Send).not.toHaveBeenCalled();
+    expect(mockDeleteThumbnailObject).not.toHaveBeenCalled();
   });
 });

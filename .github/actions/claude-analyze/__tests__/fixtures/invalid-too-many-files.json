@@ -1,0 +1,12 @@
+{
+  "severity": "high",
+  "ai_summary": "Claude returned 6 suspected files, exceeding the documented 5-entry cap.",
+  "ai_suspected_files": [
+    { "path": "src/a.ts" },
+    { "path": "src/b.ts" },
+    { "path": "src/c.ts" },
+    { "path": "src/d.ts" },
+    { "path": "src/e.ts" },
+    { "path": "src/f.ts" }
+  ]
+}

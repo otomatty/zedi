@@ -42,6 +42,11 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({ className }) => {
           className="flex shrink-0 items-center gap-1 empty:hidden"
           data-testid="header-left-slot"
         />
+        {/* Note switching is now handled per-page via `NoteTitleSwitcher`,
+            so the mobile header keeps just the search input and the
+            page-supplied left/right slots.
+            ノート切替は各画面の `NoteTitleSwitcher` に統合済みのため、
+            モバイルヘッダーは検索とスロットのみを残す。 */}
         {hasSearchContext && (
           <div className="min-w-0 flex-1">
             <HeaderSearchBar />

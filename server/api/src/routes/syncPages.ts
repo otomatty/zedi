@@ -3,13 +3,22 @@
  *
  * GET  /api/sync/pages  — 差分ページ取得 (since クエリパラメータ)
  * POST /api/sync/pages  — ページ + リンク バルク同期
+ *
+ * Issue #823: 旧「個人ページ」（`note_id IS NULL`）は廃止。同期対象は呼び出し元の
+ * **デフォルトノート（マイノート）**所属かつ `owner_id = userId` のページに限定する。
+ * フロント差し替え完了まで、古いクライアントは GET が空になり得る。
+ *
+ * Issue #823: legacy personal pages (`note_id IS NULL`) are gone. Sync targets rows
+ * in the caller's **default note** with `owner_id = userId`. Older clients may see
+ * empty GET responses until the frontend migrates.
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { eq, and, gt, inArray, isNull } from "drizzle-orm";
+import { eq, and, gt, inArray } from "drizzle-orm";
 import { pages, links, ghostLinks, LINK_TYPES, type LinkType } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
+import { ensureDefaultNote } from "../services/defaultNoteService.js";
 
 /**
  * `body.links` / `body.ghost_links` で受け取った `link_type` を正規化する。
@@ -32,19 +41,16 @@ function normalizeLinkType(value: unknown): LinkType {
 const app = new Hono<AppEnv>();
 
 // ── GET /sync/pages ─────────────────────────────────────────────────────────
-// 個人ページ同期はクライアントの IndexedDB と個人ページ (`pages.note_id IS
-// NULL`) のみを対象にする。ノートネイティブページ（issue #713）はサーバー側
-// で管理され、ノート画面/共同編集経由でのみアクセスする。
+// Issue #823: デフォルトノート所属ページのみクライアント IndexedDB と同期する。
 //
-// Personal-page sync only mirrors personal pages (`pages.note_id IS NULL`)
-// into the client's IndexedDB. Note-native pages (issue #713) live solely on
-// the server and are accessed through the note view / collaborative editor.
+// Issue #823: only pages under the user's default note sync to IndexedDB.
 app.get("/", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
   const since = c.req.query("since");
 
-  const personalPageFilter = and(eq(pages.ownerId, userId), isNull(pages.noteId));
+  const defaultNote = await ensureDefaultNote(db, userId);
+  const personalPageFilter = and(eq(pages.ownerId, userId), eq(pages.noteId, defaultNote.id));
 
   let query = db
     .select({
@@ -160,19 +166,15 @@ app.post("/", authRequired, async (c) => {
     link_type: normalizeLinkType(g.link_type),
   }));
 
+  const defaultNote = await ensureDefaultNote(db, userId);
+  const defaultNoteId = defaultNote.id;
+
   const results: Array<{ id: string; action: string }> = [];
 
   // ページごとに LWW (Last Write Wins) 同期。
-  // 同期対象は個人ページ（`pages.note_id IS NULL`）のみ。ノートネイティブ
-  // ページ（issue #713）や他人の個人ページは衝突回避のため `skipped` 扱い。
+  // Issue #823: 対象はデフォルトノート所属かつ `owner_id = userId` のページのみ。
   //
-  // バルク取得で N+1 を避ける: クライアントから来た全 ID を一括で引き、
-  // メモリ上で「未存在 / 自分の個人ページ / それ以外（ノートネイティブ or
-  // 他人）」に振り分けてから個別の DML を発行する。
-  //
-  // LWW sync runs only against personal pages (`pages.note_id IS NULL`).
-  // Note-native pages (issue #713) and other users' personal pages are skipped
-  // to avoid ID collisions and IDOR.
+  // LWW sync runs only for pages in the caller's default note owned by the caller.
   //
   // Bulk-load to avoid N+1: fetch every incoming id in one query, then classify
   // in memory as "missing", "owned personal", or "other (note-native or
@@ -206,7 +208,7 @@ app.post("/", authRequired, async (c) => {
     noteId: string | null;
     updatedAt: Date;
   };
-  const existingRows: ExistingRow[] =
+  const existingRaw =
     incomingIds.length > 0
       ? await db
           .select({
@@ -218,6 +220,7 @@ app.post("/", authRequired, async (c) => {
           .from(pages)
           .where(inArray(pages.id, incomingIds))
       : [];
+  const existingRows: ExistingRow[] = existingRaw;
   const existingMap = new Map<string, ExistingRow>(existingRows.map((row) => [row.id, row]));
 
   for (const p of latestIncomingById.values()) {
@@ -228,6 +231,7 @@ app.post("/", authRequired, async (c) => {
       await db.insert(pages).values({
         id: p.id,
         ownerId: userId,
+        noteId: defaultNoteId,
         title: p.title ?? null,
         contentPreview: p.content_preview ?? null,
         thumbnailUrl: p.thumbnail_url ?? null,
@@ -243,16 +247,16 @@ app.post("/", authRequired, async (c) => {
       existingMap.set(p.id, {
         id: p.id,
         ownerId: userId,
-        noteId: null,
+        noteId: defaultNoteId,
         updatedAt: clientTime,
       });
       results.push({ id: p.id, action: "created" });
       continue;
     }
 
-    // ノートネイティブ or 他人の個人ページは触らない
-    // Skip note-native rows or rows owned by another user
-    if (existing.noteId !== null || existing.ownerId !== userId) {
+    // デフォルトノート以外 or 他人ページは触らない
+    // Skip rows outside the default note or owned by another user
+    if (existing.ownerId !== userId || existing.noteId !== defaultNoteId) {
       results.push({ id: p.id, action: "skipped" });
       continue;
     }
@@ -269,7 +273,7 @@ app.post("/", authRequired, async (c) => {
           isDeleted: p.is_deleted ?? false,
           updatedAt: clientTime,
         })
-        .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId), isNull(pages.noteId)));
+        .where(and(eq(pages.id, p.id), eq(pages.ownerId, userId), eq(pages.noteId, defaultNoteId)));
       existingMap.set(p.id, { ...existing, updatedAt: clientTime });
       results.push({ id: p.id, action: "updated" });
     } else {
@@ -292,10 +296,17 @@ app.post("/", authRequired, async (c) => {
   // "missing source_id → no delete" semantics along the link_type axis.
   if (incomingLinks.length > 0) {
     const sourceIds = [...new Set(incomingLinks.map((l) => l.source_id))];
-    const ownedPages = await db
+    const ownedPagesRaw = await db
       .select({ id: pages.id })
       .from(pages)
-      .where(and(eq(pages.ownerId, userId), isNull(pages.noteId), inArray(pages.id, sourceIds)));
+      .where(
+        and(
+          eq(pages.ownerId, userId),
+          eq(pages.noteId, defaultNoteId),
+          inArray(pages.id, sourceIds),
+        ),
+      );
+    const ownedPages = ownedPagesRaw;
     const ownedIds = new Set(ownedPages.map((r) => r.id));
 
     const deletePairs = new Set<string>();
@@ -327,10 +338,17 @@ app.post("/", authRequired, async (c) => {
   // Ghost link sync — personal pages only (同じ link_type スコープ化方針)
   if (incomingGhostLinks.length > 0) {
     const sourceIds = [...new Set(incomingGhostLinks.map((g) => g.source_page_id))];
-    const ownedGhostPages = await db
+    const ownedGhostRaw = await db
       .select({ id: pages.id })
       .from(pages)
-      .where(and(eq(pages.ownerId, userId), isNull(pages.noteId), inArray(pages.id, sourceIds)));
+      .where(
+        and(
+          eq(pages.ownerId, userId),
+          eq(pages.noteId, defaultNoteId),
+          inArray(pages.id, sourceIds),
+        ),
+      );
+    const ownedGhostPages = ownedGhostRaw;
     const ownedGhostIds = new Set(ownedGhostPages.map((r) => r.id));
 
     const deletePairs = new Set<string>();

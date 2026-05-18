@@ -1,42 +1,41 @@
 /**
- * /api/pages — ページ CRUD + コンテンツ管理
+ * /api/pages — ページ CRUD + 読み取り専用コンテンツ取得
  *
- * GET    /api/pages                — 自分 (own) のページ一覧、または共有 (shared) を含めた一覧をページネーション取得
- *        — List the caller's pages (own, or own + shared via notes) with limit/offset pagination.
- * GET    /api/pages/:id/content — Y.Doc コンテンツ取得（`page_contents` 行が未作成の空ページは 200 + 空 ydoc）
- *        — Retrieve Y.Doc content (200 + empty `ydoc_state` when no `page_contents` row).
- * PUT    /api/pages/:id/content — Y.Doc コンテンツ更新 (楽観的ロック) / Update with optimistic locking
- * POST   /api/pages             — 新規ページ作成 / Create page
- * DELETE /api/pages/:id         — ページ論理削除 / Soft-delete page
+ * GET    /api/pages                       — 後方互換のページ一覧（Issue #823 以降は `Deprecation: true`）。
+ *        新規実装は `GET /api/notes/me` → `GET /api/notes/:noteId/pages` を推奨。
+ *        — Legacy page listing (sends `Deprecation: true` after issue #823).
+ *        Prefer `GET /api/notes/me` then `GET /api/notes/:noteId/pages` for new clients.
+ * GET    /api/pages/:id/public-content — 読み取り専用のページ本文（ゲスト・viewer 用 / Y.Doc を返さない）
+ *        — Read-only page text for guests / viewer-only callers (no Y.Doc bytes).
+ * GET    /api/pages/:id                — 単一ページのメタデータ取得 / Single-page metadata fetch
+ * PUT    /api/pages/:id                — ページメタデータ（タイトル等）更新 / Update page metadata (title, preview)
+ * POST   /api/pages                    — 新規ページ作成 / Create page
+ * DELETE /api/pages/:id                — ページ論理削除 / Soft-delete page
+ *
+ * Issue #889 Phase 4: `local` コラボレーションモード廃止に伴い、Y.Doc バイト列を
+ * 直接やり取りする `GET/PUT /api/pages/:id/content` ルートは削除した。本文の
+ * 編集はすべて Hocuspocus WebSocket 経由、読み取り専用閲覧は
+ * `GET /api/pages/:id/public-content` 経由に統一されている。
+ *
+ * Issue #889 Phase 4: the `local` collaboration mode has been retired. The
+ * legacy `GET/PUT /api/pages/:id/content` routes that exchanged raw Y.Doc
+ * bytes are gone — editors flow through Hocuspocus over WebSocket, while
+ * read-only consumers use `GET /api/pages/:id/public-content`.
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and, sql } from "drizzle-orm";
-import { pages, pageContents } from "../schema/index.js";
-import { authRequired } from "../middleware/auth.js";
+import { pages, pageContents, type Page } from "../schema/index.js";
+import { authRequired, authOptional } from "../middleware/auth.js";
 import type { AppEnv, Database } from "../types/index.js";
-import { maybeCreateSnapshot } from "../services/snapshotService.js";
-import { assertPageViewAccess, assertPageEditAccess } from "../services/pageAccessService.js";
+import { ensureDefaultNote, getDefaultNoteOrNull } from "../services/defaultNoteService.js";
+import { getNoteRole, canEdit } from "./notes/helpers.js";
+import { extractEmailDomain } from "../lib/freeEmailDomains.js";
+import { assertPageEditAccess } from "../services/pageAccessService.js";
 import { propagateTitleRename } from "../services/titleRenamePropagationService.js";
-
-/**
- * ベストエフォートで自動スナップショットを作成する。失敗してもメイン処理には影響しない。
- * Best-effort auto-snapshot creation. Failures are logged but never propagate.
- */
-async function tryAutoSnapshot(
-  db: Database,
-  pageId: string,
-  ydocState: Buffer,
-  contentText: string | null,
-  version: number,
-  userId: string,
-): Promise<void> {
-  try {
-    await maybeCreateSnapshot(db, pageId, ydocState, contentText, version, userId);
-  } catch (error) {
-    console.error(`[Snapshot] Failed to create auto-snapshot for page ${pageId}:`, error);
-  }
-}
+import { deleteThumbnailObject } from "../services/thumbnailGcService.js";
+import { publishNoteEvent } from "../services/noteEventBroadcaster.js";
+import { pageRowToWindowItem } from "./notes/eventHelpers.js";
 
 const app = new Hono<AppEnv>();
 
@@ -65,30 +64,84 @@ function tryPropagateTitleRename(
 }
 
 /**
- * PUT /content リクエストから pages テーブルの更新セットを構築し、変更があれば適用する。
- * タイトル更新を検出した場合は旧タイトルを返して呼び出し側から伝播処理を
- * 起動できるようにする（issue #726）。
+ * Issue #860 Phase 4: title / content_preview が「実際に」変わったときだけ
+ * `page.updated` をノート購読者へ配信する。クライアントが現在値を毎回
+ * ラウンドトリップする実装でも spam しないよう、`applyPagesMetadataUpdate`
+ * の戻り値 `metadataChanged` で判定する。`updatedRow` も同じ helper の
+ * `.returning()` から渡るため、ここでは追加 SELECT を発生させない
+ * （gemini-code-assist + coderabbitai review on PR #867）。
+ *
+ * Emit `page.updated` only when the metadata actually changed compared to the
+ * current row. A client that round-trips the unchanged values on every save
+ * must not trigger a broadcast — the helper's `metadataChanged` flag gates
+ * that. The `updatedRow` comes from `applyPagesMetadataUpdate`'s
+ * `.returning()`, so this path stays SELECT-free (gemini-code-assist and
+ * coderabbitai reviews on PR #867).
+ */
+function emitPageUpdatedIfChanged(metadataChanged: boolean, updatedRow: Page | null): void {
+  if (!metadataChanged || !updatedRow || updatedRow.isDeleted) return;
+  publishNoteEvent({
+    type: "page.updated",
+    note_id: updatedRow.noteId,
+    page: pageRowToWindowItem(updatedRow),
+  });
+}
+
+/**
+ * PUT メタデータリクエストから pages テーブルの更新セットを構築し、変更があれば
+ * 適用する。タイトル更新を検出した場合は旧タイトルを返して呼び出し側から
+ * 伝播処理を起動できるようにする（issue #726）。
+ *
+ * Issue #860 Phase 4 で 2 つの戻り値を追加した:
+ * - `metadataChanged`: 現在値と比較して title または content_preview が
+ *   実際に変わったかどうか。クライアントが現在値をエコーバックするセーブ
+ *   フローで SSE がスパムしないように、emit 側でこのフラグを参照する
+ *   （coderabbitai major on PR #867）。
+ * - `updatedRow`: `.returning()` の結果。emit 側で追加 SELECT せずに
+ *   そのまま payload に流せる（gemini-code-assist medium on PR #867）。
  *
  * Build and apply pages-table updates (title, content_preview, updated_at)
- * from the PUT body. When the title is being changed, return the old / new
- * title pair so the caller can kick off rename propagation once the row
- * update is durable (issue #726).
+ * from the PUT body. Returns:
+ * - `renamed` — old/new title pair when the title meaningfully changed
+ *   (issue #726).
+ * - `metadataChanged` — whether title or content_preview actually differs
+ *   from the current row. Used by the Issue #860 Phase 4 SSE emit to avoid
+ *   broadcasting `page.updated` on round-tripped values
+ *   (coderabbitai review on PR #867).
+ * - `updatedRow` — the post-update row returned by `.returning()` so the
+ *   emit path does not need a follow-up SELECT
+ *   (gemini-code-assist review on PR #867).
  */
 async function applyPagesMetadataUpdate(
   db: { select: Database["select"]; update: Database["update"] },
   pageId: string,
   body: { title?: string; content_preview?: string },
-): Promise<{ renamed: { oldTitle: string; newTitle: string } | null }> {
+): Promise<{
+  renamed: { oldTitle: string; newTitle: string } | null;
+  metadataChanged: boolean;
+  updatedRow: Page | null;
+}> {
   let renamed: { oldTitle: string; newTitle: string } | null = null;
 
-  if (body.title !== undefined) {
+  // タイトル変化検知に加えて Phase 4 で content_preview の変化検知も必要
+  // なので、両方をまとめて 1 回の SELECT で取り出す。
+  // Title (for rename propagation) and content_preview (for SSE emit
+  // gating) are both compared against the current row, so fetch them in a
+  // single SELECT instead of two.
+  let currentTitle: string | null = null;
+  let currentPreview: string | null = null;
+  if (body.title !== undefined || body.content_preview !== undefined) {
     const current = await db
-      .select({ title: pages.title })
+      .select({ title: pages.title, contentPreview: pages.contentPreview })
       .from(pages)
       .where(eq(pages.id, pageId))
       .limit(1);
-    const previousRaw = current[0]?.title ?? null;
-    const previousTrimmed = typeof previousRaw === "string" ? previousRaw.trim() : "";
+    currentTitle = current[0]?.title ?? null;
+    currentPreview = current[0]?.contentPreview ?? null;
+  }
+
+  if (body.title !== undefined) {
+    const previousTrimmed = typeof currentTitle === "string" ? currentTitle.trim() : "";
     const nextTrimmed = body.title.trim();
     // 正規化（小文字化）して比較することで "Foo" → "foo" のような表記揺れだけの
     // 変更は伝播をスキップする。`wikiLinkUtils` / `tagUtils` の照合も同一正規化。
@@ -104,104 +157,100 @@ async function applyPagesMetadataUpdate(
     }
   }
 
+  // 実際に値が異なるカラムだけを set に積む。これにより:
+  // 1. クライアントがエコーバックしただけのセーブで UPDATE が走らない。
+  // 2. UPDATE が走らなければ updatedRow も null になり、emit もスキップされる。
+  // Only stage columns whose new value really differs from the current row.
+  // Skipping no-op UPDATEs avoids spurious `updated_at` churn and ensures
+  // the SSE emit path is gated on real changes (coderabbitai PR #867).
   const set: Record<string, unknown> = {};
-  if (body.title !== undefined) set.title = body.title;
-  if (body.content_preview !== undefined) set.contentPreview = body.content_preview;
-  if (Object.keys(set).length === 0) return { renamed };
+  if (body.title !== undefined && body.title !== currentTitle) {
+    set.title = body.title;
+  }
+  if (body.content_preview !== undefined && body.content_preview !== currentPreview) {
+    set.contentPreview = body.content_preview;
+  }
+  if (Object.keys(set).length === 0) {
+    return { renamed, metadataChanged: false, updatedRow: null };
+  }
   set.updatedAt = new Date();
-  await db.update(pages).set(set).where(eq(pages.id, pageId));
-  return { renamed };
+  const updated = await db.update(pages).set(set).where(eq(pages.id, pageId)).returning();
+  return { renamed, metadataChanged: true, updatedRow: updated[0] ?? null };
 }
 
 // ── GET /pages ──────────────────────────────────────────────────────────────
-// `scope=shared` の場合、`/api/search` と同じ認可ロジック
-// (own + 受諾済みノートメンバー + note owner) を流用する。
-// When `scope=shared`, reuses the same authorization model as `/api/search`
-// (own pages + accepted note members + note owners).
+// Issue #823: 一覧は `pages.note_id` モデルで再実装。MCP `zedi_list_pages` 等の後方互換のため
+// 200 で返しつつ `Deprecation: true` を付与する。新規クライアントはノート配下エンドポイントへ。
+//
+// Issue #823: reimplemented listing on `pages.note_id`. Keeps HTTP 200 for MCP / legacy callers
+// while setting `Deprecation: true`; new clients should use note-scoped routes.
 app.get("/", authRequired, async (c) => {
   const userId = c.get("userId");
+  const userEmailRaw = c.get("userEmail");
   const db = c.get("db");
 
-  // クエリパラメータは整数として明示的にパースする。`Number("abc")` だと NaN が SQL に渡るため。
-  // Parse query params as integers — `Number("abc")` would propagate NaN into SQL.
   const limit = Math.min(Math.max(parseInt(c.req.query("limit") ?? "20", 10) || 20, 1), 100);
   const offset = Math.max(parseInt(c.req.query("offset") ?? "0", 10) || 0, 0);
   const scope = c.req.query("scope") === "shared" ? "shared" : "own";
-
-  // アクセス制御だけを変数化して SELECT 文の重複を避ける。
-  // `shared` は `services/pageAccessService.ts` と同じ正規の認可モデルを採用:
-  //   - notes が未削除であること
-  //   - note_members.status = 'accepted' (招待を受諾済み) であること
-  //   - note_members / note_pages が未削除であること
-  // 大規模データセットでもプランナーが効きやすい EXISTS + JOIN を使う。
-  // Vary only the access predicate to avoid duplicating the SELECT.
-  // `shared` mirrors the canonical authorization model from `services/pageAccessService.ts`:
-  //   the linked note must be active, the membership must be accepted, and the join rows
-  //   must not be soft-deleted. EXISTS + JOIN keeps the planner happy on large datasets.
-  // `own` スコープは個人ページ（`pages.note_id IS NULL`）のみを返す。
-  // ノートネイティブページ（issue #713）は、ノート画面または `scope=shared`
-  // 経由でのみアクセスする。`shared` 経由の場合は (a) note_members 経由の
-  // メンバーシップ、または (b) `note_pages -> notes.owner_id = userId` 経由の
-  // オーナーシップで含まれる。オーナー経路を note-native page だけに限定すると、
-  // linked personal page が listing から消えて `assertPageViewAccess` と非対称になる。
-  // `getNoteRole` の解決順 (owner → member → ...) と listing predicate を揃える。
-  //
-  // The `own` scope returns personal pages only (`pages.note_id IS NULL`).
-  // Note-native pages (issue #713) are accessed via the note view or
-  // `scope=shared`. `shared` includes them either through (a) `note_members`
-  // membership or (b) note ownership reached through `note_pages`. That owner
-  // branch must cover linked personal pages too; otherwise owners could open
-  // them via `assertPageViewAccess` while the listing hides them.
-  const accessFilter =
-    scope === "shared"
-      ? sql`(
-          (p.owner_id = ${userId} AND p.note_id IS NULL)
-          OR EXISTS (
-            SELECT 1 FROM note_pages np
-            JOIN notes n ON n.id = np.note_id
-            JOIN note_members nm ON nm.note_id = np.note_id
-            JOIN "user" u ON u.email = nm.member_email
-            WHERE np.page_id = p.id
-              AND u.id = ${userId}
-              AND nm.status = 'accepted'
-              AND nm.is_deleted = false
-              AND np.is_deleted = false
-              AND n.is_deleted = false
-          )
-          OR EXISTS (
-            SELECT 1 FROM note_pages np
-            JOIN notes n ON n.id = np.note_id
-            WHERE np.page_id = p.id
-              AND np.is_deleted = false
-              AND n.owner_id = ${userId}
-              AND n.is_deleted = false
-          )
-        )`
-      : sql`p.owner_id = ${userId} AND p.note_id IS NULL`;
-
-  // Wiki の内部システムページ（`special_kind` が `__index__` / `__log__`、
-  // および `is_schema = true` のスキーマページ）は通常一覧から除外する。
-  // クライアントがそれらを編集するための専用 UI が別にあるため、`/api/pages`
-  // で返すと NotFound 化したり、ヘッダ付きカードの中に編集不能な行が混ざる。
-  // include_special=true を指定したクライアントのみオプトインで取得できる。
-  // Hide internal/system pages (special_kind set or is_schema=true) from the
-  // generic listing; clients that need them can opt in with include_special=true.
   const includeSpecial = c.req.query("include_special") === "true";
+
   const specialKindFilter = includeSpecial
     ? sql`TRUE`
     : sql`p.special_kind IS NULL AND p.is_schema = false`;
 
-  // `note_id` を返すことで、`scope=shared` で混在 listing を受け取った
-  // クライアントが個人ページ（`note_id IS NULL`）とノートネイティブページを
-  // 区別できる。MCP の `zedi_list_pages` ツールはこれに依存している。
-  // Surface `note_id` so callers receiving mixed `scope=shared` results (e.g.
-  // the `zedi_list_pages` MCP tool) can distinguish personal vs note-native.
+  c.header("Deprecation", "true");
+
+  const normalizedEmail = typeof userEmailRaw === "string" ? userEmailRaw.trim().toLowerCase() : "";
+  const emailDomain = extractEmailDomain(normalizedEmail);
+
+  const domainBranch =
+    emailDomain !== null
+      ? sql`OR EXISTS (
+          SELECT 1
+          FROM notes n
+          INNER JOIN note_domain_access nda ON nda.note_id = n.id
+          WHERE n.id = p.note_id
+            AND n.is_deleted = false
+            AND nda.is_deleted = false
+            AND nda.domain = ${emailDomain}
+        )`
+      : sql``;
+
+  let accessFilter;
+
+  if (scope === "own") {
+    const defaultNote = await getDefaultNoteOrNull(db, userId);
+    if (!defaultNote) {
+      return c.json({ pages: [] });
+    }
+    accessFilter = sql`p.note_id = ${defaultNote.id}`;
+  } else {
+    accessFilter = sql`(
+      EXISTS (
+        SELECT 1 FROM notes n
+        WHERE n.id = p.note_id AND n.is_deleted = false AND n.owner_id = ${userId}
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM notes n
+        INNER JOIN note_members nm ON nm.note_id = n.id
+        INNER JOIN "user" u ON LOWER(u.email) = LOWER(nm.member_email)
+        WHERE n.id = p.note_id
+          AND u.id = ${userId}
+          AND nm.status = 'accepted'
+          AND nm.is_deleted = false
+          AND n.is_deleted = false
+      )
+      ${domainBranch}
+    )`;
+  }
+
   const result = await db.execute(sql`
     SELECT p.id, p.title, p.content_preview, p.updated_at, p.note_id
     FROM pages p
     WHERE p.is_deleted = false
-      AND ${specialKindFilter}
-      AND ${accessFilter}
+    AND ${specialKindFilter}
+    AND ${accessFilter}
     ORDER BY p.updated_at DESC
     LIMIT ${limit}
     OFFSET ${offset}
@@ -210,244 +259,80 @@ app.get("/", authRequired, async (c) => {
   return c.json({ pages: result.rows });
 });
 
-// ── GET /pages/:id/content ──────────────────────────────────────────────────
-app.get("/:id/content", authRequired, async (c) => {
-  const pageId = c.req.param("id");
-  const userId = c.get("userId");
-  const db = c.get("db");
-
-  // 個人ページは所有者のみ、ノートネイティブページはノートのロール解決
-  // （member / domain / public guest）が成立すれば閲覧可。Issue #713 を参照。
-  // Personal pages: owner only. Note-native pages: any resolved note role
-  // (member / domain / public guest) may view. See issue #713.
-  await assertPageViewAccess(db, pageId, userId);
-
-  // コンテンツ取得
-  const content = await db
-    .select()
-    .from(pageContents)
-    .where(eq(pageContents.pageId, pageId))
-    .limit(1);
-
-  const row = content[0];
-  if (!row) {
-    return c.json({
-      ydoc_state: "",
-      version: 0,
-      content_text: null,
-    });
-  }
-  const ydocBase64 =
-    row.ydocState instanceof Buffer
-      ? row.ydocState.toString("base64")
-      : typeof row.ydocState === "string"
-        ? row.ydocState
-        : Buffer.from(row.ydocState as unknown as ArrayBufferLike).toString("base64");
-
-  return c.json({
-    ydoc_state: ydocBase64,
-    version: row.version,
-    content_text: row.contentText,
-    updated_at: row.updatedAt?.toISOString(),
-  });
-});
-
-// ── PUT /pages/:id/content ──────────────────────────────────────────────────
-app.put("/:id/content", authRequired, async (c) => {
-  const pageId = c.req.param("id");
-  const userId = c.get("userId");
-  const db = c.get("db");
-
-  const body = await c.req.json<{
-    ydoc_state: string; // base64-encoded Y.Doc state
-    expected_version?: number;
-    content_text?: string;
-    content_preview?: string;
-    title?: string;
-  }>();
-
-  // Allow "" so clients can round-trip GET (empty ydoc_state) with PUT + expected_version.
-  // GET が ydoc_state: "" を返した場合もそのまま初回保存できるようにする。
-  if (body.ydoc_state === undefined || body.ydoc_state === null) {
-    throw new HTTPException(400, { message: "ydoc_state is required" });
-  }
-
-  // 個人ページは所有者のみ、ノートネイティブページは note ロール / editPermission
-  // で判定する。Issue #713 を参照。
-  // Personal pages: owner only. Note-native pages: note role + editPermission
-  // (`canEdit`). See issue #713.
-  await assertPageEditAccess(db, pageId, userId);
-
-  const ydocBuffer = Buffer.from(body.ydoc_state, "base64");
-
-  // UPSERT page_contents with optimistic locking
-  if (body.expected_version != null) {
-    // First save after GET returned version 0 with no row: insert the initial row.
-    // GET が page_contents 未作成で version:0 を返した契約に合わせ、expected_version:0 で初回 INSERT を許容する。
-    if (body.expected_version === 0) {
-      const firstSave = await db.transaction(async (tx) => {
-        const inserted = await tx
-          .insert(pageContents)
-          .values({
-            pageId,
-            ydocState: ydocBuffer,
-            version: 1,
-            contentText: body.content_text ?? null,
-          })
-          .onConflictDoNothing({ target: pageContents.pageId })
-          .returning();
-
-        if (!inserted.length) {
-          return { done: false as const };
-        }
-
-        const insertedRow = inserted[0];
-        if (!insertedRow) throw new HTTPException(500, { message: "Insert failed" });
-
-        const { renamed } = await applyPagesMetadataUpdate(tx, pageId, body);
-
-        return { done: true as const, version: insertedRow.version ?? 1, renamed };
-      });
-
-      if (firstSave.done) {
-        void tryAutoSnapshot(
-          db,
-          pageId,
-          ydocBuffer,
-          body.content_text ?? null,
-          firstSave.version,
-          userId,
-        );
-        if (firstSave.renamed) {
-          tryPropagateTitleRename(
-            db,
-            pageId,
-            firstSave.renamed.oldTitle,
-            firstSave.renamed.newTitle,
-          );
-        }
-        return c.json({ version: firstSave.version });
-      }
-    }
-
-    // 楽観的ロック: expected_version と一致する場合のみ更新
-    const updated = await db
-      .update(pageContents)
-      .set({
-        ydocState: ydocBuffer,
-        version: sql`${pageContents.version} + 1`,
-        contentText: body.content_text ?? null,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(pageContents.pageId, pageId), eq(pageContents.version, body.expected_version)))
-      .returning();
-
-    if (!updated.length) {
-      // バージョン不一致: 現在のバージョンを返す
-      const current = await db
-        .select({ version: pageContents.version })
-        .from(pageContents)
-        .where(eq(pageContents.pageId, pageId))
-        .limit(1);
-
-      throw new HTTPException(409, {
-        message: `Version conflict. Current version: ${current[0]?.version ?? 0}`,
-      });
-    }
-
-    const updatedRow = updated[0];
-    if (!updatedRow) throw new HTTPException(500, { message: "Update failed" });
-
-    const { renamed } = await applyPagesMetadataUpdate(db, pageId, body);
-
-    void tryAutoSnapshot(
-      db,
-      pageId,
-      ydocBuffer,
-      body.content_text ?? null,
-      updatedRow.version ?? 0,
-      userId,
-    );
-
-    if (renamed) {
-      tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
-    }
-
-    return c.json({ version: updatedRow.version ?? 0 });
-  }
-
-  // No optimistic locking: UPSERT
-  const result = await db
-    .insert(pageContents)
-    .values({
-      pageId,
-      ydocState: ydocBuffer,
-      version: 1,
-      contentText: body.content_text ?? null,
-    })
-    .onConflictDoUpdate({
-      target: pageContents.pageId,
-      set: {
-        ydocState: ydocBuffer,
-        version: sql`${pageContents.version} + 1`,
-        contentText: body.content_text ?? null,
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
-
-  const { renamed } = await applyPagesMetadataUpdate(db, pageId, body);
-
-  const resultRow = result[0];
-  if (!resultRow) throw new HTTPException(500, { message: "Upsert failed" });
-
-  void tryAutoSnapshot(
-    db,
-    pageId,
-    ydocBuffer,
-    body.content_text ?? null,
-    resultRow.version ?? 0,
-    userId,
-  );
-
-  if (renamed) {
-    tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
-  }
-
-  return c.json({ version: resultRow.version });
-});
-
 // ── POST /pages ─────────────────────────────────────────────────────────────
 app.post("/", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
   const body = await c.req.json<{
+    /** 省略時は呼び出し元のデフォルトノート（マイノート）へ所属させる。 */
+    note_id?: string | null;
     title?: string;
     content_preview?: string;
     source_page_id?: string;
     source_url?: string;
     thumbnail_url?: string | null;
+    /**
+     * 紐づく thumbnail_objects.id。Web Clipper など URL からページを作る
+     * フローで保存したサムネイルを指す。DELETE 時にこの ID で GC する。
+     *
+     * The owning `thumbnail_objects.id`. Set when the page was created from
+     * a URL (e.g. Web Clipper) and the thumbnail was committed via
+     * `/api/thumbnail/commit`. DELETE /pages/:id uses this id to GC.
+     */
+    thumbnail_object_id?: string | null;
   }>();
+
+  let resolvedNoteId =
+    typeof body.note_id === "string" && body.note_id.trim() !== "" ? body.note_id.trim() : null;
+  if (!resolvedNoteId) {
+    const defaultNote = await ensureDefaultNote(db, userId);
+    resolvedNoteId = defaultNote.id;
+  } else {
+    const userEmail = c.get("userEmail");
+    const { role, note } = await getNoteRole(resolvedNoteId, userId, userEmail, db);
+    if (!note) throw new HTTPException(404, { message: "Note not found" });
+    if (!role || !canEdit(role, note)) {
+      throw new HTTPException(403, { message: "Forbidden" });
+    }
+  }
 
   const result = await db
     .insert(pages)
     .values({
       ownerId: userId,
+      noteId: resolvedNoteId,
       title: body.title ?? null,
       contentPreview: body.content_preview ?? null,
       sourcePageId: body.source_page_id ?? null,
       sourceUrl: body.source_url ?? null,
       thumbnailUrl: body.thumbnail_url ?? null,
+      thumbnailObjectId: body.thumbnail_object_id ?? null,
     })
     .returning();
 
   const row = result[0];
   if (!row) throw new HTTPException(500, { message: "Insert failed" });
+
+  // Issue #860 Phase 4: 新規ページを所属ノート購読者に通知。本ルートは Web
+  // Clipper / `/notes/me` 系の創出経路でも使われるため、`/api/notes/:noteId/pages`
+  // の POST と同じ event を出してフロント側のキャッシュ更新を一本化する。
+  // Issue #860 Phase 4: emit `page.added` so subscribers (including the
+  // `/api/notes/:noteId/events` consumers) update their cached windows
+  // without a refetch. This route is shared by Web Clipper and `/notes/me`
+  // flows, so emitting here keeps the cache patch behavior identical to
+  // `POST /api/notes/:noteId/pages`.
+  publishNoteEvent({
+    type: "page.added",
+    note_id: row.noteId,
+    page: pageRowToWindowItem(row),
+  });
+
   return c.json(
     {
       id: row.id,
       owner_id: row.ownerId,
+      note_id: row.noteId,
       source_page_id: row.sourcePageId ?? null,
       title: row.title ?? null,
       content_preview: row.contentPreview ?? null,
@@ -461,23 +346,336 @@ app.post("/", authRequired, async (c) => {
   );
 });
 
+// ── GET /pages/:id (single page metadata) ───────────────────────────────────
+/**
+ * `GET /api/pages/:pageId` — 単一ページのメタデータを返す（Issue #860 Phase 6）。
+ *
+ * Phase 6 で `GET /api/notes/:noteId` から `pages[]` を撤去したため、
+ * NotePageView などが「単一ページの所有者・所属ノート・ソース URL 等」を
+ * 取得する経路が必要になった。この route はノートシェルとも cursor pagination
+ * の `/notes/:noteId/pages` window とも独立した、id 直アクセスの軽量経路。
+ *
+ * `authOptional` + `getNoteRole` を採用し、公開 / unlisted ノート配下の
+ * ページであれば未ログインの guest からも 200 で返す（`/notes/:noteId/pages`
+ * と整合）。private ノート配下のページは role が解決しない呼び出し元に対して
+ * 403 を返す。
+ *
+ * `GET /api/pages/:pageId` returns single-page metadata (Issue #860 Phase 6).
+ *
+ * Phase 6 dropped `pages[]` from `GET /api/notes/:noteId`, so consumers like
+ * `NotePageView` lost the existing "look up one page's owner / source url /
+ * note id" path. This route fills that gap with an id-direct lookup that is
+ * independent of the note shell and the cursor-paginated `/pages` window.
+ *
+ * Auth model is `authOptional` + `getNoteRole`: guests can read pages of
+ * public / unlisted notes without sign-in (consistent with `/pages`),
+ * while private-note pages still 403 for callers without a resolved role.
+ */
+app.get("/:id", authOptional, async (c) => {
+  const pageId = c.req.param("id");
+  const userId = c.get("userId");
+  const userEmail = c.get("userEmail");
+  const db = c.get("db");
+
+  const rows = await db
+    .select({
+      id: pages.id,
+      ownerId: pages.ownerId,
+      noteId: pages.noteId,
+      sourcePageId: pages.sourcePageId,
+      title: pages.title,
+      contentPreview: pages.contentPreview,
+      thumbnailUrl: pages.thumbnailUrl,
+      sourceUrl: pages.sourceUrl,
+      createdAt: pages.createdAt,
+      updatedAt: pages.updatedAt,
+      isDeleted: pages.isDeleted,
+    })
+    .from(pages)
+    .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) throw new HTTPException(404, { message: "Page not found" });
+
+  // 所属ノートに対する role が解決しない呼び出し元はアクセス不可。owner /
+  // editor / viewer / guest のいずれかが付けば 200 で返す（owner だけに絞ると
+  // 共有ノートの member や public ノートの guest が読めなくなる）。
+  //
+  // The caller must hold *some* role on the owning note. Restricting to
+  // owner-only would cut off note members and public-note guests; the
+  // visibility check inside `getNoteRole` already gates anonymous access to
+  // private notes correctly.
+  const { role } = await getNoteRole(row.noteId, userId, userEmail, db);
+  if (!role) throw new HTTPException(403, { message: "Forbidden" });
+
+  return c.json({
+    id: row.id,
+    owner_id: row.ownerId,
+    note_id: row.noteId,
+    source_page_id: row.sourcePageId,
+    title: row.title,
+    content_preview: row.contentPreview ?? null,
+    thumbnail_url: row.thumbnailUrl,
+    source_url: row.sourceUrl,
+    created_at: row.createdAt,
+    updated_at: row.updatedAt,
+    is_deleted: row.isDeleted,
+  });
+});
+
 // ── DELETE /pages/:id ───────────────────────────────────────────────────────
 app.delete("/:id", authRequired, async (c) => {
   const pageId = c.req.param("id");
   const userId = c.get("userId");
   const db = c.get("db");
 
-  // ノートネイティブページの削除はノート編集権限で判定する。
-  // Note-native page deletion is governed by the note's edit permission.
-  // See issue #713.
+  // ページ削除は所属ノートの編集権限で判定する。
+  // Page deletion is governed by edit permission on the owning note.
   await assertPageEditAccess(db, pageId, userId);
+
+  // GC 対象のサムネイル ID とページオーナーを取りつつ、ページを soft-delete する。
+  // `thumbnail_object_id` も同時に NULL にして、DB 上は「サムネイルが
+  // 紐づいていないページ」になるようにする（復元時に死んだ ID を残さない）。
+  //
+  // Capture the linked thumbnail id and the page owner, then soft-delete in
+  // one shot. Clearing `thumbnail_object_id` keeps the row consistent — if
+  // the page is ever restored we don't want it pointing at a now-collected
+  // blob. We capture `ownerId` because thumbnails are owner-scoped: in a
+  // shared note, the user performing the deletion (`userId`) may differ
+  // from the page owner, and `deleteThumbnailObject` matches on the
+  // thumbnail's owner predicate. Passing the actor's id would orphan the
+  // blob and silently keep burning the real owner's quota.
+  const [target] = await db
+    .select({
+      thumbnailObjectId: pages.thumbnailObjectId,
+      ownerId: pages.ownerId,
+      noteId: pages.noteId,
+    })
+    .from(pages)
+    .where(eq(pages.id, pageId))
+    .limit(1);
 
   await db
     .update(pages)
-    .set({ isDeleted: true, updatedAt: new Date() })
+    .set({ isDeleted: true, thumbnailObjectId: null, updatedAt: new Date() })
     .where(eq(pages.id, pageId));
 
+  // Issue #860 Phase 4: 削除を所属ノート購読者に通知。`noteId` は同じ
+  // SELECT で取得済みのため追加クエリは発生しない。
+  // Issue #860 Phase 4: notify subscribers of the owning note. The note id
+  // came from the earlier SELECT so no extra round trip is needed.
+  if (target?.noteId) {
+    publishNoteEvent({ type: "page.deleted", note_id: target.noteId, page_id: pageId });
+  }
+
+  // GC は best-effort。サムネイル削除が S3 障害などで失敗しても、ページ削除
+  // 自体は成功させる（ユーザーから見て「削除できなかった」状態を作らない）。
+  //
+  // GC is best-effort: a thumbnail delete failure must not roll back the page
+  // soft-delete from the user's perspective. `deleteThumbnailObject` already
+  // logs S3 failures so a sweeper can reclaim orphans.
+  if (target?.thumbnailObjectId && target.ownerId) {
+    await deleteThumbnailObject(target.thumbnailObjectId, target.ownerId, db);
+  }
+
   return c.json({ id: pageId, deleted: true });
+});
+
+// ── PUT /pages/:id (metadata only) ──────────────────────────────────────────
+/**
+ * `PUT /api/pages/:pageId` — ページのメタデータ（タイトル / `content_preview`）だけを
+ * 更新する。Y.Doc 本体は Hocuspocus WebSocket 経由で更新されるため、本ルートで
+ * バイト列を受け付けることはない。
+ *
+ * Issue #889 で `local` コラボレーションモードと REST 経由の Y.Doc 同期を廃止
+ * したため、タイトル変更等の純粋なメタデータ更新は本ルートに一本化されている。
+ * `applyPagesMetadataUpdate` / `tryPropagateTitleRename` /
+ * `emitPageUpdatedIfChanged` を通じて、タイトル伝播・SSE 通知のゲーティングを
+ * 一貫して適用する。
+ *
+ * `PUT /api/pages/:pageId` updates page metadata only (title and
+ * content_preview). The Y.Doc payload is owned by Hocuspocus and is never
+ * accepted here.
+ *
+ * Issue #889 retired the `local` collaboration mode along with the REST Y.Doc
+ * sync path, so this is now the canonical REST entry point for pure metadata
+ * updates. The shared helpers (`applyPagesMetadataUpdate`,
+ * `tryPropagateTitleRename`, `emitPageUpdatedIfChanged`) keep the
+ * title-propagation and SSE-emit invariants consistent.
+ *
+ * @returns 200 + `{ id, title, content_preview, updated_at }` on success.
+ *          400 when the body is empty (neither `title` nor `content_preview`).
+ *          403 / 404 from `assertPageEditAccess` when the caller cannot edit.
+ */
+app.put("/:id", authRequired, async (c) => {
+  const pageId = c.req.param("id");
+  const userId = c.get("userId");
+  const db = c.get("db");
+
+  const body = await c.req.json<{
+    title?: string;
+    content_preview?: string;
+  }>();
+
+  // 型バリデーション: ヘルパー (`applyPagesMetadataUpdate`) は `body.title.trim()`
+  // を呼ぶので、文字列以外が混ざると runtime 500 になる。境界で 400 に倒す。
+  // Validate field types so malformed payloads (e.g. `{ "title": 123 }`)
+  // are surfaced as 400 instead of crashing inside `applyPagesMetadataUpdate`'s
+  // `.trim()` call.
+  if (body.title !== undefined && typeof body.title !== "string") {
+    throw new HTTPException(400, { message: "`title` must be a string" });
+  }
+  if (body.content_preview !== undefined && typeof body.content_preview !== "string") {
+    throw new HTTPException(400, { message: "`content_preview` must be a string" });
+  }
+
+  if (body.title === undefined && body.content_preview === undefined) {
+    throw new HTTPException(400, {
+      message: "At least one of `title` or `content_preview` is required",
+    });
+  }
+
+  await assertPageEditAccess(db, pageId, userId);
+
+  const { renamed, metadataChanged, updatedRow } = await applyPagesMetadataUpdate(db, pageId, body);
+
+  if (renamed) {
+    tryPropagateTitleRename(db, pageId, renamed.oldTitle, renamed.newTitle);
+  }
+  emitPageUpdatedIfChanged(metadataChanged, updatedRow);
+
+  // no-op (現在値と同値を送信) のときは UPDATE がスキップされて `updatedRow` が
+  // null になる。クライアントのキャッシュを null で上書きしないよう、現在値を
+  // SELECT して返す。追加 SELECT は no-op パスのみ発生する。
+  // No-op saves (request body echoes the current values) skip the UPDATE and
+  // leave `updatedRow` null. To avoid responding with null fields that would
+  // clobber a client cache, fall back to fetching the current row. The extra
+  // SELECT only fires on the no-op path.
+  let title: string | null;
+  let contentPreview: string | null;
+  let updatedAt: Date;
+  if (updatedRow) {
+    title = updatedRow.title;
+    contentPreview = updatedRow.contentPreview;
+    updatedAt = updatedRow.updatedAt;
+  } else {
+    const current = await db
+      .select({
+        title: pages.title,
+        contentPreview: pages.contentPreview,
+        updatedAt: pages.updatedAt,
+      })
+      .from(pages)
+      .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
+      .limit(1);
+    const row = current[0];
+    if (!row) {
+      // `assertPageEditAccess` の直後に同じ id が論理削除される競合は通常
+      // 起きないが、起きた場合はクライアントが再同期できるよう 404 を返す。
+      // `assertPageEditAccess` already proved the row exists; reaching here
+      // means a concurrent delete raced us. Surface 404 so the client
+      // resyncs cleanly instead of seeing a half-formed response.
+      throw new HTTPException(404, { message: "Page not found" });
+    }
+    title = row.title;
+    contentPreview = row.contentPreview;
+    updatedAt = row.updatedAt;
+  }
+
+  return c.json({
+    id: pageId,
+    title,
+    content_preview: contentPreview,
+    updated_at: updatedAt.toISOString(),
+  });
+});
+
+// ── GET /pages/:id/public-content (read-only for guests / viewers) ──────────
+/**
+ * `GET /api/pages/:pageId/public-content` — 読み取り専用のページ本文 API。
+ * `page_contents.content_text` と派生情報のみ返し、Y.Doc バイト列は返さない。
+ *
+ * Issue #889 で `local` モードと `GET /api/pages/:id/content` を廃止したため、
+ * 編集者は Hocuspocus WebSocket 経由でページを開く。未ログインの guest
+ * （public / unlisted ノートを覗いている読者）や viewer ロールのメンバーは
+ * WebSocket 接続を張らずに REST で本文だけ読みたいので、本ルートがその唯一の
+ * 経路となる。Y.Doc バイト列を返さないため、編集セッションは絶対に始まらない。
+ *
+ * 認証は `authOptional`。所属ノートに対する `getNoteRole` で role を解決し、
+ * `null`（private / restricted ノートを未認可で要求した等）の場合は 403 を返す。
+ *
+ * `GET /api/pages/:pageId/public-content` returns the rendered plain text of
+ * a page without exposing the underlying Y.Doc bytes. Used by read-only
+ * viewers — anonymous guests on public/unlisted notes and signed-in viewer
+ * members — who do not need to participate in the realtime editing session.
+ *
+ * `authOptional` so guests on public/unlisted notes can hit it. `getNoteRole`
+ * gates private/restricted notes by returning 403 when no role is resolved.
+ *
+ * @returns 200 + `{ id, title, content_text, content_preview, version, updated_at }`.
+ *          404 when the page row is missing or already soft-deleted.
+ *          403 when no role is resolved on the owning note.
+ */
+app.get("/:id/public-content", authOptional, async (c) => {
+  const pageId = c.req.param("id");
+  const userId = c.get("userId");
+  const userEmail = c.get("userEmail");
+  const db = c.get("db");
+
+  const rows = await db
+    .select({
+      id: pages.id,
+      noteId: pages.noteId,
+      title: pages.title,
+      contentPreview: pages.contentPreview,
+      updatedAt: pages.updatedAt,
+    })
+    .from(pages)
+    .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) throw new HTTPException(404, { message: "Page not found" });
+
+  // 所属ノートに対する role が解決しない呼び出し元はアクセス不可。owner /
+  // editor / viewer / guest のいずれかが付けば 200 で返す（`GET /api/pages/:id`
+  // と同じ判定）。
+  // The caller must hold some role on the owning note. The visibility check
+  // inside `getNoteRole` already gates anonymous access to private notes
+  // correctly (mirrors `GET /api/pages/:id`).
+  const { role } = await getNoteRole(row.noteId, userId, userEmail, db);
+  if (!role) throw new HTTPException(403, { message: "Forbidden" });
+
+  const contentRows = await db
+    .select({
+      contentText: pageContents.contentText,
+      version: pageContents.version,
+      updatedAt: pageContents.updatedAt,
+    })
+    .from(pageContents)
+    .where(eq(pageContents.pageId, pageId))
+    .limit(1);
+
+  const content = contentRows[0];
+
+  // 未ログインゲストはエッジで短期キャッシュ可能（同じ public ノートを多数が
+  // 開く想定）、ログイン済みは個人スコープに留める。
+  // Guests can be cached briefly at the edge (many readers on the same public
+  // note); logged-in viewers stay private.
+  c.header(
+    "Cache-Control",
+    userId ? "private, must-revalidate" : "public, max-age=60, must-revalidate",
+  );
+
+  return c.json({
+    id: pageId,
+    title: row.title ?? null,
+    content_text: content?.contentText ?? null,
+    content_preview: row.contentPreview ?? null,
+    version: content?.version ?? 0,
+    updated_at: (content?.updatedAt ?? row.updatedAt).toISOString(),
+  });
 });
 
 export default app;

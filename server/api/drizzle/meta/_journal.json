@@ -127,6 +127,90 @@
       "when": 1777420800000,
       "tag": "0018_add_onboarding_and_page_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1777507200000,
+      "tag": "0019_add_api_errors",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1777593600000,
+      "tag": "0020_seed_thumbnail_tier_quotas",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1777680000000,
+      "tag": "0021_add_pages_thumbnail_object_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1778544000000,
+      "tag": "0022_add_default_note",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1778630400000,
+      "tag": "0023_migrate_personal_pages_drop_note_pages",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1778716800000,
+      "tag": "0024_add_pages_note_active_updated_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1778803200000,
+      "tag": "0025_add_pdf_source_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1778889600000,
+      "tag": "0026_add_pdf_highlights",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1778976000000,
+      "tag": "0027_add_pages_note_active_updated_id_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1779062400000,
+      "tag": "0028_add_page_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1779667200000,
+      "tag": "0029_invite_links_user_fk_cascade",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1779840000000,
+      "tag": "0030_add_notes_tag_filter_bar",
+      "breakpoints": true
     }
   ]
 }

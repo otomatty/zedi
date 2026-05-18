@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { Editor } from "@tiptap/react";
 import { extractWikiLinksFromContent, getUniqueWikiLinkTitles } from "@/lib/wikiLinkUtils";
 import { useWikiLinkExistsChecker } from "@/hooks/usePageQueries";
-import { useNotePages } from "@/hooks/useNoteQueries";
+import { useNoteTitleIndex } from "@/hooks/useNoteQueries";
 
 interface UseWikiLinkStatusSyncOptions {
   editor: Editor | null;
@@ -14,11 +14,12 @@ interface UseWikiLinkStatusSyncOptions {
   /**
    * 編集中ページの noteId。`null`（既定）は個人ページ、文字列値なら
    * ノートネイティブページ。存在確認のスコープを切り替えるために使う。
-   * Issue #713 Phase 4。
+   * Issue #713 Phase 4 / 同 #860 Phase 6。
    *
    * Owning note ID of the page being edited. `null` (default) scopes
    * existence checks to personal pages; a string scopes them to the given
-   * note's pages (fetched via `useNotePages`). See issue #713 Phase 4.
+   * note's pages (fetched via `useNoteTitleIndex`). See issues #713
+   * Phase 4 / #860 Phase 6.
    */
   pageNoteId?: string | null;
 }
@@ -30,15 +31,15 @@ interface UseWikiLinkStatusSyncOptions {
  * 1. ページ読み込み時（pageIdの変更）
  * 2. WikiLinkの数が増加した時（Wiki生成後など）
  *
- * `pageNoteId` が指定された場合は、`useNotePages` から取得したノート配下の
- * ページ一覧を存在判定の候補にする（Issue #713 Phase 4）。これにより、
- * ノートネイティブページ内で同じノートの WikiLink が「存在しない」と
- * 誤判定されて壊れた表示に倒れる問題を防ぐ。
+ * `pageNoteId` が指定された場合は、`useNoteTitleIndex` から取得したノート
+ * 配下のタイトル一覧を存在判定の候補にする（Issue #713 Phase 4 /
+ * #860 Phase 6）。これにより、ノートネイティブページ内で同じノートの
+ * WikiLink が「存在しない」と誤判定されて壊れた表示に倒れる問題を防ぐ。
  *
  * When `pageNoteId` is provided, note-scoped existence checks use the
- * `useNotePages(pageNoteId)` result instead of personal-only IndexedDB
- * summaries. This keeps same-note WikiLinks rendering as existing after
- * subsequent sync passes (issue #713 Phase 4).
+ * `useNoteTitleIndex(pageNoteId)` result instead of personal-only
+ * IndexedDB summaries (issues #713 Phase 4 / #860 Phase 6). This keeps
+ * same-note WikiLinks rendering as existing after subsequent sync passes.
  */
 export function useWikiLinkStatusSync({
   editor,
@@ -48,26 +49,28 @@ export function useWikiLinkStatusSync({
   skipSync = false,
   pageNoteId = null,
 }: UseWikiLinkStatusSyncOptions): void {
-  const notePagesQuery = useNotePages(pageNoteId ?? "", undefined, Boolean(pageNoteId));
+  const noteTitleIndexQuery = useNoteTitleIndex(pageNoteId ?? "", {
+    enabled: Boolean(pageNoteId),
+  });
   const { checkExistence } = useWikiLinkExistsChecker({
     pageNoteId,
-    notePages: pageNoteId ? notePagesQuery.data : undefined,
+    notePages: pageNoteId ? noteTitleIndexQuery.data : undefined,
   });
   // editor の content 変更で頻繁に再レンダーされるため、map+sort+join の O(n log n)
-  // をメモ化して打鍵時のコストを抑える。`notePagesQuery.data` の参照が変わったときのみ
-  // 再計算される（React Query は同一データなら参照を保つ）。
+  // をメモ化して打鍵時のコストを抑える。`noteTitleIndexQuery.data` の参照が
+  // 変わったときのみ再計算される（React Query は同一データなら参照を保つ）。
   // Memoize the signature so keystroke-driven re-renders don't repeat the
-  // O(n log n) map/sort/join over the note's page list. React Query keeps a
+  // O(n log n) map/sort/join over the note's title index. React Query keeps a
   // stable reference for unchanged data, so this only re-computes on real changes.
-  const notePagesData = notePagesQuery.data;
+  const noteTitleIndexData = noteTitleIndexQuery.data;
   const pageScopeSignature = useMemo(() => {
     if (pageNoteId === null) return "personal";
-    if (notePagesData === undefined) return `note:${pageNoteId}:loading`;
-    return `note:${pageNoteId}:${notePagesData
+    if (noteTitleIndexData === undefined) return `note:${pageNoteId}:loading`;
+    return `note:${pageNoteId}:${noteTitleIndexData
       .map((page) => `${page.id}:${page.title.trim().toLowerCase()}`)
       .sort()
       .join("|")}`;
-  }, [pageNoteId, notePagesData]);
+  }, [pageNoteId, noteTitleIndexData]);
 
   // 最後にチェックした状態を追跡
   const lastCheckedRef = useRef<{

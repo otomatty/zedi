@@ -159,7 +159,7 @@ app.get("/index", async (c) => {
   const document = await buildIndexForOwner(db, userId);
 
   const [existing] = await db
-    .select({ id: pages.id, updatedAt: pages.updatedAt })
+    .select({ id: pages.id, noteId: pages.noteId, updatedAt: pages.updatedAt })
     .from(pages)
     .where(
       and(
@@ -172,6 +172,11 @@ app.get("/index", async (c) => {
 
   return c.json({
     pageId: existing?.id ?? null,
+    // Issue #889 Phase 3: クライアントが `/notes/:noteId/:pageId` を組み立てる
+    // 必要があるので所属ノート ID も返す（`/pages/:id` ルートは撤去済み）。
+    // Issue #889 Phase 3: include `noteId` so the client can build
+    // `/notes/:noteId/:pageId` — the legacy `/pages/:id` route is gone.
+    noteId: existing?.noteId ?? null,
     lastBuiltAt: existing?.updatedAt?.toISOString() ?? null,
     totalPages: document.totalPages,
     categories: document.categories.map((cat) => ({
@@ -191,7 +196,7 @@ app.post("/index/rebuild", async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  const { pageId, created, document } = await rebuildIndexForOwner(db, userId);
+  const { pageId, noteId, created, document } = await rebuildIndexForOwner(db, userId);
 
   await recordActivity(db, {
     ownerId: userId,
@@ -207,6 +212,9 @@ app.post("/index/rebuild", async (c) => {
 
   return c.json({
     pageId,
+    // Issue #889 Phase 3: クライアントの遷移先 `/notes/:noteId/:pageId` を
+    // 組み立てる用に同梱。Mirror of the GET handler.
+    noteId,
     created,
     totalPages: document.totalPages,
     categories: document.categories.map((cat) => ({

@@ -4,6 +4,7 @@ import type { Awareness } from "y-protocols/awareness";
 
 /**
  * リアルタイムコラボレーション用の設定（useCollaboration の戻り値から渡す）
+ * Collaboration configuration forwarded to TiptapEditor.
  */
 export interface CollaborationConfig {
   ydoc: Y.Doc;
@@ -13,6 +14,16 @@ export interface CollaborationConfig {
   user: { name: string; color: string };
   updateCursor: (anchor: number, head: number) => void;
   updateSelection: (from: number, to: number) => void;
+  /**
+   * `useCollaboration` の `isSynced` 状態。初期同期が完了したかを示す。
+   * 編集ロックや、初期同期後の一度きりの正規化（WikiLink mark 化など）に使う。
+   *
+   * Mirrors `useCollaboration().isSynced`. Editors use this to gate input
+   * before initial sync completes and to trigger one-shot post-sync
+   * normalization passes (e.g. promoting plain `[[Title]]` text to wikiLink
+   * marks loaded from Hocuspocus). Issue #880.
+   */
+  isSynced: boolean;
 }
 
 /**

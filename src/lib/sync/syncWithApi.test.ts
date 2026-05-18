@@ -46,8 +46,6 @@ function createMockApi(overrides: Partial<ApiClient> = {}): ApiClient {
       server_time: new Date().toISOString(),
       conflicts: [],
     }),
-    getPageContent: vi.fn().mockResolvedValue({ ydoc_state: "", version: 0 }),
-    putPageContent: vi.fn().mockResolvedValue({ version: 1 }),
     createPage: vi.fn().mockResolvedValue({}),
     deletePage: vi.fn().mockResolvedValue({ deleted: true }),
     getNotes: vi.fn().mockResolvedValue([]),

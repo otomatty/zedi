@@ -4,14 +4,7 @@
  */
 import { HTTPException } from "hono/http-exception";
 import { eq, and, sql, inArray } from "drizzle-orm";
-import {
-  notes,
-  notePages,
-  noteMembers,
-  noteDomainAccess,
-  pages,
-  users,
-} from "../../schema/index.js";
+import { notes, noteMembers, noteDomainAccess, pages, users } from "../../schema/index.js";
 import type { Note } from "../../schema/index.js";
 import type { Database } from "../../types/index.js";
 import type { NoteApiFields, NoteRole, NoteMemberRole } from "./types.js";
@@ -31,7 +24,10 @@ export function noteRowToApi(note: Note): NoteApiFields {
     visibility: note.visibility,
     edit_permission: note.editPermission,
     is_official: note.isOfficial,
+    is_default: note.isDefault,
     view_count: note.viewCount,
+    show_tag_filter_bar: note.showTagFilterBar,
+    default_filter_tags: note.defaultFilterTags,
     created_at: note.createdAt,
     updated_at: note.updatedAt,
     is_deleted: note.isDeleted,
@@ -104,19 +100,12 @@ export async function getActivePageCounts(
   if (noteIds.length === 0) return new Map();
   const counts = await db
     .select({
-      noteId: notePages.noteId,
+      noteId: pages.noteId,
       count: sql<number>`cast(count(*) as integer)`,
     })
-    .from(notePages)
-    .innerJoin(pages, eq(notePages.pageId, pages.id))
-    .where(
-      and(
-        inArray(notePages.noteId, noteIds),
-        eq(notePages.isDeleted, false),
-        eq(pages.isDeleted, false),
-      ),
-    )
-    .groupBy(notePages.noteId);
+    .from(pages)
+    .where(and(inArray(pages.noteId, noteIds), eq(pages.isDeleted, false)))
+    .groupBy(pages.noteId);
   return new Map(counts.map((c) => [c.noteId, c.count]));
 }
 

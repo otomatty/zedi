@@ -1,159 +1,105 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
-import { MoreHorizontal, Settings, Share2 } from "lucide-react";
-import {
-  Badge,
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@zedi/ui";
+import { Settings, Users } from "lucide-react";
+import { Button } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
-import { useNoteMembers } from "@/hooks/useNoteQueries";
 import type { Note, NoteAccessRole } from "@/types/note";
-import { NoteShareModal } from "./ShareModal/NoteShareModal";
 
 /**
- * Props for the consolidated header actions dropdown.
- * 統合ヘッダーアクション（ドロップダウン）の Props。
+ * Props for the note header actions.
+ * ノートヘッダーアクションの Props。
  */
 export interface NoteViewHeaderActionsProps {
   note: Note;
+  /**
+   * owner 相当（管理操作可能）か。owner のときは歯車を出して
+   * `/notes/:id/settings` に遷移する。
+   * Owner-equivalent: shows the gear icon linking to `/notes/:id/settings`.
+   */
   canManageMembers: boolean;
-  isSignedIn: boolean;
+  /**
+   * このユーザーがノートを閲覧できるか。editor / viewer が共有設定を
+   * read-only で確認するためのエントリポイント表示判定に使う。
+   * Whether the current user can view the note. Drives the read-only
+   * "View share settings" entry point for editor / viewer.
+   */
   canView: boolean;
   /**
-   * 共有モーダルのタブ可視性 / read-only 制御に使う現在ユーザーのロール。
-   * Current user's role on this note. Used to gate which share-modal tabs are
-   * visible and which are rendered as read-only for editor / viewer.
+   * ノート上の現在ユーザーのロール。editor / viewer に対するリンク先
+   * (`/settings/members` vs `/settings/visibility`) の分岐に使う。
+   * The caller's role on the note. Determines which settings subroute the
+   * read-only entry point links to.
    */
   userRole: NoteAccessRole;
 }
 
 /**
- * Renders the note detail page top actions.
+ * ノート詳細ページ上部の操作アイコン。ロールに応じて 1 個のリンクボタンを描画する。
  *
- * - Owner: ドロップダウン（共有 + 設定）+ 招待済みメンバー数バッジ。
- * - Editor / Viewer (signed-in, canView): 共有ボタンのみを表示する。共有モーダルは
- *   `userRole` に応じて owner 向け編集 UI / editor 向け read-only / viewer 向け
- *   公開設定のみ、と出し分ける。
- * - Guest: 共有導線は表示しない。未ログイン guest のみログインヒントを表示する。
+ * - owner: 歯車 (`Settings`) → `/notes/:id/settings`（フル編集）
+ * - editor (canView=true): 共有閲覧 (`Users`) → `/notes/:id/settings/members`
+ *   （read-only でメンバー / リンク / ドメイン / 公開設定を閲覧）
+ * - viewer (canView=true): 共有閲覧 (`Users`) → `/notes/:id/settings/visibility`
+ *   （viewer は visibility セクションのみ閲覧可）
+ * - guest / canView=false: 非表示
  *
- * /notes/[id] 上部アクション。オーナーは共有 + 設定のドロップダウンを、
- * editor / viewer はサインインしていれば共有ボタンを表示する。共有モーダル
- * 側で `userRole` を解釈し閲覧可能タブ・read-only モードを切り替える。
+ * Issue #675 (#661 follow-up): editor / viewer にもアクセス透明性のための
+ * read-only エントリを提供する。共有モーダル自体は #846 で廃止され、
+ * settings 側がすでに read-only 表示を持っているため、本コンポーネントは
+ * 純粋に動線（リンク 1 つ）に集中する。
+ *
+ * Top-right note actions. The legacy share modal was removed in #846; this
+ * component just exposes a role-aware link into `/notes/:id/settings/*`,
+ * where the read-only behavior is already enforced section by section.
  */
 export function NoteViewHeaderActions({
   note,
   canManageMembers,
-  isSignedIn,
   canView,
   userRole,
 }: NoteViewHeaderActionsProps) {
   const { t } = useTranslation();
-  const [isShareOpen, setIsShareOpen] = useState(false);
 
-  // 招待済みメンバー数バッジは owner のみ取得・表示する。editor もメンバー一覧を
-  // 閲覧できるが、ヘッダー上のバッジ価値は管理者向けのため owner 限定のままにする。
-  // Only owners fetch + display the accepted-member count badge. Editors can
-  // still browse the list inside the modal, but the header badge stays
-  // owner-only since it is an at-a-glance signal for the manager.
-  const { data: members = [] } = useNoteMembers(note.id, canManageMembers);
-  const acceptedCount = members.filter((m) => m.status === "accepted").length;
-
-  if (!canView) return null;
-
-  if (!isSignedIn) {
-    return <span className="text-muted-foreground text-sm">{t("notes.loginToPost")}</span>;
-  }
-
-  const canOpenShareModal = userRole === "editor" || userRole === "viewer";
-
-  // editor / viewer は共有ボタン単体を出す（設定ページは owner 限定）。
-  // Editors / viewers see a single share button — the settings page link stays
-  // owner-only. Signed-in guests can view public/unlisted notes but do not get
-  // the share entry point.
-  if (!canManageMembers && canOpenShareModal) {
+  if (canManageMembers) {
     return (
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsShareOpen(true)}
-          aria-label={t("notes.shareAria")}
-        >
-          <Share2 className="mr-2 h-4 w-4" aria-hidden />
-          {t("notes.share")}
-        </Button>
-        <NoteShareModal
-          open={isShareOpen}
-          onOpenChange={setIsShareOpen}
-          note={note}
-          userRole={userRole}
-        />
-      </div>
+      <Button
+        asChild
+        variant="ghost"
+        size="icon"
+        aria-label={t("notes.openSettings")}
+        title={t("notes.openSettings")}
+      >
+        <Link to={`/notes/${note.id}/settings`}>
+          <Settings className="h-4 w-4" aria-hidden />
+        </Link>
+      </Button>
     );
   }
 
-  if (!canManageMembers) {
-    return null;
-  }
+  // editor / viewer 向け read-only エントリ。canView=false の guest / none は
+  // 何も出さない。editor は members、viewer は visibility をランディングに
+  // 使う（サイドナビで他セクションへ移動可）。
+  // Read-only entry for editor / viewer. Guests with no view access see
+  // nothing. Editors land on members (richest read-only view); viewers land
+  // on visibility (the only section they can see).
+  if (!canView) return null;
+  if (userRole !== "editor" && userRole !== "viewer") return null;
+
+  const target =
+    userRole === "editor"
+      ? `/notes/${note.id}/settings/members`
+      : `/notes/${note.id}/settings/visibility`;
 
   return (
-    <div className="flex items-center gap-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            aria-label={t("notes.openActions")}
-            className="relative"
-          >
-            <MoreHorizontal className="h-4 w-4" aria-hidden />
-            {acceptedCount > 0 ? (
-              <Badge
-                variant="secondary"
-                className="ml-2 h-5 min-w-5 px-1.5 text-xs"
-                aria-label={t("notes.shareMemberCountAria", { count: acceptedCount })}
-              >
-                {acceptedCount}
-              </Badge>
-            ) : null}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-44">
-          <DropdownMenuLabel>{t("notes.headerActionsLabel")}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => setIsShareOpen(true)}>
-            <Share2 className="mr-2 h-4 w-4" aria-hidden />
-            <span>{t("notes.share")}</span>
-            {acceptedCount > 0 ? (
-              <Badge
-                variant="secondary"
-                className="ml-auto h-5 min-w-5 px-1.5 text-xs"
-                aria-label={t("notes.shareMemberCountAria", { count: acceptedCount })}
-              >
-                {acceptedCount}
-              </Badge>
-            ) : null}
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to={`/notes/${note.id}/settings`} className="flex w-full items-center">
-              <Settings className="mr-2 h-4 w-4" aria-hidden />
-              <span>{t("notes.settings")}</span>
-            </Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <NoteShareModal
-        open={isShareOpen}
-        onOpenChange={setIsShareOpen}
-        note={note}
-        userRole={userRole}
-      />
-    </div>
+    <Button
+      asChild
+      variant="ghost"
+      size="icon"
+      aria-label={t("notes.openShareSettingsReadOnly")}
+      title={t("notes.openShareSettingsReadOnly")}
+    >
+      <Link to={target}>
+        <Users className="h-4 w-4" aria-hidden />
+      </Link>
+    </Button>
   );
 }

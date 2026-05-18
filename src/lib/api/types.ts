@@ -12,20 +12,20 @@ export interface SyncPagesResponse {
 }
 
 /**
- * `/api/sync/pages` etc. が返すページ行。`note_id` が `null` または未指定の場合は
- * 個人ページ（issue #713）。GET `/api/sync/pages` は個人ページのみを返すため
- * 実運用では常に `null` だが、新規エンドポイントでも同じ型を再利用できるよう
- * 任意フィールドとして表現している。
+ * `/api/sync/pages` 等が返すページ行。Issue #823 でデフォルトノートが導入され、
+ * すべてのページは（自分のデフォルトノートを含む）いずれかのノートに所属する
+ * ようになったため、`note_id` は常に非 null。Issue #825 で `Page.noteId` も
+ * フロント型上 non-null に揃えた。
  *
- * Page row from `/api/sync/pages` and friends. `note_id` `null` or missing
- * means a personal page (issue #713). GET `/api/sync/pages` only ever returns
- * personal pages, but the field is optional so the same type can describe
- * note-native rows from future endpoints.
+ * Page row from `/api/sync/pages` and friends. After issue #823 every page
+ * belongs to exactly one note (the caller's default note for legacy
+ * "personal" pages), so `note_id` is always present. Issue #825 aligned the
+ * frontend `Page.noteId` to the same non-null contract.
  */
 export interface SyncPageItem {
   id: string;
   owner_id: string;
-  note_id?: string | null;
+  note_id: string;
   source_page_id: string | null;
   title: string | null;
   content_preview: string | null;
@@ -104,21 +104,49 @@ export interface PostSyncPagesResponse {
   conflicts: Array<{ id: string; server_updated_at: string }>;
 }
 
-/** GET /api/pages/:id/content response. */
-export interface PageContentResponse {
-  ydoc_state: string; // base64
-  version: number;
-  content_text?: string | null;
-  updated_at?: string;
+/**
+ * `PUT /api/pages/:id` ボディ。タイトル等のメタデータだけを更新する。
+ * Y.Doc バイト列は Hocuspocus 経由で扱うため含めない。
+ *
+ * `PUT /api/pages/:id` request body. Updates page metadata only (title and
+ * content_preview). Y.Doc payloads flow through Hocuspocus, not this route.
+ */
+export interface UpdatePageMetadataBody {
+  title?: string;
+  content_preview?: string;
 }
 
-/** PUT /api/pages/:id/content body. */
-export interface PutPageContentBody {
-  ydoc_state: string; // base64
-  content_text?: string;
-  content_preview?: string;
-  title?: string;
-  expected_version?: number;
+/**
+ * `PUT /api/pages/:id` レスポンス。`title` / `content_preview` はスキーマ上 nullable
+ * のままだが、`updated_at` は `pages.updated_at` (`notNull`) を反映するため必ず
+ * 文字列。
+ *
+ * `PUT /api/pages/:id` response. `title` / `content_preview` stay nullable to
+ * mirror the schema, while `updated_at` is always present because
+ * `pages.updated_at` is `notNull` in the DB.
+ */
+export interface UpdatePageMetadataResponse {
+  id: string;
+  title: string | null;
+  content_preview: string | null;
+  updated_at: string;
+}
+
+/**
+ * `GET /api/pages/:id/public-content` レスポンス。
+ * 読み取り専用ビュー（ゲスト / viewer）が `content_text` だけを取得するために使う。
+ *
+ * `GET /api/pages/:id/public-content` response. Used by read-only viewers
+ * (guests on public / unlisted notes, viewer-role members) to fetch the
+ * rendered plain text without participating in the Hocuspocus session.
+ */
+export interface PagePublicContentResponse {
+  id: string;
+  title: string | null;
+  content_text: string | null;
+  content_preview: string | null;
+  version: number;
+  updated_at: string;
 }
 
 /** POST /api/pages body. */
@@ -128,69 +156,129 @@ export interface CreatePageBody {
   content_preview?: string;
   source_page_id?: string | null;
   thumbnail_url?: string | null;
+  /**
+   * `thumbnail_objects.id` linked to this page (used by Web Clipper). Lets
+   * DELETE /api/pages/:id GC the S3 blob + DB row when the page is deleted.
+   * Web Clipper で保存したサムネイルの thumbnail_objects.id。ページ削除時に
+   * これを辿って S3 オブジェクトと DB 行を GC する。
+   */
+  thumbnail_object_id?: string | null;
   source_url?: string | null;
+  /**
+   * 明示的に所属させるノート ID。省略時はサーバが呼び出し元のデフォルトノート
+   * (`is_default = true`) を使う（Issue #823 以降）。
+   *
+   * Optional explicit note id to attach the new page to. When omitted, the
+   * server falls back to the caller's default note (`is_default = true`)
+   * since Issue #823.
+   */
+  note_id?: string | null;
 }
 
 /** POST /api/pages response (same shape as SyncPageItem). */
 export type CreatePageResponse = SyncPageItem;
 
 /**
- * `POST /api/notes/:noteId/pages/copy-from-personal/:pageId` のレスポンス。
- * 個人ページを元にノートネイティブページを新規作成した結果を返す。
- * `page` には新ページの完全な行情報（`note_id` 含む）を含めるので、クライアント
- * はノート詳細の再取得なしに即座に UI を反映できる。
- *
- * Response from `POST /api/notes/:noteId/pages/copy-from-personal/:pageId`.
- * Returns the newly-created note-native page plus the full row (including
- * `note_id`) so clients can update caches without refetching the note detail.
- */
-export interface CopyPersonalPageToNoteResponse {
-  created: true;
-  page_id: string;
-  sort_order: number;
-  page: SyncPageItem;
-}
-
-/**
- * `POST /api/notes/:noteId/pages/:pageId/copy-to-personal` のレスポンス。
- * ノートネイティブページから作成された個人ページの完全な行情報を返す。
- * クライアントはこれを使って IndexedDB / zustand の個人ページストアへ
- * 書き戻し、`/home` に即反映できる (issue #713 Phase 3 / Codex P1)。
- *
- * Response from `POST /api/notes/:noteId/pages/:pageId/copy-to-personal`.
- * Returns the full new personal page row so the client can write it through
- * to IndexedDB / zustand and show it on `/home` without a full sync.
- */
-export interface CopyNotePageToPersonalResponse {
-  created: true;
-  page_id: string;
-  page: SyncPageItem;
-}
-
-/**
  * GET /api/search?q=&scope=shared のレスポンス。
  *
- * `note_id` は個人ページ (`note_id IS NULL`) も結果に含まれ得るため null になり得る
- * (Issue #718 Phase 5-1)。呼び出し側はノートネイティブと個人を区別する必要がある場合
- * このフィールドで判定する。
+ * Issue #823 でデフォルトノートが導入されてから、すべてのページは必ずいずれかの
+ * ノートに所属する。共有検索でもこの不変条件は変わらないため、`note_id` は常に
+ * 非 null。Issue #825 で型を non-null に揃えた。
+ *
+ * Issue #864 (PDF ハイライト統合): レスポンス行は `kind` で識別する判別可能 union
+ * になった。`kind="page"` は従来のページ結果、`kind="pdf_highlight"` は PDF ローカル
+ * ソース上のハイライト本文一致を表す。クライアントは `kind` で分岐すること。
  *
  * Response of GET /api/search?q=&scope=shared.
  *
- * `note_id` may be null because personal pages (`note_id IS NULL`) can also
- * appear in shared search results (Issue #718 Phase 5-1). Callers that need to
- * distinguish note-native from personal pages should branch on this field.
+ * After issue #823 every page belongs to exactly one note (the caller's
+ * default note for legacy "personal" rows), so `note_id` is always present
+ * even in shared search results. Issue #825 tightened the type accordingly.
+ *
+ * Issue #864 (PDF highlight integration): result rows are now a discriminated
+ * union keyed on `kind`. `kind="page"` is the existing page result; the new
+ * `kind="pdf_highlight"` row carries the source id, PDF page number and
+ * optional derived page id so the UI can deep-link back to where the user was
+ * reading. Clients must branch on `kind` before reading kind-specific fields.
  */
+export type SearchPageResultRow = {
+  kind: "page";
+  id: string;
+  note_id: string;
+  owner_id: string;
+  title: string | null;
+  content_preview: string | null;
+  thumbnail_url: string | null;
+  source_url: string | null;
+  updated_at: string;
+};
+
+/**
+ * Issue #864: PDF ハイライト本文がヒットした結果行。所有検証 (`owner_id` フィルタ)
+ * 済みなので、他ユーザーのハイライトは決して含まれない。
+ *
+ * Issue #864: a result row for a `pdf_highlights.text` match. The server
+ * enforces ownership (`owner_id = userId`) before returning, so other users'
+ * highlights cannot appear here.
+ *
+ * @property highlight_id   ハイライトの一意 ID。Highlight UUID.
+ * @property source_id      元 PDF ソースの ID。Owning `sources.id` (kind="pdf_local").
+ * @property pdf_page       1 始まり PDF ページ番号。1-indexed PDF page.
+ * @property text           ハイライト本文テキスト（プレビュー用）。Highlight body text.
+ * @property derived_page_id 派生 Zedi ページがあればその ID。Optional derived page id.
+ * @property derived_page_note_id 派生 Zedi ページの所属ノート ID（Issue #889 Phase 3 で
+ *   `/notes/:noteId/:pageId` 遷移のために追加）。Derived page's owning note id.
+ * @property source_display_name UI 用ファイル名。Display filename.
+ * @property source_title   PDF メタデータ由来のタイトル（あれば）。Optional PDF title.
+ * @property updated_at     ハイライトの最終更新時刻 ISO。Highlight `updated_at` ISO.
+ */
+export type SearchPdfHighlightResultRow = {
+  kind: "pdf_highlight";
+  highlight_id: string;
+  source_id: string;
+  owner_id: string;
+  pdf_page: number;
+  text: string;
+  derived_page_id: string | null;
+  /**
+   * 派生 Zedi ページの所属ノート ID（派生が無い場合は null）。
+   * `derived_page_id` と組で `/notes/:noteId/:pageId` を組み立てる。
+   * Derived page's owning note id (null when no derived page exists).
+   * Paired with `derived_page_id` to build the `/notes/:noteId/:pageId` URL.
+   */
+  derived_page_note_id: string | null;
+  source_display_name: string | null;
+  source_title: string | null;
+  updated_at: string;
+};
+
+export type SearchResultRow = SearchPageResultRow | SearchPdfHighlightResultRow;
+
 export interface SearchSharedResponse {
-  results: Array<{
-    id: string;
-    note_id: string | null;
-    owner_id: string;
-    title: string | null;
-    content_preview: string | null;
-    thumbnail_url: string | null;
-    source_url: string | null;
-    updated_at: string;
-  }>;
+  results: SearchResultRow[];
+}
+
+/**
+ * `GET /api/notes/me` のレスポンス。呼び出し元のデフォルトノート（マイノート）を
+ * 返す。フロントの `/notes/me` ランディングはこの `id` を使って
+ * `/notes/:noteId` にリダイレクトする。Issue #823 / #825。
+ *
+ * Response of `GET /api/notes/me` — the caller's default note ("マイノート").
+ * The `/notes/me` landing page reads `id` and redirects to `/notes/:noteId`.
+ * See issues #823 and #825.
+ */
+export interface MyNoteResponse {
+  id: string;
+  owner_id: string;
+  title: string | null;
+  visibility: string;
+  edit_permission: string;
+  is_official: boolean;
+  is_default: boolean;
+  view_count: number;
+  created_at: string;
+  updated_at: string;
+  is_deleted: boolean;
 }
 
 /** GET /api/notes response item (C3-9: role, page_count, member_count). Create/update return base fields only. */
@@ -201,7 +289,26 @@ export interface NoteListItem {
   visibility: string;
   edit_permission?: string;
   is_official?: boolean;
+  /**
+   * Whether this is the caller's default note. Surfaced to the frontend so
+   * note settings can warn before flipping the default note to public/unlisted.
+   * 既定ノート（マイノート）かどうか。公開警告ダイアログ判定に利用する。
+   */
+  is_default?: boolean;
   view_count?: number;
+  /**
+   * オーナーが「`/notes/:noteId` のページ一覧上部にタグフィルタバーを既定表示」
+   * と宣言したかどうか。ユーザー側は localStorage で個別に上書き可能。
+   *
+   * Owner-declared default for showing the tag filter bar on `/notes/:noteId`.
+   * Each user can override via localStorage.
+   */
+  show_tag_filter_bar?: boolean;
+  /**
+   * フィルタバーの既定選択タグ (小文字キー、`__none__` トークンを含み得る)。
+   * Default tags selected on first load (lower-cased keys; may include `__none__`).
+   */
+  default_filter_tags?: string[];
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
@@ -235,7 +342,19 @@ export interface DiscoverNoteItem {
   page_count: number;
 }
 
-/** GET /api/notes/:id response. */
+/**
+ * `GET /api/notes/:id` のレスポンス（"note shell"）。Issue #860 Phase 6 で
+ * `pages[]` を撤去し、ノート属性と呼び出し元の解決ロールのみを返す形に
+ * なった。ページ一覧は cursor pagination の `GET /api/notes/:noteId/pages`、
+ * wiki link / AI chat scope のような全ページタイトルが必要な経路は
+ * `GET /api/notes/:noteId/page-titles` を使う。
+ *
+ * `GET /api/notes/:id` response — the "note shell". Issue #860 Phase 6
+ * removed the `pages[]` field entirely; the response now carries only note
+ * attributes plus the caller's resolved role. Visible page lists fetch via
+ * the cursor-paginated `/pages` endpoint, and full-set title consumers
+ * fetch via `/page-titles`.
+ */
 export interface GetNoteResponse {
   id: string;
   owner_id: string;
@@ -243,38 +362,114 @@ export interface GetNoteResponse {
   visibility: string;
   edit_permission?: string;
   is_official?: boolean;
+  /**
+   * Whether this is the caller's default note. The settings page reads this to
+   * gate the "公開化で個人メモが流出する可能性" warning dialog.
+   * 既定ノートかどうか。設定画面で公開化警告ダイアログを出す判定に使う。
+   */
+  is_default?: boolean;
   view_count?: number;
+  /** {@link NoteListItem.show_tag_filter_bar} と同じ。/ See {@link NoteListItem.show_tag_filter_bar}. */
+  show_tag_filter_bar?: boolean;
+  /** {@link NoteListItem.default_filter_tags} と同じ。/ See {@link NoteListItem.default_filter_tags}. */
+  default_filter_tags?: string[];
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
   current_user_role: "owner" | "editor" | "viewer" | "guest";
-  pages: Array<{
-    id: string;
-    owner_id: string;
-    /**
-     * ページのスコープ。`null` ならこのノートに「リンク」されているだけの個人
-     * ページ（所有者の /home にも現れる）、値ありならこのノートに所属する
-     * ノートネイティブページ。クライアントはこれを見て note-native 限定の
-     * アクション（例: 「個人に取り込み」）を出し分ける。Issue #713 Phase 3。
-     *
-     * Page scope. `null` → a linked personal page (also visible on the
-     * owner's /home). A non-null value → a note-native page owned by this
-     * note. Clients gate note-native-only actions such as "copy to personal"
-     * on this. See issue #713 Phase 3.
-     */
-    note_id: string | null;
-    source_page_id: string | null;
-    title: string | null;
-    content_preview: string | null;
-    thumbnail_url: string | null;
-    source_url: string | null;
-    created_at: string;
-    updated_at: string;
-    is_deleted: boolean;
-    sort_order: number;
-    added_by_user_id: string;
-    added_at: string;
-  }>;
+}
+
+/**
+ * `GET /api/notes/:noteId/tags` の 1 件分。
+ * Single row from the note tag aggregation endpoint.
+ */
+export interface NoteTagAggregationItem {
+  name: string;
+  name_lower: string;
+  page_count: number;
+  resolved: boolean;
+}
+
+/**
+ * `GET /api/notes/:noteId/tags` のレスポンス全体。
+ * Full response for the note tag aggregation endpoint.
+ */
+export interface NoteTagAggregationResponse {
+  items: NoteTagAggregationItem[];
+  none_count: number;
+  total_pages: number;
+}
+
+/**
+ * `GET /api/notes/:noteId/page-titles` のページ行（issue #860 Phase 6）。
+ * wiki link 解決・AI chat scope sync・追加 dialog の重複判定など、
+ * 「ノート全ページのタイトル」を完全集合として必要とする consumer 向けの
+ * 軽量ペイロード。
+ *
+ * Page row from `GET /api/notes/:noteId/page-titles` (issue #860 Phase 6).
+ * Lightweight payload for consumers that need the *complete* set of
+ * page titles in a note: wiki-link resolution, AI-chat scope sync,
+ * and add-dialog dedup.
+ */
+export interface NotePageTitleItem {
+  id: string;
+  title: string;
+  is_deleted: boolean;
+  updated_at: string;
+}
+
+/**
+ * `GET /api/notes/:noteId/page-titles` のレスポンス。サーバ順
+ * (`updated_at DESC, id DESC`) を維持したフラット配列を返す。
+ *
+ * `GET /api/notes/:noteId/page-titles` response. Returns a flat array
+ * preserving the server order (`updated_at DESC, id DESC`).
+ */
+export interface NotePageTitleIndexResponse {
+  items: NotePageTitleItem[];
+}
+
+/**
+ * `?include=` トークンで追加できるオプションフィールド（issue #860 Phase 1）。
+ * `preview` は `content_preview`、`thumbnail` は `thumbnail_url` の同梱を要求する。
+ *
+ * Optional field tokens for `?include=` on `GET /api/notes/:noteId/pages`
+ * (issue #860 Phase 1). `preview` toggles `content_preview` and `thumbnail`
+ * toggles `thumbnail_url`.
+ */
+export type NotePageWindowInclude = "preview" | "thumbnail";
+
+/**
+ * `GET /api/notes/:noteId/pages` のページ行（keyset window）。`content_preview`
+ * と `thumbnail_url` は `?include=` で要求された場合のみ非 null。
+ *
+ * Page summary row from `GET /api/notes/:noteId/pages`. `content_preview` /
+ * `thumbnail_url` are populated only when the matching `?include=` token is set.
+ */
+export interface NotePageWindowItem {
+  id: string;
+  owner_id: string;
+  note_id: string;
+  source_page_id: string | null;
+  title: string | null;
+  content_preview: string | null;
+  thumbnail_url: string | null;
+  source_url: string | null;
+  created_at: string;
+  updated_at: string;
+  is_deleted: boolean;
+}
+
+/**
+ * `GET /api/notes/:noteId/pages` の keyset cursor pagination レスポンス。
+ * `next_cursor` が `null` の場合は末尾まで到達済み。
+ *
+ * Keyset cursor pagination response. A `null` `next_cursor` means the caller
+ * has reached the end of the list.
+ */
+export interface NotePageWindowResponse {
+  items: NotePageWindowItem[];
+  next_cursor: string | null;
 }
 
 /** GET /api/pages/:id/snapshots response. */

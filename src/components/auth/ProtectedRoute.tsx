@@ -11,6 +11,20 @@ interface ProtectedRouteProps {
  * A wrapper component that protects routes requiring authentication.
  * Redirects to the sign-in page if the user is not signed in.
  *
+ * 未ログイン時は元のパス + クエリ + ハッシュを `returnTo` として `/sign-in` に
+ * 渡すことで、サインイン → OAuth コールバック経由で同じ URL（例:
+ * `/notes/me?clipUrl=...`）に復帰できるようにする。`returnTo` は
+ * `AuthCallback` 側の `getSafeReturnTarget` で `ALLOWED_RETURN_PATHS` と
+ * 突き合わせるため、許可リストに含まれないパスは自動的に既定ランディングへ
+ * フォールバックされる。
+ *
+ * On guest access, the original `pathname + search + hash` is forwarded as a
+ * `returnTo` query parameter to `/sign-in`, so the post-auth callback can
+ * resume the same URL (e.g. the Chrome-extension `clipUrl` hand-off via
+ * `/notes/me?clipUrl=...`). `AuthCallback` validates `returnTo` against
+ * `ALLOWED_RETURN_PATHS` so any unrecognized path falls back to the default
+ * landing.
+ *
  * Note: E2E test mode is handled at the useAuth hook level via VITE_E2E_TEST.
  */
 export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
@@ -28,9 +42,16 @@ export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
     );
   }
 
-  // Redirect to sign-in page if not signed in
+  // Redirect to sign-in page if not signed in.
+  // 未ログインならサインインへ。`returnTo` クエリで元 URL を保持し、
+  // クリップ URL のような付随クエリも復帰できるようにする。
   if (!isSignedIn) {
-    return <Navigate to="/sign-in" state={{ from: location }} replace />;
+    const returnTo = `${location.pathname}${location.search}${location.hash}`;
+    const signInTarget =
+      returnTo && returnTo !== "/"
+        ? `/sign-in?${new URLSearchParams({ returnTo }).toString()}`
+        : "/sign-in";
+    return <Navigate to={signInTarget} state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

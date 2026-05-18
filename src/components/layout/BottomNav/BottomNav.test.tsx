@@ -1,8 +1,8 @@
 /**
- * BottomNav: 4 tabs (Home / Notes / AI / Me), aria-current on active tab,
+ * BottomNav: 4 tabs (My Note / Notes / AI / Me), aria-current on active tab,
  * safe-area padding, and Me tab opens a Sheet with the account menu content.
  *
- * ボトムナビ: 4 タブ（Home / Notes / AI / Me）、アクティブタブの aria-current、
+ * ボトムナビ: 4 タブ（マイノート / ノート / AI / Me）、アクティブタブの aria-current、
  * safe-area padding、Me タブの Sheet 表示を検証する。
  */
 import React from "react";
@@ -30,7 +30,7 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, fallback?: string) => {
       const table: Record<string, string> = {
-        "nav.home": "Home",
+        "nav.myNote": "My Note",
         "nav.notes": "Notes",
         "nav.ai": "AI",
         "nav.account": "Account",
@@ -71,25 +71,27 @@ describe("BottomNav", () => {
     vi.clearAllMocks();
   });
 
-  it("renders four tabs: Home, Notes, AI, Me", () => {
-    renderAt("/home");
-    expect(screen.getByRole("link", { name: /home/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /notes/i })).toBeInTheDocument();
+  it("renders four tabs: My Note, Notes, AI, Me", () => {
+    renderAt("/notes/me");
+    expect(screen.getByRole("link", { name: /my note/i })).toBeInTheDocument();
+    // 「Notes」と「My Note」が両方含まれるため、`/^notes$/i` で完全一致させる。
+    // Use exact match for "Notes" since "My Note" also contains "Note".
+    expect(screen.getByRole("link", { name: /^notes$/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /^ai$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /account/i })).toBeInTheDocument();
   });
 
-  it("marks the Home tab as aria-current when on /home", () => {
-    renderAt("/home");
-    const homeLink = screen.getByRole("link", { name: /home/i });
-    expect(homeLink).toHaveAttribute("aria-current", "page");
-    const notesLink = screen.getByRole("link", { name: /notes/i });
+  it("marks the My Note tab as aria-current when on /notes/me", () => {
+    renderAt("/notes/me");
+    const myNoteLink = screen.getByRole("link", { name: /my note/i });
+    expect(myNoteLink).toHaveAttribute("aria-current", "page");
+    const notesLink = screen.getByRole("link", { name: /^notes$/i });
     expect(notesLink).not.toHaveAttribute("aria-current", "page");
   });
 
   it("marks the Notes tab as aria-current when on /notes", () => {
     renderAt("/notes");
-    const notesLink = screen.getByRole("link", { name: /notes/i });
+    const notesLink = screen.getByRole("link", { name: /^notes$/i });
     expect(notesLink).toHaveAttribute("aria-current", "page");
   });
 
@@ -109,7 +111,7 @@ describe("BottomNav", () => {
   });
 
   it("fixes the nav at the bottom with safe-area padding", () => {
-    const { container } = renderAt("/home");
+    const { container } = renderAt("/notes/me");
     const nav = container.querySelector("nav");
     expect(nav).toBeInTheDocument();
     // 個別のクラストークンで判定する。`className.match(/.../)` だと Tailwind
@@ -123,7 +125,7 @@ describe("BottomNav", () => {
   });
 
   it("opens the Me sheet when the Me tab is clicked", async () => {
-    renderAt("/home");
+    renderAt("/notes/me");
     const meButton = screen.getByRole("button", { name: /account/i });
     fireEvent.click(meButton);
     expect(await screen.findByTestId("bottom-nav-me-content")).toBeInTheDocument();

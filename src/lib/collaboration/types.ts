@@ -49,22 +49,17 @@ export interface CollaborationState {
 }
 
 /**
- * コラボレーションモード（C3-5）
- * - local: 個人ページ。Y.Doc + y-indexeddb のみ。WebSocket 接続なし。
- * - collaborative: 共有ノート内ページ。Hocuspocus でリアルタイム共同編集。
- */
-export type CollaborationMode = "local" | "collaborative";
-
-/**
  * useCollaborationフックのオプション
+ * Issue #889 Phase 3 で `mode` オプションを撤去（全ページが Hocuspocus 経由で同期される）。
+ *
+ * Options for the `useCollaboration` hook. Issue #889 Phase 3 removed the
+ * `mode` option — every page now syncs through Hocuspocus.
  */
 export interface UseCollaborationOptions {
   /** ページID */
   pageId: string;
   /** コラボレーション機能を有効にするか */
   enabled?: boolean;
-  /** local = 個人ページ（y-indexeddb のみ）。collaborative = 共有ノート（Hocuspocus）。省略時は local。 */
-  mode?: CollaborationMode;
 }
 
 /**
@@ -85,15 +80,6 @@ export interface UseCollaborationReturn extends CollaborationState {
   updateSelection: (from: number, to: number) => void;
   /** 手動再接続 */
   reconnect: () => void;
-  /** 保留中の保存をキャンセルし、直ちに API へ保存する（local モード・URL 取り込み後の即時保存用） */
-  flushSave: () => void;
-  /**
-   * ページタイトルを CollaborationManager に伝達する。
-   * 次回の Y.Doc 保存時にサーバーへ同期される。
-   * Notify the CollaborationManager of the current page title
-   * so it is included in the next Y.Doc save to the server.
-   */
-  setPageTitle: (title: string) => void;
 }
 
 /**

@@ -46,8 +46,13 @@ const Header: React.FC<HeaderProps> = ({ className }) => {
       )}
     >
       <Container className="flex h-[4.5rem] items-center justify-between gap-3 md:gap-4">
-        {/* Left: Logo.
-            左: ロゴ。 */}
+        {/* Left: Logo only. The note switcher previously sat here but has
+            moved into the per-page note title (`NoteTitleSwitcher`) so the
+            current note name itself acts as the dropdown trigger. See the
+            note detail / settings / members pages.
+            左: ロゴのみ。旧 NoteSwitcher は各ノート画面のタイトル
+            （`NoteTitleSwitcher`）に統合し、タイトル自体が切替 UI として
+            機能するようにした。 */}
         <div className="flex min-w-0 shrink-0 items-center gap-2 md:gap-3">
           <div className="hidden items-center gap-3 md:flex">
             <HeaderLogo />

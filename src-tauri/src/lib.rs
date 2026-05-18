@@ -1,4 +1,5 @@
 mod claude_sidecar;
+mod pdf_sources;
 mod workspace_paths;
 
 /// Tauri アプリケーション共通エントリポイント。
@@ -26,6 +27,11 @@ pub fn run() {
             workspace_paths::clear_note_workspace_root,
             workspace_paths::read_note_workspace_file,
             workspace_paths::list_note_workspace_entries,
+            pdf_sources::register_pdf_source,
+            pdf_sources::attach_pdf_source_path,
+            pdf_sources::verify_pdf_source,
+            pdf_sources::forget_pdf_source,
+            pdf_sources::read_pdf_bytes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

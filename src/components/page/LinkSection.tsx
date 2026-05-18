@@ -6,7 +6,13 @@ interface LinkSectionProps {
   title?: string;
   icon?: ReactNode;
   pages: PageCard[];
-  onPageClick: (pageId: string) => void;
+  /**
+   * 遷移先 URL は `/notes/:noteId/:pageId` のため、呼び出し元には pageId に
+   * 加えて noteId も渡す（Issue #889 Phase 3）。
+   * `/notes/:noteId/:pageId` requires both ids — pass the page's `noteId` to
+   * the parent (Issue #889 Phase 3).
+   */
+  onPageClick: (pageId: string, noteId: string) => void;
 }
 
 /**
@@ -25,7 +31,11 @@ export function LinkSection({ title, icon, pages, onPageClick }: LinkSectionProp
       )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {pages.map((page) => (
-          <PageLinkCard key={page.id} page={page} onClick={() => onPageClick(page.id)} />
+          <PageLinkCard
+            key={page.id}
+            page={page}
+            onClick={() => onPageClick(page.id, page.noteId)}
+          />
         ))}
       </div>
     </div>
