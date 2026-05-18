@@ -41,11 +41,8 @@ describe("EditorSkeleton", () => {
   });
 
   it("段落構造のスケルトン行を 9 本描画する / renders 9 paragraph-shaped skeleton lines", () => {
-    const { container } = renderWithI18n(<EditorSkeleton />);
-    // Skeleton の実装は `bg-muted animate-pulse rounded-md` を持つ div。
-    // The Skeleton component renders a div with `bg-muted animate-pulse rounded-md`.
-    const lines = container.querySelectorAll("div.animate-pulse");
-    expect(lines).toHaveLength(9);
+    renderWithI18n(<EditorSkeleton />);
+    expect(screen.getAllByTestId("editor-skeleton-line")).toHaveLength(9);
   });
 
   it("旧テキスト「リアルタイム編集を準備中」を含まない / does not render the legacy text", () => {

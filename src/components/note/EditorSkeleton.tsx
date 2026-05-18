@@ -1,3 +1,4 @@
+import type React from "react";
 import { useTranslation } from "react-i18next";
 import { Skeleton } from "@zedi/ui";
 
@@ -18,7 +19,7 @@ const PARAGRAPH_GROUPS: readonly (readonly string[])[] = [
  * コラボレーティブエディタの初期化中に表示するプレースホルダー。実エディタと同じ最小高さを
  * 確保し、コンテンツ表示への切替時にレイアウトシフトが起きないようにする。
  */
-export function EditorSkeleton() {
+export function EditorSkeleton(): React.ReactElement {
   const { t } = useTranslation();
 
   return (
@@ -33,7 +34,11 @@ export function EditorSkeleton() {
       {PARAGRAPH_GROUPS.map((lines, groupIndex) => (
         <div key={`paragraph-${groupIndex}`} className="space-y-3">
           {lines.map((widthClass, lineIndex) => (
-            <Skeleton key={`line-${groupIndex}-${lineIndex}`} className={`h-4 ${widthClass}`} />
+            <Skeleton
+              key={`line-${groupIndex}-${lineIndex}`}
+              data-testid="editor-skeleton-line"
+              className={`h-4 ${widthClass}`}
+            />
           ))}
         </div>
       ))}
