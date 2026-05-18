@@ -145,8 +145,8 @@ describe("GET /api/admin/errors/:id", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { error: { id: string } };
-    expect(body.error.id).toBe("00000000-0000-0000-0000-000000000010");
+    const body = (await res.json()) as { apiError: { id: string } };
+    expect(body.apiError.id).toBe("00000000-0000-0000-0000-000000000010");
   });
 
   it("returns 404 when the row is not found", async () => {
@@ -196,8 +196,8 @@ describe("PATCH /api/admin/errors/:id", () => {
     });
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { error: { status: string } };
-    expect(body.error.status).toBe("investigating");
+    const body = (await res.json()) as { apiError: { status: string } };
+    expect(body.apiError.status).toBe("investigating");
   });
 
   it("returns 200 (no-op) when transitioning to the same status", async () => {
