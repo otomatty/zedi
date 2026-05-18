@@ -32,8 +32,9 @@ import { runAutoIssue } from "./autoIssue.mjs";
  * @returns {string}
  */
 function requireEnv(name) {
-  const value = process.env[name];
-  if (typeof value !== "string" || value.length === 0) {
+  const raw = process.env[name];
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (value.length === 0) {
     throw new Error(`Missing required env var: ${name}`);
   }
   return value;

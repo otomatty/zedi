@@ -75,15 +75,86 @@ export const analysisOutputSchema = z
  */
 
 /**
- * Claude の生応答 (テキスト) から JSON を抽出して `analysisOutputSchema` で
- * 検証する。Claude は時々 ```json ... ``` のコードフェンスで包んだり前置きを
- * 付けたりするので、最初の `{` から最後の `}` までを切り出してパースする。
+ * @param {string} str
+ * @param {number} startIdx - index of `{`
+ * @returns {string | null} balanced JSON object substring or null
+ */
+function extractBalancedJsonObject(str, startIdx) {
+  if (str[startIdx] !== "{") return null;
+  let depth = 0;
+  let inString = false;
+  let stringEscape = false;
+  for (let i = startIdx; i < str.length; i++) {
+    const c = str[i];
+    if (stringEscape) {
+      stringEscape = false;
+      continue;
+    }
+    if (inString) {
+      if (c === "\\") {
+        stringEscape = true;
+        continue;
+      }
+      if (c === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      continue;
+    }
+    if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) return str.slice(startIdx, i + 1);
+    }
+  }
+  return null;
+}
+
+/**
+ * トップレベル解析ペイロードの「形」か（severity / ai_summary のキーが両方あるか）。
+ * 型までは見ない。誤った型のオブジェクトでもキーが揃っていればルート意図とみなし、
+ * 後続の別オブジェクトへフォールスルーしない（誤採択防止）。
  *
- * Extract a JSON object from Claude's raw text response and validate it
- * against `analysisOutputSchema`. Claude occasionally wraps JSON in
- * ```json ... ``` fences or adds prose preambles, so we slice from the first
- * `{` to the last `}` rather than relying on `JSON.parse(raw)`. Throws
- * `Error` with a descriptive message on malformed JSON or schema violation.
+ * Whether `value` looks like the intended root analysis object (both `severity` and
+ * `ai_summary` own keys). Types are not checked: malformed values still fail fast via
+ * schema throw instead of scanning for a later unrelated JSON object.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function looksLikeAnalysisPayload(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const o = /** @type {Record<string, unknown>} */ (value);
+  return Object.hasOwn(o, "severity") && Object.hasOwn(o, "ai_summary");
+}
+
+/**
+ * ```json ... ``` フェンスがあれば内側だけを返す（なければそのまま）。
+ * 言語ラベル無しの ``` ... ``` は JSON とみなさずそのままにする（誤ってコードブロックを剥がさない）。
+ *
+ * If an explicit ```json ... ``` fence exists, return the inner body; otherwise raw.
+ * Plain ``` ... ``` fences are left intact so non-JSON fenced blocks are not stripped.
+ *
+ * @param {string} raw
+ * @returns {string}
+ */
+function stripMarkdownJsonFence(raw) {
+  const m = raw.match(/```json\s*([\s\S]*?)```/im);
+  return m ? m[1].trim() : raw;
+}
+
+/**
+ * Claude の生応答 (テキスト) から JSON を抽出して `analysisOutputSchema` で
+ * 検証する。フェンスや前置きに加え、本文中の `{}` がバランスしない場合でも、
+ * 各 `{` 起点で括弧バランスを取った候補を順に試して最初にスキーマ合格したものを採用する。
+ *
+ * Extract and validate analysis JSON from Claude's raw text. Besides fences and
+ * prose, stray `{}` pairs in preambles are handled by scanning each `{` start,
+ * taking the balanced span, and accepting the first candidate that passes the
+ * Zod schema (instead of slicing first `{` to last `}`).
  *
  * @param {string} raw - The raw text returned by Claude.
  * @returns {AnalysisOutput}
@@ -92,23 +163,28 @@ export function parseAndValidate(raw) {
   if (typeof raw !== "string" || raw.length === 0) {
     throw new Error("Claude response was empty");
   }
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("Could not locate a JSON object in Claude response");
+  const normalized = stripMarkdownJsonFence(raw);
+  /** @type {string | null} */
+  let lastJsonError = null;
+  for (let i = 0; i < normalized.length; i++) {
+    if (normalized[i] !== "{") continue;
+    const slice = extractBalancedJsonObject(normalized, i);
+    if (!slice) continue;
+    /** @type {unknown} */
+    let parsed;
+    try {
+      parsed = JSON.parse(slice);
+    } catch (err) {
+      lastJsonError = err instanceof Error ? err.message : String(err);
+      continue;
+    }
+    const result = analysisOutputSchema.safeParse(parsed);
+    if (result.success) return result.data;
+    lastJsonError = result.error.message;
+    if (looksLikeAnalysisPayload(parsed)) {
+      throw new Error(`Claude response failed schema validation: ${lastJsonError}`);
+    }
   }
-  const slice = raw.slice(start, end + 1);
-  /** @type {unknown} */
-  let parsed;
-  try {
-    parsed = JSON.parse(slice);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`Claude response was not valid JSON: ${msg}`);
-  }
-  const result = analysisOutputSchema.safeParse(parsed);
-  if (!result.success) {
-    throw new Error(`Claude response failed schema validation: ${result.error.message}`);
-  }
-  return result.data;
+  const suffix = lastJsonError ? `: ${lastJsonError}` : "";
+  throw new Error(`Could not locate valid analysis JSON in Claude response${suffix}`);
 }

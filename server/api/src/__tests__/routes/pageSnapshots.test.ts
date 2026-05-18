@@ -54,7 +54,12 @@ function mockNote(noteOwnerId: string) {
   };
 }
 
-/** 1: pages row  2: caller email  3: findActiveNoteById */
+/**
+ * 1: pages row — 2: caller email — 3: findActiveNoteById
+ * SELECT の並び順（モック DB）。
+ *
+ * Chain order for mocks: pages row, caller email lookup, findActiveNoteById.
+ */
 function viewAccessPrefix(
   asUserEmail: string,
   noteOwnerId: string,

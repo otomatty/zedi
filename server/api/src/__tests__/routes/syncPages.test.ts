@@ -17,7 +17,10 @@ vi.mock("../../middleware/auth.js", () => ({
   },
 }));
 
-/** PR 1b: GET/POST sync は ensureDefaultNote を先に叩く。モックしてチェーンをページ同期クエリに寄せる。 */
+/**
+ * PR 1b: GET/POST sync は ensureDefaultNote を先に叩く。モックしてチェーンをページ同期クエリに寄せる。
+ * Mock ensureDefaultNote so SELECT chains align with page sync queries (PR 1b).
+ */
 vi.mock("../../services/defaultNoteService.js", () => ({
   ensureDefaultNote: vi.fn(async () => ({
     id: "sync-default-note-id",

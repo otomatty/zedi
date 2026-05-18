@@ -344,14 +344,23 @@ async function readUntil(
 ): Promise<string> {
   const decoder = new TextDecoder();
   let acc = "";
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) acc += decoder.decode(value, { stream: true });
-    if (predicate(acc)) return acc;
+  let timedOut = false;
+  const timer = globalThis.setTimeout(() => {
+    timedOut = true;
+    void reader.cancel();
+  }, timeoutMs);
+  try {
+    for (;;) {
+      if (timedOut) break;
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) acc += decoder.decode(value, { stream: true });
+      if (predicate(acc)) return acc;
+    }
+    return acc;
+  } finally {
+    globalThis.clearTimeout(timer);
   }
-  return acc;
 }
 
 describe("GET /api/admin/errors/stream", () => {

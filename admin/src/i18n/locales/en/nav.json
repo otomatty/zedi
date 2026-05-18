@@ -2,7 +2,8 @@
   "adminPanelTitle": "Zedi Admin",
   "adminShortTitle": "Admin",
   "menu": "Menu",
-  "unreadBadgeAriaLabel": "{{count}} unresolved API errors",
+  "unreadBadgeAriaLabel_one": "{{count}} unresolved API error",
+  "unreadBadgeAriaLabel_other": "{{count}} unresolved API errors",
   "items": {
     "aiModels": "AI Models",
     "users": "Users",

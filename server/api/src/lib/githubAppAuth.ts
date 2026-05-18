@@ -15,7 +15,8 @@
  *   it for an installation access token via
  *   `POST /app/installations/{id}/access_tokens`.
  * - Caches the resulting installation token in memory and refreshes 60 s
- *   before expiry to avoid stampede on every dispatch.
+ *   before expiry to avoid stampede on every dispatch; concurrent callers share
+ *   a single in-flight refresh promise while the cache is cold or near expiry.
  * - `triggerRepositoryDispatch` fires a `repository_dispatch` event without
  *   awaiting the response on the user-visible path (errors are logged).
  * - `verifyInstallationToken` validates inbound installation tokens by calling
@@ -95,6 +96,9 @@ interface CachedInstallationToken {
 
 let cachedInstallationToken: CachedInstallationToken | null = null;
 
+/** Single in-flight refresh so webhook bursts coalesce to one GitHub token mint. */
+let installationTokenRefreshInFlight: Promise<string> | null = null;
+
 /**
  * 環境変数から GitHub App の設定を読み出す。各値が欠けていれば throw する。
  * Read GitHub App configuration from environment. Throws when any value is
@@ -159,6 +163,13 @@ export async function getInstallationToken(): Promise<string> {
   ) {
     return cachedInstallationToken.token;
   }
+  installationTokenRefreshInFlight ??= fetchInstallationTokenFromGitHub().finally(() => {
+    installationTokenRefreshInFlight = null;
+  });
+  return installationTokenRefreshInFlight;
+}
+
+async function fetchInstallationTokenFromGitHub(): Promise<string> {
   const { installationId } = readAppConfig();
   const jwt = await createAppJWT();
   const res = await fetchGitHubWithTimeout(
@@ -197,6 +208,7 @@ export async function getInstallationToken(): Promise<string> {
  */
 export function __resetInstallationTokenCacheForTests(): void {
   cachedInstallationToken = null;
+  installationTokenRefreshInFlight = null;
 }
 
 /**

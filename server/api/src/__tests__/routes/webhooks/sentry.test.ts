@@ -283,34 +283,37 @@ describe("POST /api/webhooks/sentry", () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    const existingRow = {
-      id: "00000000-0000-0000-0000-0000000000cc",
-      sentryIssueId: "recur-1",
-      title: "recurrence",
-      route: null,
-      occurrences: 5,
-    };
-    const upserted = { ...existingRow, occurrences: 6 };
-    // First SELECT returns the existing row → isNew=false → no dispatch.
-    const { app } = createApp([[existingRow], [upserted]]);
-    const body = JSON.stringify({
-      data: { issue: { id: "recur-1", title: "recurrence" } },
-    });
+    try {
+      const existingRow = {
+        id: "00000000-0000-0000-0000-0000000000cc",
+        sentryIssueId: "recur-1",
+        title: "recurrence",
+        route: null,
+        occurrences: 5,
+      };
+      const upserted = { ...existingRow, occurrences: 6 };
+      // First SELECT returns the existing row → isNew=false → no dispatch.
+      const { app } = createApp([[existingRow], [upserted]]);
+      const body = JSON.stringify({
+        data: { issue: { id: "recur-1", title: "recurrence" } },
+      });
 
-    const res = await app.request("/api/webhooks/sentry", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "sentry-hook-signature": sign(body),
-      },
-      body,
-    });
+      const res = await app.request("/api/webhooks/sentry", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "sentry-hook-signature": sign(body),
+        },
+        body,
+      });
 
-    expect(res.status).toBe(200);
-    await new Promise((r) => setTimeout(r, 0));
-    // No GitHub fetch should have happened: the dispatch path was skipped.
-    expect(fetchMock).not.toHaveBeenCalled();
-    vi.unstubAllGlobals();
+      expect(res.status).toBe(200);
+      await new Promise((r) => setTimeout(r, 0));
+      // No GitHub fetch should have happened: the dispatch path was skipped.
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("returns 403 when signature is missing", async () => {

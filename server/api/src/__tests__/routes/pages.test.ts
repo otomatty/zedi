@@ -67,7 +67,10 @@ import { createMockDb } from "../createMockDb.js";
 
 const TEST_USER_ID = "user-test-123";
 const PAGE_ID = "page-content-test-001";
-/** pages.note_id と findActiveNoteById が参照するノート ID を一致させる。 */
+/**
+ * pages.note_id と findActiveNoteById が参照するノート ID を一致させる。
+ * Align NOTE_ID with pages.note_id and the findActiveNoteById mock chain.
+ */
 const NOTE_ID = "note-access-test-001";
 
 function authHeaders() {
@@ -93,7 +96,10 @@ function mockNoteRow() {
   };
 }
 
-/** PR 1b 以降の assertPage*Access が要求する SELECT 3 連を先頭に付ける。 */
+/**
+ * PR 1b 以降の assertPage*Access が要求する SELECT 3 連を先頭に付ける。
+ * Prefix chains with the three SELECT results required by assertPage*Access (PR 1b+).
+ */
 function pageAccessPrefix(extraPageFields: Record<string, unknown> = {}) {
   return [
     [{ id: PAGE_ID, ownerId: TEST_USER_ID, noteId: NOTE_ID, ...extraPageFields }],

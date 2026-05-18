@@ -95,8 +95,61 @@ test("parseAndValidate strips Claude's ```json``` fence and prose preamble", () 
   assert.equal(validated.ai_summary, "wrapped in fence");
 });
 
+test("parseAndValidate does not strip a plain ``` fenced block without the json label", () => {
+  const payload = {
+    severity: "low",
+    ai_summary: "plain fence skipped",
+    ai_root_cause: null,
+    ai_suggested_fix: null,
+    ai_suspected_files: null,
+  };
+  const wrapped = [
+    "Here is a code sample:",
+    "```",
+    "not json",
+    "```",
+    "",
+    JSON.stringify(payload),
+  ].join("\n");
+  const validated = parseAndValidate(wrapped);
+  assert.equal(validated.severity, "low");
+  assert.equal(validated.ai_summary, "plain fence skipped");
+});
+
 test("parseAndValidate throws when no JSON object is present", () => {
-  assert.throws(() => parseAndValidate("nope, no braces here"), /JSON object/);
+  assert.throws(() => parseAndValidate("nope, no braces here"), /valid analysis JSON/i);
+});
+
+test("parseAndValidate finds schema-valid JSON when prose contains stray braces", () => {
+  const payload = {
+    severity: "low",
+    ai_summary: "brace noise tolerated",
+    ai_root_cause: null,
+    ai_suggested_fix: null,
+    ai_suspected_files: null,
+  };
+  const raw = `Here is { "not": "the payload" } the real payload:\n${JSON.stringify(payload)}`;
+  const validated = parseAndValidate(raw);
+  assert.equal(validated.severity, "low");
+});
+
+test("parseAndValidate fails fast when root-shaped JSON has invalid types (no later-object fallback)", () => {
+  const badRoot = {
+    severity: 999,
+    ai_summary: "severity has wrong type",
+    ai_root_cause: null,
+    ai_suggested_fix: null,
+    ai_suspected_files: null,
+  };
+  const laterObject = {
+    severity: "low",
+    ai_summary: "would be wrongly picked without root-intent detection",
+    ai_root_cause: null,
+    ai_suggested_fix: null,
+    ai_suspected_files: null,
+  };
+  const raw = `${JSON.stringify(badRoot)}\nTrailing prose ${JSON.stringify(laterObject)}`;
+  assert.throws(() => parseAndValidate(raw), /schema validation/i);
 });
 
 test("parseAndValidate throws on empty input", () => {
