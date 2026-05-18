@@ -79,6 +79,18 @@ jobs:
 
       - run: bunx tsc --noEmit
 
+      # `bunx tsc --noEmit` 単独はルートの tsconfig（`src/` のみ）しか見ない
+      # ため、workspace パッケージ `@zedi/ui` を別途型チェックする。これを
+      # 怠ると `packages/ui` だけで起きる型エラー（例: Issue #913 の
+      # react-day-picker v10 互換問題）が deploy 時まで気付かれない。
+      #
+      # The root `tsc --noEmit` only checks `src/`, so the `@zedi/ui`
+      # workspace package needs its own pass. Without this, type breakage
+      # confined to `packages/ui` (e.g. the react-day-picker v10 mismatch in
+      # Issue #913) slips through CI until deploy time.
+      - name: Type-check @zedi/ui
+        run: bunx tsc --noEmit -p packages/ui/tsconfig.json
+
   test:
     name: Unit Tests
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
@@ -144,6 +156,21 @@ jobs:
       - run: bun install --frozen-lockfile
 
       - run: bun run build
+
+      # admin の production build (`tsc -b && vite build`) は `@zedi/ui` の
+      # barrel export まで型チェックするため、ルート build や `tsc --noEmit`
+      # では落ちない型不整合（例: Issue #913 の react-day-picker v10）を拾える。
+      # deploy-prod.yml / deploy-dev.yml の deploy-admin と同じコマンドに揃え、
+      # deploy 前に regressions を検知する。
+      #
+      # The admin production build runs `tsc -b && vite build`, which type
+      # checks `@zedi/ui` through its barrel export and catches issues the
+      # root build / root `tsc --noEmit` miss (see Issue #913). Keep this in
+      # sync with the deploy-admin step in deploy-prod.yml / deploy-dev.yml
+      # so regressions are caught before deploy.
+      - name: Build admin (production)
+        working-directory: admin
+        run: bun run build
 
       - name: Report bundle size
         run: |
