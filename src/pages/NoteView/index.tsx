@@ -125,7 +125,7 @@ const NoteView: React.FC = () => {
           <div className="mr-4 mb-4 flex flex-col items-end gap-2">
             <FloatingActionButton
               noteId={note.id}
-              initialClipUrl={validClipUrl ? validClipUrl : undefined}
+              initialClipUrl={validClipUrl ?? undefined}
               onClipDialogClosedWithInitialUrl={
                 validClipUrl ? handleClipDialogClosedWithInitialUrl : undefined
               }

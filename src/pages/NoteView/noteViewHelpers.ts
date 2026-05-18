@@ -17,7 +17,7 @@ export function getNoteViewPermissions(
       }
     | undefined,
   noteSource: string,
-) {
+): { canView: boolean; canEdit: boolean; canManageMembers: boolean } {
   const canView = Boolean(access?.canView);
   const canEdit = Boolean(access?.canEdit && noteSource === "local");
   const canManageMembers = Boolean(access?.canManageMembers && noteSource === "local");
