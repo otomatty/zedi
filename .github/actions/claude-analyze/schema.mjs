@@ -130,14 +130,16 @@ function looksLikeAnalysisPayload(value) {
 
 /**
  * ```json ... ``` フェンスがあれば内側だけを返す（なければそのまま）。
+ * 言語ラベル無しの ``` ... ``` は JSON とみなさずそのままにする（誤ってコードブロックを剥がさない）。
  *
- * If a ```json ... ``` fence exists, return the inner body; otherwise raw.
+ * If an explicit ```json ... ``` fence exists, return the inner body; otherwise raw.
+ * Plain ``` ... ``` fences are left intact so non-JSON fenced blocks are not stripped.
  *
  * @param {string} raw
  * @returns {string}
  */
 function stripMarkdownJsonFence(raw) {
-  const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/im);
+  const m = raw.match(/```json\s*([\s\S]*?)```/im);
   return m ? m[1].trim() : raw;
 }
 

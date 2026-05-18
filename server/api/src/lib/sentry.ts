@@ -131,32 +131,51 @@ export function scrubSentryEvent(event: ErrorEvent): ErrorEvent {
 }
 
 /**
+ * `new URL(relative)` が失敗する場合のみ使う合成オリジン。
+ * Synthetic origin used only when `new URL(absolute)` fails for SDK-recorded paths.
+ */
+const RELATIVE_REQUEST_URL_BASE = "https://sentry-request-url-scrub.invalid";
+
+/**
  * SDK が記録するリクエスト URL からクエリと不透明パス成分を落とす。
  * matched route は `routePath` など別チャネルに載せる前提。
  *
  * Strip query strings and redact opaque path segments from the raw URL SDKs
  * record; structured routing context belongs in `routePath` / extras instead.
+ *
+ * 相対パス（例: `/api/pages/...`）もパースできるよう合成ベースで解決する。
+ * Relative paths (e.g. `/api/pages/...`) are resolved against a synthetic base so
+ * scrubbing still applies instead of collapsing everything to `[Filtered]`.
  */
-function scrubRequestUrl(url: unknown): unknown {
-  if (typeof url !== "string" || url.length === 0) return url;
+function scrubRequestUrl(url: string | undefined): string | undefined {
+  if (url === undefined) return undefined;
+  if (typeof url !== "string") return undefined;
+  if (url.length === 0) return "";
+
+  let u: URL;
   try {
-    const u = new URL(url);
-    u.search = "";
-    const segments = u.pathname.split("/").map((seg) => {
-      if (seg.length === 0) return seg;
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg)) {
-        return "[uuid]";
-      }
-      if (/^[A-Za-z0-9._~-]{24,}$/.test(seg)) {
-        return FILTERED;
-      }
-      return seg;
-    });
-    u.pathname = segments.join("/") || "/";
-    return u.toString();
+    u = new URL(url);
   } catch {
-    return FILTERED;
+    try {
+      u = new URL(url, `${RELATIVE_REQUEST_URL_BASE}/`);
+    } catch {
+      return FILTERED;
+    }
   }
+
+  u.search = "";
+  const segments = u.pathname.split("/").map((seg) => {
+    if (seg.length === 0) return seg;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg)) {
+      return "[uuid]";
+    }
+    if (/^[A-Za-z0-9._~-]{24,}$/.test(seg)) {
+      return FILTERED;
+    }
+    return seg;
+  });
+  u.pathname = segments.join("/") || "/";
+  return u.toString();
 }
 
 function scrubShallowRecord<T extends Record<string, unknown> | undefined>(input: T): T;

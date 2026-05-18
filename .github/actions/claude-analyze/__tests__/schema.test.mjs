@@ -95,6 +95,27 @@ test("parseAndValidate strips Claude's ```json``` fence and prose preamble", () 
   assert.equal(validated.ai_summary, "wrapped in fence");
 });
 
+test("parseAndValidate does not strip a plain ``` fenced block without the json label", () => {
+  const payload = {
+    severity: "low",
+    ai_summary: "plain fence skipped",
+    ai_root_cause: null,
+    ai_suggested_fix: null,
+    ai_suspected_files: null,
+  };
+  const wrapped = [
+    "Here is a code sample:",
+    "```",
+    "not json",
+    "```",
+    "",
+    JSON.stringify(payload),
+  ].join("\n");
+  const validated = parseAndValidate(wrapped);
+  assert.equal(validated.severity, "low");
+  assert.equal(validated.ai_summary, "plain fence skipped");
+});
+
 test("parseAndValidate throws when no JSON object is present", () => {
   assert.throws(() => parseAndValidate("nope, no braces here"), /valid analysis JSON/i);
 });

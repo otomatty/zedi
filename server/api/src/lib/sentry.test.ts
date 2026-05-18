@@ -121,6 +121,19 @@ describe("scrubSentryEvent", () => {
     expect(scrubbed.request?.url).toBe("https://api.example.com/api/pages/[uuid]");
   });
 
+  it("scrubs relative request.url paths using a synthetic base URL", () => {
+    const event = makeEvent({
+      request: {
+        url: "/api/pages/550e8400-e29b-41d4-a716-446655440000?token=secret&safe=1",
+        headers: {},
+      },
+    });
+
+    const scrubbed = scrubSentryEvent(event);
+
+    expect(scrubbed.request?.url).toBe("https://sentry-request-url-scrub.invalid/api/pages/[uuid]");
+  });
+
   it("scrubs user, extra, contexts, tags, and breadcrumb data", () => {
     const event = makeEvent({
       user: { id: "user-1", email: "user@example.com" },
