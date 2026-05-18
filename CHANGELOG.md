@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.20.0 (2026-05-18)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🔧 Maintenance
+* chore(deps): bump the minor-and-patch group with 2 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/800
+* chore(deps): bump tauri from 2.11.0 to 2.11.1 in /src-tauri in the cargo group across 1 directory by @dependabot[bot] in https://github.com/otomatty/zedi/pull/822
+* chore(deps): bump actions/create-github-app-token from 2 to 3 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/840
+* chore(deps): bump @anthropic-ai/sdk from 0.92.0 to 0.95.1 in the minor-and-patch group by @dependabot[bot] in https://github.com/otomatty/zedi/pull/841
+* chore(deps-dev): bump @commitlint/cli from 20.5.3 to 21.0.0 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/842
+* chore(deps): bump react-day-picker from 9.14.0 to 10.0.0 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/843
+* chore(deps): bump cloudflare/wrangler-action from 3 to 4 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/899
+* chore(deps): bump the minor-and-patch group with 2 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/900
+* chore(deps): bump pdfjs-dist from 4.10.38 to 5.7.284 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/901
+
+
+**Full Changelog**: https://github.com/otomatty/zedi/compare/zedi-v0.19.0...zedi-v0.20.0
+
 ## 0.19.0 (2026-05-02)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
