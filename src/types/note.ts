@@ -103,7 +103,6 @@ export interface NoteAccess {
   editPermission: NoteEditPermission;
   canView: boolean;
   canEdit: boolean;
-  canAddPage: boolean;
   canManageMembers: boolean;
   canDeletePage: (addedByUserId: string) => boolean;
 }

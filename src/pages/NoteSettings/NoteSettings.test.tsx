@@ -75,7 +75,6 @@ const ownerAccess: NoteAccess = {
   editPermission: "owner_only",
   canView: true,
   canEdit: true,
-  canAddPage: true,
   canManageMembers: true,
   canDeletePage: () => true,
 };
@@ -88,7 +87,6 @@ function buildAccess(role: NoteAccessRole): NoteAccess {
     editPermission: "owner_only",
     canView: true,
     canEdit: role === "editor",
-    canAddPage: role === "editor",
     canManageMembers: false,
     canDeletePage: () => false,
   };

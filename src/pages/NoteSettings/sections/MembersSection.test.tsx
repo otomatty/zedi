@@ -60,7 +60,6 @@ const ownerAccess: NoteAccess = {
   editPermission: "owner_only",
   canView: true,
   canEdit: true,
-  canAddPage: true,
   canManageMembers: true,
   canDeletePage: () => true,
 };

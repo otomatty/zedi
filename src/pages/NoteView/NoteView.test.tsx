@@ -32,15 +32,7 @@ vi.mock("@/hooks/useNoteQueries", () => ({
     isLoaded: true,
   }),
   useAddPageToNote: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useCopyPersonalPageToNote: () => ({
-    mutateAsync: vi.fn().mockResolvedValue({ created: true, page_id: "pg", sort_order: 1 }),
-    isPending: false,
-  }),
   useRemovePageFromNote: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  // issue #860 Phase 6: NoteAddPageDialog uses useNoteTitleIndex for the
-  // title-dedup warning. Stub it so the test does not error on
-  // undefined-as-function.
-  useNoteTitleIndex: () => ({ data: [], isLoading: false }),
 }));
 
 // `useNoteTagAggregation` calls `useNoteApi` internally; we already stub the
@@ -242,7 +234,6 @@ describe("NoteView", () => {
       access: {
         canView: true,
         canEdit: true,
-        canAddPage: true,
         canManageMembers: true,
         canDeletePage: vi.fn(() => true),
       },
@@ -277,7 +268,6 @@ describe("NoteView", () => {
         access: {
           canView: true,
           canEdit: true,
-          canAddPage: true,
           canManageMembers: true,
           canDeletePage: vi.fn(() => true),
         },
