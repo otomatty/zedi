@@ -291,7 +291,7 @@ describe("getApiErrorById", () => {
       id: "550e8400-e29b-41d4-a716-446655440000/with+reserved",
     };
     vi.mocked(adminFetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: rowNeedsEncoding }), { status: 200 }),
+      new Response(JSON.stringify({ apiError: rowNeedsEncoding }), { status: 200 }),
     );
     const out = await getApiErrorById(rowNeedsEncoding.id);
     expect(out).toEqual(rowNeedsEncoding);
@@ -309,7 +309,7 @@ describe("patchApiErrorStatus", () => {
   it("PATCH に status を載せ、更新後の row を返す", async () => {
     const updated = { ...sampleErrorRow, status: "investigating" as const };
     vi.mocked(adminFetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: updated }), { status: 200 }),
+      new Response(JSON.stringify({ apiError: updated }), { status: 200 }),
     );
     const out = await patchApiErrorStatus(sampleErrorRow.id, "investigating");
     expect(out.status).toBe("investigating");

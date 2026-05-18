@@ -277,7 +277,7 @@ app.get("/:id", async (c) => {
   if (!row) {
     return c.json({ error: "Not found" }, 404);
   }
-  return c.json({ error: row });
+  return c.json({ apiError: row });
 });
 
 /**
@@ -334,7 +334,7 @@ app.patch("/:id", async (c) => {
     // Notify SSE subscribers; errors here must not flip the PATCH response from
     // 200 to 5xx because the DB write already succeeded.
     publishApiErrorUpdate(row);
-    return c.json({ error: row });
+    return c.json({ apiError: row });
   } catch (err) {
     if (err instanceof ApiErrorStatusConflictError) {
       return c.json({ error: "status changed concurrently; refetch and retry" }, 409);

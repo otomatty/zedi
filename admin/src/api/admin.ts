@@ -462,8 +462,8 @@ export async function getApiErrorById(id: string): Promise<ApiErrorRow> {
   if (!res.ok) {
     throw new Error(await getErrorMessage(res, "Failed to fetch API error"));
   }
-  const data: { error: ApiErrorRow } = await res.json();
-  return data.error;
+  const data: { apiError: ApiErrorRow } = await res.json();
+  return data.apiError;
 }
 
 /**
@@ -485,8 +485,8 @@ export async function patchApiErrorStatus(
   if (!res.ok) {
     throw new Error(await getErrorMessage(res, "Failed to update API error status"));
   }
-  const data: { error: ApiErrorRow } = await res.json();
-  return data.error;
+  const data: { apiError: ApiErrorRow } = await res.json();
+  return data.apiError;
 }
 
 /**
