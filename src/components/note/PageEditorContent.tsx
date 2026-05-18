@@ -1,6 +1,5 @@
 import React, { useRef, useCallback, useMemo } from "react";
 import type { MutableRefObject } from "react";
-import { Loader2 } from "lucide-react";
 import TiptapEditor from "@/components/editor/TiptapEditor";
 import type { ContentError } from "@/components/editor/TiptapEditor/useContentSanitizer";
 import type { CollaborationConfig } from "@/components/editor/TiptapEditor/types";
@@ -13,6 +12,7 @@ import { isContentNotEmpty } from "@/lib/contentUtils";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
 import type { WikiGeneratorStatus } from "@/hooks/useWikiGenerator";
 import { PageTitleBlock } from "./PageTitleBlock";
+import { EditorSkeleton } from "./EditorSkeleton";
 
 /**
  * `useCollaboration` の戻り値から、Tiptap に渡す collaborationConfig と
@@ -191,12 +191,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
 
         {/* エディター（生成中はオーバーレイを表示） */}
         <div className="relative">
-          {showCollaborationLoading && (
-            <div className="text-muted-foreground flex min-h-[200px] items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <span className="ml-2">リアルタイム編集を準備中...</span>
-            </div>
-          )}
+          {showCollaborationLoading && <EditorSkeleton />}
           {showEditor && (
             <>
               <TiptapEditor

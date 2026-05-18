@@ -3,6 +3,7 @@
   "savedAt": "{{relative}}に保存",
   "startWritingPlaceholder": "思考を書き始める...",
   "titlePlaceholder": "タイトル",
+  "collaborationLoading": "エディタを読み込み中",
   "pageMenu": {
     "exportMarkdown": "Markdownでエクスポート",
     "copyMarkdown": "Markdownをコピー",

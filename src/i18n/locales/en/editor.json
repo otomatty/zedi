@@ -3,6 +3,7 @@
   "savedAt": "Saved {{relative}}",
   "startWritingPlaceholder": "Start writing your thoughts...",
   "titlePlaceholder": "Title",
+  "collaborationLoading": "Loading editor",
   "pageMenu": {
     "exportMarkdown": "Export Markdown",
     "copyMarkdown": "Copy Markdown",
