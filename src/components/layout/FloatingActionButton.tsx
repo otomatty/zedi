@@ -19,15 +19,9 @@ import { useFloatingActionButtonHandlers } from "./useFloatingActionButtonHandle
  *
  * When initialClipUrl is provided, onClipDialogClosedWithInitialUrl is required
  * so the dialog can be closed and URL cleared.
- *
- * `onAddExistingPage` が渡されたとき、FAB メニューに「既存のページを追加」
- * 項目が表示される。`noteId` とあわせて渡すことを想定している。
- * When `onAddExistingPage` is provided, the FAB menu exposes an "add existing
- * page" entry that invokes it. Intended to be paired with `noteId`.
  */
 type FloatingActionButtonProps = {
   noteId?: string;
-  onAddExistingPage?: () => void;
   /**
    * 追加で非表示にするメニュー項目。未ログイン時の `url` 非表示ロジックは
    * 内部で自動適用されるため、重ねて渡す必要はない。
@@ -56,7 +50,6 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   initialClipUrl,
   onClipDialogClosedWithInitialUrl,
   noteId,
-  onAddExistingPage,
   hiddenOptions: extraHiddenOptions,
 }) => {
   const { t } = useTranslation();
@@ -80,7 +73,6 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
     setIsWebClipperOpen,
     setIsImageDialogOpen,
     noteId,
-    onAddExistingPage,
   });
 
   const mergedHidden: FABMenuOption[] = [
@@ -89,7 +81,6 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   ];
   const hiddenOptions: FABMenuOption[] | undefined =
     mergedHidden.length > 0 ? mergedHidden : undefined;
-  const extraOptions: FABMenuOption[] | undefined = onAddExistingPage ? ["addExisting"] : undefined;
 
   const fabButton = (
     <TooltipProvider delayDuration={300}>
@@ -127,7 +118,6 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
         onSelect={handlers.handleMenuSelect}
         trigger={fabButton}
         hiddenOptions={hiddenOptions}
-        extraOptions={extraOptions}
       />
 
       {isSignedIn && (

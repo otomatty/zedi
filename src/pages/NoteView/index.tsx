@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Container from "@/components/layout/Container";
 import FloatingActionButton from "@/components/layout/FloatingActionButton";
@@ -7,7 +7,6 @@ import { NoteShareUrlCopyButton } from "@/components/note/NoteShareUrlCopyButton
 import { NoteTitleSwitcher } from "@/components/note/NoteTitleSwitcher";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Badge } from "@zedi/ui";
-import { NoteAddPageDialog } from "./NoteAddPageDialog";
 import { useNote } from "@/hooks/useNoteQueries";
 import { useTranslation } from "react-i18next";
 import { getNoteViewPermissions } from "./noteViewHelpers";
@@ -53,22 +52,9 @@ const NoteView: React.FC = () => {
   } = useNote(noteId ?? "", { allowRemote: true });
 
   const noteSource = source === "remote" ? "remote" : "local";
-  const { canView, canEdit, canShowAddPage, canManageMembers } = getNoteViewPermissions(
-    access,
-    noteSource,
-  );
+  const { canView, canEdit, canManageMembers } = getNoteViewPermissions(access, noteSource);
   const isLoading = isNoteLoading;
   const isNotFound = !note || !access?.canView;
-
-  // issue #860 Phase 3: `NoteAddPageDialog` は `notePages` 配列を受け取らなくなった
-  // （重複判定の no-op 化に伴い prop ごと除去）。ノートのページ一覧は `PageGrid`
-  // 配下の `useInfiniteNotePages` だけが取りに行く。
-  // Issue #860 Phase 3: `NoteAddPageDialog` no longer takes a `notePages`
-  // array — the duplicate filter was a no-op and the prop was removed. The
-  // note's page list is now fetched only by `useInfiniteNotePages` inside
-  // `PageGrid`.
-
-  const [isAddPageOpen, setIsAddPageOpen] = useState(false);
 
   /**
    * ページごとの削除可否を `access.canDeletePage(addedByUserId)` で判定する
@@ -135,16 +121,14 @@ const NoteView: React.FC = () => {
   return (
     <ContentWithAIChat
       floatingAction={
-        canEdit || canShowAddPage ? (
+        canEdit ? (
           <div className="mr-4 mb-4 flex flex-col items-end gap-2">
             <FloatingActionButton
               noteId={note.id}
-              onAddExistingPage={canShowAddPage ? () => setIsAddPageOpen(true) : undefined}
-              initialClipUrl={validClipUrl && canEdit ? validClipUrl : undefined}
+              initialClipUrl={validClipUrl ?? undefined}
               onClipDialogClosedWithInitialUrl={
-                validClipUrl && canEdit ? handleClipDialogClosedWithInitialUrl : undefined
+                validClipUrl ? handleClipDialogClosedWithInitialUrl : undefined
               }
-              hiddenOptions={canEdit ? undefined : ["blank", "url", "image"]}
             />
           </div>
         ) : undefined
@@ -181,14 +165,6 @@ const NoteView: React.FC = () => {
               selection drives both surfaces in lock-step. */}
         </Container>
       </div>
-      {canShowAddPage && (
-        <NoteAddPageDialog
-          open={isAddPageOpen}
-          onOpenChange={setIsAddPageOpen}
-          noteId={note.id}
-          canEdit={canEdit}
-        />
-      )}
     </ContentWithAIChat>
   );
 };

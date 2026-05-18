@@ -179,39 +179,6 @@ export interface CreatePageBody {
 export type CreatePageResponse = SyncPageItem;
 
 /**
- * `POST /api/notes/:noteId/pages/copy-from-personal/:pageId` のレスポンス。
- * 個人ページを元にノートネイティブページを新規作成した結果を返す。
- * `page` には新ページの完全な行情報（`note_id` 含む）を含めるので、クライアント
- * はノート詳細の再取得なしに即座に UI を反映できる。
- *
- * Response from `POST /api/notes/:noteId/pages/copy-from-personal/:pageId`.
- * Returns the newly-created note-native page plus the full row (including
- * `note_id`) so clients can update caches without refetching the note detail.
- */
-export interface CopyPersonalPageToNoteResponse {
-  created: true;
-  page_id: string;
-  sort_order: number;
-  page: SyncPageItem;
-}
-
-/**
- * `POST /api/notes/:noteId/pages/:pageId/copy-to-personal` のレスポンス。
- * ノートネイティブページから作成された個人ページの完全な行情報を返す。
- * クライアントはこれを使って IndexedDB / zustand の個人ページストアへ
- * 書き戻し、`/home` に即反映できる (issue #713 Phase 3 / Codex P1)。
- *
- * Response from `POST /api/notes/:noteId/pages/:pageId/copy-to-personal`.
- * Returns the full new personal page row so the client can write it through
- * to IndexedDB / zustand and show it on `/home` without a full sync.
- */
-export interface CopyNotePageToPersonalResponse {
-  created: true;
-  page_id: string;
-  page: SyncPageItem;
-}
-
-/**
  * GET /api/search?q=&scope=shared のレスポンス。
  *
  * Issue #823 でデフォルトノートが導入されてから、すべてのページは必ずいずれかの
