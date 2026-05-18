@@ -59,6 +59,12 @@ export function ErrorDetailDialog({
     setPendingFor({ id: row.id, status: next });
   };
 
+  /** オーバーレイ・ESC と同様に、キャンセルボタンでも未保存選択を破棄する。 */
+  const handleClose = () => {
+    setPendingFor(null);
+    onClose();
+  };
+
   if (!row) return null;
 
   const effectiveStatus: ApiErrorStatus = pendingStatus ?? row.status;
@@ -74,8 +80,7 @@ export function ErrorDetailDialog({
       open={row !== null}
       onOpenChange={(open) => {
         if (!open) {
-          setPendingFor(null);
-          onClose();
+          handleClose();
         }
       }}
     >
@@ -194,7 +199,7 @@ export function ErrorDetailDialog({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+          <Button type="button" variant="outline" onClick={handleClose} disabled={saving}>
             {t("common.cancel")}
           </Button>
           <Button type="button" onClick={handleSave} disabled={!dirty || saving}>

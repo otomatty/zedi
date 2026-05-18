@@ -114,18 +114,21 @@ function extractBalancedJsonObject(str, startIdx) {
 }
 
 /**
- * severity + ai_summary を持つオブジェクトか（ネストした suspected_files エントリと区別）。
+ * トップレベル解析ペイロードの「形」か（severity / ai_summary のキーが両方あるか）。
+ * 型までは見ない。誤った型のオブジェクトでもキーが揃っていればルート意図とみなし、
+ * 後続の別オブジェクトへフォールスルーしない（誤採択防止）。
  *
- * Whether `value` looks like the top-level analysis payload rather than a nested
- * suspected-file entry (which lacks `ai_summary`).
+ * Whether `value` looks like the intended root analysis object (both `severity` and
+ * `ai_summary` own keys). Types are not checked: malformed values still fail fast via
+ * schema throw instead of scanning for a later unrelated JSON object.
  *
  * @param {unknown} value
  * @returns {boolean}
  */
 function looksLikeAnalysisPayload(value) {
-  if (!value || typeof value !== "object") return false;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const o = /** @type {Record<string, unknown>} */ (value);
-  return typeof o.severity === "string" && typeof o.ai_summary === "string";
+  return Object.hasOwn(o, "severity") && Object.hasOwn(o, "ai_summary");
 }
 
 /**

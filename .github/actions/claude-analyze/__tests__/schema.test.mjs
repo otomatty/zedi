@@ -133,6 +133,25 @@ test("parseAndValidate finds schema-valid JSON when prose contains stray braces"
   assert.equal(validated.severity, "low");
 });
 
+test("parseAndValidate fails fast when root-shaped JSON has invalid types (no later-object fallback)", () => {
+  const badRoot = {
+    severity: 999,
+    ai_summary: "severity has wrong type",
+    ai_root_cause: null,
+    ai_suggested_fix: null,
+    ai_suspected_files: null,
+  };
+  const laterObject = {
+    severity: "low",
+    ai_summary: "would be wrongly picked without root-intent detection",
+    ai_root_cause: null,
+    ai_suggested_fix: null,
+    ai_suspected_files: null,
+  };
+  const raw = `${JSON.stringify(badRoot)}\nTrailing prose ${JSON.stringify(laterObject)}`;
+  assert.throws(() => parseAndValidate(raw), /schema validation/i);
+});
+
 test("parseAndValidate throws on empty input", () => {
   assert.throws(() => parseAndValidate(""), /empty/);
 });
