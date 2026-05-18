@@ -8,7 +8,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
 import ErrorScreen from "./ErrorScreen";
 
 vi.mock("react-i18next", () => ({
@@ -28,30 +27,18 @@ describe("ErrorScreen", () => {
   });
 
   it("renders the unexpected-error title and description via i18n keys", () => {
-    render(
-      <MemoryRouter>
-        <ErrorScreen error={new Error("boom")} />
-      </MemoryRouter>,
-    );
+    render(<ErrorScreen error={new Error("boom")} />);
     expect(screen.getByText("errors.unexpectedTitle")).toBeInTheDocument();
     expect(screen.getByText("errors.unexpectedDescription")).toBeInTheDocument();
   });
 
   it("exposes role=alert on the root container for assistive tech", () => {
-    render(
-      <MemoryRouter>
-        <ErrorScreen error={new Error("boom")} />
-      </MemoryRouter>,
-    );
+    render(<ErrorScreen error={new Error("boom")} />);
     expect(screen.getByRole("alert")).toBeInTheDocument();
   });
 
   it("shows the error message inside a collapsible details element", () => {
-    render(
-      <MemoryRouter>
-        <ErrorScreen error={new Error("kaboom-details")} />
-      </MemoryRouter>,
-    );
+    render(<ErrorScreen error={new Error("kaboom-details")} />);
     // <details><summary> のラベルとエラーメッセージが含まれる。
     // The disclosure label and the underlying error message are both present.
     expect(screen.getByText("errors.unexpectedDetails")).toBeInTheDocument();
@@ -70,11 +57,7 @@ describe("ErrorScreen", () => {
 
     try {
       const user = userEvent.setup();
-      render(
-        <MemoryRouter>
-          <ErrorScreen error={new Error("boom")} />
-        </MemoryRouter>,
-      );
+      render(<ErrorScreen error={new Error("boom")} />);
 
       await user.click(screen.getByRole("button", { name: "errors.actionReload" }));
       expect(reload).toHaveBeenCalledTimes(1);
@@ -87,11 +70,7 @@ describe("ErrorScreen", () => {
   });
 
   it("renders a home link pointing to /", () => {
-    render(
-      <MemoryRouter>
-        <ErrorScreen error={new Error("boom")} />
-      </MemoryRouter>,
-    );
+    render(<ErrorScreen error={new Error("boom")} />);
     const home = screen.getByRole("link", { name: /errors\.actionBackToHome/ });
     expect(home).toHaveAttribute("href", "/");
   });

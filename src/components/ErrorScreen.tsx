@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { AlertTriangle, Home, RotateCw } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
@@ -57,10 +56,19 @@ const ErrorScreen = ({ error }: ErrorScreenProps) => {
             {t("errors.actionReload")}
           </Button>
           <Button asChild variant="outline">
-            <Link to="/" className="gap-2">
+            {/*
+             * Root ErrorBoundary の fallback は BrowserRouter の外側で描画されるため、
+             * <Link> ではなく素の <a> を使う。フルリロードで boundary 状態とアプリ
+             * 状態もまとめてリセットする。
+             *
+             * The root ErrorBoundary fallback renders outside BrowserRouter, so a
+             * plain <a> is used instead of <Link>. A full reload also clears any
+             * lingering boundary / app state.
+             */}
+            <a href="/" className="gap-2">
               <Home className="h-4 w-4" aria-hidden="true" />
               {t("errors.actionBackToHome")}
-            </Link>
+            </a>
           </Button>
         </div>
       </div>
