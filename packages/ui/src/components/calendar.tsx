@@ -17,7 +17,7 @@ export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 /**
  * Themed wrapper around react-day-picker `DayPicker`.
  *
- * Uses the v9/v10 `classNames` keys (e.g. `month_caption`, `button_previous`,
+ * Uses the v10 `classNames` keys (e.g. `month_caption`, `button_previous`,
  * `day_button`, `selected`, `today`). When upgrading react-day-picker, check
  * `UI` / `SelectionState` / `DayFlag` enums in the package types.
  *
@@ -33,7 +33,6 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         month: "space-y-4",
         month_caption: "flex justify-center pt-1 relative items-center",
         caption_label: "text-sm font-medium",
-        nav: "flex items-center",
         button_previous: cn(
           buttonVariants({ variant: "outline" }),
           "absolute left-1 h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",

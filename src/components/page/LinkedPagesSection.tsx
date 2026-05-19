@@ -14,13 +14,25 @@ interface LinkedPagesSectionProps {
   /**
    * データ取得経路。`"repo"`（既定）は IndexedDB から、`"api"` は
    * `GET /api/pages/:id/public-links` 経由で取得する。
-   * `"api"` ではゴーストリンク（新規ページ作成 UI）を非表示にする。
    *
    * Data source. `"repo"` (default) reads IndexedDB; `"api"` calls
-   * `GET /api/pages/:id/public-links`. Ghost links (which trigger
-   * authenticated page creation) are hidden in `"api"` mode.
+   * `GET /api/pages/:id/public-links`.
    */
   mode?: "repo" | "api";
+  /**
+   * ゴーストリンク（新規ページ作成 UI）を表示するかどうか。
+   * 既定では `mode === "repo"` のときのみ表示する（後方互換）。
+   * 認証済み編集者が `mode="api"` を使うケース（ノートネイティブページ等）では
+   * 明示的に `true` を渡すことでゴーストリンクを表示できる。逆にゲストには
+   * `false` を渡して `useCreatePage` mutation 失敗を防ぐ。
+   *
+   * Whether to render ghost links (new-page-creation UI). Defaults to
+   * `mode === "repo"` for backward compatibility. Authenticated editors using
+   * `mode="api"` (e.g. note-native pages) can opt into ghost links by passing
+   * `true`. Guest views must pass `false` to avoid triggering the
+   * authenticated `useCreatePage` mutation.
+   */
+  showGhostLinks?: boolean;
 }
 
 function LinkedPagesSkeleton() {
@@ -44,9 +56,11 @@ function LinkedPagesSkeleton() {
  * outgoing WikiLink・backlink・ゴーストリンクを描画する。
  *
  * - `mode="repo"` (既定): IndexedDB から取得し 2-hop も表示する。編集者向け。
- * - `mode="api"`: `GET /api/pages/:id/public-links` から取得し、ゴーストカードを
- *   非表示にする (新規ページ作成 mutation が認証必須のため)。公開ノートを
- *   ゲストが閲覧する `NotePagePublicView` から呼ばれる経路。
+ * - `mode="api"`: `GET /api/pages/:id/public-links` から取得する。公開ノートを
+ *   ゲストが閲覧する `NotePagePublicView` や、IndexedDB に永続化されない
+ *   ノートネイティブページの編集者からも呼ばれる経路。
+ * - `showGhostLinks`: ゴーストリンクの表示可否。既定は `mode === "repo"`。
+ *   認証済み編集者が `mode="api"` を使う場合は `true` を渡せば表示できる。
  * - `isSyncingLinks=true` の間は skeleton を返す。
  *
  * Renders the linked-pages section below the page body, listing same-note
@@ -54,9 +68,12 @@ function LinkedPagesSkeleton() {
  *
  * - `mode="repo"` (default): reads from IndexedDB and includes 2-hop content
  *   (editor flow).
- * - `mode="api"`: reads from `GET /api/pages/:id/public-links` and hides ghost
- *   cards (page-creation requires auth). Used by `NotePagePublicView` for
- *   guests on public / unlisted notes.
+ * - `mode="api"`: reads from `GET /api/pages/:id/public-links`. Used by
+ *   `NotePagePublicView` for guests and by editors of note-native pages
+ *   that are not persisted to IndexedDB.
+ * - `showGhostLinks`: gates the ghost-link UI. Defaults to `mode === "repo"`.
+ *   Authenticated editors using `mode="api"` can pass `true` to keep ghost
+ *   cards visible.
  * - While `isSyncingLinks=true`, a skeleton is rendered instead.
  *
  * @see {@link LinkedPagesSectionProps}
@@ -65,6 +82,7 @@ export function LinkedPagesSection({
   pageId,
   isSyncingLinks = false,
   mode = "repo",
+  showGhostLinks = mode === "repo",
 }: LinkedPagesSectionProps) {
   const { t } = useTranslation();
   /**
@@ -97,10 +115,11 @@ export function LinkedPagesSection({
    */
   const allLinks = [...outgoingLinks, ...backlinks];
 
-  // api モードではゴーストリンクを非表示にするため、表示判定からも除外する。
-  // In api mode ghost links are hidden, so they should not keep the section
-  // from collapsing into nothing.
-  const ghostLinksVisible = mode === "repo" && ghostLinks.length > 0;
+  // `showGhostLinks` で抑止されている場合は、その存在をセクション全体の
+  // 表示判定からも除外する（ゴーストだけのとき空セクションが残らないように）。
+  // When ghost links are gated off via `showGhostLinks`, exclude them from
+  // the overall visibility check so the section can collapse cleanly.
+  const ghostLinksVisible = showGhostLinks && ghostLinks.length > 0;
 
   /**
    *
@@ -161,11 +180,11 @@ export function LinkedPagesSection({
         />
       )}
 
-      {/* Ghost Links (renamed to 新しいリンク) — repo モードのみ表示。
-          api モードはゲスト向けで `useCreatePage` mutation が失敗するため抑止。
-          Ghost Links — shown only in repo mode. Suppressed under api mode
-          because the `useCreatePage` mutation requires an authenticated user. */}
-      {mode === "repo" && ghostLinks.length > 0 && (
+      {/* Ghost Links (renamed to 新しいリンク) — `showGhostLinks` で制御。
+          ゲスト経路では `useCreatePage` mutation が失敗するため抑止する。
+          Ghost Links — gated by `showGhostLinks`. Guest paths must keep it
+          false because the `useCreatePage` mutation requires authentication. */}
+      {showGhostLinks && ghostLinks.length > 0 && (
         <div className="space-y-3">
           <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
             <FilePlus className="h-4 w-4" />

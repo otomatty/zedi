@@ -227,12 +227,19 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
           )}
         </div>
 
-        {/* Linked Pages Section */}
+        {/* Linked Pages Section
+            ゴーストリンクは編集可能なときだけ表示する。`isEditorReadOnly` は
+            読み取り専用ページ（公開ゲスト閲覧や Wiki 生成中）で true になるため、
+            それらの経路では `useCreatePage` mutation を呼び得ない UI を出さない。
+            Ghost links render only while the editor is writable. `isEditorReadOnly`
+            covers guest public views and Wiki generation, both of which must not
+            expose the authenticated `useCreatePage` mutation. */}
         {currentPageId && (
           <LinkedPagesSection
             pageId={currentPageId}
             isSyncingLinks={isSyncingLinks}
             mode={linkedPagesMode}
+            showGhostLinks={!isEditorReadOnly}
           />
         )}
 

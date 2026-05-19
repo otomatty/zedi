@@ -324,4 +324,44 @@ describe("LinkedPagesSection", () => {
       expect(container.firstChild).toBeNull();
     });
   });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // `showGhostLinks` は `mode` と独立してゴーストリンクの可視性を制御する。
+  // ノートネイティブページ（IndexedDB に永続化されない）を編集する場合は
+  // `mode="api"` + `showGhostLinks=true` を渡すことで認証済み編集者にも
+  // ゴーストリンクを提示できる。
+  //
+  // `showGhostLinks` controls ghost-link visibility independently of `mode`.
+  // Authenticated editors of note-native pages (not persisted in IndexedDB)
+  // pass `mode="api"` + `showGhostLinks=true` to keep ghost links available.
+  // ──────────────────────────────────────────────────────────────────────
+  describe("showGhostLinks prop", () => {
+    it("renders ghost links in api mode when showGhostLinks is true", () => {
+      mockLinkedPagesData.ghostLinks = ["NotYetCreated"];
+
+      const queryClient = createTestQueryClient();
+      render(
+        <TestWrapper queryClient={queryClient}>
+          <LinkedPagesSection pageId="test-page-id" mode="api" showGhostLinks />
+        </TestWrapper>,
+      );
+
+      expect(screen.getByText("新しいリンク (1)")).toBeInTheDocument();
+      expect(screen.getByText("NotYetCreated")).toBeInTheDocument();
+    });
+
+    it("hides ghost links in repo mode when showGhostLinks is false", () => {
+      mockLinkedPagesData.ghostLinks = ["NotYetCreated"];
+
+      const queryClient = createTestQueryClient();
+      render(
+        <TestWrapper queryClient={queryClient}>
+          <LinkedPagesSection pageId="test-page-id" showGhostLinks={false} />
+        </TestWrapper>,
+      );
+
+      expect(screen.queryByText("新しいリンク (1)")).not.toBeInTheDocument();
+      expect(screen.queryByText("NotYetCreated")).not.toBeInTheDocument();
+    });
+  });
 });
