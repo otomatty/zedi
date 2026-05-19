@@ -40,7 +40,26 @@ function LinkedPagesSkeleton() {
 }
 
 /**
+ * ページ本文の下に表示するリンク済みページ一覧。同一ノート内の
+ * outgoing WikiLink・backlink・ゴーストリンクを描画する。
  *
+ * - `mode="repo"` (既定): IndexedDB から取得し 2-hop も表示する。編集者向け。
+ * - `mode="api"`: `GET /api/pages/:id/public-links` から取得し、ゴーストカードを
+ *   非表示にする (新規ページ作成 mutation が認証必須のため)。公開ノートを
+ *   ゲストが閲覧する `NotePagePublicView` から呼ばれる経路。
+ * - `isSyncingLinks=true` の間は skeleton を返す。
+ *
+ * Renders the linked-pages section below the page body, listing same-note
+ * outgoing WikiLinks, backlinks, and ghost links.
+ *
+ * - `mode="repo"` (default): reads from IndexedDB and includes 2-hop content
+ *   (editor flow).
+ * - `mode="api"`: reads from `GET /api/pages/:id/public-links` and hides ghost
+ *   cards (page-creation requires auth). Used by `NotePagePublicView` for
+ *   guests on public / unlisted notes.
+ * - While `isSyncingLinks=true`, a skeleton is rendered instead.
+ *
+ * @see {@link LinkedPagesSectionProps}
  */
 export function LinkedPagesSection({
   pageId,

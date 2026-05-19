@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { LinkedPagesSection } from "./LinkedPagesSection";
 import { TestWrapper, createTestQueryClient } from "@/test/testWrapper";
 import type { LinkedPagesData } from "@/hooks/useLinkedPages";
+import { useLinkedPages } from "@/hooks/useLinkedPages";
 
 // Mock the hooks
 const mockNavigate = vi.fn();
@@ -306,6 +307,9 @@ describe("LinkedPagesSection", () => {
 
       renderWithMode();
 
+      // mode が hook に正しく伝搬していることをロックする (coderabbitai review)。
+      // Lock the mode-threading contract from component → hook.
+      expect(vi.mocked(useLinkedPages)).toHaveBeenCalledWith("test-page-id", { mode: "api" });
       // outgoing は表示される / outgoing links should still render
       expect(screen.getByText("Outgoing Page")).toBeInTheDocument();
       // ゴーストリンクは描画されない / ghost cards must not render

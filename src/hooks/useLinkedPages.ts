@@ -400,7 +400,7 @@ export function useLinkedPages(pageId: string, options?: UseLinkedPagesOptions) 
 
       // OPTIMIZED: Get summaries for title matching (no content)
       const allPagesSummary = await repo.getPagesSummary(userId);
-      const backlinkIds = await repo.getBacklinks(pageId);
+      const rawBacklinkIds = await repo.getBacklinks(pageId);
 
       // ノートスコープ：現在のページが属するノート内のページだけを評価対象に
       // する。これにより別ノートの WikiLink は自然にゴーストへ降格し、別ノート
@@ -409,6 +409,20 @@ export function useLinkedPages(pageId: string, options?: UseLinkedPagesOptions) 
       // Cross-note WikiLink targets become ghosts and cross-note backlink IDs
       // fall through during summary lookup.
       const scopedSummary = allPagesSummary.filter((p) => p.noteId === currentPage.noteId);
+
+      // backlink ID は `links` テーブルから note 越境して返るため、scopedSummary
+      // に存在する ID だけに事前フィルタする。これがないと `getPagesByIds` が
+      // 別ノートのページ本体を解決し、`calculateLinkedPagesOptimized` が
+      // 「Page 本体あり」を優先するロジックでクロスノート backlink を昇格させて
+      // しまう（coderabbitai review on PR #915）。
+      // backlink IDs come from the `links` table without a note filter. Without
+      // pre-filtering here, `getPagesByIds` resolves cross-note pages and
+      // `calculateLinkedPagesOptimized` (which prefers full Page over summary)
+      // would surface them. Restrict to ids present in `scopedSummary` so the
+      // backlink scope is enforced before hydration (coderabbitai review on
+      // PR #915).
+      const scopedIds = new Set(scopedSummary.map((p) => p.id));
+      const backlinkIds = rawBacklinkIds.filter((id) => scopedIds.has(id));
 
       // Extract WikiLinks to identify which pages need full content
       const wikiLinks = extractWikiLinksFromContent(currentPage.content);
