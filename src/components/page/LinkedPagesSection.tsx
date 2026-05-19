@@ -11,6 +11,16 @@ import { useCreatePage } from "@/hooks/usePageQueries";
 interface LinkedPagesSectionProps {
   pageId: string;
   isSyncingLinks?: boolean;
+  /**
+   * データ取得経路。`"repo"`（既定）は IndexedDB から、`"api"` は
+   * `GET /api/pages/:id/public-links` 経由で取得する。
+   * `"api"` ではゴーストリンク（新規ページ作成 UI）を非表示にする。
+   *
+   * Data source. `"repo"` (default) reads IndexedDB; `"api"` calls
+   * `GET /api/pages/:id/public-links`. Ghost links (which trigger
+   * authenticated page creation) are hidden in `"api"` mode.
+   */
+  mode?: "repo" | "api";
 }
 
 function LinkedPagesSkeleton() {
@@ -32,12 +42,16 @@ function LinkedPagesSkeleton() {
 /**
  *
  */
-export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPagesSectionProps) {
+export function LinkedPagesSection({
+  pageId,
+  isSyncingLinks = false,
+  mode = "repo",
+}: LinkedPagesSectionProps) {
   const { t } = useTranslation();
   /**
    *
    */
-  const { data, isLoading } = useLinkedPages(pageId);
+  const { data, isLoading } = useLinkedPages(pageId, { mode });
   /**
    *
    */
@@ -64,11 +78,16 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
    */
   const allLinks = [...outgoingLinks, ...backlinks];
 
+  // api モードではゴーストリンクを非表示にするため、表示判定からも除外する。
+  // In api mode ghost links are hidden, so they should not keep the section
+  // from collapsing into nothing.
+  const ghostLinksVisible = mode === "repo" && ghostLinks.length > 0;
+
   /**
    *
    */
   const hasAnyLinks =
-    allLinks.length > 0 || outgoingLinksWithChildren.length > 0 || ghostLinks.length > 0;
+    allLinks.length > 0 || outgoingLinksWithChildren.length > 0 || ghostLinksVisible;
 
   if (!hasAnyLinks) return null;
 
@@ -123,8 +142,11 @@ export function LinkedPagesSection({ pageId, isSyncingLinks = false }: LinkedPag
         />
       )}
 
-      {/* Ghost Links (renamed to 新しいリンク) */}
-      {ghostLinks.length > 0 && (
+      {/* Ghost Links (renamed to 新しいリンク) — repo モードのみ表示。
+          api モードはゲスト向けで `useCreatePage` mutation が失敗するため抑止。
+          Ghost Links — shown only in repo mode. Suppressed under api mode
+          because the `useCreatePage` mutation requires an authenticated user. */}
+      {mode === "repo" && ghostLinks.length > 0 && (
         <div className="space-y-3">
           <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
             <FilePlus className="h-4 w-4" />

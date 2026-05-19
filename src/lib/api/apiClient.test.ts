@@ -649,6 +649,38 @@ describe("apiClient", () => {
       const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       expect(init.method).toBe("DELETE");
     });
+
+    it("getPagePublicLinks sends GET to /api/pages/:id/public-links and returns the payload", async () => {
+      const payload = {
+        outgoing_links: [
+          {
+            id: "out-1",
+            note_id: "note-1",
+            title: "Out",
+            content_preview: "p",
+            updated_at: "2026-05-19T00:00:00.000Z",
+            source_url: null,
+          },
+        ],
+        backlinks: [],
+        ghost_links: ["Missing"],
+      };
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify(payload)),
+        headers: new Headers(),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = createApiClient({ baseUrl: "https://api.test.example.com" });
+      const result = await client.getPagePublicLinks("page-1");
+
+      expect(result).toEqual(payload);
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://api.test.example.com/api/pages/page-1/public-links");
+      expect(init.method).toBe("GET");
+    });
   });
 
   // ── getNoteWithCache (ETag / 304, Issue #853) ────────────────────────

@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRepository, usePage, pageKeys } from "./usePageQueries";
+import { useNoteApi } from "./useNoteQueries";
 import { extractWikiLinksFromContent, getUniqueWikiLinkTitles } from "@/lib/wikiLinkUtils";
 import { getContentPreview } from "@/lib/contentUtils";
 import type { Page, PageSummary } from "@/types/page";
+import type { PagePublicLinksResponse, PagePublicLinkCard } from "@/lib/api/types";
 
 /**
  * Card data for linked pages display
@@ -305,20 +307,81 @@ const emptyLinkedPagesData: LinkedPagesData = {
 };
 
 /**
- * Hook to fetch linked pages data for a given page
+ * 公開リンク API レスポンスを `LinkedPagesData` に変換する。2-hop は提供
+ * しないため `outgoingLinksWithChildren` / `twoHopLinks` は空配列で返す。
  *
- * OPTIMIZED:
+ * Adapt the `/public-links` API payload to `LinkedPagesData`. The endpoint
+ * does not surface 2-hop data, so `outgoingLinksWithChildren` and
+ * `twoHopLinks` are returned as empty arrays.
+ */
+function apiToLinkedPagesData(resp: PagePublicLinksResponse): LinkedPagesData {
+  const toCard = (r: PagePublicLinkCard): PageCard => ({
+    id: r.id,
+    noteId: r.note_id,
+    title: r.title ?? "",
+    preview: r.content_preview ?? "",
+    updatedAt: new Date(r.updated_at).getTime(),
+    sourceUrl: r.source_url ?? undefined,
+  });
+  return {
+    outgoingLinks: resp.outgoing_links.map(toCard),
+    outgoingLinksWithChildren: [],
+    backlinks: resp.backlinks.map(toCard),
+    twoHopLinks: [],
+    ghostLinks: resp.ghost_links,
+  };
+}
+
+/**
+ * `useLinkedPages` のオプション。`mode` でデータ取得経路を切り替える。
+ *
+ * - `"repo"` (既定): ログイン編集者向け。IndexedDB の `StorageAdapter`
+ *   から read し、`currentPage.noteId` でクライアントサイドにスコープする。
+ * - `"api"`: 公開ノートを閲覧するゲスト用。`GET /api/pages/:id/public-links`
+ *   を呼び、サーバが返したノートスコープ済みデータを利用する。
+ *
+ * Options for `useLinkedPages`. `mode` selects the data source:
+ *
+ * - `"repo"` (default): for signed-in editors. Reads `StorageAdapter`
+ *   (IndexedDB) and filters by `currentPage.noteId` client-side.
+ * - `"api"`: for guests viewing public/unlisted notes. Calls
+ *   `GET /api/pages/:id/public-links`; the server already enforces the
+ *   note-scope filter and returns ready-to-render cards.
+ */
+export interface UseLinkedPagesOptions {
+  mode?: "repo" | "api";
+}
+
+/**
+ * Hook to fetch linked pages data for a given page.
+ *
+ * OPTIMIZED (mode="repo"):
  * - Uses getPagesSummary() for title matching (no content, reduces Rows Read by ~95%)
  * - Only fetches content for outgoing link pages (needed for 2-hop calculation)
  * - Only fetches content for backlink pages (needed for preview)
+ *
+ * Note-scoped: link graph is restricted to pages within `currentPage.noteId`.
+ * Cross-note WikiLink targets become ghost links; cross-note backlinks are
+ * dropped.
+ *
+ * mode="api": calls `/public-links` so unauthenticated guests can render the
+ * linked pages section. The server returns note-scoped cards and does not
+ * include 2-hop data.
  */
-export function useLinkedPages(pageId: string) {
+export function useLinkedPages(pageId: string, options?: UseLinkedPagesOptions) {
+  const mode = options?.mode ?? "repo";
   const { getRepository, userId, isLoaded } = useRepository();
   const { data: currentPage } = usePage(pageId);
+  const { api } = useNoteApi();
 
   return useQuery({
-    queryKey: [...pageKeys.all, "linkedPages", userId, pageId],
+    queryKey: [...pageKeys.all, "linkedPages", mode, userId, pageId],
     queryFn: async (): Promise<LinkedPagesData> => {
+      if (mode === "api") {
+        const resp = await api.getPagePublicLinks(pageId);
+        return apiToLinkedPagesData(resp);
+      }
+
       if (!currentPage) {
         return emptyLinkedPagesData;
       }
@@ -329,12 +392,20 @@ export function useLinkedPages(pageId: string) {
       const allPagesSummary = await repo.getPagesSummary(userId);
       const backlinkIds = await repo.getBacklinks(pageId);
 
+      // ノートスコープ：現在のページが属するノート内のページだけを評価対象に
+      // する。これにより別ノートの WikiLink は自然にゴーストへ降格し、別ノート
+      // からの backlink は ID 解決に失敗して結果から落ちる。
+      // Note-scoping: restrict the candidate set to pages in the current note.
+      // Cross-note WikiLink targets become ghosts and cross-note backlink IDs
+      // fall through during summary lookup.
+      const scopedSummary = allPagesSummary.filter((p) => p.noteId === currentPage.noteId);
+
       // Extract WikiLinks to identify which pages need full content
       const wikiLinks = extractWikiLinksFromContent(currentPage.content);
       const linkTitles = getUniqueWikiLinkTitles(wikiLinks);
 
-      // Map titles to page IDs
-      const summaryByTitle = new Map(allPagesSummary.map((p) => [p.title.toLowerCase().trim(), p]));
+      // Map titles to page IDs (scoped)
+      const summaryByTitle = new Map(scopedSummary.map((p) => [p.title.toLowerCase().trim(), p]));
 
       // Identify outgoing page IDs (need content for 2-hop calculation)
       const outgoingPageIds: string[] = [];
@@ -354,13 +425,13 @@ export function useLinkedPages(pageId: string) {
       return calculateLinkedPagesOptimized({
         currentPage,
         pageId,
-        allPagesSummary,
+        allPagesSummary: scopedSummary,
         outgoingPages,
         backlinkPages,
         backlinkIds,
       });
     },
-    enabled: isLoaded && !!pageId && !!currentPage,
+    enabled: mode === "api" ? !!pageId : isLoaded && !!pageId && !!currentPage,
     staleTime: 1000 * 30, // 30 seconds
   });
 }

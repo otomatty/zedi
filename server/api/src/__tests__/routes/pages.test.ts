@@ -706,3 +706,170 @@ describe("GET /api/pages/:id/public-content", () => {
     expect(res.headers.get("cache-control")).toBe("public, max-age=60, must-revalidate");
   });
 });
+
+// ── GET /api/pages/:id/public-links (note-scoped link graph for read-only callers) ─
+//
+// `LinkedPagesSection` をログイン編集者だけでなく公開ノート閲覧ゲストでも表示する
+// ため、ページ単位の outgoing / backlinks / ghost-links をノート内スコープで返す
+// 読み取り専用エンドポイント。サーバ側で `pages.note_id` の一致を強制し、別ノートの
+// 行が応答に混入しないようにする。`authOptional` + `getNoteRole` で公開ノート閲覧者
+// にも開放する。
+//
+// `LinkedPagesSection` is rendered for guests on public/unlisted notes too, so
+// this endpoint returns the per-page link graph (outgoing wiki edges, backlinks,
+// unresolved ghost-link titles) scoped to the page's owning note. The note-scope
+// filter is enforced server-side via `pages.note_id`. `authOptional` plus
+// `getNoteRole` opens the route to anonymous readers on public/unlisted notes.
+describe("GET /api/pages/:id/public-links", () => {
+  /**
+   * outgoing / backlinks の各レスポンス行は `PageCard` 由来のフィールドだけを返す。
+   * Each outgoing/backlink row exposes `PageCard`-shaped columns only.
+   */
+  function makeLinkedPageRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "linked-page-1",
+      noteId: NOTE_ID,
+      title: "Linked",
+      contentPreview: "preview",
+      updatedAt: new Date("2026-05-19T00:00:00Z"),
+      sourceUrl: null,
+      ...overrides,
+    };
+  }
+
+  it("returns note-scoped outgoing, backlinks, and ghost-links for the owner", async () => {
+    const app = createPagesApp([
+      // SELECT pages (page row)
+      [{ id: PAGE_ID, noteId: NOTE_ID }],
+      // getNoteRole → findActiveNoteById (owner short-circuit)
+      [mockNoteRow()],
+      // outgoing links (links INNER JOIN pages, note-scoped)
+      [makeLinkedPageRow({ id: "out-1", title: "Out 1" })],
+      // backlinks (links INNER JOIN pages, note-scoped)
+      [makeLinkedPageRow({ id: "back-1", title: "Back 1" })],
+      // ghost_links DISTINCT link_text
+      [{ linkText: "Ghost Title" }],
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/public-links`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      outgoing_links: Array<Record<string, unknown>>;
+      backlinks: Array<Record<string, unknown>>;
+      ghost_links: string[];
+    };
+    expect(body.outgoing_links).toHaveLength(1);
+    expect(body.outgoing_links[0]).toMatchObject({
+      id: "out-1",
+      note_id: NOTE_ID,
+      title: "Out 1",
+      content_preview: "preview",
+      updated_at: "2026-05-19T00:00:00.000Z",
+    });
+    expect(body.backlinks).toHaveLength(1);
+    expect(body.backlinks[0]).toMatchObject({ id: "back-1", note_id: NOTE_ID, title: "Back 1" });
+    expect(body.ghost_links).toEqual(["Ghost Title"]);
+    expect(res.headers.get("cache-control")).toBe("private, must-revalidate");
+  });
+
+  it("returns 404 when the page row is missing or already soft-deleted", async () => {
+    const app = createPagesApp([[]]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/public-links`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 when caller has no role on the owning private note", async () => {
+    const privateNote = {
+      ...mockNoteRow(),
+      ownerId: "other-user",
+      visibility: "private" as const,
+    };
+    const app = createPagesApp([
+      [{ id: PAGE_ID, noteId: NOTE_ID }],
+      [privateNote], // note row
+      [], // member SELECT empty
+      [], // domain SELECT empty
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/public-links`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(403);
+  });
+
+  it("allows guest access on a public note with edge-cacheable Cache-Control", async () => {
+    const publicNote = {
+      ...mockNoteRow(),
+      ownerId: "other-user",
+      visibility: "public" as const,
+    };
+    const app = createPagesApp([
+      [{ id: PAGE_ID, noteId: NOTE_ID }],
+      [publicNote],
+      [makeLinkedPageRow({ id: "out-guest" })],
+      [], // no backlinks
+      [], // no ghosts
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/public-links`, {
+      method: "GET",
+      // no auth header → guest path
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      outgoing_links: unknown[];
+      backlinks: unknown[];
+      ghost_links: string[];
+    };
+    expect(body.outgoing_links).toHaveLength(1);
+    expect(body.backlinks).toEqual([]);
+    expect(body.ghost_links).toEqual([]);
+    expect(res.headers.get("cache-control")).toBe("public, max-age=60, must-revalidate");
+  });
+
+  it("filters cross-note backlinks via the WHERE clause on pages.note_id", async () => {
+    // ノートスコープの強制：ルートは links INNER JOIN pages の WHERE で
+    // `pages.note_id = currentPage.note_id` を要求する。createMockDb は
+    // チェーンの WHERE 句を実際に評価しないため、本テストでは「ノート外の行が
+    // DB から返らない」前提のもとで応答が空になることを担保する。
+    //
+    // Scope enforcement: the route's INNER JOIN includes a `pages.note_id =
+    // currentPage.note_id` predicate. createMockDb does not evaluate the WHERE
+    // clause, so this test feeds an *empty* result for backlinks to model the
+    // expected DB behavior and asserts the response stays empty.
+    const app = createPagesApp([
+      [{ id: PAGE_ID, noteId: NOTE_ID }],
+      [mockNoteRow()],
+      [], // outgoing: none in scope
+      [], // backlinks: cross-note rows filtered out at DB
+      [], // ghost: none
+    ]);
+
+    const res = await app.request(`/api/pages/${PAGE_ID}/public-links`, {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      outgoing_links: unknown[];
+      backlinks: unknown[];
+      ghost_links: string[];
+    };
+    expect(body.outgoing_links).toEqual([]);
+    expect(body.backlinks).toEqual([]);
+    expect(body.ghost_links).toEqual([]);
+  });
+});

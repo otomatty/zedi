@@ -25,7 +25,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and, sql } from "drizzle-orm";
-import { pages, pageContents, type Page } from "../schema/index.js";
+import { pages, pageContents, links, ghostLinks, type Page } from "../schema/index.js";
 import { authRequired, authOptional } from "../middleware/auth.js";
 import type { AppEnv, Database } from "../types/index.js";
 import { ensureDefaultNote, getDefaultNoteOrNull } from "../services/defaultNoteService.js";
@@ -675,6 +675,142 @@ app.get("/:id/public-content", authOptional, async (c) => {
     content_preview: row.contentPreview ?? null,
     version: content?.version ?? 0,
     updated_at: (content?.updatedAt ?? row.updatedAt).toISOString(),
+  });
+});
+
+// ── GET /pages/:id/public-links (note-scoped link graph for read-only callers) ─
+/**
+ * `GET /api/pages/:pageId/public-links` — ノート内スコープのリンクグラフを返す
+ * 読み取り専用 API。`LinkedPagesSection` をログイン編集者だけでなく公開ノートの
+ * 閲覧ゲストにも表示するために用意する。
+ *
+ * 返却内容:
+ * - `outgoing_links`: このページから張られている WikiLink の解決済み先（同一ノート内）
+ * - `backlinks`: このページを指している WikiLink の発信元ページ（同一ノート内）
+ * - `ghost_links`: 未解決の WikiLink テキスト（タイトル文字列のみ）
+ *
+ * 2-hop（`outgoingLinksWithChildren`）は本ルートでは返さない。負荷とゲスト権限の
+ * 観点から、ログイン編集者向けの IndexedDB ベース計算のみで提供する。
+ *
+ * `authOptional` + `getNoteRole` で `public-content` と同じ閲覧権限を踏襲し、
+ * `pages.note_id` の JOIN 条件でクロスノート行をサーバ側で排除する。
+ *
+ * `GET /api/pages/:pageId/public-links` returns the note-scoped link graph
+ * (outgoing wiki edges, backlinks, ghost-link titles) so the
+ * `LinkedPagesSection` component can render for unauthenticated guests on
+ * public/unlisted notes as well as for signed-in editors.
+ *
+ * The endpoint deliberately omits 2-hop (`outgoingLinksWithChildren`) data —
+ * that view stays on the IndexedDB-driven path for signed-in editors only.
+ * Auth follows the `public-content` precedent (`authOptional` + `getNoteRole`),
+ * and the INNER JOIN on `pages.note_id` enforces note-scoping server-side so
+ * cross-note rows can never leak into the response.
+ *
+ * @returns 200 + `{ outgoing_links, backlinks, ghost_links }`.
+ *          404 when the page row is missing or already soft-deleted.
+ *          403 when no role is resolved on the owning note.
+ */
+app.get("/:id/public-links", authOptional, async (c) => {
+  const pageId = c.req.param("id");
+  const userId = c.get("userId");
+  const userEmail = c.get("userEmail");
+  const db = c.get("db");
+
+  const pageRows = await db
+    .select({ id: pages.id, noteId: pages.noteId })
+    .from(pages)
+    .where(and(eq(pages.id, pageId), eq(pages.isDeleted, false)))
+    .limit(1);
+
+  const page = pageRows[0];
+  if (!page) throw new HTTPException(404, { message: "Page not found" });
+
+  const { role } = await getNoteRole(page.noteId, userId, userEmail, db);
+  if (!role) throw new HTTPException(403, { message: "Forbidden" });
+
+  // outgoing: このページから出ている wiki link のうち、同一ノート内に解決した行のみ。
+  // outgoing: wiki edges from this page resolved to a page inside the same note.
+  const outgoingRows = await db
+    .select({
+      id: pages.id,
+      noteId: pages.noteId,
+      title: pages.title,
+      contentPreview: pages.contentPreview,
+      updatedAt: pages.updatedAt,
+      sourceUrl: pages.sourceUrl,
+    })
+    .from(links)
+    .innerJoin(pages, eq(pages.id, links.targetId))
+    .where(
+      and(
+        eq(links.sourceId, pageId),
+        eq(links.linkType, "wiki"),
+        eq(pages.noteId, page.noteId),
+        eq(pages.isDeleted, false),
+      ),
+    )
+    .limit(50);
+
+  // backlinks: このページを指している wiki link のうち、発信元が同一ノートのもの。
+  // backlinks: wiki edges pointing at this page whose source page lives in the same note.
+  const backlinkRows = await db
+    .select({
+      id: pages.id,
+      noteId: pages.noteId,
+      title: pages.title,
+      contentPreview: pages.contentPreview,
+      updatedAt: pages.updatedAt,
+      sourceUrl: pages.sourceUrl,
+    })
+    .from(links)
+    .innerJoin(pages, eq(pages.id, links.sourceId))
+    .where(
+      and(
+        eq(links.targetId, pageId),
+        eq(links.linkType, "wiki"),
+        eq(pages.noteId, page.noteId),
+        eq(pages.isDeleted, false),
+      ),
+    )
+    .limit(50);
+
+  // ghost: 未解決リンクのタイトル文字列のみ。source page に紐付くため自然にスコープ済み。
+  // ghost: unresolved link titles. Source-page-bound rows are already note-scoped.
+  const ghostRows = await db
+    .select({ linkText: ghostLinks.linkText })
+    .from(ghostLinks)
+    .where(and(eq(ghostLinks.sourcePageId, pageId), eq(ghostLinks.linkType, "wiki")))
+    .limit(50);
+
+  // public-content と同じキャッシュ方針：ゲストはエッジで短期キャッシュ可能、
+  // ログイン済みは個人スコープに留める。
+  // Same Cache-Control story as public-content: guests get a short edge cache,
+  // logged-in callers stay private.
+  c.header(
+    "Cache-Control",
+    userId ? "private, must-revalidate" : "public, max-age=60, must-revalidate",
+  );
+
+  const toCard = (r: {
+    id: string;
+    noteId: string;
+    title: string | null;
+    contentPreview: string | null;
+    updatedAt: Date;
+    sourceUrl: string | null;
+  }) => ({
+    id: r.id,
+    note_id: r.noteId,
+    title: r.title,
+    content_preview: r.contentPreview,
+    updated_at: r.updatedAt.toISOString(),
+    source_url: r.sourceUrl,
+  });
+
+  return c.json({
+    outgoing_links: outgoingRows.map(toCard),
+    backlinks: backlinkRows.map(toCard),
+    ghost_links: ghostRows.map((r) => r.linkText),
   });
 });
 

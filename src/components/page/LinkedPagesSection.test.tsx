@@ -273,4 +273,51 @@ describe("LinkedPagesSection", () => {
     // Ghost links renamed
     expect(screen.getByText("新しいリンク (1)")).toBeInTheDocument();
   });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // ゲスト向け (mode="api") ではゴーストリンクを非表示にする。`useCreatePage`
+  // mutation は認証必須で、ゲストがクリックしても失敗するため UI 自体を出さない。
+  //
+  // In `mode="api"` (guest view) ghost links are suppressed because the
+  // `useCreatePage` mutation requires authentication and would fail for
+  // unauthenticated callers.
+  // ──────────────────────────────────────────────────────────────────────
+  describe("mode='api'", () => {
+    const renderWithMode = () => {
+      const queryClient = createTestQueryClient();
+      return render(
+        <TestWrapper queryClient={queryClient}>
+          <LinkedPagesSection pageId="test-page-id" mode="api" />
+        </TestWrapper>,
+      );
+    };
+
+    it("hides ghost links when mode is api", () => {
+      mockLinkedPagesData.outgoingLinks = [
+        {
+          id: "page-1",
+          noteId: "note-1",
+          title: "Outgoing Page",
+          preview: "Preview",
+          updatedAt: Date.now(),
+        },
+      ];
+      mockLinkedPagesData.ghostLinks = ["NotYetCreated"];
+
+      renderWithMode();
+
+      // outgoing は表示される / outgoing links should still render
+      expect(screen.getByText("Outgoing Page")).toBeInTheDocument();
+      // ゴーストリンクは描画されない / ghost cards must not render
+      expect(screen.queryByText("NotYetCreated")).not.toBeInTheDocument();
+      expect(screen.queryByText("新しいリンク (1)")).not.toBeInTheDocument();
+    });
+
+    it("renders nothing when only ghost links exist in api mode", () => {
+      mockLinkedPagesData.ghostLinks = ["Ghost1", "Ghost2"];
+
+      const { container } = renderWithMode();
+      expect(container.firstChild).toBeNull();
+    });
+  });
 });

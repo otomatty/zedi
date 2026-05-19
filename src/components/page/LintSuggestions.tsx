@@ -13,6 +13,7 @@ import {
 import { Badge, Button, Skeleton } from "@zedi/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/hooks/useAuth";
 
 /**
  * Lint finding の型（API レスポンス）。
@@ -167,6 +168,7 @@ interface LintSuggestionsProps {
 export function LintSuggestions({ pageId }: LintSuggestionsProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { isSignedIn, isLoaded: isAuthLoaded } = useAuth();
 
   const ruleLabel = (rule: string) => {
     const key = `common.page.lintRule.${rule}` as const;
@@ -184,6 +186,13 @@ export function LintSuggestions({ pageId }: LintSuggestionsProps) {
     queryKey: ["lintFindings", pageId],
     queryFn: () => fetchPageFindings(pageId),
     staleTime: 1000 * 60, // 1 minute
+    // ゲスト（未認証）では `/api/lint/findings/page/:id` が 401/403 を返すため
+    // クエリを発火させない。`fetchPageFindings` 側でも空配列にフォールバックする。
+    // The findings endpoint requires auth (401/403 for guests). Skip the query
+    // entirely for unauthenticated viewers — `fetchPageFindings` also falls
+    // back to an empty array, but disabling the call avoids the wasted round
+    // trip.
+    enabled: isAuthLoaded && isSignedIn,
   });
 
   const resolveMutation = useMutation({
@@ -192,6 +201,14 @@ export function LintSuggestions({ pageId }: LintSuggestionsProps) {
       void queryClient.invalidateQueries({ queryKey: ["lintFindings", pageId] });
     },
   });
+
+  // 未認証 (ゲスト) では LintSuggestions 自体を描画しない。
+  // 公開ノートの閲覧経路 `NotePagePublicView` でも `currentPageId` を渡すように
+  // なったため、ここでゲストを除外しないと毎回 401 を返すリクエストが走る。
+  // Skip rendering entirely for unauthenticated viewers. `NotePagePublicView`
+  // now passes `currentPageId`, so without this gate guests would issue
+  // requests that always 401.
+  if (!isAuthLoaded || !isSignedIn) return null;
 
   if (isLoading) {
     return (

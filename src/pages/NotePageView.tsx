@@ -462,7 +462,6 @@ function NotePageEditorEditable({
           isNewPage={false}
           isWikiGenerating={false}
           isReadOnly={false}
-          showLinkedPages={false}
           showToolbar
           onContentChange={setEditorContent}
           onContentError={() => undefined}
