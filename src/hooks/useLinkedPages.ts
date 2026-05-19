@@ -310,9 +310,19 @@ const emptyLinkedPagesData: LinkedPagesData = {
  * 公開リンク API レスポンスを `LinkedPagesData` に変換する。2-hop は提供
  * しないため `outgoingLinksWithChildren` / `twoHopLinks` は空配列で返す。
  *
+ * 表示上限は `calculateLinkedPagesOptimized` と揃え、repo モード（IndexedDB
+ * 経路）と UI 上のカード枚数が一致するようにする：outgoing / backlinks は
+ * それぞれ 10 件、ghost は 5 件まで。サーバは既に 50 件で打ち切るが、
+ * クライアント側でも明示的に slice する。
+ *
  * Adapt the `/public-links` API payload to `LinkedPagesData`. The endpoint
  * does not surface 2-hop data, so `outgoingLinksWithChildren` and
  * `twoHopLinks` are returned as empty arrays.
+ *
+ * Display caps mirror `calculateLinkedPagesOptimized` so the repo-mode and
+ * api-mode UIs render the same number of cards: outgoing / backlinks cap at
+ * 10, ghosts at 5. The server already truncates at 50; the client repeats
+ * the slice explicitly so the limit is documented at both layers.
  */
 function apiToLinkedPagesData(resp: PagePublicLinksResponse): LinkedPagesData {
   const toCard = (r: PagePublicLinkCard): PageCard => ({
@@ -324,11 +334,11 @@ function apiToLinkedPagesData(resp: PagePublicLinksResponse): LinkedPagesData {
     sourceUrl: r.source_url ?? undefined,
   });
   return {
-    outgoingLinks: resp.outgoing_links.map(toCard),
+    outgoingLinks: resp.outgoing_links.slice(0, 10).map(toCard),
     outgoingLinksWithChildren: [],
-    backlinks: resp.backlinks.map(toCard),
+    backlinks: resp.backlinks.slice(0, 10).map(toCard),
     twoHopLinks: [],
-    ghostLinks: resp.ghost_links,
+    ghostLinks: resp.ghost_links.slice(0, 5),
   };
 }
 
