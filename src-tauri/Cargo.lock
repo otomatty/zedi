@@ -5303,7 +5303,7 @@ dependencies = [
 
 [[package]]
 name = "zedi"
-version = "0.20.0"
+version = "0.21.0"
 dependencies = [
  "dirs 5.0.1",
  "serde",
