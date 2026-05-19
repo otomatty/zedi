@@ -66,7 +66,16 @@ interface PageEditorContentProps {
   isWikiGenerating: boolean;
   isReadOnly?: boolean;
   isSyncingLinks?: boolean;
-  showLinkedPages?: boolean;
+  /**
+   * `LinkedPagesSection` のデータ取得経路。`"repo"`（既定）は IndexedDB から、
+   * `"api"` は `/public-links` 経由でリンク一覧を取得する。公開ノートの
+   * 閲覧ゲスト向け `NotePagePublicView` からは `"api"` を渡す。
+   *
+   * Data source for `LinkedPagesSection`. `"repo"` (default) reads from
+   * IndexedDB; `"api"` calls `/public-links`. `NotePagePublicView` passes
+   * `"api"` so guests on public/unlisted notes can render the section.
+   */
+  linkedPagesMode?: "repo" | "api";
   showToolbar?: boolean;
   onContentChange: (content: string) => void;
   onContentError: (error: ContentError | null) => void;
@@ -118,7 +127,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   isWikiGenerating,
   isReadOnly,
   isSyncingLinks = false,
-  showLinkedPages = true,
+  linkedPagesMode = "repo",
   showToolbar = true,
   onContentChange,
   onContentError,
@@ -218,9 +227,20 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
           )}
         </div>
 
-        {/* Linked Pages Section */}
-        {showLinkedPages && currentPageId && (
-          <LinkedPagesSection pageId={currentPageId} isSyncingLinks={isSyncingLinks} />
+        {/* Linked Pages Section
+            ゴーストリンクは編集可能なときだけ表示する。`isEditorReadOnly` は
+            読み取り専用ページ（公開ゲスト閲覧や Wiki 生成中）で true になるため、
+            それらの経路では `useCreatePage` mutation を呼び得ない UI を出さない。
+            Ghost links render only while the editor is writable. `isEditorReadOnly`
+            covers guest public views and Wiki generation, both of which must not
+            expose the authenticated `useCreatePage` mutation. */}
+        {currentPageId && (
+          <LinkedPagesSection
+            pageId={currentPageId}
+            isSyncingLinks={isSyncingLinks}
+            mode={linkedPagesMode}
+            showGhostLinks={!isEditorReadOnly}
+          />
         )}
 
         {/* Lint Suggestions */}

@@ -462,7 +462,20 @@ function NotePageEditorEditable({
           isNewPage={false}
           isWikiGenerating={false}
           isReadOnly={false}
-          showLinkedPages={false}
+          // ノートネイティブページは IndexedDB に永続化されない（個人ページ
+          // しか同期しない）ため、`linkedPagesMode="repo"` だと `usePage` が
+          // null を返し `LinkedPagesSection` が常時空になる。サーバの
+          // `/public-links` 経路は `authOptional` + `getNoteRole` で
+          // owner/editor/viewer もハンドリングするので、認証済みでも API モード
+          // で取得する（codex review on PR #915）。
+          //
+          // Note-native pages are not persisted to IndexedDB (only personal
+          // pages sync there), so `linkedPagesMode="repo"` would always end
+          // up with `usePage` returning null and the section empty. The
+          // `/public-links` endpoint is `authOptional` + `getNoteRole`, so it
+          // serves authenticated owner/editor/viewer flows just as well as
+          // guests (codex review on PR #915).
+          linkedPagesMode="api"
           showToolbar
           onContentChange={setEditorContent}
           onContentError={() => undefined}

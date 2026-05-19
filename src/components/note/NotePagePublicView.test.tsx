@@ -62,7 +62,7 @@ vi.mock("./PageEditorContent", () => ({
         data-testid="page-editor-content"
         data-title={String(props.title ?? "")}
         data-read-only={String(props.isReadOnly ?? false)}
-        data-show-linked-pages={String(props.showLinkedPages ?? false)}
+        data-linked-pages-mode={String(props.linkedPagesMode ?? "repo")}
         data-show-toolbar={String(props.showToolbar ?? false)}
         data-current-page-id={String(props.currentPageId ?? "null")}
         data-page-id={String(props.pageId ?? "")}
@@ -154,9 +154,16 @@ describe("NotePagePublicView", () => {
     const editor = await screen.findByTestId("page-editor-content");
     expect(editor).toHaveAttribute("data-title", "Public title");
     expect(editor).toHaveAttribute("data-read-only", "true");
-    expect(editor).toHaveAttribute("data-show-linked-pages", "false");
+    // ゲスト向けに LinkedPagesSection を `/public-links` API 経由で描画する。
+    // The section renders for guests via the `/public-links` API path.
+    expect(editor).toHaveAttribute("data-linked-pages-mode", "api");
     expect(editor).toHaveAttribute("data-show-toolbar", "false");
-    expect(editor).toHaveAttribute("data-current-page-id", "null");
+    // 公開ノート閲覧でも `currentPageId` を渡し、LinkedPagesSection を描画する。
+    // `LintSuggestions` は内部で `isSignedIn` をチェックしてゲスト時は描画しない。
+    // `currentPageId` is now provided so the LinkedPagesSection renders even
+    // for guests; `LintSuggestions` self-gates on `isSignedIn` so it stays
+    // hidden for unauthenticated callers.
+    expect(editor).toHaveAttribute("data-current-page-id", "page-1");
     expect(editor).toHaveAttribute("data-page-id", "page-1");
 
     // `content` should be a JSON.stringify-ed Tiptap doc containing the two

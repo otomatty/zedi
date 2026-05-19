@@ -149,6 +149,38 @@ export interface PagePublicContentResponse {
   updated_at: string;
 }
 
+/**
+ * `GET /api/pages/:id/public-links` で返される 1 件分のリンク先（または発信元）。
+ * `LinkedPagesSection` の `PageCard` を直接組み立てるためのフィールドのみ含む。
+ *
+ * Shape of a single linked / backlinking page returned by
+ * `GET /api/pages/:id/public-links`. Contains exactly the fields required to
+ * construct a `PageCard` for `LinkedPagesSection`.
+ */
+export interface PagePublicLinkCard {
+  id: string;
+  note_id: string;
+  title: string | null;
+  content_preview: string | null;
+  updated_at: string;
+  source_url: string | null;
+}
+
+/**
+ * `GET /api/pages/:id/public-links` レスポンス。ノート内スコープで解決済みの
+ * `outgoing_links` / `backlinks` と、未解決リンクのタイトル文字列 `ghost_links`
+ * を返す。2-hop（`outgoingLinksWithChildren`）は意図的に含めない。
+ *
+ * `GET /api/pages/:id/public-links` response. Returns the note-scoped resolved
+ * `outgoing_links` and `backlinks` plus unresolved-link titles (`ghost_links`).
+ * 2-hop data (`outgoingLinksWithChildren`) is intentionally omitted.
+ */
+export interface PagePublicLinksResponse {
+  outgoing_links: PagePublicLinkCard[];
+  backlinks: PagePublicLinkCard[];
+  ghost_links: string[];
+}
+
 /** POST /api/pages body. */
 export interface CreatePageBody {
   id?: string;

@@ -121,17 +121,21 @@ export const NotePagePublicView: React.FC<NotePagePublicViewProps> = ({ pageId, 
       content={tiptapContent}
       title={data?.title ?? page.title ?? ""}
       sourceUrl={page.sourceUrl}
-      // `currentPageId={null}` で LinkedPagesSection と LintSuggestions の描画を抑止する
-      // (どちらも認証必須エンドポイントを叩くためゲスト互換性のために必須)。
-      // Suppress LinkedPagesSection / LintSuggestions (both call authenticated
-      // endpoints) by leaving currentPageId null. WikiLink scope still works
-      // via the `pageId` prop below.
-      currentPageId={null}
+      // ゲスト向けでも `LinkedPagesSection` を描画するため `currentPageId` を
+      // 渡す。リンク一覧は `linkedPagesMode="api"` で公開 API 経路を使う。
+      // `LintSuggestions` は内部で `useAuth().isSignedIn` を確認し、ゲスト時は
+      // 描画しない。
+      //
+      // Pass `currentPageId` so `LinkedPagesSection` can render for guests;
+      // the section switches to the `/public-links` API path via
+      // `linkedPagesMode="api"`. `LintSuggestions` self-gates on
+      // `useAuth().isSignedIn` and renders nothing for unauthenticated callers.
+      currentPageId={page.id}
       pageId={page.id}
       isNewPage={false}
       isWikiGenerating={false}
       isReadOnly
-      showLinkedPages={false}
+      linkedPagesMode="api"
       showToolbar={false}
       onContentChange={NOOP}
       onContentError={NOOP}
