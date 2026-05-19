@@ -8,6 +8,7 @@ import type {
   PostSyncPagesBody,
   PostSyncPagesResponse,
   PagePublicContentResponse,
+  PagePublicLinksResponse,
   UpdatePageMetadataBody,
   UpdatePageMetadataResponse,
   CreatePageBody,
@@ -351,6 +352,24 @@ export function createApiClient(options?: Partial<ApiClientOptions>) {
       return reqOptionalAuth<PagePublicContentResponse>(
         "GET",
         `/api/pages/${encodeURIComponent(pageId)}/public-content`,
+      );
+    },
+
+    /**
+     * `GET /api/pages/:id/public-links` — ノート内スコープのリンクグラフを取得する。
+     * 公開ノート閲覧ゲストでも `LinkedPagesSection` を描画するため、IndexedDB を
+     * 持たないクライアントのためにサーバが計算結果を返す。2-hop は含まない。
+     *
+     * `GET /api/pages/:id/public-links` returns the note-scoped link graph
+     * (outgoing wiki edges, backlinks, ghost-link titles) so the
+     * `LinkedPagesSection` can render for guests on public/unlisted notes
+     * without an IndexedDB store. 2-hop (`outgoingLinksWithChildren`) is not
+     * included by design.
+     */
+    async getPagePublicLinks(pageId: string): Promise<PagePublicLinksResponse> {
+      return reqOptionalAuth<PagePublicLinksResponse>(
+        "GET",
+        `/api/pages/${encodeURIComponent(pageId)}/public-links`,
       );
     },
 

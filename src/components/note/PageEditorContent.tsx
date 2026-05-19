@@ -66,7 +66,16 @@ interface PageEditorContentProps {
   isWikiGenerating: boolean;
   isReadOnly?: boolean;
   isSyncingLinks?: boolean;
-  showLinkedPages?: boolean;
+  /**
+   * `LinkedPagesSection` のデータ取得経路。`"repo"`（既定）は IndexedDB から、
+   * `"api"` は `/public-links` 経由でリンク一覧を取得する。公開ノートの
+   * 閲覧ゲスト向け `NotePagePublicView` からは `"api"` を渡す。
+   *
+   * Data source for `LinkedPagesSection`. `"repo"` (default) reads from
+   * IndexedDB; `"api"` calls `/public-links`. `NotePagePublicView` passes
+   * `"api"` so guests on public/unlisted notes can render the section.
+   */
+  linkedPagesMode?: "repo" | "api";
   showToolbar?: boolean;
   onContentChange: (content: string) => void;
   onContentError: (error: ContentError | null) => void;
@@ -118,7 +127,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   isWikiGenerating,
   isReadOnly,
   isSyncingLinks = false,
-  showLinkedPages = true,
+  linkedPagesMode = "repo",
   showToolbar = true,
   onContentChange,
   onContentError,
@@ -219,8 +228,12 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
         </div>
 
         {/* Linked Pages Section */}
-        {showLinkedPages && currentPageId && (
-          <LinkedPagesSection pageId={currentPageId} isSyncingLinks={isSyncingLinks} />
+        {currentPageId && (
+          <LinkedPagesSection
+            pageId={currentPageId}
+            isSyncingLinks={isSyncingLinks}
+            mode={linkedPagesMode}
+          />
         )}
 
         {/* Lint Suggestions */}

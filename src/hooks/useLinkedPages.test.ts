@@ -705,4 +705,77 @@ describe("calculateLinkedPagesOptimized", () => {
 
     expect(result.outgoingLinks).toHaveLength(2);
   });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // ノートスコープ：呼び出し側で `allPagesSummary` を `currentPage.noteId` に
+  // 絞り込んだ前提で、別ノートの WikiLink がゴーストへ降格し、別ノートの
+  // backlink が結果から除外されることを担保する。`calculateLinkedPagesOptimized`
+  // 自体は無変更で、入力をスコープ済みにするだけで意図が満たされる。
+  //
+  // Note-scoping: when the caller pre-filters `allPagesSummary` to the current
+  // page's note, links pointing to pages in other notes become ghost links and
+  // cross-note backlink IDs are dropped. The pure function does not need to
+  // change — passing scoped inputs is enough to achieve the desired behavior.
+  // ──────────────────────────────────────────────────────────────────────
+  describe("note-scoped inputs (Issue: LinkedPagesSection scoping)", () => {
+    it("demotes cross-note WikiLinks to ghost links when summary is pre-filtered to the note", () => {
+      const currentPage = createTestPage(
+        "current",
+        "Current Page",
+        createWikiLinkContent(["Same Note", "Other Note Page"]),
+        { noteId: "note-A" },
+      );
+      const sameNote = createTestPage("page-same", "Same Note", createPlainTextContent("body"), {
+        noteId: "note-A",
+      });
+      // 別ノートの「Other Note Page」は呼び出し側でフィルタ済みのため summary に存在しない。
+      // The cross-note "Other Note Page" is absent from the pre-filtered summary.
+      const scopedSummaries: PageSummary[] = [
+        createTestSummary("page-same", "Same Note", { noteId: "note-A" }),
+      ];
+
+      const result = calculateLinkedPagesOptimized({
+        currentPage,
+        pageId: "current",
+        allPagesSummary: scopedSummaries,
+        outgoingPages: [sameNote],
+        backlinkPages: [],
+        backlinkIds: [],
+      });
+
+      expect(result.outgoingLinks).toHaveLength(1);
+      expect(result.outgoingLinks[0]?.id).toBe("page-same");
+      expect(result.ghostLinks).toContain("Other Note Page");
+    });
+
+    it("drops cross-note backlinks because their IDs do not resolve in the scoped summary", () => {
+      const currentPage = createTestPage("current", "Current", createPlainTextContent(""), {
+        noteId: "note-A",
+      });
+      const scopedSummaries: PageSummary[] = [
+        createTestSummary("in-note", "In Note", { noteId: "note-A" }),
+      ];
+      const inNoteBacklink = createTestPage(
+        "in-note",
+        "In Note",
+        createPlainTextContent("links here"),
+        { noteId: "note-A" },
+      );
+      // backlinkIds には別ノート ("cross-note") からの参照が含まれているが、
+      // scoped summary には存在しないため除外される。
+      // backlinkIds carries a cross-note id ("cross-note") that does not appear
+      // in the scoped summary, so it falls through.
+      const result = calculateLinkedPagesOptimized({
+        currentPage,
+        pageId: "current",
+        allPagesSummary: scopedSummaries,
+        outgoingPages: [],
+        backlinkPages: [inNoteBacklink],
+        backlinkIds: ["in-note", "cross-note"],
+      });
+
+      expect(result.backlinks).toHaveLength(1);
+      expect(result.backlinks[0]?.id).toBe("in-note");
+    });
+  });
 });
