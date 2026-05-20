@@ -22,6 +22,7 @@ const {
   mockSetPageContext,
   mockExportMarkdown,
   mockCopyMarkdown,
+  mockExportPdf,
   mockRemoveFromNoteMutate,
   mockUseMarkdownExport,
 } = vi.hoisted(() => ({
@@ -39,6 +40,7 @@ const {
   mockSetPageContext: vi.fn(),
   mockExportMarkdown: vi.fn(),
   mockCopyMarkdown: vi.fn().mockResolvedValue(undefined),
+  mockExportPdf: vi.fn().mockResolvedValue(undefined),
   mockRemoveFromNoteMutate: vi.fn(),
   // `useMarkdownExport(title, body, sourceUrl)` の呼び出し引数を捕捉するための
   // モック。Codex P1 (PR #893) の「export/copy が `page.content` を読んで空に
@@ -141,6 +143,12 @@ vi.mock("@/components/editor/PageEditor/useMarkdownExport", () => ({
       handleCopyMarkdown: mockCopyMarkdown,
     };
   },
+}));
+
+vi.mock("@/components/editor/PageEditor/usePdfExport", () => ({
+  usePdfExport: () => ({
+    handleExportPdf: mockExportPdf,
+  }),
 }));
 
 // 読み取り専用経路の Markdown export ソースは `usePagePublicContent` 経由で
@@ -323,6 +331,7 @@ describe("NotePageView", () => {
     mockApi.updatePageMetadata.mockReset();
     mockExportMarkdown.mockReset();
     mockCopyMarkdown.mockReset().mockResolvedValue(undefined);
+    mockExportPdf.mockReset().mockResolvedValue(undefined);
     mockRemoveFromNoteMutate.mockReset();
     mockUseMarkdownExport.mockReset();
     // 既定: read-only 経路の公開コンテンツは「ロード完了 + 本文あり」。
@@ -500,6 +509,7 @@ describe("NotePageView", () => {
 
       expect(screen.getByText("editor.pageHistory.menuButton")).toBeInTheDocument();
       expect(screen.getByText("editor.pageMenu.exportMarkdown")).toBeInTheDocument();
+      expect(screen.getByText("editor.pageMenu.exportPdf")).toBeInTheDocument();
       expect(screen.getByText("editor.pageMenu.copyMarkdown")).toBeInTheDocument();
       expect(screen.getByText("editor.pageMenu.deletePage")).toBeInTheDocument();
       // 旧「個人に取り込み」項目は削除されていることを明示的に検証する。
@@ -507,7 +517,7 @@ describe("NotePageView", () => {
       expect(screen.queryByText("notes.copyToPersonal")).not.toBeInTheDocument();
     });
 
-    it("read-only 時、削除以外の3項目だけを出す / shows history/export/copy but hides delete in read-only mode", () => {
+    it("read-only 時、削除以外の4項目だけを出す / shows history/export-md/export-pdf/copy but hides delete in read-only mode", () => {
       vi.mocked(useNote).mockReturnValue({
         note: { id: "note-1" },
         access: { canView: true, canEdit: false },
@@ -529,6 +539,7 @@ describe("NotePageView", () => {
 
       expect(screen.getByText("editor.pageHistory.menuButton")).toBeInTheDocument();
       expect(screen.getByText("editor.pageMenu.exportMarkdown")).toBeInTheDocument();
+      expect(screen.getByText("editor.pageMenu.exportPdf")).toBeInTheDocument();
       expect(screen.getByText("editor.pageMenu.copyMarkdown")).toBeInTheDocument();
       // read-only では削除は出さない（権限がないため）。
       // Delete is hidden in read-only mode (no permission).
@@ -577,6 +588,7 @@ describe("NotePageView", () => {
 
       expect(screen.queryByText("editor.pageHistory.menuButton")).not.toBeInTheDocument();
       expect(screen.getByText("editor.pageMenu.exportMarkdown")).toBeInTheDocument();
+      expect(screen.getByText("editor.pageMenu.exportPdf")).toBeInTheDocument();
       expect(screen.getByText("editor.pageMenu.copyMarkdown")).toBeInTheDocument();
       expect(screen.queryByText("editor.pageMenu.deletePage")).not.toBeInTheDocument();
     });
@@ -625,6 +637,15 @@ describe("NotePageView", () => {
       fireEvent.click(screen.getByText("editor.pageMenu.exportMarkdown"));
 
       expect(mockExportMarkdown).toHaveBeenCalledTimes(1);
+    });
+
+    it("`PDFで出力` で `handleExportPdf` を呼ぶ / invokes handleExportPdf on PDF export click", () => {
+      setupEditableRender();
+      renderNotePageView();
+
+      fireEvent.click(screen.getByText("editor.pageMenu.exportPdf"));
+
+      expect(mockExportPdf).toHaveBeenCalledTimes(1);
     });
 
     it("`Markdownをコピー` で `handleCopyMarkdown` を呼ぶ / invokes handleCopyMarkdown on copy click", () => {
@@ -1039,8 +1060,10 @@ describe("NotePageView", () => {
     renderNotePageView();
 
     const exportItem = screen.getByText("editor.pageMenu.exportMarkdown").closest("button");
+    const pdfItem = screen.getByText("editor.pageMenu.exportPdf").closest("button");
     const copyItem = screen.getByText("editor.pageMenu.copyMarkdown").closest("button");
     expect(exportItem).toBeDisabled();
+    expect(pdfItem).toBeDisabled();
     expect(copyItem).toBeDisabled();
   });
 

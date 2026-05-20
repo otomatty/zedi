@@ -6,6 +6,7 @@
   "collaborationLoading": "エディタを読み込み中",
   "pageMenu": {
     "exportMarkdown": "Markdownでエクスポート",
+    "exportPdf": "PDFで出力",
     "copyMarkdown": "Markdownをコピー",
     "deletePage": "削除"
   },
@@ -317,5 +318,10 @@
     "downloaded": "Markdownファイルをダウンロードしました",
     "copied": "Markdownをクリップボードにコピーしました",
     "copyFailed": "コピーに失敗しました"
+  },
+  "pdfExport": {
+    "sourceAttribution": "📎 引用元",
+    "downloaded": "PDFをダウンロードしました",
+    "failed": "PDFの生成に失敗しました"
   }
 }

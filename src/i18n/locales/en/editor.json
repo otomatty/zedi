@@ -6,6 +6,7 @@
   "collaborationLoading": "Loading editor",
   "pageMenu": {
     "exportMarkdown": "Export Markdown",
+    "exportPdf": "Export as PDF",
     "copyMarkdown": "Copy Markdown",
     "deletePage": "Delete"
   },
@@ -317,5 +318,10 @@
     "downloaded": "Markdown file downloaded",
     "copied": "Markdown copied to clipboard",
     "copyFailed": "Copy failed"
+  },
+  "pdfExport": {
+    "sourceAttribution": "📎 Source",
+    "downloaded": "PDF downloaded",
+    "failed": "Failed to generate PDF"
   }
 }

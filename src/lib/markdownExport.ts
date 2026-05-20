@@ -239,10 +239,13 @@ export function downloadMarkdown(
 }
 
 /**
- * Sanitize filename for safe file system usage
+ * ダウンロードファイル名で使えない文字を `_` に置換し、長さを 100 文字に制限する。
+ * Markdown / PDF 等エクスポート系コード間で共有する純粋関数。
+ *
+ * Replace characters that are invalid in filenames with `_` and clamp the
+ * length to 100 chars. Shared across export utilities (Markdown / PDF).
  */
-function sanitizeFilename(name: string): string {
-  // Remove or replace characters that are invalid in filenames
+export function sanitizeFilename(name: string): string {
   return name
     .replace(/[<>:"/\\|?*]/g, "_")
     .replace(/\s+/g, "_")
