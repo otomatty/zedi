@@ -233,11 +233,47 @@ describe("tiptapToHtml", () => {
     );
   });
 
-  it("returns plain-text fallback when content is not valid JSON", () => {
-    expect(tiptapToHtml("just text")).toContain("just text");
+  it("wraps non-JSON plain text in a single <p>", () => {
+    expect(tiptapToHtml("just text")).toBe("<p>just text</p>");
+  });
+
+  // PR #921 codex P1: 読み取り専用パスは Hocuspocus の `extractTextFromYXml`
+  // で抽出したプレーンテキスト（ブロック間に `\n`）を渡してくる。空行で
+  // 区切られた段落を `<p>` ブロックに、単独の `\n` を `<br />` に落とす。
+  //
+  // PR #921 codex P1: the read-only path feeds plain text whose blocks are
+  // separated by `\n` (and sometimes `\n\n`). Blank-line runs delimit `<p>`
+  // paragraphs; single `\n` becomes `<br />` to preserve line structure.
+  it("preserves paragraph and line-break structure for plain-text fallback", () => {
+    const text = "First paragraph\nstill first.\n\nSecond paragraph.\n\n\nThird paragraph.";
+    expect(tiptapToHtml(text)).toBe(
+      "<p>First paragraph<br />still first.</p><p>Second paragraph.</p><p>Third paragraph.</p>",
+    );
+  });
+
+  it("escapes HTML metacharacters in the plain-text fallback", () => {
+    expect(tiptapToHtml("<script>")).toBe("<p>&lt;script&gt;</p>");
+  });
+
+  it("normalises CRLF line endings in the plain-text fallback", () => {
+    expect(tiptapToHtml("a\r\n\r\nb")).toBe("<p>a</p><p>b</p>");
   });
 
   it("renders an empty string for empty input", () => {
     expect(tiptapToHtml("")).toBe("");
+  });
+
+  it("treats whitespace-only input as empty in the plain-text fallback", () => {
+    expect(tiptapToHtml("\n\n\n")).toBe("");
+  });
+
+  // PR #921 gemini-code-assist high: 相対 URL 内のドットを許可する。
+  // PR #921 gemini-code-assist high: dotted relative URLs must be allowed.
+  it("keeps dotted relative image paths through sanitizeUrl", () => {
+    const json = JSON.stringify({
+      type: "doc",
+      content: [{ type: "image", attrs: { src: "image.png", alt: "x" } }],
+    });
+    expect(tiptapToHtml(json)).toContain('src="image.png"');
   });
 });

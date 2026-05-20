@@ -25,10 +25,16 @@ interface TiptapMark {
 
 /**
  * Tiptap JSON 文字列を export 用 HTML 文字列へ変換する。
- * 入力が JSON でなければプレーンテキストとしてそのままエスケープして返す。
+ * 入力が JSON でなければプレーンテキストとみなし、`\n` を段落区切りとして
+ * `<p>` ブロックに包んで返す。これにより、読み取り専用パスから渡される
+ * Hocuspocus 抽出の `content_text`（ブロック間に `\n` を挟むプレーンテキスト）
+ * が PDF 上で 1 行に潰れずに描画される（PR #921 codex P1）。
  *
  * Convert a Tiptap JSON string to an HTML string suitable for PDF export.
- * Non-JSON inputs are returned as escaped plain text.
+ * For non-JSON inputs (e.g. the Y.Doc-extracted `content_text` fed from the
+ * read-only path) split on consecutive newlines and emit each chunk as a
+ * `<p>` block so paragraphs survive html2canvas rasterisation. Single `\n`
+ * inside a chunk becomes `<br />` (PR #921 codex P1).
  */
 export function tiptapToHtml(content: string): string {
   if (!content) return "";
@@ -37,10 +43,35 @@ export function tiptapToHtml(content: string): string {
     const doc = JSON.parse(content) as TiptapNode;
     return convertNode(doc);
   } catch {
-    // JSON でない場合はプレーンテキストとして扱う。
-    // Treat non-JSON inputs as plain text (still escape HTML metacharacters).
-    return escapeHtml(content);
+    return plainTextToHtmlParagraphs(content);
   }
+}
+
+/**
+ * プレーンテキストを段落 (`<p>`) と改行 (`<br />`) 構造の HTML に変換する。
+ * 連続した空行をブロック区切り、単独の `\n` を行内改行として扱う。
+ *
+ * Convert plain text into a paragraph/`<br>` HTML structure: blank-line runs
+ * delimit blocks, single `\n` becomes `<br />` inside a block.
+ */
+function plainTextToHtmlParagraphs(input: string): string {
+  // 改行コードを LF に統一してから、空行区切りでブロックに分割する。
+  // Normalise line endings then split on one-or-more blank lines.
+  const normalised = input.replace(/\r\n?/g, "\n");
+  const blocks = normalised
+    .split(/\n{2,}/)
+    .map((block) => block.replace(/^\n+|\n+$/g, ""))
+    .filter((block) => block.length > 0);
+  if (blocks.length === 0) return "";
+  return blocks
+    .map(
+      (block) =>
+        `<p>${block
+          .split("\n")
+          .map((line) => escapeHtml(line))
+          .join("<br />")}</p>`,
+    )
+    .join("");
 }
 
 type NodeHandler = (node: TiptapNode) => string;
@@ -62,10 +93,10 @@ Object.assign(nodeHandlers, {
   doc: (n) => convertChildren(n),
   paragraph: (n) => `<p>${convertChildren(n)}</p>`,
   heading: (n) => {
-    // 本文の見出しは body schema 上 h2–h5。`level` が欠落 / 1 以下の旧データは
+    // 本文の見出しは body schema 上 h2–h6。`level` が欠落 / 1 以下の旧データは
     // ページタイトル `h1` と衝突しないよう最小の本文見出し `h2` にフォールバック。
-    // Body headings span h2–h5; legacy `level: 1` / missing falls back to `h2`
-    // so it never collides with the page-title `h1`.
+    // Body headings span h2–h6; legacy `level: 1` / missing falls back to `h2`
+    // so it never collides with the page-title `h1` (PR #921 gemini medium).
     const rawLevel = n.attrs?.level;
     const level = typeof rawLevel === "number" && rawLevel >= 2 && rawLevel <= 6 ? rawLevel : 2;
     return `<h${level}>${convertChildren(n)}</h${level}>`;
@@ -196,9 +227,14 @@ function sanitizeUrl(input: string): string {
   if (!trimmed) return "";
   if (/^(https?:|mailto:|tel:|\/|#)/i.test(trimmed)) return trimmed;
   if (/^data:image\//i.test(trimmed)) return trimmed;
-  // 相対 URL（先頭が `./` or 英数字）は許可する。
-  // Allow relative URLs (starts with `./` or alphanumeric path).
-  if (/^(\.{0,2}\/|[a-zA-Z0-9_-]+(\/|$))/.test(trimmed)) return trimmed;
+  // 相対 URL（先頭が `./`・`../`・拡張子付きファイル名・パス断片）を許可する。
+  // 文字クラスに `.` を含めることで `image.png` 等のドット入りパスも通す
+  // （PR #921 gemini-code-assist high）。
+  //
+  // Allow relative URLs: `./`, `../`, or a first segment built from
+  // alphanumeric / `.` / `_` / `-` characters. Including `.` in the class
+  // lets dotted filenames like `image.png` through (PR #921 review).
+  if (/^(\.{0,2}\/|[a-zA-Z0-9_.-]+(\/|$))/.test(trimmed)) return trimmed;
   return "";
 }
 
