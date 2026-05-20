@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Copy, Download, History, Trash2 } from "lucide-react";
+import { Copy, Download, FileText, History, Trash2 } from "lucide-react";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { PageEditorContent } from "@/components/note/PageEditorContent";
 import { NotePagePublicView } from "@/components/note/NotePagePublicView";
@@ -35,6 +35,7 @@ import { NoteWorkspaceProvider, useNoteWorkspaceOptional } from "@/contexts/Note
 import { useAIChatContext } from "@/contexts/AIChatContext";
 import { NoteWorkspaceToolbar } from "@/components/note/NoteWorkspaceToolbar";
 import { useMarkdownExport } from "@/components/editor/PageEditor/useMarkdownExport";
+import { usePdfExport } from "@/components/editor/PageEditor/usePdfExport";
 import { usePagePublicContent } from "@/hooks/usePagePublicContent";
 import { PageHistoryModal } from "@/components/editor/pageHistory/PageHistoryModal";
 import { convertMarkdownToTiptapContent } from "@/lib/markdownToTiptap";
@@ -85,11 +86,13 @@ function buildSharedMenuItems({
   t,
   onOpenHistory,
   onExportMarkdown,
+  onExportPdf,
   onCopyMarkdown,
 }: {
   t: (key: string) => string;
   onOpenHistory: () => void;
   onExportMarkdown: () => void;
+  onExportPdf: () => void;
   onCopyMarkdown: () => void;
 }): PageDetailToolbarAction[] {
   return [
@@ -104,6 +107,12 @@ function buildSharedMenuItems({
       label: t("editor.pageMenu.exportMarkdown"),
       icon: Download,
       onClick: onExportMarkdown,
+    },
+    {
+      id: "export-pdf",
+      label: t("editor.pageMenu.exportPdf"),
+      icon: FileText,
+      onClick: onExportPdf,
     },
     {
       id: "copy-markdown",
@@ -199,6 +208,7 @@ function NotePageEditorEditable({
     editorContent,
     page.sourceUrl,
   );
+  const { handleExportPdf } = usePdfExport(title, editorContent, page.sourceUrl);
 
   useEffect(() => {
     setPageContext({
@@ -418,6 +428,7 @@ function NotePageEditorEditable({
         t,
         onOpenHistory: handleOpenHistory,
         onExportMarkdown: handleExportMarkdown,
+        onExportPdf: handleExportPdf,
         onCopyMarkdown: handleCopyMarkdown,
       }),
       {
@@ -434,6 +445,7 @@ function NotePageEditorEditable({
       t,
       handleOpenHistory,
       handleExportMarkdown,
+      handleExportPdf,
       handleCopyMarkdown,
       onRequestDelete,
       isDeletePending,
@@ -568,6 +580,11 @@ function NotePageReadOnly({
     exportSource,
     page.sourceUrl,
   );
+  const { handleExportPdf } = usePdfExport(
+    publicContent?.title ?? page.title,
+    exportSource,
+    page.sourceUrl,
+  );
 
   const handleOpenHistory = useCallback(() => {
     setHistoryOpen(true);
@@ -599,6 +616,15 @@ function NotePageReadOnly({
         disabled: !isExportSourceReady,
       },
       {
+        id: "export-pdf",
+        label: t("editor.pageMenu.exportPdf"),
+        icon: FileText,
+        onClick: handleExportPdf,
+        // Markdown と同じ理由で公開コンテンツ未到着時は無効化する。
+        // Same gating as Markdown: block until public-content resolves.
+        disabled: !isExportSourceReady,
+      },
+      {
         id: "copy-markdown",
         label: t("editor.pageMenu.copyMarkdown"),
         icon: Copy,
@@ -612,6 +638,7 @@ function NotePageReadOnly({
     canViewHistory,
     handleOpenHistory,
     handleExportMarkdown,
+    handleExportPdf,
     handleCopyMarkdown,
     isExportSourceReady,
   ]);
