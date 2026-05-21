@@ -1,4 +1,4 @@
-import { useRef, useState, type MutableRefObject, type RefObject } from "react";
+import { useMemo, useRef, useState, type MutableRefObject, type RefObject } from "react";
 import type { Editor } from "@tiptap/core";
 import type { WikiLinkSuggestionState } from "../extensions/wikiLinkSuggestionPlugin";
 import type { SlashSuggestionState } from "../extensions/slashSuggestionPlugin";
@@ -6,6 +6,7 @@ import type { TagSuggestionState } from "../extensions/tagSuggestionPlugin";
 import type { WikiLinkSuggestionHandle } from "../extensions/WikiLinkSuggestion";
 import type { TagSuggestionHandle } from "../extensions/TagSuggestion";
 import type { SlashSuggestionHandle } from "./SlashSuggestionLayer";
+import { useAuth } from "@/hooks/useAuth";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";
 import { useWikiLinkNavigation } from "./useWikiLinkNavigation";
 import { useEditorSetup } from "./useEditorSetup";
@@ -17,6 +18,7 @@ import { useImageUploadController } from "./useImageUploadController";
 import { useClaudeAgentSlashAvailability } from "./useClaudeAgentSlashAvailability";
 import { useNoteWorkspaceOptional } from "@/contexts/NoteWorkspaceContext";
 import type { TiptapEditorProps } from "./types";
+import type { PageActionContext } from "../PageActionHub/types";
 
 function useEditorControllers(args: {
   content: string;
@@ -150,6 +152,7 @@ export function useTiptapEditorController({
   collaborationConfig,
   focusContentRef,
   insertAtCursorRef,
+  pageActionHubRef,
   initialContent,
   onInitialContentApplied,
   isWikiGenerating = false,
@@ -158,6 +161,7 @@ export function useTiptapEditorController({
   pageNoteId = null,
 }: TiptapEditorProps) {
   const { editorFontSizePx } = useGeneralSettings();
+  const { isSignedIn } = useAuth();
   const noteWorkspace = useNoteWorkspaceOptional();
   const workspaceRoot = noteWorkspace?.workspaceRoot ?? null;
   const noteIdForWorkspace = noteWorkspace?.noteId ?? null;
@@ -249,6 +253,19 @@ export function useTiptapEditorController({
     storageSettings,
   );
 
+  // PageActionHub に渡すコンテキスト。レジストリゲートと各アクションが参照する。
+  // Context object passed to PageActionHub; consumed by registry gates and actions.
+  const pageActionContext: PageActionContext = useMemo(
+    () => ({
+      pageTitle,
+      isReadOnly,
+      isSignedIn,
+      hasThumbnail,
+      insertThumbnail: handleInsertThumbnailImage,
+    }),
+    [pageTitle, isReadOnly, isSignedIn, hasThumbnail, handleInsertThumbnailImage],
+  );
+
   return {
     editor: editorControllers.editor,
     editorFontSizePx,
@@ -293,5 +310,7 @@ export function useTiptapEditorController({
     claudeWorkspaceRoot: noteWorkspace?.workspaceRoot ?? null,
     claudeWorkspaceNoteId: noteWorkspace?.noteId ?? null,
     pageNoteId,
+    pageActionHubRef,
+    pageActionContext,
   };
 }
