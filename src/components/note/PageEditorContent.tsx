@@ -3,6 +3,7 @@ import type { MutableRefObject } from "react";
 import TiptapEditor from "@/components/editor/TiptapEditor";
 import type { ContentError } from "@/components/editor/TiptapEditor/useContentSanitizer";
 import type { CollaborationConfig } from "@/components/editor/TiptapEditor/types";
+import type { PageActionHubHandle } from "@/components/editor/PageActionHub/types";
 import { SourceUrlBadge } from "@/components/editor/SourceUrlBadge";
 import { WikiGeneratorButton } from "@/components/editor/WikiGeneratorButton";
 import { LinkedPagesSection } from "@/components/page/LinkedPagesSection";
@@ -102,6 +103,13 @@ interface PageEditorContentProps {
    */
   insertAtCursorRef?: MutableRefObject<((content: unknown) => boolean) | null>;
   /**
+   * `PageActionHub` を親 (NotePageView の FAB) から開閉するための ref。
+   * TiptapEditor に透過的に渡す。
+   * Ref the NotePageView FAB uses to open/close the PageActionHub.
+   * Forwarded to TiptapEditor.
+   */
+  pageActionHubRef?: MutableRefObject<PageActionHubHandle | null>;
+  /**
    * 編集中ページの noteId。WikiLink 候補・解決のスコープを決定する。
    * `null` は個人ページ、文字列値はそのノートに所属するノートネイティブ
    * ページ。Issue #713 Phase 4 を参照。
@@ -141,6 +149,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   wikiContentForCollab = null,
   onWikiContentApplied,
   insertAtCursorRef,
+  pageActionHubRef,
   pageNoteId = null,
 }) => {
   const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
@@ -217,6 +226,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
                 collaborationConfig={collaborationConfig}
                 focusContentRef={contentFocusRef}
                 insertAtCursorRef={insertAtCursorRef}
+                pageActionHubRef={pageActionHubRef}
                 initialContent={initialContent}
                 onInitialContentApplied={onInitialContentApplied}
                 wikiContentForCollab={wikiContentForCollab ?? undefined}

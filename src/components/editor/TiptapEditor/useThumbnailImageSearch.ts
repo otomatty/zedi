@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { ThumbnailCandidate } from "./EditorRecommendationBarTypes";
+import type { ThumbnailCandidate } from "./thumbnailTypes";
 
 export function useThumbnailImageSearch(
   trimmedTitle: string,

@@ -4,6 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Download, FileText, History, Trash2 } from "lucide-react";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { PageEditorContent } from "@/components/note/PageEditorContent";
+import { PageActionHubFab } from "@/components/editor/PageActionHub/PageActionHubFab";
+import type { PageActionHubHandle } from "@/components/editor/PageActionHub/types";
 import { NotePagePublicView } from "@/components/note/NotePagePublicView";
 import {
   PageEditorHeader,
@@ -195,6 +197,8 @@ function NotePageEditorEditable({
   const noteWorkspace = useNoteWorkspaceOptional();
   const workspaceRoot = noteWorkspace?.workspaceRoot ?? null;
   const editorInsertRef = useRef<((content: unknown) => boolean) | null>(null);
+  const pageActionHubRef = useRef<PageActionHubHandle | null>(null);
+  const { isSignedIn: editorIsSignedIn } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -458,7 +462,15 @@ function NotePageEditorEditable({
 
   return (
     <>
-      <ContentWithAIChat>
+      <ContentWithAIChat
+        floatingAction={
+          <PageActionHubFab
+            canEdit
+            isSignedIn={editorIsSignedIn}
+            onOpen={() => pageActionHubRef.current?.open()}
+          />
+        }
+      >
         <PageEditorHeader
           onBack={onBack}
           menuItems={menuItems}
@@ -494,6 +506,7 @@ function NotePageEditorEditable({
           onTitleChange={isTitleEditable ? handleTitleChange : undefined}
           collaboration={isCollaborationEnabled ? collaboration : undefined}
           insertAtCursorRef={editorInsertRef}
+          pageActionHubRef={pageActionHubRef}
           pageNoteId={page.noteId ?? null}
           initialContent={initialContent}
           onInitialContentApplied={onInitialContentApplied}

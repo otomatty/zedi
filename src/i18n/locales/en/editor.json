@@ -233,13 +233,29 @@
       "aliases": "summarize,summary"
     }
   },
-  "recommendation": {
-    "next": "Next",
+  "pageActionHub": {
+    "title": "Page actions",
+    "openAriaLabel": "Open page actions",
     "back": "Back",
     "close": "Close",
-    "generating": "Generating image",
-    "labelRecommendation": "Recommendations",
-    "labelThumbnails": "Thumbnail candidates"
+    "emptyState": "No actions available",
+    "actions": {
+      "thumbnailSearch": {
+        "label": "Search image",
+        "description": "Search by title and insert as thumbnail",
+        "loading": "Searching images...",
+        "empty": "No candidates found",
+        "next": "Next",
+        "retry": "Retry"
+      },
+      "thumbnailGenerate": {
+        "label": "Generate with AI",
+        "description": "Generate an image with AI and insert as thumbnail",
+        "loading": "Generating image...",
+        "retry": "Regenerate",
+        "missingTitle": "Please enter a title"
+      }
+    }
   },
   "webClipper": {
     "title": "Import from URL",

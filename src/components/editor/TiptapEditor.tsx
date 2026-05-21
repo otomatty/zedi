@@ -13,7 +13,7 @@ import { TagSuggestionLayer } from "./TiptapEditor/TagSuggestionLayer";
 import { SlashSuggestionLayer } from "./TiptapEditor/SlashSuggestionLayer";
 import { EditorBubbleMenu } from "./TiptapEditor/EditorBubbleMenu";
 import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
-import { EditorRecommendationBar } from "@/components/editor/TiptapEditor/EditorRecommendationBar";
+import { PageActionHub } from "@/components/editor/PageActionHub/PageActionHub";
 import { useTiptapEditorController } from "./TiptapEditor/useTiptapEditorController";
 import { SlashAgentLoadingOverlay } from "./TiptapEditor/SlashAgentLoadingOverlay";
 
@@ -39,6 +39,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   collaborationConfig,
   focusContentRef,
   insertAtCursorRef,
+  pageActionHubRef,
   initialContent,
   onInitialContentApplied,
   isWikiGenerating = false,
@@ -81,8 +82,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     pendingCreatePageTitle,
     handleConfirmCreate,
     handleCancelCreate,
-    hasThumbnail,
-    handleInsertThumbnailImage,
+    pageActionContext,
     storageSetupDialogOpen,
     setStorageSetupDialogOpen,
     handleGoToStorageSettings,
@@ -104,6 +104,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     onContentError,
     focusContentRef,
     insertAtCursorRef,
+    pageActionHubRef,
     initialContent,
     onInitialContentApplied,
     isWikiGenerating,
@@ -194,14 +195,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         onConfirm={handleConfirmCreate}
         onCancel={handleCancelCreate}
       />
-      {showToolbar && (
-        <EditorRecommendationBar
-          pageTitle={pageTitle}
-          isReadOnly={isReadOnly}
-          hasThumbnail={hasThumbnail}
-          onSelectThumbnail={handleInsertThumbnailImage}
-        />
-      )}
+      {showToolbar && <PageActionHub ctx={pageActionContext} hubRef={pageActionHubRef} />}
       <StorageSetupDialog
         open={storageSetupDialogOpen}
         onOpenChange={setStorageSetupDialogOpen}
