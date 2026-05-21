@@ -25,9 +25,24 @@ export const ThumbnailGenerateAction: React.FC<PageActionComponentProps> = ({ ct
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const initialFireRef = useRef(false);
+  // `generateImage` 解決前にユーザがハブを閉じてコンポーネントがアンマウントすると
+  // 後段の setState / onClose が「unmounted な相手」に走り、警告および挙動異常を
+  // 招くため、ref で生存中のみ処理する。
+  // The user can close the hub before `generateImage` resolves; without this
+  // guard the subsequent setState / onClose would target an unmounted
+  // component, producing warnings and double-close behavior.
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const runGenerate = useCallback(async () => {
     const err = await generateImage();
+    if (!isMountedRef.current) return;
     setErrorMessage(err);
     if (!err) {
       onClose();

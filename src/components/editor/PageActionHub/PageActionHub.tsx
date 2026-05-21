@@ -73,16 +73,15 @@ export const PageActionHub: React.FC<PageActionHubProps> = ({ ctx, hubRef }) => 
       <PageActionList ctx={ctx} actions={availableActions} onSelect={selectAction} />
     );
 
-  const header = (
-    <div className="flex items-center gap-2">
-      {view.kind === "detail" && (
+  const header =
+    view.kind === "detail" ? (
+      <div className="flex items-center gap-2">
         <Button type="button" size="sm" variant="ghost" className="-ml-2" onClick={backToList}>
           <ChevronLeft className="mr-1 h-4 w-4" />
           {t("editor.pageActionHub.back")}
         </Button>
-      )}
-    </div>
-  );
+      </div>
+    ) : null;
 
   if (isMobile) {
     return (
