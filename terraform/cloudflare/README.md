@@ -1,77 +1,81 @@
-# Cloudflare Terraform（3 スタック構成）
+> **Language:** English | [日本語](README.ja.md)
 
-dev と prod の適用タイミングを分離するため、Cloudflare リソースを **shared / dev / prod** の 3 スタックで管理する。
+# Cloudflare Terraform (3-stack layout)
 
-## ディレクトリと役割
+Cloudflare resources are split into **shared / dev / prod** stacks so dev and prod apply at different times.
 
-| スタック   | ディレクトリ | Terraform Cloud Workspace | 管理リソース                                                              |
-| ---------- | ------------ | ------------------------- | ------------------------------------------------------------------------- |
-| **shared** | `shared/`    | `cloudflare-shared`       | ゾーン参照・api/realtime の DNS（CNAME + Railway 検証 TXT）               |
-| **dev**    | `dev/`       | `cloudflare-dev`          | Pages `zedi-dev`、`dev.zedi-note.app` の DNS                              |
-| **prod**   | `prod/`      | `cloudflare-prod`         | Pages `zedi`・`zedi-admin`、`zedi-note.app`・`admin.zedi-note.app` の DNS |
+## Directories and roles
 
-## 適用タイミング
+| Stack      | Directory | Terraform Cloud Workspace | Resources managed                                                                |
+| ---------- | --------- | ------------------------- | -------------------------------------------------------------------------------- |
+| **shared** | `shared/` | `cloudflare-shared`       | Zone reference; api/realtime DNS (CNAME + Railway verification TXT)              |
+| **dev**    | `dev/`    | `cloudflare-dev`          | Pages `zedi-dev`; DNS for `dev.zedi-note.app`                                    |
+| **prod**   | `prod/`   | `cloudflare-prod`         | Pages `zedi` and `zedi-admin`; DNS for `zedi-note.app` and `admin.zedi-note.app` |
 
-- **shared**: 変更は少ない想定。PR で plan、**手動で workflow_dispatch の Apply Shared** のみ実行。
-- **dev**: `develop` への push（かつ `terraform/cloudflare/dev/**` の変更）で自動 apply。PR で plan。
-- **prod**: `main` への push（かつ `terraform/cloudflare/prod/**` の変更）で自動 apply。PR で plan。`deploy-prod` の Deploy Admin は apply-cloudflare-prod の後に実行される。
+## Apply timing
 
-## Cloudflare トークンと Account ID の設定
+- **shared**: Infrequent changes. Plan on PR; run **Apply Shared** via manual `workflow_dispatch` only.
+- **dev**: Auto-apply on push to `develop` when `terraform/cloudflare/dev/**` changes. Plan on PR.
+- **prod**: Auto-apply on push to `main` when `terraform/cloudflare/prod/**` changes. Plan on PR. `deploy-prod` Deploy Admin runs after `apply-cloudflare-prod`.
 
-**3 つの Workspace（shared / dev / prod）すべてで、同じ `cloudflare_api_token` と `cloudflare_account_id` を使ってよい。** 同一 Cloudflare アカウント・同一ゾーンを扱うため、1 セットを共通で設定すれば十分。
+## Cloudflare token and Account ID
 
-| 設定場所             | 用途                                                                                                     |
-| -------------------- | -------------------------------------------------------------------------------------------------------- |
-| **Terraform Cloud**  | 各 Workspace の Variables に Terraform 変数として同じ値を登録（ローカル・手動実行時）                    |
-| **terraform.tfvars** | 各スタックの `terraform.tfvars.example` をコピーして `terraform.tfvars` に同じ値を記入（ローカル実行時） |
-| **GitHub Secrets**   | `CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` を Environment に登録（CI 実行時）                     |
+**All three workspaces (shared / dev / prod) may use the same `cloudflare_api_token` and `cloudflare_account_id`** — one Cloudflare account and zone.
 
-Terraform Cloud の Workspace 変数・トークン作成は [HashiCorp Terraform Cloud ドキュメント](https://developer.hashicorp.com/terraform/cloud-docs) を参照（リポジトリ内の長文ガイドは持たない）。
+| Location             | Purpose                                                                                 |
+| -------------------- | --------------------------------------------------------------------------------------- |
+| **Terraform Cloud**  | Register the same values as Terraform variables in each workspace (local / manual runs) |
+| **terraform.tfvars** | Copy each stack's `terraform.tfvars.example` to `terraform.tfvars` with the same values |
+| **GitHub Secrets**   | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in GitHub Environments (CI runs)     |
 
-## Railway 検証 TXT トークン（shared 専用）
+See [HashiCorp Terraform Cloud docs](https://developer.hashicorp.com/terraform/cloud-docs) for workspace variables and token creation (no long in-repo guide).
 
-`shared` スタックは Railway カスタムドメイン用の検証 TXT トークン（`api_railway_verify_txt` / `realtime_railway_verify_txt`）を必須変数として要求する。
-これらは機密値であり、リポジトリには平文で含めない。次のいずれかで渡すこと（**推奨は Terraform Cloud Workspace 変数**）。
+## Railway verification TXT tokens (shared only)
 
-| 渡し方                                 | 設定例                                                             |
-| -------------------------------------- | ------------------------------------------------------------------ |
-| Terraform Cloud Workspace 変数（推奨） | `cloudflare-shared` Workspace の Variables に **Sensitive** で登録 |
-| 環境変数 `TF_VAR_*`                    | `export TF_VAR_api_railway_verify_txt="railway-verify=..."`        |
-| `terraform.tfvars`（gitignored）       | `terraform.tfvars.example` をコピーして記入                        |
+The `shared` stack requires Railway custom-domain verification TXT tokens (`api_railway_verify_txt` / `realtime_railway_verify_txt`).
 
-値は Railway ダッシュボードの該当ドメイン設定画面（`api.zedi-note.app` / `realtime.zedi-note.app`）から取得する。
-**過去にリポジトリへ平文 commit されていたトークンはローテーションすること。**
+These are secrets — do not commit plaintext. Pass via one of:
 
-## ローカルでの実行
+| Method                                       | Example                                                     |
+| -------------------------------------------- | ----------------------------------------------------------- |
+| Terraform Cloud workspace vars (recommended) | Register as **Sensitive** in `cloudflare-shared` workspace  |
+| `TF_VAR_*` env vars                          | `export TF_VAR_api_railway_verify_txt="railway-verify=..."` |
+| `terraform.tfvars` (gitignored)              | Copy from `terraform.tfvars.example` and fill in            |
 
-各スタックは独立している。Terraform Cloud に **3 つの Workspace** を作成し、上記のとおり変数を設定する（共通のトークン・Account ID でよい）。
+Obtain values from the Railway dashboard for `api.zedi-note.app` / `realtime.zedi-note.app`.
+
+**Rotate any tokens previously committed in plaintext.**
+
+## Local execution
+
+Each stack is independent. Create **three Terraform Cloud workspaces** and set variables (same token and Account ID is fine).
 
 ```bash
-# 例: shared の plan（変数は Terraform Cloud または terraform.tfvars で設定済みとする）
+# Example: shared plan (vars set in Terraform Cloud or terraform.tfvars)
 cd terraform/cloudflare/shared
 terraform init
-# 未設定なら環境変数で渡す:
+# If unset, pass via env:
 # export TF_VAR_cloudflare_api_token="..."
 # export TF_VAR_cloudflare_account_id="..."
-# shared スタックでは追加で Railway 検証 TXT も必要:
+# shared stack also needs Railway verification TXT:
 # export TF_VAR_api_railway_verify_txt="railway-verify=..."
 # export TF_VAR_realtime_railway_verify_txt="railway-verify=..."
 terraform plan
 ```
 
-変数は各ディレクトリの `terraform.tfvars.example` をコピーして `terraform.tfvars` に記入するか、Terraform Cloud の各 Workspace 変数で**同じ値**を設定する。
+Copy each directory's `terraform.tfvars.example` to `terraform.tfvars` or set the **same values** in each Terraform Cloud workspace.
 
-## CI での変数
+## CI variables
 
-GitHub Actions では次の Secrets を Environment（development / production）に設定する。
+GitHub Actions uses these Secrets in Environments (development / production):
 
-- `TF_API_TOKEN` — Terraform Cloud 認証（backend 用）
-- `CLOUDFLARE_API_TOKEN` — Provider 用（`TF_VAR_cloudflare_api_token` として渡す）
-- `CLOUDFLARE_ACCOUNT_ID` — Provider 用（`TF_VAR_cloudflare_account_id` として渡す）
+- `TF_API_TOKEN` — Terraform Cloud auth (backend)
+- `CLOUDFLARE_API_TOKEN` — Provider (`TF_VAR_cloudflare_api_token`)
+- `CLOUDFLARE_ACCOUNT_ID` — Provider (`TF_VAR_cloudflare_account_id`)
 
-各 workflow で上記を `TF_VAR_*` に渡しているため、plan/apply はそのまま動作する。
+Workflows pass these as `TF_VAR_*` so plan/apply works as-is.
 
-## 参考（外部）
+## External references
 
-- [Terraform Cloud](https://developer.hashicorp.com/terraform/cloud-docs) — Workspace・変数・実行
-- [Cloudflare Provider](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs) — DNS・ゾーン
+- [Terraform Cloud](https://developer.hashicorp.com/terraform/cloud-docs) — Workspaces, variables, runs
+- [Cloudflare Provider](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs) — DNS, zones

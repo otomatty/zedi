@@ -34,6 +34,9 @@ jobs:
       - name: Check formatting
         run: bun run format:check
 
+      - name: Check documentation pairs
+        run: bun run docs:check-pairs
+
       - name: Run linter
         run: bun run lint
 

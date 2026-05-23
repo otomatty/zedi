@@ -1,46 +1,48 @@
-# Zedi 管理画面
+> **Language:** English | [日本語](README.ja.md)
 
-管理者用 SPA（admin.zedi-note.app）。認証基盤と AI モデル管理を提供。
+# Zedi Admin
 
-## 開発
+Admin SPA (admin.zedi-note.app). Provides authentication and AI model management.
+
+## Development
 
 ```bash
-# 初回のみ
+# First time only
 cd admin && npm install
 
-# 起動（ポート 30001、API は ZEDI_API_PROXY_TARGET でプロキシ）
+# Start (port 30001; API proxied via ZEDI_API_PROXY_TARGET)
 npm run dev
 ```
 
-ルートから:
+From repository root:
 
 ```bash
 npm run dev:admin
 ```
 
-## ローカル動作確認
+## Local verification
 
-バックエンド（`docker-compose -f docker-compose.dev.yml up --build`）起動後、管理画面を起動し、以下を確認する。
+After starting the backend (`docker-compose -f docker-compose.dev.yml up --build`), start the admin app and verify:
 
-- [ ] `http://localhost:30001` で管理画面が表示される
-- [ ] ログイン（Google/GitHub）後、管理者ユーザーなら AI モデル一覧が表示される
-- [ ] 非管理者なら「管理者権限がありません」等の案内が出る
-- [ ] モデルのトグル・ティア変更・同期が動作する
+- [ ] Admin UI loads at `http://localhost:30001`
+- [ ] After login (Google/GitHub), admin users see the AI model list
+- [ ] Non-admin users see an "insufficient permissions" message
+- [ ] Model toggle, tier change, and sync work
 
-## ビルド
+## Build
 
 ```bash
 cd admin && npm install && npm run build
 ```
 
-出力は `admin/dist`。本番は Terraform で管理する Cloudflare Pages プロジェクト `zedi-admin` に対して、GitHub Actions `deploy-prod.yml` から自動デプロイする。
+Output is `admin/dist`. Production deploys to Cloudflare Pages project `zedi-admin` via GitHub Actions `deploy-prod.yml` (managed by Terraform).
 
-## 環境変数
+## Environment variables
 
-- **開発:** `.env` に `ZEDI_API_PROXY_TARGET=http://localhost:3000` を設定すると `/api` がその API にプロキシされる。
-- **本番:** GitHub Actions の production environment から `VITE_API_BASE_URL=https://api.zedi-note.app` を渡してビルドする。`VITE_MAIN_APP_URL` は `https://zedi-note.app` を使用する。
+- **Development:** Set `ZEDI_API_PROXY_TARGET=http://localhost:3000` in `.env` to proxy `/api` to that API.
+- **Production:** GitHub Actions production environment passes `VITE_API_BASE_URL=https://api.zedi-note.app` at build time. `VITE_MAIN_APP_URL` is `https://zedi-note.app`.
 
-## 仕様
+## Specification
 
-- 挙動・契約は **ソースの TSDoc** とテストを正とする（[`SPECIFICATION_POLICY.md`](../SPECIFICATION_POLICY.md)）。
-- [Issue #141 — AIモデル管理](https://github.com/otomatty/zedi/issues/141)
+- Behavior and contracts are defined in **source TSDoc** and tests ([`SPECIFICATION_POLICY.md`](../SPECIFICATION_POLICY.md)).
+- [Issue #141 — AI model management](https://github.com/otomatty/zedi/issues/141)
