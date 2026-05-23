@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Editor } from "@tiptap/core";
 
@@ -335,6 +335,63 @@ describe("WikiLinkInputBar - ガード / guards", () => {
 
     expect(input.value).toBe("");
     expect(editor.commandsReturn.focus).toHaveBeenCalled();
+  });
+});
+
+describe("WikiLinkInputBar - 外部フォーカス / external focus", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseWikiLinkCandidates.mockReturnValue({ pages: [], isLoading: false });
+    mockUseWikiLinkExistsChecker.mockImplementation(() => ({
+      checkExistence: mockCheckExistence,
+    }));
+    mockCheckExistence.mockResolvedValue({
+      pageTitles: new Set(),
+      referencedTitles: new Set(),
+      pageTitleToId: new Map(),
+    });
+    mockCheckReferenced.mockResolvedValue(false);
+  });
+
+  it("`focusInputBarRef` 経由で input にフォーカスを移せる / lets the parent focus the input via `focusInputBarRef` (issue #928 / Cmd+K)", () => {
+    const editor = createMockEditor();
+    const focusInputBarRef: React.MutableRefObject<(() => void) | null> = { current: null };
+    render(
+      <WikiLinkInputBar
+        editor={editor}
+        pageId="p1"
+        pageNoteId={null}
+        focusInputBarRef={focusInputBarRef}
+      />,
+    );
+
+    // マウント時点で割り当てられている。
+    // The handle is wired on mount.
+    expect(typeof focusInputBarRef.current).toBe("function");
+
+    act(() => {
+      focusInputBarRef.current?.();
+    });
+
+    const input = screen.getByTestId("wiki-link-input-bar-input");
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("unmount で ref が null に戻る / clears the ref on unmount to avoid dangling references", () => {
+    const editor = createMockEditor();
+    const focusInputBarRef: React.MutableRefObject<(() => void) | null> = { current: null };
+    const { unmount } = render(
+      <WikiLinkInputBar
+        editor={editor}
+        pageId="p1"
+        pageNoteId={null}
+        focusInputBarRef={focusInputBarRef}
+      />,
+    );
+
+    expect(focusInputBarRef.current).not.toBeNull();
+    unmount();
+    expect(focusInputBarRef.current).toBeNull();
   });
 });
 

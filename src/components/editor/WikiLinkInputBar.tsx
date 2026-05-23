@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef, type MutableRefObject } from "react";
 import type { Editor } from "@tiptap/core";
 import { cn } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
@@ -33,6 +33,17 @@ export interface WikiLinkInputBarProps {
   pageNoteId: string | null;
   /** 追加でルートに付ける className。 / Optional class name for the outer container. */
   className?: string;
+  /**
+   * バーの input にフォーカスを移すための imperative ハンドル。`focusContentRef`
+   * 等と同じ `MutableRefObject<(() => void) | null>` 規約。`useEditorWikiLinkShortcuts`
+   * の `Cmd/Ctrl+K` 経由で外部からフォーカスを移すために使う（issue #928）。
+   *
+   * Imperative handle for focusing the bar's input. Follows the project's
+   * `MutableRefObject<(() => void) | null>` convention (same as
+   * `focusContentRef`). Used by `useEditorWikiLinkShortcuts` to focus the
+   * bar via `Cmd/Ctrl+K` (issue #928).
+   */
+  focusInputBarRef?: MutableRefObject<(() => void) | null>;
 }
 
 /**
@@ -55,9 +66,27 @@ export const WikiLinkInputBar: React.FC<WikiLinkInputBarProps> = ({
   pageId,
   pageNoteId,
   className,
+  focusInputBarRef,
 }) => {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // imperative ハンドル: 親（TiptapEditor 経由のショートカットフック）が
+  // バーの input にフォーカスを移すための関数を ref に割り当てる。unmount
+  // 時に null クリアして dangling reference を残さない。
+  // Imperative handle: parent (the shortcut hook wired through TiptapEditor)
+  // gets a function to focus the bar's input. Cleared on unmount to avoid
+  // dangling references.
+  useEffect(() => {
+    if (!focusInputBarRef) return;
+    focusInputBarRef.current = () => {
+      inputRef.current?.focus();
+    };
+    return () => {
+      focusInputBarRef.current = null;
+    };
+  }, [focusInputBarRef]);
+
   const {
     value,
     setValue,
