@@ -1,7 +1,7 @@
 import React, { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { EditorContent } from "@tiptap/react";
-import { cn } from "@zedi/ui";
+import { cn, useIsMobile } from "@zedi/ui";
 import { MermaidGeneratorDialog } from "./MermaidGeneratorDialog";
 import { CreatePageDialog } from "./TiptapEditor/CreatePageDialog";
 import type { TiptapEditorProps } from "./TiptapEditor/types";
@@ -13,6 +13,7 @@ import { WikiLinkHoverCardLayer } from "./TiptapEditor/WikiLinkHoverCardLayer";
 import { TagSuggestionLayer } from "./TiptapEditor/TagSuggestionLayer";
 import { SlashSuggestionLayer } from "./TiptapEditor/SlashSuggestionLayer";
 import { EditorBubbleMenu } from "./TiptapEditor/EditorBubbleMenu";
+import { MobileSelectionSheet } from "./TiptapEditor/MobileSelectionSheet";
 import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
 import { PageActionHub } from "@/components/editor/PageActionHub/PageActionHub";
 import { useTiptapEditorController } from "./TiptapEditor/useTiptapEditorController";
@@ -51,6 +52,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   pageNoteId = null,
 }) => {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const resolvedPlaceholder = placeholder ?? t("editor.startWritingPlaceholder");
   const {
     editor,
@@ -165,7 +167,16 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       <EditorContent editor={editor} />
       {editor && !isReadOnly && (
         <>
-          <EditorBubbleMenu editor={editor} pageId={pageId} />
+          {/*
+            BubbleMenu はモバイルでは仮想キーボードと干渉するため非表示にし、
+            代わりにキーボード直上のシート (MobileSelectionSheet) で同等の
+            装飾アクションを提供する（issue #924 §2 / #929）。
+            The bubble menu collides with the on-screen keyboard on phones,
+            so we hide it on mobile and route the same actions through the
+            keyboard-aware sheet instead (issue #924 §2 / #929).
+          */}
+          {!isMobile && <EditorBubbleMenu editor={editor} pageId={pageId} />}
+          {isMobile && <MobileSelectionSheet editor={editor} pageId={pageId} />}
           <TableBubbleMenu editor={editor} />
         </>
       )}
