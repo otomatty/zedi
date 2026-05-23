@@ -27,13 +27,18 @@ interface WikiLinkSuggestionLayerProps {
 }
 
 /**
- * WikiLink サジェスト UI のフローティング層。`useWikiLinkCandidates` で
- * スコープ（個人 / ノート）に応じた候補ページを取得し、`WikiLinkSuggestion`
- * に渡す。Issue #713 Phase 4。
+ * WikiLink サジェスト UI のフローティング層（本文中の `[[` 用）。
+ * `useWikiLinkCandidates` でスコープ（個人 / ノート）に応じた候補ページを
+ * 取得し、共通プレゼンテーションである `WikiLinkSuggestion` に流す。
+ * 確定時の範囲置換は `onSelect` 側（`useSuggestionEffects`）で行う。
+ * Issue #713 Phase 4 / Issue #925（共通化）。
  *
- * Floating layer for the WikiLink suggestion popup. Fetches scope-aware
- * candidate pages via `useWikiLinkCandidates` and forwards them to
- * `WikiLinkSuggestion`. See issue #713 Phase 4.
+ * Floating layer that mounts the shared `WikiLinkSuggestion` over the
+ * editor for the in-body `[[` flow. Scope-aware candidates come from
+ * `useWikiLinkCandidates`, and range replacement on confirm is handled
+ * by the caller's `onSelect`. The input bar (#924 §2) reuses the same
+ * presentation component via its own host. See issues #713 Phase 4 and
+ * #925.
  */
 export const WikiLinkSuggestionLayer: React.FC<WikiLinkSuggestionLayerProps> = ({
   editor,
@@ -58,9 +63,7 @@ export const WikiLinkSuggestionLayer: React.FC<WikiLinkSuggestionLayerProps> = (
     >
       <WikiLinkSuggestion
         ref={suggestionRef}
-        editor={editor}
         query={suggestionState.query}
-        range={suggestionState.range}
         onSelect={onSelect}
         onClose={onClose}
         pages={pages}
