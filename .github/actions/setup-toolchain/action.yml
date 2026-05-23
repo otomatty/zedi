@@ -1,0 +1,130 @@
+# `.github/actions/setup-toolchain` — Composite action that performs the
+# repository's common setup (Node + Bun + bun install) with retry on transient
+# GitHub API failures. See Issue #937 for the original symptoms (e.g.
+# `setup-bun` getting a one-shot 401 from `api.github.com/repos/oven-sh/bun/
+# git/refs/tags`).
+#
+# 注意 / Note: `actions/checkout` は本 composite action には含めない。
+# ローカル composite action はリポジトリが workspace に展開された後でないと
+# 解決できないため、checkout を内部に持つと chicken-and-egg になる。caller
+# 側で先に `actions/checkout`（必要なら `Wandalen/wretry.action` でラップ）
+# を呼ぶこと。詳しくは `README.md` を参照。
+#
+# We intentionally exclude `actions/checkout` from this composite action.
+# A local composite action's `action.yml` only becomes resolvable AFTER the
+# repository is checked out, so including checkout would be chicken-and-egg.
+# Callers must run `actions/checkout` first (wrap it with
+# `Wandalen/wretry.action` to also get checkout-level retry). See `README.md`.
+#
+# CI ワークフロー (`ci.yml` / `deploy-dev.yml` / `deploy-prod.yml` /
+# `nightly-mutation.yml`) で繰り返し使われる「Node → Bun → bun install」を
+# まとめ、GitHub API の一過性失敗（401 など）に対してリトライを効かせる。
+# 詳細は Issue #937 を参照。
+name: Setup toolchain
+description: >
+  Install Node + Bun and run `bun install` with retry on transient GitHub
+  API failures (Issue #937). Caller must run `actions/checkout` first.
+  / Node + Bun のセットアップと `bun install` を GitHub API の一過性失敗に
+  強いリトライ付きで実行する共通 setup (Issue #937)。caller が先に
+  `actions/checkout` を実行している必要がある。
+
+inputs:
+  setup-bun:
+    description: >
+      `"false"` を渡すと Bun のセットアップをスキップする（Node しか使わない
+      ジョブ向け）。`"false"` 指定時は `install-deps` も実質無効化される。
+      / Set to `"false"` to skip Bun setup (for Node-only jobs). When
+      Bun is skipped, `install-deps` is effectively disabled too.
+    required: false
+    default: "true"
+  bun-version:
+    description: >
+      `oven-sh/setup-bun` に渡す Bun のバージョン指定子。デフォルトは
+      リポジトリ全体で揃えている `"1.3"`。
+      / Bun version spec forwarded to `oven-sh/setup-bun`. Defaults to
+      the repo-wide `"1.3"`.
+    required: false
+    default: "1.3"
+  install-deps:
+    description: >
+      `"false"` を渡すとルートの `bun install --frozen-lockfile` をスキップする。
+      `server/mcp` など個別ワークスペースで install するジョブ向け。
+      / Set to `"false"` to skip the root `bun install --frozen-lockfile`,
+      useful for jobs that install dependencies inside a specific workspace
+      (e.g. `server/mcp`).
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    # `Wandalen/wretry.action` は `uses:` 形式のアクションを丸ごとリトライする
+    # composite ラッパー。`setup-node` / `setup-bun` はいずれも
+    # `${{ github.token }}` を使って GitHub API を叩く JS アクションなので、
+    # GitHub バックエンドの一時的な 401/5xx で落ちることがある（Issue #937）。
+    #
+    # `Wandalen/wretry.action` is a composite wrapper that retries the inner
+    # `uses:` action up to `attempt_limit` times. `setup-node` / `setup-bun`
+    # are JS actions that authenticate against the GitHub API via
+    # `${{ github.token }}`, and have been observed to fail intermittently
+    # on transient 401/5xx responses (Issue #937).
+    - name: Setup Node (with retry)
+      uses: Wandalen/wretry.action@v3
+      with:
+        action: actions/setup-node@v6
+        with: |
+          node-version-file: .nvmrc
+        attempt_limit: 3
+        attempt_delay: 5000
+
+    - name: Setup Bun (with retry)
+      if: inputs.setup-bun == 'true'
+      uses: Wandalen/wretry.action@v3
+      with:
+        action: oven-sh/setup-bun@v2
+        # `token` を明示的に渡さないと、`Wandalen/wretry.action` 経由のネスト
+        # 呼び出しで `setup-bun` のデフォルト式 `${{ github.token }}` が解決
+        # されず "Bad credentials" (401) で恒常的に失敗する（Issue #937 で
+        # 解こうとした症状が、皮肉にも wretry 経由だと逆に再現する）。
+        #
+        # Pass `token` explicitly. When `setup-bun` is invoked through
+        # `Wandalen/wretry.action`, the action.yml default expression
+        # `${{ github.token }}` does not resolve in the nested context and
+        # the API call to api.github.com hits a persistent "Bad credentials"
+        # 401 (the very symptom Issue #937 sought to fix, ironically
+        # reproduced by the wrapper unless the token is forwarded by hand).
+        with: |
+          bun-version: ${{ inputs.bun-version }}
+          token: ${{ github.token }}
+        attempt_limit: 3
+        attempt_delay: 5000
+
+    # `bun install` の失敗は GitHub API ではなく npm レジストリ側の一過性問題
+    # が主な要因。`Wandalen/wretry.action` でラップする必要はないので、シェル
+    # で素直に再試行する。バックオフは 5s → 10s（線形）→ 失敗扱いで終了。
+    #
+    # Retry `bun install` from shell rather than wretry — the failure mode
+    # here is npm-registry / network flake rather than GitHub API auth, and
+    # shell-level retry keeps the composite action simpler. Backoff is
+    # 5s / 10s (linear), then the step fails.
+    - name: Install dependencies (with retry)
+      if: inputs.install-deps == 'true' && inputs.setup-bun == 'true'
+      shell: bash
+      run: |
+        set -uo pipefail
+        attempts=3
+        for i in $(seq 1 $attempts); do
+          echo "::group::bun install (attempt $i/$attempts)"
+          if bun install --frozen-lockfile; then
+            echo "::endgroup::"
+            exit 0
+          fi
+          echo "::endgroup::"
+          if [ "$i" -lt "$attempts" ]; then
+            sleep_seconds=$((i * 5))
+            echo "::warning::bun install attempt $i failed; sleeping ${sleep_seconds}s before retry"
+            sleep "$sleep_seconds"
+          fi
+        done
+        echo "::error::bun install --frozen-lockfile failed after $attempts attempts"
+        exit 1
