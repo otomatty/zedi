@@ -1,5 +1,4 @@
 import { forwardRef, useEffect, useImperativeHandle, useState, useCallback } from "react";
-import { Editor } from "@tiptap/core";
 import { cn } from "@zedi/ui";
 import { FileText, Plus } from "lucide-react";
 
@@ -25,11 +24,45 @@ export interface WikiLinkSuggestionPage {
   isDeleted?: boolean;
 }
 
+/**
+ * `WikiLinkSuggestion` の props。本コンポーネントは
+ *
+ * - 本文中の `[[` サジェスト（`WikiLinkSuggestionLayer`、絶対配置）
+ * - FAB 横のリンク入力バー（#924 §2、固定配置）
+ *
+ * の両方で再利用するため、マウント位置（fixed / absolute）や
+ * Editor / ProseMirror の range などの呼び出し元コンテキストには一切
+ * 依存しない。確定処理（範囲置換 / リンク挿入 / 入力バークリア）は
+ * すべて `onSelect` の呼び出し側に委ねる。
+ *
+ * Props for `WikiLinkSuggestion`. Kept deliberately free of editor /
+ * range / positioning concerns so the same component can back both the
+ * in-body `[[` suggestion (absolutely positioned over the editor) and
+ * the FAB-adjacent input bar (#924 §2, fixed near the keyboard). The
+ * host owns mounting + post-select side effects (range replacement,
+ * link insertion, clearing the input bar). See issue #925.
+ */
 interface WikiLinkSuggestionProps {
-  editor: Editor;
+  /**
+   * 現在の入力クエリ。`[[` サジェストの場合は `[[` の後ろのテキスト、入力バー
+   * の場合は入力欄の値をそのまま渡す。
+   * Current input query — the text after `[[` for the in-body popup, or
+   * the input bar value verbatim.
+   */
   query: string;
-  range: { from: number; to: number };
+  /**
+   * 候補行 / 「新規作成」行が確定したときに呼ばれる。`item.exists` で既存
+   * ページか新規作成かを判別する。
+   * Invoked when an existing or create-new row is confirmed; `item.exists`
+   * distinguishes the two branches.
+   */
   onSelect: (item: SuggestionItem) => void;
+  /**
+   * Escape などでサジェストを閉じたいときに呼ばれる。クローズ後の挙動は
+   * 呼び出し側に任せる（プラグイン状態のリセット、入力バーのフォーカス制御等）。
+   * Fired when the popup should close. Host decides what closing means
+   * (plugin meta reset for the editor host; input-bar blur for the bar).
+   */
   onClose: () => void;
   /**
    * サジェスト候補として渡されるページ一覧。呼び出し側で WikiLink のスコープ
