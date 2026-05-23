@@ -85,9 +85,15 @@ export function useEditorWikiLinkShortcuts({
       const mod = event.metaKey || event.ctrlKey;
       if (!mod) return;
 
+      // Caps Lock 等で `event.key` が大文字になっても拾えるよう `toLowerCase()`
+      // で正規化する（Codex P2: Caps Lock 中の `Cmd+K` が無視されていた問題）。
+      // Normalize case so Caps Lock-uppercased `event.key` still matches
+      // (Codex P2: previously Cmd+K was skipped while Caps Lock was on).
+      const normalizedKey = event.key.toLowerCase();
+
       // Cmd/Ctrl + K (Shift 無し) → 入力バーへフォーカス。
       // Cmd/Ctrl + K (no Shift) → focus the Wiki Link input bar.
-      if (!event.shiftKey && event.key === "k") {
+      if (!event.shiftKey && normalizedKey === "k") {
         event.preventDefault();
         event.stopPropagation();
         focusInputBar();
@@ -95,19 +101,22 @@ export function useEditorWikiLinkShortcuts({
       }
 
       // Cmd/Ctrl + Shift + L → 選択範囲を Wiki Link 化。
-      // Shift を押すと `key` が大文字になる実装が大半だが、`l` も許容して
-      // キーボードレイアウト差や synthetic イベント差に強くしておく。
-      // Cmd/Ctrl + Shift + L → convert selection to wiki link. Most layouts
-      // uppercase `key` while Shift is held, but accept lowercase `l` too
-      // for robustness against synthetic events and layout edge cases.
-      if (event.shiftKey && (event.key === "L" || event.key === "l")) {
+      // Cmd/Ctrl + Shift + L → convert selection to wiki link.
+      if (event.shiftKey && normalizedKey === "l") {
         const { from, to } = editor.state.selection;
         // 空選択は no-op、preventDefault も呼ばない（受け入れ条件）。
         // Empty selection is a no-op; do not even preventDefault (issue #928 AC).
         if (from === to) return;
         event.preventDefault();
         event.stopPropagation();
-        void convertSelectionToWikiLink();
+        // 非同期処理の rejection はログだけ取る。document の keydown ハンドラ
+        // 経由で unhandled rejection を出さないための防御（CodeRabbit / Gemini）。
+        // Swallow rejections after logging; prevents unhandled promise
+        // rejections from leaking out of the document keydown handler
+        // (CodeRabbit / Gemini review).
+        void convertSelectionToWikiLink().catch((error: unknown) => {
+          console.error("[useEditorWikiLinkShortcuts] convertSelectionToWikiLink failed", error);
+        });
       }
     };
 

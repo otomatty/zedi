@@ -100,6 +100,18 @@ describe("useEditorWikiLinkShortcuts - Cmd/Ctrl+K", () => {
     expect(event.defaultPrevented).toBe(false);
   });
 
+  it("Caps Lock で `event.key` が 'K' になっても捕捉する / matches uppercase 'K' too (Caps Lock without Shift) — Codex P2", () => {
+    const editor = createMockEditor({ isFocused: true });
+    renderHook(() =>
+      useEditorWikiLinkShortcuts({ editor, focusInputBar, convertSelectionToWikiLink }),
+    );
+
+    const event = dispatchKeyDown({ key: "K", metaKey: true });
+
+    expect(focusInputBar).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
   it("Alt 併用は無視する / ignores when Alt is held", () => {
     const editor = createMockEditor({ isFocused: true });
     renderHook(() =>
@@ -180,6 +192,34 @@ describe("useEditorWikiLinkShortcuts - Cmd/Ctrl+Shift+L", () => {
 
     expect(convertSelectionToWikiLink).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("convertSelectionToWikiLink が reject しても unhandled rejection を出さない / swallows rejections from convertSelectionToWikiLink so the document keydown handler does not leak unhandled rejections (CodeRabbit / Gemini review)", async () => {
+    const editor = createMockEditor({ isFocused: true, selection: { from: 3, to: 8 } });
+    const rejection = new Error("boom");
+    const rejecting = vi.fn().mockRejectedValue(rejection);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      renderHook(() =>
+        useEditorWikiLinkShortcuts({
+          editor,
+          focusInputBar,
+          convertSelectionToWikiLink: rejecting,
+        }),
+      );
+
+      dispatchKeyDown({ key: "L", metaKey: true, shiftKey: true });
+
+      // microtask まで待って catch が走ったことを確認する。
+      // Flush microtasks so the catch handler runs.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(rejecting).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("Shift 無しの Cmd+L は捕捉しない / does not capture Cmd+L without Shift", () => {
