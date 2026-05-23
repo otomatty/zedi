@@ -1,8 +1,10 @@
+> **Language:** English | [日本語](SECURITY.ja.md)
+
 # Security Policy
 
 ## Supported Versions
 
-現在サポートされているバージョン:
+Currently supported versions:
 
 | Version | Supported          |
 | ------- | ------------------ |
@@ -10,44 +12,44 @@
 
 ## Reporting a Vulnerability
 
-セキュリティの脆弱性を発見した場合は、**公開の Issue として報告しないでください**。
+If you discover a security vulnerability, **do not report it as a public Issue**.
 
-### 報告方法
+### How to report
 
-1. **メールで報告**: security@example.com (プロジェクトのセキュリティメールアドレスに置き換えてください)
-2. **GitHub Security Advisories**: リポジトリの Security タブから Private vulnerability reporting を使用
+1. **Email**: security@example.com (replace with the project security contact)
+2. **GitHub Security Advisories**: Use Private vulnerability reporting from the repository Security tab
 
-### 報告に含める情報
+### What to include
 
-- 脆弱性の詳細な説明
-- 再現手順
-- 影響を受けるバージョン
-- 可能であれば、修正案
+- Detailed description of the vulnerability
+- Steps to reproduce
+- Affected versions
+- Suggested fix, if available
 
-### 対応プロセス
+### Response process
 
-1. **確認**: 報告を受け取ったら、48時間以内に確認の連絡をします
-2. **調査**: 脆弱性を調査し、影響範囲を評価します
-3. **修正**: 優先度に応じて修正を行います
-4. **公開**: 修正がリリースされた後、適切なタイミングで脆弱性を公開します
+1. **Acknowledgment**: We confirm receipt within 48 hours
+2. **Investigation**: We assess impact and scope
+3. **Fix**: We patch according to severity
+4. **Disclosure**: We publish details after a fix is released, at an appropriate time
 
-### セキュリティ上の考慮事項
+### Security considerations
 
-#### API キーの取り扱い
+#### API keys
 
-- AI 機能用の API キーはローカルに暗号化して保存されます
-- API キーがサーバーに送信されることはありません（BYOK: Bring Your Own Key）
+- AI provider API keys are stored encrypted locally when configured in the app
+- BYOK (Bring Your Own Key): keys are not sent to Zedi servers for inference
 
-#### データの保存
+#### Data storage
 
-- ローカルデータは SQLite (sql.js) に保存されます
-- 認証済みユーザーのデータは Turso クラウドに同期されます
-- すべての通信は HTTPS で暗号化されます
+- Local-only mode may use IndexedDB in the browser
+- Authenticated user data is stored in PostgreSQL (via `server/api`)
+- All remote communication uses HTTPS
 
-#### 認証
+#### Authentication
 
-- 認証には Clerk を使用しています
-- パスワードはアプリケーション側では一切取り扱いません
+- Authentication uses [Better Auth](https://better-auth.com/) (OAuth / session cookies)
+- Passwords are not handled by application code when using OAuth providers
 
 ---
 
