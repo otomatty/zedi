@@ -12,6 +12,7 @@ import type { Editor } from "@tiptap/core";
 import type { WikiLinkSuggestionState } from "../extensions/wikiLinkSuggestionPlugin";
 import type { SlashSuggestionState } from "../extensions/slashSuggestionPlugin";
 import type { TagSuggestionState } from "../extensions/tagSuggestionPlugin";
+import type { WikiLinkGhostCompletionCandidate } from "../extensions/wikiLinkGhostCompletionPlugin";
 import type { WikiLinkSuggestionHandle } from "../extensions/WikiLinkSuggestion";
 import type { TagSuggestionHandle } from "../extensions/TagSuggestion";
 import type { SlashSuggestionHandle } from "./SlashSuggestionLayer";
@@ -74,6 +75,15 @@ interface UseEditorSetupOptions {
   workspaceRoot: string | null;
   /** Current note id for Tauri workspace registry reads (Issue #461). */
   noteId: string | null;
+  /**
+   * インライン・ゴースト補完（issue #930）に渡す候補一覧の getter。ref ベースで
+   * 最新値を返すことで、候補が更新されても `useEditor` を再実行せずに済む。
+   *
+   * Getter returning the latest candidate list for inline ghost completion
+   * (issue #930). Ref-based so `useEditor` does not need to re-run when the
+   * candidate snapshot changes.
+   */
+  getGhostCompletionCandidates: () => ReadonlyArray<WikiLinkGhostCompletionCandidate>;
 }
 
 /**
@@ -110,6 +120,7 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     tagSuggestionRef,
     workspaceRoot,
     noteId,
+    getGhostCompletionCandidates,
   } = options;
 
   const isEditorInitializedRef = useRef(false);
@@ -197,6 +208,7 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
           getWorkspaceRoot: () => workspaceRootRef.current,
           getNoteId: () => noteIdRef.current,
         },
+        getGhostCompletionCandidates,
       }),
       /* eslint-enable react-hooks/refs */
       content: useCollaborationMode ? undefined : initialParsedContent,

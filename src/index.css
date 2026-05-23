@@ -885,6 +885,32 @@
     border-radius: 2px;
   }
 
+  /* Inline ghost completion preview (issue #930). Rendered as a
+     `Decoration.widget` next to the caret while the typed word prefix-matches
+     an existing page title. Tap (mobile) or press Tab (desktop) to confirm. */
+  /* インライン・ゴースト補完（issue #930）。入力中の単語が既存ページ名の
+     接頭辞に一致した時に `Decoration.widget` でカーソル右に出す薄色のプレビュー。
+     Tab（デスクトップ）またはチップタップ（モバイル）で確定する。 */
+  .wiki-link-ghost-completion {
+    color: hsl(var(--muted-foreground));
+    opacity: 0.55;
+    font-style: italic;
+    /* widget の pointer-events は editor 親から none を継承し得るため明示。
+       Widgets may inherit pointer-events: none from the editor host; opt back
+       in so the chip is tappable on mobile. */
+    pointer-events: auto;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    background: transparent;
+    border: none;
+    text-decoration: none;
+  }
+
+  .wiki-link-ghost-completion:hover {
+    opacity: 0.8;
+  }
+
   /* Tag styling — shares the WikiLink color scheme so existing/referenced/ghost
      states are visually consistent across both mark types. See issue #725. */
   /* タグのスタイル。WikiLink と同じ色系列を共有し、existing / referenced /
