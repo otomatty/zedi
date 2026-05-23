@@ -82,8 +82,20 @@ runs:
       uses: Wandalen/wretry.action@v3
       with:
         action: oven-sh/setup-bun@v2
+        # `token` を明示的に渡さないと、`Wandalen/wretry.action` 経由のネスト
+        # 呼び出しで `setup-bun` のデフォルト式 `${{ github.token }}` が解決
+        # されず "Bad credentials" (401) で恒常的に失敗する（Issue #937 で
+        # 解こうとした症状が、皮肉にも wretry 経由だと逆に再現する）。
+        #
+        # Pass `token` explicitly. When `setup-bun` is invoked through
+        # `Wandalen/wretry.action`, the action.yml default expression
+        # `${{ github.token }}` does not resolve in the nested context and
+        # the API call to api.github.com hits a persistent "Bad credentials"
+        # 401 (the very symptom Issue #937 sought to fix, ironically
+        # reproduced by the wrapper unless the token is forwarded by hand).
         with: |
           bun-version: ${{ inputs.bun-version }}
+          token: ${{ github.token }}
         attempt_limit: 3
         attempt_delay: 5000
 
