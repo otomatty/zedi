@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { EditorContent } from "@tiptap/react";
 import { cn } from "@zedi/ui";
@@ -16,6 +16,8 @@ import { EditorBubbleMenu } from "./TiptapEditor/EditorBubbleMenu";
 import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
 import { PageActionHub } from "@/components/editor/PageActionHub/PageActionHub";
 import { useTiptapEditorController } from "./TiptapEditor/useTiptapEditorController";
+import { useBubbleMenuWikiLink } from "./TiptapEditor/useBubbleMenuWikiLink";
+import { useEditorWikiLinkShortcuts } from "@/hooks/useEditorWikiLinkShortcuts";
 import { SlashAgentLoadingOverlay } from "./TiptapEditor/SlashAgentLoadingOverlay";
 
 // Re-export types for consumers
@@ -114,6 +116,27 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     pageNoteId,
   });
 
+  // 入力バーへフォーカスを移すための imperative ハンドル（issue #928 §Cmd+K）。
+  // 入力バー側の `useEffect` がここに focus 関数を割り当てる。
+  // Imperative handle that the bar populates with a focus function (issue
+  // #928 / Cmd+K).
+  const focusInputBarRef = useRef<(() => void) | null>(null);
+
+  // `Cmd/Ctrl+Shift+L` の実体。既存のバブルメニュー実装をそのまま再利用し、
+  // 「選択範囲を Wiki Link 化」操作のロジックを 1 箇所に集約する。
+  // Cmd/Ctrl+Shift+L is wired to the existing bubble-menu conversion so the
+  // "selection → wiki link" logic lives in a single place.
+  const { convertToWikiLink } = useBubbleMenuWikiLink({ editor, pageId });
+  const focusInputBar = useCallback(() => {
+    focusInputBarRef.current?.();
+  }, []);
+  useEditorWikiLinkShortcuts({
+    editor,
+    focusInputBar,
+    convertSelectionToWikiLink: convertToWikiLink,
+    isReadOnly,
+  });
+
   return (
     <div
       ref={editorContainerRef}
@@ -208,7 +231,12 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         // Always-on pill input bar mounted to the left of the FAB (issue
         // #924 §2 / #926). Doubles as ghost-link creation and existing-link
         // insertion via the shared suggestion popup.
-        <FloatingWikiLinkInputBar editor={editor} pageId={pageId} pageNoteId={resolvedPageNoteId} />
+        <FloatingWikiLinkInputBar
+          editor={editor}
+          pageId={pageId}
+          pageNoteId={resolvedPageNoteId}
+          focusInputBarRef={focusInputBarRef}
+        />
       )}
     </div>
   );

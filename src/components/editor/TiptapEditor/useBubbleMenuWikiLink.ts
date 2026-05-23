@@ -11,7 +11,15 @@ import { useWikiLinkExistsChecker } from "@/hooks/usePageQueries";
  * existence checks (and to exclude self-references).
  */
 export interface UseBubbleMenuWikiLinkOptions {
-  editor: Editor;
+  /**
+   * 操作対象のエディタ。`null` の間（初期化前など）は `convertToWikiLink` /
+   * `unsetWikiLink` は no-op、`isWikiLinkSelection` は `false` を返す。
+   *
+   * Target editor. While `null` (e.g. during initialization), the returned
+   * `convertToWikiLink` / `unsetWikiLink` are no-ops and
+   * `isWikiLinkSelection` is `false`.
+   */
+  editor: Editor | null;
   pageId?: string;
 }
 
@@ -53,9 +61,10 @@ export function useBubbleMenuWikiLink({
   const [isConverting, setIsConverting] = useState(false);
   const convertingRef = useRef(false);
 
-  const isWikiLinkSelection = editor.isActive("wikiLink");
+  const isWikiLinkSelection = editor?.isActive("wikiLink") ?? false;
 
   const convertToWikiLink = useCallback(async () => {
+    if (!editor) return;
     if (convertingRef.current) return;
 
     const { from, to } = editor.state.selection;
@@ -113,6 +122,7 @@ export function useBubbleMenuWikiLink({
   }, [editor, pageId, checkExistence]);
 
   const unsetWikiLink = useCallback(() => {
+    if (!editor) return;
     editor.chain().focus().unsetWikiLink().run();
   }, [editor]);
 
