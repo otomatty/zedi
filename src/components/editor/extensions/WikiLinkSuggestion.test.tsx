@@ -1,6 +1,6 @@
 import React, { createRef } from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   WikiLinkSuggestion,
@@ -162,12 +162,14 @@ describe("WikiLinkSuggestion - 確定 / キーボード操作 / selection + keyb
     render(
       <WikiLinkSuggestion ref={ref} query="" onSelect={onSelect} onClose={vi.fn()} pages={pages} />,
     );
-    // 初回マウント直後の queueMicrotask(setSelectedIndex(0)) を act 内で
-    // 流して、後続の onKeyDown が確定済み state に対して走るようにする。
-    // Flush the initial-mount microtask (queueMicrotask → setSelectedIndex(0))
-    // inside act so subsequent onKeyDown calls run against a settled state.
-    await act(async () => {
-      await Promise.resolve();
+    // 初回マウント時の選択状態が確定する（先頭行に `bg-accent` が付く）まで待つ。
+    // `queueMicrotask` などの内部実装に依存せず、観測可能な副作用で同期する。
+    // Wait for the initial selection to settle by observing the highlight
+    // class on the first row, avoiding coupling to the internal
+    // `queueMicrotask` mechanism (gemini / CodeRabbit review feedback).
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button");
+      expect(buttons[0].className).toMatch(/\bbg-accent\b/);
     });
 
     // 最初は先頭が選択されている。Enter で確定して確認。

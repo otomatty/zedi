@@ -42,7 +42,7 @@ export interface WikiLinkSuggestionPage {
  * host owns mounting + post-select side effects (range replacement,
  * link insertion, clearing the input bar). See issue #925.
  */
-interface WikiLinkSuggestionProps {
+export interface WikiLinkSuggestionProps {
   /**
    * 現在の入力クエリ。`[[` サジェストの場合は `[[` の後ろのテキスト、入力バー
    * の場合は入力欄の値をそのまま渡す。
@@ -187,6 +187,7 @@ export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkS
           {items.map((item, index) => (
             <button
               key={item.id}
+              type="button"
               onClick={() => selectItem(index)}
               className={cn(
                 "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
