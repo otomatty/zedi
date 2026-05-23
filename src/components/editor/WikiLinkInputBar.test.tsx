@@ -21,8 +21,9 @@ vi.mock("@/hooks/useWikiLinkCandidates", () => ({
 
 const mockCheckExistence = vi.fn();
 const mockCheckReferenced = vi.fn();
+const mockUseWikiLinkExistsChecker = vi.fn(() => ({ checkExistence: mockCheckExistence }));
 vi.mock("@/hooks/usePageQueries", () => ({
-  useWikiLinkExistsChecker: () => ({ checkExistence: mockCheckExistence }),
+  useWikiLinkExistsChecker: (options: unknown) => mockUseWikiLinkExistsChecker(options),
   useCheckGhostLinkReferenced: () => ({ checkReferenced: mockCheckReferenced }),
 }));
 
@@ -71,6 +72,9 @@ describe("WikiLinkInputBar - 基本表示 / basic rendering", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseWikiLinkCandidates.mockReturnValue({ pages: [], isLoading: false });
+    mockUseWikiLinkExistsChecker.mockImplementation(() => ({
+      checkExistence: mockCheckExistence,
+    }));
     mockCheckExistence.mockResolvedValue({
       pageTitles: new Set(),
       referencedTitles: new Set(),
@@ -79,16 +83,19 @@ describe("WikiLinkInputBar - 基本表示 / basic rendering", () => {
     mockCheckReferenced.mockResolvedValue(false);
   });
 
-  it("プレースホルダ『ページを作成』を持つ入力欄を描画する / renders the input with the 'create page' placeholder key", () => {
+  it("プレースホルダ『ページを作成』と aria-label を持つ入力欄を描画する / renders the input with the placeholder + aria-label i18n keys", () => {
     const editor = createMockEditor();
     render(<WikiLinkInputBar editor={editor} pageId="p1" pageNoteId={null} />);
 
     const input = screen.getByTestId("wiki-link-input-bar-input") as HTMLInputElement;
     // i18n キーは `useTranslation` モックで素通りするため、キー自体が
-    // placeholder として現れる。値そのものは `common.json` 側のテキスト。
-    // The `useTranslation` mock passes keys through, so the placeholder is the
-    // i18n key here. The actual text lives in `common.json`.
+    // placeholder / aria-label として現れる。値そのものは `common.json` 側の
+    // テキスト。Accessible-name の i18n key 連結が崩れていないことを担保する。
+    // The `useTranslation` mock passes keys through, so the placeholder and
+    // aria-label show up as the i18n keys themselves. Pinning both keys keeps
+    // the accessible-name spec from silently regressing.
     expect(input.placeholder).toBe("common.wikiLinkInputBar.placeholder");
+    expect(input.getAttribute("aria-label")).toBe("common.wikiLinkInputBar.ariaLabel");
   });
 
   it("入力が空のときはサジェストを描画しない / does not render the suggestion list when input is empty", () => {
@@ -128,6 +135,9 @@ describe("WikiLinkInputBar - 確定挙動 / confirm behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseWikiLinkCandidates.mockReturnValue({ pages: [], isLoading: false });
+    mockUseWikiLinkExistsChecker.mockImplementation(() => ({
+      checkExistence: mockCheckExistence,
+    }));
     mockCheckExistence.mockResolvedValue({
       pageTitles: new Set(),
       referencedTitles: new Set(),
@@ -281,6 +291,9 @@ describe("WikiLinkInputBar - ガード / guards", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseWikiLinkCandidates.mockReturnValue({ pages: [], isLoading: false });
+    mockUseWikiLinkExistsChecker.mockImplementation(() => ({
+      checkExistence: mockCheckExistence,
+    }));
   });
 
   it("editor が null のときは何もしない / no-op when editor is null", async () => {
@@ -322,5 +335,58 @@ describe("WikiLinkInputBar - ガード / guards", () => {
 
     expect(input.value).toBe("");
     expect(editor.commandsReturn.focus).toHaveBeenCalled();
+  });
+});
+
+describe("WikiLinkInputBar - スコープ転送 / scope forwarding", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseWikiLinkExistsChecker.mockImplementation(() => ({
+      checkExistence: mockCheckExistence,
+    }));
+    mockCheckExistence.mockResolvedValue({
+      pageTitles: new Set(),
+      referencedTitles: new Set(),
+      pageTitleToId: new Map(),
+    });
+    mockCheckReferenced.mockResolvedValue(false);
+  });
+
+  it("ノートスコープでは候補ページを `notePages` として exists checker に渡す / forwards note-scope candidates as `notePages` so the Enter fallback can resolve same-note pages (Codex P1, PR #934)", () => {
+    const editor = createMockEditor();
+    const notePages = [
+      { id: "p-alpha", title: "Alpha", isDeleted: false },
+      { id: "p-beta", title: "Beta", isDeleted: false },
+    ];
+    mockUseWikiLinkCandidates.mockReturnValue({ pages: notePages, isLoading: false });
+
+    render(<WikiLinkInputBar editor={editor} pageId="p1" pageNoteId="note-1" />);
+
+    // `useWikiLinkExistsChecker` がノートスコープで呼ばれるとき、候補ページを
+    // `notePages` として渡していないと checker が空集合を返し、Enter による
+    // 完全一致フォールバックが効かなくなる（同名既存ページがあってもゴーストを
+    // 挿入してしまう）。
+    // Without forwarding `notePages` in note scope the checker returns empty
+    // sets and the Enter exact-match fallback silently inserts a ghost link
+    // even when an existing same-note page matches.
+    expect(mockUseWikiLinkExistsChecker).toHaveBeenCalledWith({
+      pageNoteId: "note-1",
+      notePages,
+    });
+  });
+
+  it("個人スコープでは `notePages` を渡さず checker 既定の個人ページ取得に任せる / leaves `notePages` undefined for personal scope to keep the checker's `getPagesSummary` path", () => {
+    const editor = createMockEditor();
+    mockUseWikiLinkCandidates.mockReturnValue({
+      pages: [{ id: "p-alpha", title: "Alpha", isDeleted: false }],
+      isLoading: false,
+    });
+
+    render(<WikiLinkInputBar editor={editor} pageId="p1" pageNoteId={null} />);
+
+    expect(mockUseWikiLinkExistsChecker).toHaveBeenCalledWith({
+      pageNoteId: null,
+      notePages: undefined,
+    });
   });
 });

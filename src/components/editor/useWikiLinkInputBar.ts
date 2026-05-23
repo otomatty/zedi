@@ -120,7 +120,25 @@ export function useWikiLinkInputBar({
   const isConfirmingRef = useRef(false);
 
   const { pages } = useWikiLinkCandidates(pageNoteId);
-  const { checkExistence } = useWikiLinkExistsChecker({ pageNoteId });
+  // ノートスコープでは `useWikiLinkExistsChecker` が `notePages` 無しに呼ば
+  // れると意図的に空の集合を返し、Enter フォールバックが既存ページを解決
+  // できずゴーストを挿入してしまう（Codex P1, PR #934）。サジェスト用に
+  // 既に取得済みの候補ページを `notePages` としてそのまま流し込み、同じ
+  // データソースで完全一致判定できるようにする。`useWikiLinkStatusSync`
+  // と同じ流儀。個人スコープでは未指定のまま渡し、checker 側の
+  // `repo.getPagesSummary(userId)` 経路を維持する。
+  //
+  // In note scope `useWikiLinkExistsChecker` returns empty sets when
+  // `notePages` is missing, causing the bar's exact-match fallback to
+  // never resolve existing note-scope pages and always insert a ghost
+  // (Codex P1, PR #934). Reuse the suggestion candidates we already
+  // fetched here so the checker has the same data — mirrors
+  // `useWikiLinkStatusSync`. Personal scope stays unchanged: the checker
+  // ignores `notePages` and falls back to `repo.getPagesSummary(userId)`.
+  const { checkExistence } = useWikiLinkExistsChecker({
+    pageNoteId,
+    notePages: pageNoteId !== null ? pages : undefined,
+  });
   const { checkReferenced } = useCheckGhostLinkReferenced();
 
   const handleFocus = useCallback(() => {
