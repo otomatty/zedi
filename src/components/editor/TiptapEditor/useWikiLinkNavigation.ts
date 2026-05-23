@@ -18,8 +18,20 @@ interface UseWikiLinkNavigationOptions {
   pageNoteId: string | null;
 }
 
+/**
+ * クリック時の追加オプション。`newTab` が `true` のときは `window.open` で
+ * 新タブを開き、現在のタブの URL は変更しない（Issue #931）。
+ *
+ * Click options. When `newTab` is `true`, navigation opens the destination
+ * in a new tab via `window.open` and the current tab is left untouched
+ * (Issue #931).
+ */
+interface WikiLinkNavigationOptions {
+  newTab?: boolean;
+}
+
 interface UseWikiLinkNavigationReturn {
-  handleLinkClick: (title: string) => void;
+  handleLinkClick: (title: string, options?: WikiLinkNavigationOptions) => void;
   createPageDialogOpen: boolean;
   pendingCreatePageTitle: string | null;
   handleConfirmCreate: () => Promise<void>;
@@ -145,7 +157,19 @@ export function useWikiLinkNavigation(
   const isFetched = pageNoteId === null ? personalResolved.isFetched : noteLookup.isFetched;
 
   // Pending link action
-  const pendingLinkActionRef = useRef<{ title: string } | null>(null);
+  // Issue #931: `newTab` を保持して既存ページ解決 / ダイアログ確定の両方で
+  // window.open ⇔ navigate を切り替える。
+  // Issue #931: persist the `newTab` intent so both the existing-page
+  // resolution and the create-dialog confirmation can switch between
+  // `window.open` and `navigate`.
+  const pendingLinkActionRef = useRef<{ title: string; newTab: boolean } | null>(null);
+  // ダイアログ確定時に `window.open` を使うかを保存する。Cmd+クリックで
+  // ゴーストリンクを開いた場合、ダイアログを通常通り表示しつつ確定後の
+  // 遷移だけ新タブにする（Issue #931）。
+  // Tracks whether the create-dialog confirmation should open the new
+  // page in a new tab. Preserved separately from `pendingLinkActionRef`
+  // because that ref is cleared once navigation resolution finishes.
+  const pendingCreatePageNewTabRef = useRef<boolean>(false);
 
   // Create page confirmation dialog state
   const [createPageDialogOpen, setCreatePageDialogOpen] = useState(false);
@@ -153,8 +177,8 @@ export function useWikiLinkNavigation(
 
   // Handle link click - navigate to page or create new
   // WikiLinkクリック時は常に既存ページの存在をチェック（byTitle キャッシュに依存、createdPageIdsRef は廃止）
-  const handleLinkClick = useCallback((title: string) => {
-    pendingLinkActionRef.current = { title };
+  const handleLinkClick = useCallback((title: string, options?: WikiLinkNavigationOptions) => {
+    pendingLinkActionRef.current = { title, newTab: options?.newTab ?? false };
     setLinkTitleToFind(title);
   }, []);
 
@@ -164,7 +188,7 @@ export function useWikiLinkNavigation(
       // linkTitleToFindが設定されていない場合は何もしない
       if (!linkTitleToFind || !pendingLinkActionRef.current) return;
 
-      const { title } = pendingLinkActionRef.current;
+      const { title, newTab } = pendingLinkActionRef.current;
 
       // タイトルが一致しない場合は何もしない
       if (linkTitleToFind !== title) return;
@@ -183,12 +207,23 @@ export function useWikiLinkNavigation(
         // After Issue #889 Phase 3 retired `/pages/:id`, navigation always
         // targets `/notes/:noteId/:pageId`. Both resolution paths populate
         // `foundPage.noteId` so this branch unifies cleanly.
-        navigate(`/notes/${foundPage.noteId}/${foundPage.id}`, {
-          replace: false,
-          flushSync: true,
-        });
+        const targetUrl = `/notes/${foundPage.noteId}/${foundPage.id}`;
+        if (newTab) {
+          // Issue #931: Cmd/Ctrl+クリックや中クリックでは新タブで開く。
+          // Issue #931: open in a new tab for Cmd/Ctrl+click or middle click.
+          window.open(targetUrl, "_blank", "noopener,noreferrer");
+        } else {
+          navigate(targetUrl, {
+            replace: false,
+            flushSync: true,
+          });
+        }
       } else {
-        // ページが見つからなかった場合は確認ダイアログを表示
+        // ページが見つからなかった場合は確認ダイアログを表示。
+        // 新タブ意図はダイアログ確定時に消費するので別 ref に退避する（Issue #931）。
+        // Stash the new-tab intent so the create-dialog confirmation can
+        // honor it later (Issue #931).
+        pendingCreatePageNewTabRef.current = newTab;
         setPendingCreatePageTitle(title);
         setCreatePageDialogOpen(true);
       }
@@ -218,6 +253,7 @@ export function useWikiLinkNavigation(
       // ノートスコープ内での新規作成は未対応。今は何もせずダイアログを閉じる。
       setCreatePageDialogOpen(false);
       setPendingCreatePageTitle(null);
+      pendingCreatePageNewTabRef.current = false;
       return;
     }
 
@@ -228,10 +264,21 @@ export function useWikiLinkNavigation(
       });
       setCreatePageDialogOpen(false);
       setPendingCreatePageTitle(null);
-      navigate(`/notes/${newPage.noteId}/${newPage.id}`, {
-        replace: false,
-        flushSync: true,
-      });
+      const targetUrl = `/notes/${newPage.noteId}/${newPage.id}`;
+      const newTab = pendingCreatePageNewTabRef.current;
+      pendingCreatePageNewTabRef.current = false;
+      if (newTab) {
+        // Issue #931: Cmd/Ctrl+クリックや中クリックで開いたゴーストリンクは
+        // ダイアログ確定後も新タブで開く。
+        // Issue #931: ghost links opened with Cmd/Ctrl+click or middle click
+        // should land in a new tab after the create dialog is confirmed.
+        window.open(targetUrl, "_blank", "noopener,noreferrer");
+      } else {
+        navigate(targetUrl, {
+          replace: false,
+          flushSync: true,
+        });
+      }
     } catch (error) {
       console.error("Failed to create page:", error);
     }
@@ -240,6 +287,7 @@ export function useWikiLinkNavigation(
   const handleCancelCreate = useCallback(() => {
     setCreatePageDialogOpen(false);
     setPendingCreatePageTitle(null);
+    pendingCreatePageNewTabRef.current = false;
   }, []);
 
   return {

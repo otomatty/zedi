@@ -178,6 +178,137 @@ describe("useWikiLinkNavigation", () => {
     expect(result.current.pendingCreatePageTitle).toBe(null);
   });
 
+  // Issue #931: 既存個人ページに対する Cmd/Ctrl+クリックは新タブで開き、
+  // ルータには遷移しない。
+  // Issue #931: Cmd/Ctrl+click on an existing personal page opens a new tab
+  // via `window.open` and must not invoke the router.
+  it("既存個人ページに対する newTab クリックは window.open を呼び navigate は呼ばない", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    vi.mocked(usePageByTitle).mockImplementation(
+      (title: string) =>
+        ({
+          data:
+            title === "Existing Page"
+              ? { id: "existing-id", title: "Existing Page", noteId: DEFAULT_NOTE_ID }
+              : undefined,
+          isFetched: title !== "",
+        }) as ReturnType<typeof usePageByTitle>,
+    );
+
+    const { result } = renderHook(() => useWikiLinkNavigation(), {
+      wrapper: createHookWrapper(),
+    });
+
+    act(() => {
+      result.current.handleLinkClick("Existing Page", { newTab: true });
+    });
+
+    await waitFor(() => {
+      expect(openSpy).toHaveBeenCalledWith(
+        `/notes/${DEFAULT_NOTE_ID}/existing-id`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+
+    openSpy.mockRestore();
+  });
+
+  // Issue #931: ゴーストリンクを Cmd/Ctrl+クリックすると確認ダイアログは
+  // 通常通り開き、確定後の遷移だけが新タブになる。
+  // Issue #931: Cmd/Ctrl+click on a ghost link still opens the confirm
+  // dialog. Only the post-confirm navigation switches to a new tab.
+  it("newTab で開いたゴーストリンクは Dialog 経由で window.open に到達する", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    mockMutateAsync.mockResolvedValue({ id: "new-page-id", noteId: DEFAULT_NOTE_ID });
+    vi.mocked(usePageByTitle).mockImplementation(
+      (title: string) =>
+        ({
+          data: undefined,
+          isFetched: title !== "",
+        }) as ReturnType<typeof usePageByTitle>,
+    );
+
+    const { result } = renderHook(() => useWikiLinkNavigation(), {
+      wrapper: createHookWrapper(),
+    });
+
+    act(() => {
+      result.current.handleLinkClick("Brand New", { newTab: true });
+    });
+
+    await waitFor(() => {
+      expect(result.current.createPageDialogOpen).toBe(true);
+      expect(result.current.pendingCreatePageTitle).toBe("Brand New");
+    });
+
+    await act(async () => {
+      await result.current.handleConfirmCreate();
+    });
+
+    expect(mockMutateAsync).toHaveBeenCalledWith({ title: "Brand New", content: "" });
+    expect(openSpy).toHaveBeenCalledWith(
+      `/notes/${DEFAULT_NOTE_ID}/new-page-id`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(result.current.createPageDialogOpen).toBe(false);
+
+    openSpy.mockRestore();
+  });
+
+  // Issue #931: newTab で開いたあとキャンセル → 次回の通常クリックで
+  // 新タブ意図が漏れないことを確認する（ダイアログ確定経路の漏洩対策）。
+  // Issue #931: cancelling a new-tab ghost dialog must not leak the intent
+  // into a subsequent normal-click flow.
+  it("newTab ゴーストをキャンセルすると次の通常クリックは navigate にフォールバックする", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    mockMutateAsync.mockResolvedValue({ id: "second-id", noteId: DEFAULT_NOTE_ID });
+    vi.mocked(usePageByTitle).mockImplementation(
+      (title: string) =>
+        ({
+          data: undefined,
+          isFetched: title !== "",
+        }) as ReturnType<typeof usePageByTitle>,
+    );
+
+    const { result } = renderHook(() => useWikiLinkNavigation(), {
+      wrapper: createHookWrapper(),
+    });
+
+    act(() => {
+      result.current.handleLinkClick("Ghost A", { newTab: true });
+    });
+    await waitFor(() => {
+      expect(result.current.createPageDialogOpen).toBe(true);
+    });
+    act(() => {
+      result.current.handleCancelCreate();
+    });
+
+    act(() => {
+      result.current.handleLinkClick("Ghost B");
+    });
+    await waitFor(() => {
+      expect(result.current.createPageDialogOpen).toBe(true);
+      expect(result.current.pendingCreatePageTitle).toBe("Ghost B");
+    });
+
+    await act(async () => {
+      await result.current.handleConfirmCreate();
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith(`/notes/${DEFAULT_NOTE_ID}/second-id`, {
+      replace: false,
+      flushSync: true,
+    });
+    expect(openSpy).not.toHaveBeenCalled();
+
+    openSpy.mockRestore();
+  });
+
   it("re-clicking a just-created title navigates immediately without reopening dialog", async () => {
     mockMutateAsync.mockResolvedValue({ id: "new-page-id", noteId: DEFAULT_NOTE_ID });
     const byTitleCache: Record<string, { id: string; title: string; noteId: string } | undefined> =
@@ -297,6 +428,38 @@ describe("useWikiLinkNavigation", () => {
       expect(mockNavigate).not.toHaveBeenCalled();
       expect(result.current.createPageDialogOpen).toBe(false);
       expect(result.current.pendingCreatePageTitle).toBe(null);
+    });
+
+    // Issue #931: Cmd/Ctrl+クリックや中クリックは新タブで開く。
+    // `window.open` が呼ばれ、`navigate` は呼ばれないことを検証する。
+    // Issue #931: Cmd/Ctrl+click and middle-click should open in a new tab
+    // via `window.open` and must not call `navigate`.
+    it("既存ノートページに対する newTab クリックは window.open を呼び navigate は呼ばない", async () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      vi.mocked(useNoteTitleIndex).mockReturnValue({
+        data: [{ id: "note-page-1", title: "Note Page A", isDeleted: false, updatedAt: 0 }],
+        isFetched: true,
+        isLoading: false,
+      } as unknown as ReturnType<typeof useNoteTitleIndex>);
+
+      const { result } = renderHook(() => useWikiLinkNavigation({ pageNoteId: noteId }), {
+        wrapper: createHookWrapper(),
+      });
+
+      act(() => {
+        result.current.handleLinkClick("Note Page A", { newTab: true });
+      });
+
+      await waitFor(() => {
+        expect(openSpy).toHaveBeenCalledWith(
+          `/notes/${noteId}/note-page-1`,
+          "_blank",
+          "noopener,noreferrer",
+        );
+      });
+      expect(mockNavigate).not.toHaveBeenCalled();
+
+      openSpy.mockRestore();
     });
 
     it("削除済みノートページと同一タイトルのクリックでは、ダイアログを開いて新規作成フローに入る", async () => {

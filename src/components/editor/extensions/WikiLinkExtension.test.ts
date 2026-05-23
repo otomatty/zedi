@@ -76,6 +76,134 @@ describe("WikiLinkExtension paste rule", () => {
     });
   });
 
+  // Issue #931: WikiLink クリックハンドラが Cmd/Ctrl+クリックと中クリックを
+  // 「新タブ意図」として伝搬することを検証する。`addProseMirrorPlugins`
+  // から取り出した Plugin spec を直接実行して、`onLinkClick` 呼び出しの
+  // 第 2 引数を検証する。
+  // Issue #931: verify that the wiki-link click handler propagates
+  // Cmd/Ctrl+click and middle-click as a "new tab" intent. Drives the
+  // Plugin spec directly so we can assert the second argument of
+  // `onLinkClick`.
+  describe("WikiLink click handler (issue #931)", () => {
+    type LinkClick = (title: string, options?: { newTab?: boolean }) => void;
+    type HandleClick = (view: unknown, pos: number, event: MouseEvent) => boolean | undefined;
+    type AuxClick = (view: unknown, event: MouseEvent) => boolean | undefined;
+
+    function buildPlugin(onLinkClick: LinkClick) {
+      const extension = WikiLink.configure({});
+      const addProseMirrorPlugins = extension.config.addProseMirrorPlugins;
+      if (typeof addProseMirrorPlugins !== "function") {
+        throw new Error("addProseMirrorPlugins must be a function");
+      }
+      const context: Record<string, unknown> = {
+        ...extension,
+        options: { HTMLAttributes: {}, onLinkClick },
+        parent: undefined,
+      };
+      const plugins = addProseMirrorPlugins.call(context) as Array<{
+        spec: {
+          props: {
+            handleClick?: HandleClick;
+            handleDOMEvents?: { auxclick?: AuxClick };
+          };
+        };
+      }>;
+      return plugins[0];
+    }
+
+    function makeWikiLinkSpan(title: string): HTMLElement {
+      const span = document.createElement("span");
+      span.setAttribute("data-wiki-link", "");
+      span.setAttribute("data-title", title);
+      document.body.appendChild(span);
+      return span;
+    }
+
+    it("通常クリックでは newTab: false を伝える", () => {
+      const onLinkClick = vi.fn();
+      const plugin = buildPlugin(onLinkClick);
+      const span = makeWikiLinkSpan("Some Page");
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "target", { value: span });
+
+      const handled = plugin.spec.props.handleClick?.(null, 0, event);
+
+      expect(handled).toBe(true);
+      expect(onLinkClick).toHaveBeenCalledWith("Some Page", { newTab: false });
+      span.remove();
+    });
+
+    it("Cmd+クリック (metaKey) では newTab: true を伝える", () => {
+      const onLinkClick = vi.fn();
+      const plugin = buildPlugin(onLinkClick);
+      const span = makeWikiLinkSpan("Cmd Page");
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true, metaKey: true });
+      Object.defineProperty(event, "target", { value: span });
+
+      plugin.spec.props.handleClick?.(null, 0, event);
+
+      expect(onLinkClick).toHaveBeenCalledWith("Cmd Page", { newTab: true });
+      span.remove();
+    });
+
+    it("Ctrl+クリック (ctrlKey) では newTab: true を伝える", () => {
+      const onLinkClick = vi.fn();
+      const plugin = buildPlugin(onLinkClick);
+      const span = makeWikiLinkSpan("Ctrl Page");
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true });
+      Object.defineProperty(event, "target", { value: span });
+
+      plugin.spec.props.handleClick?.(null, 0, event);
+
+      expect(onLinkClick).toHaveBeenCalledWith("Ctrl Page", { newTab: true });
+      span.remove();
+    });
+
+    it("中クリック (button === 1) では auxclick 経由で newTab: true を伝える", () => {
+      const onLinkClick = vi.fn();
+      const plugin = buildPlugin(onLinkClick);
+      const span = makeWikiLinkSpan("Middle Page");
+      const event = new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 1 });
+      Object.defineProperty(event, "target", { value: span });
+
+      const handled = plugin.spec.props.handleDOMEvents?.auxclick?.(null, event);
+
+      expect(handled).toBe(true);
+      expect(onLinkClick).toHaveBeenCalledWith("Middle Page", { newTab: true });
+      span.remove();
+    });
+
+    it("中クリック以外の auxclick (button !== 1) は無視する", () => {
+      const onLinkClick = vi.fn();
+      const plugin = buildPlugin(onLinkClick);
+      const span = makeWikiLinkSpan("Right Page");
+      // 右クリック (button === 2) は新タブ対象外。
+      const event = new MouseEvent("auxclick", { bubbles: true, cancelable: true, button: 2 });
+      Object.defineProperty(event, "target", { value: span });
+
+      const handled = plugin.spec.props.handleDOMEvents?.auxclick?.(null, event);
+
+      expect(handled).toBe(false);
+      expect(onLinkClick).not.toHaveBeenCalled();
+      span.remove();
+    });
+
+    it("wiki-link 要素以外のクリックは無視する", () => {
+      const onLinkClick = vi.fn();
+      const plugin = buildPlugin(onLinkClick);
+      const plain = document.createElement("p");
+      document.body.appendChild(plain);
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "target", { value: plain });
+
+      const handled = plugin.spec.props.handleClick?.(null, 0, event);
+
+      expect(handled).toBe(false);
+      expect(onLinkClick).not.toHaveBeenCalled();
+      plain.remove();
+    });
+  });
+
   describe("WikiLink extension configuration", () => {
     it("should have addPasteRules defined", () => {
       const extension = WikiLink.configure({});

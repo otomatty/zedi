@@ -37,12 +37,44 @@ function extractWikiLinkTitle(fullMatch: string): string | null {
 }
 
 /**
+ * WikiLink クリック時の追加オプション（Issue #931）。
+ * `newTab` が `true` のときは新タブで遷移する。
+ *
+ * Click options forwarded to `onLinkClick` (Issue #931). `newTab` indicates
+ * that the destination should open in a new tab (Cmd/Ctrl+click or middle
+ * click).
+ */
+export interface WikiLinkClickOptions {
+  newTab?: boolean;
+}
+
+/**
  * Options for the WikiLink mark extension.
  * WikiLink マーク拡張のオプション。
  */
 export interface WikiLinkOptions {
   HTMLAttributes: Record<string, unknown>;
-  onLinkClick?: (title: string) => void;
+  onLinkClick?: (title: string, options?: WikiLinkClickOptions) => void;
+}
+
+/**
+ * クリックイベントから wiki-link 要素を辿り、関連するタイトルを取り出す。
+ * 該当しない場合は `null`。`handleClick` (左クリック) と `handleDOMEvents.auxclick`
+ * (中クリック) で共有する。
+ *
+ * Resolve the wiki-link DOM target for a click event. Returns the matching
+ * element and its `data-title`, or `null` if the click landed outside of a
+ * wiki-link mark. Shared between left-click and middle-click handlers.
+ */
+function findWikiLinkTarget(
+  target: EventTarget | null,
+): { element: HTMLElement; title: string } | null {
+  if (!(target instanceof Element)) return null;
+  const element = target.closest("[data-wiki-link]") as HTMLElement | null;
+  if (!element) return null;
+  const title = element.getAttribute("data-title");
+  if (!title) return null;
+  return { element, title };
 }
 
 // Link status types:
@@ -197,22 +229,38 @@ export const WikiLink = Mark.create<WikiLinkOptions>({
           handleClick: (_view, _pos, event) => {
             if (!onLinkClick) return false;
 
-            const target = event.target as HTMLElement;
+            const hit = findWikiLinkTarget(event.target);
+            if (!hit) return false;
 
-            // Check if clicked on a wiki-link element
-            const wikiLinkElement = target.closest("[data-wiki-link]") as HTMLElement | null;
-            if (!wikiLinkElement) return false;
-
-            const title = wikiLinkElement.getAttribute("data-title");
-
-            if (title) {
+            // Issue #931: Cmd/Ctrl+クリックは新タブで開く。span 要素は
+            // ネイティブリンクではないため、いずれの場合も自前で navigate / open
+            // を呼ぶ必要があり、`preventDefault` は両ケースで実行する。
+            // Issue #931: Cmd/Ctrl+click opens in a new tab. The wiki-link
+            // span is not a native anchor, so both branches navigate via the
+            // callback and we always call `preventDefault`.
+            const newTab = event.metaKey || event.ctrlKey;
+            event.preventDefault();
+            event.stopPropagation();
+            onLinkClick(hit.title, { newTab });
+            return true;
+          },
+          handleDOMEvents: {
+            // Issue #931: 中クリック（マウスホイールクリック）も新タブ扱い。
+            // ProseMirror の `handleClick` は左クリックのみ発火するため、
+            // 中クリックは `auxclick` で別途処理する。
+            // Issue #931: middle-click also opens in a new tab. ProseMirror's
+            // `handleClick` only fires for the primary button, so we register
+            // an `auxclick` listener to catch button === 1.
+            auxclick: (_view, event) => {
+              if (!onLinkClick) return false;
+              if (event.button !== 1) return false;
+              const hit = findWikiLinkTarget(event.target);
+              if (!hit) return false;
               event.preventDefault();
               event.stopPropagation();
-              onLinkClick(title);
+              onLinkClick(hit.title, { newTab: true });
               return true;
-            }
-
-            return false;
+            },
           },
         },
       }),

@@ -55,7 +55,7 @@ interface UseEditorSetupOptions {
   collaborationConfig: TiptapEditorProps["collaborationConfig"];
   editorRef: MutableRefObject<Editor | null>;
   lastSelectionRef: MutableRefObject<{ from: number; to: number } | null>;
-  handleLinkClick: (title: string) => void;
+  handleLinkClick: (title: string, options?: { newTab?: boolean }) => void;
   handleStateChange: (state: WikiLinkSuggestionState) => void;
   handleSlashStateChange: (state: SlashSuggestionState) => void;
   handleTagSuggestionStateChange: (state: TagSuggestionState) => void;
