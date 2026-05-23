@@ -8,6 +8,7 @@ import type { TiptapEditorProps } from "./TiptapEditor/types";
 import { StorageSetupDialog } from "./TiptapEditor/StorageSetupDialog";
 import { DragOverlay } from "./TiptapEditor/DragOverlay";
 import { WikiLinkSuggestionLayer } from "./TiptapEditor/WikiLinkSuggestionLayer";
+import { FloatingWikiLinkInputBar } from "./FloatingWikiLinkInputBar";
 import { WikiLinkHoverCardLayer } from "./TiptapEditor/WikiLinkHoverCardLayer";
 import { TagSuggestionLayer } from "./TiptapEditor/TagSuggestionLayer";
 import { SlashSuggestionLayer } from "./TiptapEditor/SlashSuggestionLayer";
@@ -201,6 +202,14 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         onOpenChange={setStorageSetupDialogOpen}
         onConfirm={handleGoToStorageSettings}
       />
+      {!isReadOnly && (
+        // FAB 左にピル型 Wiki Link 入力バーを常時表示する（issue #924 §2 / #926）。
+        // 役割はゴーストリンク作成 + 入力中の既存ページ候補提示の二役 UI。
+        // Always-on pill input bar mounted to the left of the FAB (issue
+        // #924 §2 / #926). Doubles as ghost-link creation and existing-link
+        // insertion via the shared suggestion popup.
+        <FloatingWikiLinkInputBar editor={editor} pageId={pageId} pageNoteId={resolvedPageNoteId} />
+      )}
     </div>
   );
 };
