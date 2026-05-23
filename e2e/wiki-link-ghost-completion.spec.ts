@@ -20,8 +20,6 @@ const GHOST_SELECTOR = ".wiki-link-ghost-completion";
 
 /**
  * Seed a single candidate page so the ghost completion has something to match.
- * Returns the title that was created.
- *
  * ゴーストが match できるように候補ページを 1 枚作る。
  */
 async function seedCandidatePage(
@@ -129,6 +127,7 @@ test.describe("Inline Ghost Completion (issue #930)", () => {
 
     await page.keyboard.type("h");
     // Now at 2 chars → ghost should appear.
+    // 2 文字に達したのでゴーストが出る。
     await expect(page.locator(GHOST_SELECTOR)).toBeVisible();
   });
 
@@ -147,6 +146,34 @@ test.describe("Inline Ghost Completion (issue #930)", () => {
     await page.keyboard.type("```");
     await page.keyboard.press("Enter");
     await page.keyboard.type("Gho");
+    await expect(page.locator(GHOST_SELECTOR)).toHaveCount(0);
+  });
+
+  test("does not fire inside inline code", async ({ page, helpers }) => {
+    // 受け入れ条件: インラインコード（バッククォート 1 つ）内ではゴースト不発火。
+    // 内部では `wikiLink` マークが付けられない（`excludes: "code"` 相当）ため、
+    // サジェストも出さない契約。
+    // Acceptance: ghost must not fire inside inline code (single backticks)
+    // since the WikiLink mark cannot apply there.
+    await seedCandidatePage(page, helpers, "Ghost Target");
+    await helpers.createNewPage(page);
+    await page.getByPlaceholder("タイトル").fill("Source InlineCode");
+    await page.waitForTimeout(800);
+
+    const editor = editorLocator(page);
+    await editor.click();
+    // Open an inline code span via Markdown input rule: typing "`Gho`" turns
+    // the text between backticks into inline code. We type the opening
+    // backtick + the prefix first to land the caret inside the active code
+    // mark, which mirrors what users do mid-line.
+    // Markdown 入力規則で「`Gho`」と打って `Gho` をインラインコードにする。
+    // 開きバッククォート + 接頭辞を打鍵した時点でキャレットは `code` マーク
+    // 内にあるので、その状態でゴーストが出ないことを確認する。
+    await page.keyboard.type("`Gho`");
+    // Move the caret back inside the code span and type another matching char.
+    // キャレットをインラインコード内に戻して 1 文字追加し、再度抑止を確認する。
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.type("s");
     await expect(page.locator(GHOST_SELECTOR)).toHaveCount(0);
   });
 
@@ -180,6 +207,7 @@ test.describe("Inline Ghost Completion (issue #930)", () => {
     const editor = editorLocator(page);
     await editor.click();
     // Start a bullet list.
+    // 箇条書きリストを開始する。
     await page.keyboard.type("- first item");
     await page.keyboard.press("Enter");
     await page.keyboard.type("nested");

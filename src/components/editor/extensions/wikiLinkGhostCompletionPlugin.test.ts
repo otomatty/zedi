@@ -31,6 +31,7 @@ import {
 } from "./wikiLinkGhostCompletionPlugin";
 import { WikiLinkSuggestionPlugin, wikiLinkSuggestionPluginKey } from "./wikiLinkSuggestionPlugin";
 import { TagSuggestionPlugin, tagSuggestionPluginKey } from "./tagSuggestionPlugin";
+import { SlashSuggestionPlugin, slashSuggestionPluginKey } from "./slashSuggestionPlugin";
 
 /**
  * Minimal schema covering every node / mark the plugin needs to reason about.
@@ -145,7 +146,10 @@ function buildPlugin(opts: BuildOpts = {}): Plugin {
   });
 }
 
-/** Place caret at end of inline content in the given block. */
+/**
+ * Place caret at end of inline content in the given block.
+ * 指定ブロックのインライン末尾にキャレットを置く。
+ */
 function caretAtEnd(state: EditorState, text: string): EditorState {
   const tr = state.tr.setSelection(TextSelection.create(state.doc, 1 + text.length));
   return state.apply(tr);
@@ -175,6 +179,7 @@ function makeBlockquoteState(text: string, plugin: Plugin): EditorState {
   ]);
   const state = EditorState.create({ doc, schema, plugins: [plugin] });
   // doc(0)/blockquote(1)/paragraph(1)/text… → caret at 2 + text.length.
+  // ネスト 2 段なので caret 位置は 2 + text.length。
   const tr = state.tr.setSelection(TextSelection.create(state.doc, 2 + text.length));
   return state.apply(tr);
 }
@@ -189,6 +194,7 @@ function makeListItemState(text: string, plugin: Plugin): EditorState {
   ]);
   const state = EditorState.create({ doc, schema, plugins: [plugin] });
   // doc/bullet_list(1)/list_item(1)/paragraph(1)/text…
+  // ネスト 3 段なので caret 位置は 3 + text.length。
   const tr = state.tr.setSelection(TextSelection.create(state.doc, 3 + text.length));
   return state.apply(tr);
 }
@@ -205,6 +211,7 @@ function makeTableCellState(text: string, plugin: Plugin): EditorState {
   ]);
   const state = EditorState.create({ doc, schema, plugins: [plugin] });
   // doc/table(1)/table_row(1)/table_cell(1)/paragraph(1)/text…
+  // ネスト 4 段なので caret 位置は 4 + text.length。
   const tr = state.tr.setSelection(TextSelection.create(state.doc, 4 + text.length));
   return state.apply(tr);
 }
@@ -302,7 +309,8 @@ describe("wikiLinkGhostCompletionPlugin — activation", () => {
   it("matches CJK candidates", () => {
     const plugin = buildPlugin({ candidates: TARGETS });
     const state = makeParagraphState("技", plugin);
-    // 1 char only → ≥2 rule rejects
+    // 1 char only → ≥2 rule rejects.
+    // 1 文字なので 2 文字以上ルールにより不発火。
     expect(wikiLinkGhostCompletionPluginKey.getState(state)?.active).toBe(false);
 
     const state2 = makeParagraphState("技術", plugin);
@@ -368,6 +376,7 @@ describe("wikiLinkGhostCompletionPlugin — minimum length and word boundary", (
     expect(ps?.active).toBe(true);
     expect(ps?.query).toBe("Gho");
     // "hello " is 6 chars → typed word starts at pos 7.
+    // 直前の "hello " が 6 文字なので入力中の単語は pos 7 から始まる。
     expect(ps?.range).toEqual({ from: 7, to: 10 });
   });
 
@@ -434,8 +443,10 @@ describe("wikiLinkGhostCompletionPlugin — coordination with other suggesters",
     state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, 6)));
 
     // Wiki link suggestion must be active for this assertion to be meaningful.
+    // この assertion が意味を持つよう、Wiki サジェスト側が active であることを担保。
     expect(wikiLinkSuggestionPluginKey.getState(state)?.active).toBe(true);
     // Ghost completion must be suppressed.
+    // ゴースト補完は抑止されているべき。
     expect(wikiLinkGhostCompletionPluginKey.getState(state)?.active).toBe(false);
   });
 
@@ -451,6 +462,32 @@ describe("wikiLinkGhostCompletionPlugin — coordination with other suggesters",
     state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, 5)));
 
     expect(tagSuggestionPluginKey.getState(state)?.active).toBe(true);
+    expect(wikiLinkGhostCompletionPluginKey.getState(state)?.active).toBe(false);
+  });
+
+  it("is suppressed when the `/` slash suggestion plugin is active (even mid-arg)", () => {
+    // SlashSuggestionPlugin は空白を含むクエリでも active を維持するため、
+    // 「`/cmd Ghost`」のような入力ではスラッシュメニューとゴーストが衝突しうる。
+    // ここでは両プラグインを同居させ、スラッシュ active 中はゴーストが立たない
+    // ことを保証する（Codex PR レビュー指摘）。
+    // SlashSuggestionPlugin stays active across whitespace, so an input like
+    // `/cmd Ghost` could double-fire the ghost. This test pins the mutual
+    // exclusion contract added in response to the PR review.
+    const ghost = buildPlugin({ candidates: TARGETS });
+    const slashExt = SlashSuggestionPlugin.configure({});
+    const addSlashPlugins = slashExt.config.addProseMirrorPlugins;
+    if (!addSlashPlugins) throw new Error("SlashSuggestionPlugin.addProseMirrorPlugins missing");
+    const slashPlugin = addSlashPlugins.call({ options: {} } as never)[0];
+
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, [schema.text("/cmd Gho")]),
+    ]);
+    let state = EditorState.create({ doc, schema, plugins: [slashPlugin, ghost] });
+    state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, 9)));
+
+    // Slash サジェスト側が active であることを前提に、ゴーストは抑止される。
+    // Slash side must be active for this assertion to be meaningful.
+    expect(slashSuggestionPluginKey.getState(state)?.active).toBe(true);
     expect(wikiLinkGhostCompletionPluginKey.getState(state)?.active).toBe(false);
   });
 });

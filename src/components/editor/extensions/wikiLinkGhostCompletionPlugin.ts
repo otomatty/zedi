@@ -6,6 +6,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import type { EditorView } from "@tiptap/pm/view";
 import { wikiLinkSuggestionPluginKey } from "./wikiLinkSuggestionPlugin";
 import { tagSuggestionPluginKey } from "./tagSuggestionPlugin";
+import { slashSuggestionPluginKey } from "./slashSuggestionPlugin";
 
 /**
  * Lightweight candidate page descriptor consumed by the ghost completion plugin.
@@ -208,6 +209,14 @@ function findContextSuppression(
 
   if (wikiLinkSuggestionPluginKey.getState(newState)?.active) return "wiki-suggestion-active";
   if (tagSuggestionPluginKey.getState(newState)?.active) return "tag-suggestion-active";
+  // Slash サジェストが開いている間は同時に発火させない。`SlashSuggestionPlugin`
+  // は空白を含むクエリでも active を保つため (`/(^|\\s)\\/([^\\n]*)$/`)、
+  // 「`/cmd Ghost`」のような入力でゴーストと UI が二重に出るのを抑止する。
+  // また Tab を奪われずスラッシュメニュー側のキー操作を維持する。
+  // Mutually exclude with the slash menu: `SlashSuggestionPlugin` stays
+  // active across spaces, so `/cmd Ghost` would otherwise double-fire the
+  // ghost widget and steal Tab from the slash command flow.
+  if (slashSuggestionPluginKey.getState(newState)?.active) return "slash-suggestion-active";
 
   const { $from } = selection;
   if ($from.parent.type.spec.code) return "code-block";
@@ -405,8 +414,8 @@ function confirmGhostCompletion(view: EditorView, state: WikiLinkGhostCompletion
  *   即時 close）
  * - コードブロック (`parent.type.spec.code`) / インラインコード
  *   (`code` mark) / `title` / `caption` などの本文外
- * - `wikiLinkSuggestionPlugin` か `tagSuggestionPlugin` が active のとき
- *   （`[[`・`#` 入力が優先）
+ * - `wikiLinkSuggestionPlugin` / `tagSuggestionPlugin` / `slashSuggestionPlugin`
+ *   のいずれかが active のとき（`[[`・`#`・`/` 入力が優先）
  * - 既存 `wikiLink` マーク内
  * - 単語の先頭が `[`, `]`, `#`, `@`, `/`（他フローへ譲る）
  * - 候補に prefix 一致するページがない、または完全一致で suffix が空
@@ -542,8 +551,13 @@ export const WikiLinkGhostCompletionPlugin = Extension.create<WikiLinkGhostCompl
             // モバイルのチップタップ・デスクトップのマウス確定。`mousedown`
             // で ProseMirror の selection 処理より先に確定する。
             mousedown(view, event) {
-              const target = event.target as HTMLElement | null;
-              if (!target?.closest(`[${GHOST_DATA_ATTR}="true"]`)) return false;
+              // `event.target` はテキストノードなど `Element` ではないことも
+              // ある。`closest` を安全に呼ぶため `instanceof Element` で絞る。
+              // Guard against non-Element targets (e.g. text nodes) so we can
+              // safely call `closest` without runtime errors.
+              const target = event.target;
+              if (!(target instanceof Element)) return false;
+              if (!target.closest(`[${GHOST_DATA_ATTR}="true"]`)) return false;
               const pluginState = wikiLinkGhostCompletionPluginKey.getState(view.state);
               if (!pluginState?.active) return false;
               event.preventDefault();
@@ -551,8 +565,11 @@ export const WikiLinkGhostCompletionPlugin = Extension.create<WikiLinkGhostCompl
             },
 
             touchstart(view, event) {
-              const target = event.target as HTMLElement | null;
-              if (!target?.closest(`[${GHOST_DATA_ATTR}="true"]`)) return false;
+              // mousedown と同じ理由で `instanceof Element` ガード。
+              // Same Element guard as mousedown above.
+              const target = event.target;
+              if (!(target instanceof Element)) return false;
+              if (!target.closest(`[${GHOST_DATA_ATTR}="true"]`)) return false;
               const pluginState = wikiLinkGhostCompletionPluginKey.getState(view.state);
               if (!pluginState?.active) return false;
               event.preventDefault();
