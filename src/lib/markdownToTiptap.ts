@@ -30,6 +30,7 @@
  */
 
 import { parseInlineContent, type TiptapTextNode } from "./markdownToTiptapHelpers";
+import { transformMermaidCodeBlocksInContent } from "@/components/editor/extensions/transformMermaidCodeBlocksInContent";
 
 type TiptapBlockNode = {
   type: string;
@@ -183,5 +184,14 @@ export function convertMarkdownToTiptapContent(
     });
   }
 
-  return JSON.stringify(doc);
+  // `codeBlock` + `language: "mermaid"` を `mermaid` ノードに正規化する。
+  // 現状この変換器は codeBlock を出さないが、将来 fenced code 対応を入れた際の
+  // 取りこぼし防止と、外部経由で同形の JSON が渡るケースの一貫性のために通す。
+  // Normalise any `codeBlock` + `language: "mermaid"` into a dedicated `mermaid`
+  // node. The current converter doesn't emit code blocks, but running the
+  // transform keeps the output consistent if fenced-code support is added
+  // later or if an external caller hands us a doc containing them.
+  const normalised = transformMermaidCodeBlocksInContent(doc);
+
+  return JSON.stringify(normalised);
 }

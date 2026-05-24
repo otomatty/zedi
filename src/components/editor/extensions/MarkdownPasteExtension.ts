@@ -4,6 +4,10 @@ import {
   containsWikiLinkPattern,
   transformWikiLinksInContent,
 } from "./transformWikiLinksInContent";
+import {
+  containsMermaidFence,
+  transformMermaidCodeBlocksInContent,
+} from "./transformMermaidCodeBlocksInContent";
 
 /**
  * ProseMirror プラグインキー（拡張再初期化時の再生成を避けるためトップレベルで定義）。
@@ -80,11 +84,20 @@ export const MarkdownPaste = Extension.create({
               // 後処理で `wikiLink` マークを付与する。
               // `@tiptap/markdown` leaves `[[...]]` as plain text, so post-process
               // the parsed JSON to apply the `wikiLink` mark.
-              const content = hasWikiLink
+              let content = hasWikiLink
                 ? transformWikiLinksInContent(
                     parsed as Parameters<typeof transformWikiLinksInContent>[0],
                   )
-                : parsed;
+                : (parsed as Parameters<typeof transformWikiLinksInContent>[0]);
+              // ```mermaid``` フェンスは `@tiptap/markdown` が `codeBlock` ノード
+              // （`language: "mermaid"`）として生成するので、後処理で専用の
+              // `mermaid` ノードに置換してダイアグラム描画に回す。
+              // `@tiptap/markdown` parses ```mermaid``` fences into `codeBlock`
+              // nodes with `language: "mermaid"`; convert them to dedicated
+              // `mermaid` nodes here so they render as diagrams downstream.
+              if (containsMermaidFence(text)) {
+                content = transformMermaidCodeBlocksInContent(content);
+              }
               return editor.commands.insertContent(content);
             } catch {
               // パース失敗時は ProseMirror のデフォルトペースト処理にフォールバック
