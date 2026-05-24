@@ -103,6 +103,12 @@ export {
   type ActivityKind,
   type ActivityActor,
 } from "./activityLog.js";
+export {
+  wikiComposeSessions,
+  type WikiComposeSession,
+  type NewWikiComposeSession,
+  type WikiComposeSessionStatus,
+} from "./wikiComposeSessions.js";
 
 export {
   usersRelations,
