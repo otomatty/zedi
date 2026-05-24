@@ -33,7 +33,7 @@
       "project": ["src/**/*.ts"]
     },
     "server/api": {
-      "entry": ["scripts/**/*.ts"],
+      "entry": ["scripts/**/*.ts", "src/agents/index.ts"],
       "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts"]
     },
     "server/hocuspocus": {
@@ -103,7 +103,10 @@
     "wrangler",
     "@tauri-apps/plugin-shell",
     "@tauri-apps/plugin-store",
-    "@tauri-apps/plugin-updater"
+    "@tauri-apps/plugin-updater",
+    "@langchain/openai",
+    "@langchain/anthropic",
+    "@langchain/google-genai"
   ],
   "ignoreExportsUsedInFile": {
     "interface": true,

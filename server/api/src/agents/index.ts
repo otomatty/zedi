@@ -32,7 +32,8 @@ export {
 export {
   getPostgresCheckpointer,
   ensurePostgresCheckpointerSetup,
-} from "./core/checkpoint/postgresCheckpointer.js";
+  resolveCheckpointerForRun,
+} from "./core/checkpoint/index.js";
 export { BaseState, type BaseStateType, type BaseStateUpdate } from "./core/state/baseState.js";
 export {
   SHARED_TOOLS,

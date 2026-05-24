@@ -14,14 +14,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../types/index.js";
 
-vi.mock("../../auth.js", () => ({
-  auth: {
-    api: {
-      getSession: async () => null,
-    },
-  },
-}));
-
 vi.mock("../../middleware/auth.js", () => ({
   authRequired: async (c: Context<AppEnv>, next: Next) => {
     const userId = c.req.header("x-test-user-id");
@@ -35,10 +27,6 @@ vi.mock("../../middleware/rateLimit.js", () => ({
   rateLimit: () => async (_c: Context<AppEnv>, next: Next) => {
     await next();
   },
-}));
-
-vi.mock("../../services/subscriptionService.js", () => ({
-  getUserTier: async () => "free" as const,
 }));
 
 import { Hono } from "hono";
@@ -274,6 +262,7 @@ describe("DELETE /api/pages/:pageId/compose-sessions/:id", () => {
     const { app, chains } = createComposeApp([
       ...pageAccessPrefix(),
       [interruptedRow],
+      [], // getUserTier subscription lookup
       [interruptedRow], // atomic claim → running
       undefined, // GraphNotRegisteredError recovery → failed update
     ]);

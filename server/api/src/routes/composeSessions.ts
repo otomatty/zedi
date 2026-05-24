@@ -39,6 +39,7 @@ import {
 } from "../agents/core/llm/modelFactory.js";
 import { SSE_EVENT_NAMES, type SseEvent } from "../agents/core/types/sseEvents.js";
 import { GRAPH_CONTEXT_CONFIG_KEY } from "../agents/core/types/graphContext.js";
+import { resolveCheckpointerForRun } from "../agents/core/checkpoint/index.js";
 import type { AppEnv } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -232,18 +233,18 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
       void persistSession();
     });
 
+    // `DATABASE_URL` が設定された本番経路では `PostgresSaver` を取得して
+    // checkpoint 保存・再開を有効化する。テスト / CI では未設定なので `false`
+    // を返し、LangGraph の checkpoint 機構を無効化したまま smoke-test で走る。
+    const checkpointer = await resolveCheckpointerForRun();
+
     try {
       await send(startedEvent(id, session.graphId, session.phase));
 
       const events = runner.streamEvents(
         {
           graphId: session.graphId,
-          // P0 routes use `checkpointer: false` so the smoke-test path can run
-          // without DDL. Production wiring swaps in `getPostgresCheckpointer()`
-          // once `ensurePostgresCheckpointerSetup()` has been invoked at boot.
-          // P0 では checkpointer 無効で走らせる。本番配線は boot 時に setup を
-          // 通した上で PostgresSaver を渡す。
-          checkpointer: false,
+          checkpointer,
           context: {
             threadId: id,
             sessionId: id,
@@ -335,12 +336,16 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
     throw new HTTPException(409, { message: "Session is not interrupted" });
   }
 
+  // Resume relies on the checkpointer to fetch the suspended thread; production
+  // routes load `PostgresSaver` here, tests/smoke runs get `false`.
+  const checkpointer = await resolveCheckpointerForRun();
+
   let result;
   try {
     result = await runner.resume(
       {
         graphId: session.graphId,
-        checkpointer: false,
+        checkpointer,
         context: {
           threadId: id,
           sessionId: id,
