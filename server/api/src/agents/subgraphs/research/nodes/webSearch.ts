@@ -23,6 +23,19 @@ interface WebSearchToolEnvelope {
   }>;
 }
 
+/**
+ * `web_search` node — fans out the `webSearchTool` over every query whose
+ * `channels` include "web". Tool failures are swallowed (skipped) so one bad
+ * query never aborts the iteration.
+ *
+ * web 検索ノード本体。web チャンネル指定のクエリごとに `webSearchTool` を
+ * 並列実行し、結果を `pendingSources` にマージする。
+ *
+ * @param state  Current research-loop state.
+ * @param config LangGraph runnable config (tool invocation requires it so
+ *               `GraphContext` can flow to the tool).
+ * @returns Partial state update: `{ pendingSources: collectedRows[] }`.
+ */
 export async function webSearch(
   state: ResearchLoopStateType,
   config: LangGraphRunnableConfig,

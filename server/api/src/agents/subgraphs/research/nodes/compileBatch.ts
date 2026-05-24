@@ -12,6 +12,18 @@ import { dispatchResearchBatch } from "./shared/dispatchSseCustom.js";
 import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { ExitReason, ResearchBatch } from "../types.js";
 
+/**
+ * `compile_batch` node — pure projection that freezes the current state into a
+ * UI-facing {@link ResearchBatch}, appends it to `state.batches`, and dispatches
+ * the `research_batch` SSE custom event.
+ *
+ * `compile_batch` ノード本体。`pendingSources` のスナップショットを 1 件の
+ * {@link ResearchBatch} に固めて `batches` に append し、`exitReason` を確定する。
+ *
+ * @param state  Current research-loop state.
+ * @param config LangGraph runnable config (carries `GraphContext` + callbacks).
+ * @returns Partial state update: `{ batches: [newBatch], exitReason, phase }`.
+ */
 export async function compileBatch(
   state: ResearchLoopStateType,
   config: LangGraphRunnableConfig,

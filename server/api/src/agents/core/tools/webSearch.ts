@@ -123,7 +123,7 @@ export const webSearchTool = tool(
 
     let modelId: string | null;
     try {
-      modelId = await resolveWebSearchModelId(ctx.db);
+      modelId = await resolveWebSearchModelId(ctx.db, ctx.tier);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return JSON.stringify({

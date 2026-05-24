@@ -38,6 +38,20 @@ interface FetchArticleFailure {
 
 const PER_ITERATION_FETCH_LIMIT = 5;
 
+/**
+ * `fetch_articles` node — Readability-extracts up to {@link PER_ITERATION_FETCH_LIMIT}
+ * pending `web` rows in parallel and emits `kind:"fetched"` upgrades. The
+ * reducer ({@link mergeSourcesById}) overwrites each upgraded row in place
+ * because fetched sources carry the same `src:<sha>` id as the originating
+ * web row (codex review #956 P2 / gemini #4).
+ *
+ * fetch_articles ノード本体。pending な `web` 行を最大 N 件並列で取得し、
+ * `kind:"fetched"` に in-place 昇格させる。
+ *
+ * @param state  Current research-loop state.
+ * @param config LangGraph runnable config (carries `GraphContext` + callbacks).
+ * @returns Partial state update: `{ pendingSources: upgradedRows[] }`.
+ */
 export async function fetchArticles(
   state: ResearchLoopStateType,
   config: LangGraphRunnableConfig,

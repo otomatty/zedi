@@ -23,6 +23,20 @@ interface WikiSearchToolEnvelope {
   }>;
 }
 
+/**
+ * `wiki_search` node — fans out the `wikiSearchTool` over every query whose
+ * `channels` include "wiki". Authorisation (own / accepted-member / domain
+ * rule) is enforced inside the tool via `searchUserWikiPages`, scoped by
+ * `GraphContext.userId` + `userEmail`.
+ *
+ * wiki 検索ノード本体。wiki チャンネル指定のクエリごとに `wikiSearchTool` を
+ * 並列実行し、内部ページのヒットを `pendingSources` にマージする。
+ *
+ * @param state  Current research-loop state.
+ * @param config LangGraph runnable config (tool invocation requires it so
+ *               `GraphContext` can flow to the tool).
+ * @returns Partial state update: `{ pendingSources: collectedRows[] }`.
+ */
 export async function wikiSearch(
   state: ResearchLoopStateType,
   config: LangGraphRunnableConfig,

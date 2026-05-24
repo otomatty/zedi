@@ -354,7 +354,14 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
         }
       }
 
-      finalStatus = "completed";
+      // Only promote to "completed" if the stream did NOT emit an interrupt
+      // event above. Without this guard, an interrupt detected inside the
+      // for-await loop would be silently overwritten to "completed" once the
+      // stream drains (codex review #956 / coderabbit critical finding).
+      // ストリーム完走時点で interrupted を上書きしないよう、明示的にガードする。
+      if (finalStatus !== "interrupted") {
+        finalStatus = "completed";
+      }
     } catch (err) {
       // Legacy throw path (LangGraph might re-introduce, version skew etc.).
       // 古い throw 経路の保険として残す。

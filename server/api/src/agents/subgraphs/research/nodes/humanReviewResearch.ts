@@ -30,6 +30,24 @@ export interface HumanReviewInterruptPayload {
   pendingSources: Source[];
 }
 
+/**
+ * `human_review_research` node — HITL interrupt point. Halts the graph via
+ * LangGraph `interrupt(payload)` to surface the latest batch + pending sources
+ * to the client; on resume, validates the `{ approvedSourceIds,
+ * rejectedSourceIds?, note? }` payload with {@link researchResumeSchema} and
+ * projects approved/rejected sources into the state.
+ *
+ * HITL 中断ノード本体。`interrupt()` でグラフを停止し、resume 時に
+ * resume payload を検証して `approvedResearch` / `rejectedResearch` を確定する。
+ *
+ * @param state   Current research-loop state.
+ * @param _config LangGraph runnable config (unused but required by the node
+ *                signature).
+ * @returns Partial state update on resume: `{ approvedResearch, rejectedResearch,
+ *          phase: "completed" }`.
+ * @throws  zod `ZodError` if the resume payload is malformed; surfaces as a
+ *          failed run via `GraphRunner`.
+ */
 export async function humanReviewResearch(
   state: ResearchLoopStateType,
   _config: LangGraphRunnableConfig,

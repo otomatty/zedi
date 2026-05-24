@@ -43,6 +43,18 @@ function buildUserPrompt(state: ResearchLoopStateType): string {
   ].join("\n");
 }
 
+/**
+ * `refine_queries` node — replaces `state.queries` with a fresh batch that
+ * addresses `lastEvaluation.missingAspects`, then dispatches
+ * `research_iteration { status: "refined" }`. Loops back to the search
+ * fan-out via the graph edge.
+ *
+ * リファインノード本体。直近の評価結果を元に次イテレーションのクエリを生成する。
+ *
+ * @param state  Current research-loop state.
+ * @param config LangGraph runnable config (carries `GraphContext` + callbacks).
+ * @returns Partial state update: `{ queries: newQueries, phase }`.
+ */
 export async function refineQueries(
   state: ResearchLoopStateType,
   config: LangGraphRunnableConfig,

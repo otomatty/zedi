@@ -15,8 +15,14 @@ import {
 
 /**
  * Returns the `GraphContext` injected by `GraphRunner.buildConfig`. Throws
- * when missing so misconfigured callers fail loudly instead of silently
- * running with default credentials.
+ * when missing or malformed so misconfigured callers fail loudly with a
+ * pointed error rather than running with default / undefined credentials and
+ * exploding deep inside `createZediChatModel` / `recordUsage`.
+ *
+ * `GraphRunner.buildConfig` が唯一の正規生成者だが、テスト誤用や手動構築の
+ * 防御として、必須フィールドの存在 (`userId`, `db`, `feature`) を浅く検証する。
+ * Zod 等の重い依存は導入しない — 単一のプロデューサで保証している契約への
+ * 二次防衛なので、shape check で十分（coderabbit review #956）。
  */
 export function getGraphContext(config: LangGraphRunnableConfig | undefined): GraphContext {
   const configurable = config?.configurable as Record<string, unknown> | undefined;
@@ -27,5 +33,16 @@ export function getGraphContext(config: LangGraphRunnableConfig | undefined): Gr
         "GraphRunner is responsible for populating it.",
     );
   }
-  return candidate as GraphContext;
+  const ctx = candidate as Partial<GraphContext>;
+  const missing: string[] = [];
+  if (typeof ctx.userId !== "string" || ctx.userId.length === 0) missing.push("userId");
+  if (!ctx.db) missing.push("db");
+  if (typeof ctx.feature !== "string" || ctx.feature.length === 0) missing.push("feature");
+  if (missing.length > 0) {
+    throw new Error(
+      `GraphContext is missing required fields: ${missing.join(", ")}. ` +
+        "Check GraphRunner.buildConfig.",
+    );
+  }
+  return ctx as GraphContext;
 }

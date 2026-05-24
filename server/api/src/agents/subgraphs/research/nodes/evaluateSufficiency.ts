@@ -52,6 +52,19 @@ function buildUserPrompt(state: ResearchLoopStateType): string {
   ].join("\n");
 }
 
+/**
+ * `evaluate_sufficiency` node — scores the gathered sources against the brief,
+ * post-increments `iteration`, and dispatches the `research_evaluation` SSE
+ * custom event. The conditional edge {@link shouldRefine} reads
+ * `lastEvaluation.score` + `iteration` to decide refine vs compile.
+ *
+ * 充足度評価ノード本体。LLM で `{ score, rationale, missingAspects }` を
+ * 構造化出力で得て、`iteration` を 1 進めて返す。
+ *
+ * @param state  Current research-loop state.
+ * @param config LangGraph runnable config (carries `GraphContext` + callbacks).
+ * @returns Partial state update: `{ lastEvaluation, iteration, phase }`.
+ */
 export async function evaluateSufficiency(
   state: ResearchLoopStateType,
   config: LangGraphRunnableConfig,
