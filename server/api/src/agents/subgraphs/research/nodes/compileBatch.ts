@@ -9,10 +9,7 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { randomUUID } from "node:crypto";
 import { dispatchResearchBatch } from "./shared/dispatchSseCustom.js";
-import type {
-  ResearchLoopStateType,
-  ResearchLoopStateUpdate,
-} from "../state.js";
+import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { ExitReason, ResearchBatch } from "../types.js";
 
 export async function compileBatch(

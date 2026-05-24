@@ -15,10 +15,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
-import {
-  GRAPH_CONTEXT_CONFIG_KEY,
-  type GraphContext,
-} from "../types/graphContext.js";
+import { GRAPH_CONTEXT_CONFIG_KEY, type GraphContext } from "../types/graphContext.js";
 import { searchUserWikiPages } from "../../../services/wikiSearchService.js";
 
 /** Tool name. */

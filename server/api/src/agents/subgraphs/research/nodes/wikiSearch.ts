@@ -8,10 +8,7 @@
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { wikiSearchTool } from "../../../core/tools/wikiSearch.js";
-import type {
-  ResearchLoopStateType,
-  ResearchLoopStateUpdate,
-} from "../state.js";
+import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { Source } from "../types.js";
 
 interface WikiSearchToolEnvelope {

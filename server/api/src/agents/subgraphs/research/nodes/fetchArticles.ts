@@ -17,10 +17,7 @@
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { fetchArticleTool } from "../../../core/tools/fetchArticle.js";
-import type {
-  ResearchLoopStateType,
-  ResearchLoopStateUpdate,
-} from "../state.js";
+import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { Source } from "../types.js";
 
 interface FetchArticleSuccess {

@@ -14,10 +14,7 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { interrupt } from "@langchain/langgraph";
 import { researchResumeSchema } from "../resumeSchema.js";
-import type {
-  ResearchLoopStateType,
-  ResearchLoopStateUpdate,
-} from "../state.js";
+import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { ResearchBatch, Source } from "../types.js";
 
 /**

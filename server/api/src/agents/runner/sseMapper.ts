@@ -174,7 +174,8 @@ function mapChainEnd(event: LangGraphRuntimeEvent): SseEvent[] {
   const interrupts = (output as { __interrupt__?: unknown }).__interrupt__;
   if (Array.isArray(interrupts) && interrupts.length > 0) {
     for (const entry of interrupts) {
-      const value = entry && typeof entry === "object" ? (entry as { value?: unknown }).value : undefined;
+      const value =
+        entry && typeof entry === "object" ? (entry as { value?: unknown }).value : undefined;
       events.push({ type: "interrupt", payload: value });
     }
   }
@@ -229,12 +230,7 @@ function mapResearchEvaluation(data: Record<string, unknown>): SseResearchEvalua
   const rationale = typeof data.rationale === "string" ? data.rationale : null;
   const missingAspectsCount =
     typeof data.missingAspectsCount === "number" ? data.missingAspectsCount : null;
-  if (
-    iteration === null ||
-    score === null ||
-    rationale === null ||
-    missingAspectsCount === null
-  ) {
+  if (iteration === null || score === null || rationale === null || missingAspectsCount === null) {
     return [];
   }
   return [{ type: "research_evaluation", iteration, score, rationale, missingAspectsCount }];

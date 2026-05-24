@@ -42,12 +42,7 @@ export async function resolveWebSearchModelId(db: Database): Promise<string | nu
       outputCostUnits: aiModels.outputCostUnits,
     })
     .from(aiModels)
-    .where(
-      and(
-        eq(aiModels.isActive, true),
-        inArray(aiModels.provider, ["openai", "google"]),
-      ),
-    )
+    .where(and(eq(aiModels.isActive, true), inArray(aiModels.provider, ["openai", "google"])))
     .orderBy(asc(aiModels.inputCostUnits), asc(aiModels.outputCostUnits));
 
   // Prefer OpenAI when costs tie, since `useWebSearch` (chat completions

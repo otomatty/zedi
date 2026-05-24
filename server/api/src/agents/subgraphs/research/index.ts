@@ -24,8 +24,5 @@ export type {
   ExitReason,
   ResearchResumeInput,
 } from "./types.js";
-export {
-  researchResumeSchema,
-  type ResearchResumeParsed,
-} from "./resumeSchema.js";
+export { researchResumeSchema, type ResearchResumeParsed } from "./resumeSchema.js";
 export type { HumanReviewInterruptPayload } from "./nodes/humanReviewResearch.js";

@@ -108,8 +108,7 @@ export async function searchUserWikiPages(
     return result.rows.map(rowToHit);
   }
 
-  const normalizedEmail =
-    typeof userEmail === "string" ? userEmail.trim().toLowerCase() : "";
+  const normalizedEmail = typeof userEmail === "string" ? userEmail.trim().toLowerCase() : "";
   const emailDomain = extractEmailDomain(normalizedEmail);
 
   const domainPredicate =

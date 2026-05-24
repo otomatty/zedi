@@ -76,10 +76,9 @@ describe("compileBatch", () => {
   });
 
   it("handles null evaluation gracefully", async () => {
-    const update = await compileBatch(
-      state({ lastEvaluation: null }),
-      { configurable: {} } as never,
-    );
+    const update = await compileBatch(state({ lastEvaluation: null }), {
+      configurable: {},
+    } as never);
     expect(update.exitReason).toBe("max_iterations");
     const batches = update.batches as ResearchBatch[] | undefined;
     expect(batches?.[0]?.evaluation).toBeNull();

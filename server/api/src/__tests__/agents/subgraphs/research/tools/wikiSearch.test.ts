@@ -22,7 +22,9 @@ import { GRAPH_CONTEXT_CONFIG_KEY } from "../../../../../agents/core/types/graph
 import type { GraphContext } from "../../../../../agents/core/types/graphContext.js";
 import type { Database } from "../../../../../types/index.js";
 
-function ctxConfig(overrides: Partial<GraphContext> = {}): { configurable: Record<string, unknown> } {
+function ctxConfig(overrides: Partial<GraphContext> = {}): {
+  configurable: Record<string, unknown>;
+} {
   return {
     configurable: {
       [GRAPH_CONTEXT_CONFIG_KEY]: {
@@ -86,7 +88,14 @@ describe("wikiSearchTool", () => {
     };
     expect(parsed.ok).toBe(true);
     expect(parsed.results).toEqual([
-      { id: "wiki:page-1", kind: "wiki", title: "Alpha", pageId: "page-1", noteId: "note-1", snippet: "preview" },
+      {
+        id: "wiki:page-1",
+        kind: "wiki",
+        title: "Alpha",
+        pageId: "page-1",
+        noteId: "note-1",
+        snippet: "preview",
+      },
     ]);
   });
 

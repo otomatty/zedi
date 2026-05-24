@@ -14,10 +14,7 @@ import { createZediChatModel } from "../../../core/llm/modelFactory.js";
 import { getGraphContext } from "./shared/getGraphContext.js";
 import { dispatchResearchEvaluation } from "./shared/dispatchSseCustom.js";
 import { getOrchestratorModelId } from "./planQueries.js";
-import type {
-  ResearchLoopStateType,
-  ResearchLoopStateUpdate,
-} from "../state.js";
+import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { Evaluation } from "../types.js";
 
 export const evaluationSchema = z.object({
@@ -40,8 +37,7 @@ function buildUserPrompt(state: ResearchLoopStateType): string {
     .filter((s) => s.length > 0)
     .join("\n\n");
   const sourceLines = state.pendingSources.map((s, i) => {
-    const tag =
-      s.kind === "fetched" ? "FETCHED" : s.kind === "wiki" ? "WIKI" : "WEB";
+    const tag = s.kind === "fetched" ? "FETCHED" : s.kind === "wiki" ? "WIKI" : "WEB";
     const body = s.excerpt ?? s.snippet ?? "(no preview)";
     return `[${i + 1}] ${tag} ${s.title}\n${body}`;
   });

@@ -21,9 +21,9 @@ vi.mock("../../../../../lib/clipUrlPolicy.js", () => ({
 }));
 
 vi.mock("../../../../../lib/articleExtractor.js", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../../../../lib/articleExtractor.js")
-  >("../../../../../lib/articleExtractor.js");
+  const actual = await vi.importActual<typeof import("../../../../../lib/articleExtractor.js")>(
+    "../../../../../lib/articleExtractor.js",
+  );
   return {
     ...actual,
     extractArticleFromUrl: (...args: unknown[]) =>

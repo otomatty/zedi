@@ -12,7 +12,9 @@ const { getDefaultNoteOrNull } = vi.hoisted(() => ({ getDefaultNoteOrNull: vi.fn
 vi.mock("../../services/defaultNoteService.js", () => ({
   getDefaultNoteOrNull: (...args: unknown[]) =>
     getDefaultNoteOrNull(
-      ...(args as Parameters<typeof import("../../services/defaultNoteService.js").getDefaultNoteOrNull>),
+      ...(args as Parameters<
+        typeof import("../../services/defaultNoteService.js").getDefaultNoteOrNull
+      >),
     ),
 }));
 
@@ -30,7 +32,14 @@ afterEach(() => {
 describe("searchUserWikiPages", () => {
   it("returns [] for empty query without DB access", async () => {
     const { db, chains } = createMockDb([]);
-    const out = await searchUserWikiPages(db as unknown as Database, "u-1", null, "  ", "shared", 10);
+    const out = await searchUserWikiPages(
+      db as unknown as Database,
+      "u-1",
+      null,
+      "  ",
+      "shared",
+      10,
+    );
     expect(out).toEqual([]);
     expect(chains.length).toBe(0);
     expect(getDefaultNoteOrNull).not.toHaveBeenCalled();

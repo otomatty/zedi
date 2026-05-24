@@ -25,10 +25,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
-import {
-  GRAPH_CONTEXT_CONFIG_KEY,
-  type GraphContext,
-} from "../types/graphContext.js";
+import { GRAPH_CONTEXT_CONFIG_KEY, type GraphContext } from "../types/graphContext.js";
 import { createZediChatModel } from "../llm/modelFactory.js";
 import { resolveWebSearchModelId } from "./resolveWebSearchModel.js";
 import type { ExtraProviderOptions } from "../llm/zediChatModel.js";

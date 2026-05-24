@@ -113,9 +113,7 @@ describe("researchLoopSubgraph — autonomous loop", () => {
       phase: "research:plan",
     }));
     webSearch.mockImplementation(async (_state, _config) => ({
-      pendingSources: [
-        { id: "src:a", kind: "web", title: "A", url: "https://a/" },
-      ],
+      pendingSources: [{ id: "src:a", kind: "web", title: "A", url: "https://a/" }],
     }));
     wikiSearch.mockImplementation(async (_state, _config) => ({ pendingSources: [] }));
     fetchArticles.mockImplementation(async (_state, _config) => ({ pendingSources: [] }));
@@ -132,7 +130,9 @@ describe("researchLoopSubgraph — autonomous loop", () => {
     });
 
     refineQueries.mockImplementation(async (state, _config) => ({
-      queries: [{ id: `q-${state.iteration}`, query: `refined-${state.iteration}`, channels: ["web"] }],
+      queries: [
+        { id: `q-${state.iteration}`, query: `refined-${state.iteration}`, channels: ["web"] },
+      ],
       phase: "research:refine",
     }));
 

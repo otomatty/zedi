@@ -82,9 +82,7 @@ const factory: GraphFactory = ({ checkpointer }) => {
 
   // `checkpointer === false` is honoured by LangGraph as "no persistence" (the
   // test path), `BaseCheckpointSaver` enables resume in production.
-  return checkpointer
-    ? builder.compile({ checkpointer })
-    : builder.compile();
+  return checkpointer ? builder.compile({ checkpointer }) : builder.compile();
 };
 
 /**

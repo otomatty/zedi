@@ -9,10 +9,7 @@
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { webSearchTool } from "../../../core/tools/webSearch.js";
-import type {
-  ResearchLoopStateType,
-  ResearchLoopStateUpdate,
-} from "../state.js";
+import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { Source } from "../types.js";
 
 interface WebSearchToolEnvelope {

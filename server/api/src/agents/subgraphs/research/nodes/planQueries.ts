@@ -17,10 +17,7 @@ import { z } from "zod";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
 import { getGraphContext } from "./shared/getGraphContext.js";
 import { dispatchResearchIteration } from "./shared/dispatchSseCustom.js";
-import type {
-  ResearchLoopStateType,
-  ResearchLoopStateUpdate,
-} from "../state.js";
+import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { PlannedQuery, Source } from "../types.js";
 
 /** Default LLM model id for plan/evaluate/refine nodes; overridable by env. */

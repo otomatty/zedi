@@ -13,10 +13,7 @@ import { getGraphContext } from "./shared/getGraphContext.js";
 import { dispatchResearchIteration } from "./shared/dispatchSseCustom.js";
 import { getOrchestratorModelId } from "./planQueries.js";
 import { planQueriesSchema } from "./planQueries.js";
-import type {
-  ResearchLoopStateType,
-  ResearchLoopStateUpdate,
-} from "../state.js";
+import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { PlannedQuery } from "../types.js";
 
 const SYSTEM_PROMPT =
