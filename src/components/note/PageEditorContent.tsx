@@ -124,6 +124,12 @@ interface PageEditorContentProps {
    * Trailing control rendered beside the floating Wiki Link input bar.
    */
   bottomBarTrailingAction?: React.ReactNode;
+  /**
+   * Wiki Compose 画面 (`/compose`) への遷移先 URL。指定すると `WikiGeneratorButton`
+   * が Compose 画面に遷移する経路を取り、本文ありでも表示される (#950 U2)。
+   * Pass-through to the WikiGeneratorButton's `composeHref`.
+   */
+  wikiComposeHref?: string;
 }
 
 /**
@@ -157,6 +163,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   pageActionHubRef,
   pageNoteId = null,
   bottomBarTrailingAction,
+  wikiComposeHref,
 }) => {
   const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
   const hasContent = useMemo(() => isContentNotEmpty(content), [content]);
@@ -198,13 +205,25 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
               onEnterMoveToContent={!isEditorReadOnly ? focusContent : undefined}
             />
           </div>
-          {wikiStatus && onGenerateWiki && (
+          {/* Wiki 生成ボタンの表示条件:
+              - 旧経路: `wikiStatus` + `onGenerateWiki` 両方ある場合（インライン生成）
+              - 新経路: `wikiComposeHref` がある場合（Compose 画面に遷移、#950）
+              いずれも `WikiGeneratorButton` 自身がタイトル / 本文条件で更に
+              フィルタする。
+
+              Show the Wiki generation button when either:
+              - legacy: both `wikiStatus` + `onGenerateWiki` are supplied
+                (inline generation), or
+              - new: `wikiComposeHref` is supplied (navigate to Compose, #950).
+              `WikiGeneratorButton` itself filters on title/content state. */}
+          {((wikiStatus && onGenerateWiki) || wikiComposeHref) && (
             <div className="shrink-0">
               <WikiGeneratorButton
                 title={title}
                 hasContent={hasContent}
-                onGenerate={onGenerateWiki}
-                status={wikiStatus}
+                onGenerate={onGenerateWiki ?? (() => undefined)}
+                status={wikiStatus ?? "idle"}
+                composeHref={wikiComposeHref}
               />
             </div>
           )}

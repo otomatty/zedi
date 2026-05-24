@@ -58,6 +58,7 @@ import { SSE_EVENT_NAMES, type SseEvent } from "../agents/core/types/sseEvents.j
 import { GRAPH_CONTEXT_CONFIG_KEY } from "../agents/core/types/graphContext.js";
 import { resolveCheckpointerForRun } from "../agents/core/checkpoint/index.js";
 import { RESEARCH_GRAPH_ID } from "../agents/subgraphs/research/index.js";
+import { WIKI_COMPOSE_GRAPH_ID } from "../agents/graphs/wikiCompose/index.js";
 import type { AppEnv } from "../types/index.js";
 
 /**
@@ -94,14 +95,17 @@ function translateGraphInput(graphId: string, raw: unknown): unknown {
 /**
  * Per-graph recursion limit. LangGraph's default of 25 is enough for the stub
  * graph but tight for `wiki-compose-research`, which runs up to ~5 iterations
- * × ~6 nodes ≈ 30 node executions. We bump it for that graph only rather than
- * raising the global default at `graphRunner.ts:147`.
+ * × ~6 nodes ≈ 30 node executions. The full `wiki-compose` orchestrator (#950)
+ * adds Brief + Structure + Draft (up to ~10 sections × 1 node) on top of the
+ * inlined research loop, so it needs a larger budget still.
  *
  * 調査ループは最大 5 イテレーション × 約 6 ノード = ~30 node 実行になり得るため、
- * 既定の 25 では不足する。該当 graph だけ 60 に引き上げる。
+ * 既定の 25 では不足する。orchestrator (`wiki-compose`) は更に Brief / Structure /
+ * Draft フェーズ + 最大 10 セクションを足すので 120 に引き上げる。
  */
 function recursionLimitFor(graphId: string): number | undefined {
   if (graphId === RESEARCH_GRAPH_ID) return 60;
+  if (graphId === WIKI_COMPOSE_GRAPH_ID) return 120;
   return undefined;
 }
 

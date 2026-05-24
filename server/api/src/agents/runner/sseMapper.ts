@@ -11,6 +11,8 @@
  * file only describes the shape transformation so unit tests can pin it.
  */
 import type {
+  SseComposePhaseEvent,
+  SseComposeSectionEvent,
   SseEvent,
   SseResearchBatchEvent,
   SseResearchEvaluationEvent,
@@ -208,6 +210,10 @@ function mapCustomEvent(event: LangGraphRuntimeEvent): SseEvent[] {
       return mapResearchEvaluation(data);
     case "research_batch":
       return mapResearchBatch(data);
+    case "compose_phase":
+      return mapComposePhase(data);
+    case "compose_section":
+      return mapComposeSection(data);
     default:
       // Unknown custom event names are dropped silently; emitting them as `status`
       // would risk leaking implementation detail to the wire.
@@ -234,6 +240,40 @@ function mapResearchEvaluation(data: Record<string, unknown>): SseResearchEvalua
     return [];
   }
   return [{ type: "research_evaluation", iteration, score, rationale, missingAspectsCount }];
+}
+
+function mapComposePhase(data: Record<string, unknown>): SseComposePhaseEvent[] {
+  const phase = data.phase;
+  const status = data.status;
+  if (
+    phase !== "brief" &&
+    phase !== "research" &&
+    phase !== "structure" &&
+    phase !== "draft" &&
+    phase !== "completed"
+  ) {
+    return [];
+  }
+  if (status !== "entered" && status !== "completed") return [];
+  return [{ type: "compose_phase", phase, status }];
+}
+
+function mapComposeSection(data: Record<string, unknown>): SseComposeSectionEvent[] {
+  const sectionId = typeof data.sectionId === "string" ? data.sectionId : null;
+  const heading = typeof data.heading === "string" ? data.heading : null;
+  const status = data.status === "started" || data.status === "completed" ? data.status : null;
+  const index = typeof data.index === "number" ? data.index : null;
+  const total = typeof data.total === "number" ? data.total : null;
+  if (
+    sectionId === null ||
+    heading === null ||
+    status === null ||
+    index === null ||
+    total === null
+  ) {
+    return [];
+  }
+  return [{ type: "compose_section", sectionId, heading, status, index, total }];
 }
 
 function mapResearchBatch(data: Record<string, unknown>): SseResearchBatchEvent[] {

@@ -127,4 +127,48 @@ describe("mapLangGraphEvent", () => {
   it("returns an empty array for unrecognised events", () => {
     expect(mapLangGraphEvent({ event: "on_unknown_event" })).toEqual([]);
   });
+
+  it("maps on_custom_event compose_phase to a typed compose_phase event", () => {
+    const ev: LangGraphRuntimeEvent = {
+      event: "on_custom_event",
+      name: "compose_phase",
+      data: { phase: "structure", status: "entered" },
+    };
+    expect(mapLangGraphEvent(ev)).toEqual([
+      { type: "compose_phase", phase: "structure", status: "entered" },
+    ]);
+  });
+
+  it("drops compose_phase with an unknown phase value", () => {
+    const ev: LangGraphRuntimeEvent = {
+      event: "on_custom_event",
+      name: "compose_phase",
+      data: { phase: "bogus", status: "entered" },
+    };
+    expect(mapLangGraphEvent(ev)).toEqual([]);
+  });
+
+  it("maps on_custom_event compose_section to a typed compose_section event", () => {
+    const ev: LangGraphRuntimeEvent = {
+      event: "on_custom_event",
+      name: "compose_section",
+      data: {
+        sectionId: "sec-1",
+        heading: "Overview",
+        status: "started",
+        index: 1,
+        total: 3,
+      },
+    };
+    expect(mapLangGraphEvent(ev)).toEqual([
+      {
+        type: "compose_section",
+        sectionId: "sec-1",
+        heading: "Overview",
+        status: "started",
+        index: 1,
+        total: 3,
+      },
+    ]);
+  });
 });
