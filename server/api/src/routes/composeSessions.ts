@@ -60,6 +60,7 @@ import { resolveCheckpointerForRun } from "../agents/core/checkpoint/index.js";
 import { RESEARCH_GRAPH_ID } from "../agents/subgraphs/research/index.js";
 import { WIKI_COMPOSE_GRAPH_ID } from "../agents/graphs/wikiCompose/index.js";
 import type { AppEnv } from "../types/index.js";
+import { persistOutcomeIfStillRunning } from "./composeSessionPersistence.js";
 
 /**
  * Translate the documented `body.input.kind === "additional_research"` shape
@@ -289,15 +290,10 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
     const persistSession = async () => {
       if (persisted) return;
       persisted = true;
-      await db
-        .update(wikiComposeSessions)
-        .set({
-          status: finalStatus,
-          lastError: finalStatus === "failed" ? lastError : null,
-          closedAt: finalStatus === "interrupted" ? null : new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(wikiComposeSessions.id, id));
+      await persistOutcomeIfStillRunning(db, id, {
+        status: finalStatus,
+        lastError,
+      });
     };
 
     stream.onAbort(() => {
@@ -475,15 +471,10 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await db
-      .update(wikiComposeSessions)
-      .set({
-        status: "failed",
-        lastError: message,
-        closedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(wikiComposeSessions.id, id));
+    await persistOutcomeIfStillRunning(db, id, {
+      status: "failed",
+      lastError: message,
+    });
     if (err instanceof GraphNotRegisteredError || err instanceof UnsupportedBackendError) {
       throw new HTTPException(400, { message: err.message });
     }
@@ -497,15 +488,10 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
         ? "interrupted"
         : "failed";
 
-  await db
-    .update(wikiComposeSessions)
-    .set({
-      status,
-      lastError: status === "failed" ? (result.error ?? null) : null,
-      closedAt: status === "interrupted" ? null : new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(wikiComposeSessions.id, id));
+  await persistOutcomeIfStillRunning(db, id, {
+    status,
+    lastError: status === "failed" ? (result.error ?? null) : null,
+  });
 
   return c.json({ status, output: result.output ?? null });
 });
