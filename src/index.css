@@ -58,8 +58,11 @@
     --surface-elevated: 220 18% 14%;
     --text-subtle: 220 10% 50%;
     --link-color: 175 50% 60%;
-    --link-referenced: 200 70% 60%;
-    --link-ghost: 35 80% 60%;
+    /* Ghost link family: warm orange, distinguished by lightness/saturation only.
+     * `referenced` is slightly stronger, `ghost` is the faintest. See #932.
+     * ゴーストリンク系: オレンジ系統で薄さの強弱だけで区別する（#932）。 */
+    --link-referenced: 30 65% 62%;
+    --link-ghost: 30 35% 58%;
 
     /* Callout foreground colors (shared dark/light)
      * コールアウト前景色（ダーク/ライト共通） */
@@ -106,8 +109,12 @@
     --surface-elevated: 0 0% 100%;
     --text-subtle: 220 10% 55%;
     --link-color: 175 60% 40%;
-    --link-referenced: 200 65% 50%;
-    --link-ghost: 35 70% 50%;
+    /* Ghost link family on light background, see #932.
+     * Both pass WCAG AA (≥4.5:1) against `--background` (45 15% 97%).
+     * `referenced` is darker/more saturated, `ghost` is paler.
+     * ライト背景時のゴーストリンク系（#932）。両者とも WCAG AA を満たす。 */
+    --link-referenced: 24 80% 35%;
+    --link-ghost: 28 50% 40%;
 
     --sidebar-background: 45 15% 97%;
     --sidebar-foreground: 220 25% 12%;
@@ -842,11 +849,13 @@
     background: hsl(var(--link-color) / 0.2);
   }
 
-  /* Referenced — exists in other pages but not yet created */
+  /* Referenced — exists in other pages but not yet created.
+   * Distinguished from `ghost` by a slightly stronger orange only; no dashed
+   * underline or icon decorations (#932).
+   * 参照あり未作成: ゴーストよりわずかに濃いオレンジで区別。装飾なし（#932）。 */
   .wiki-link-referenced {
     color: hsl(var(--link-referenced));
     background: hsl(var(--link-referenced) / 0.1);
-    border-bottom: 1px dashed currentcolor;
     padding: 1px 4px;
     margin: 0 -2px;
     border-radius: 3px;
@@ -857,14 +866,18 @@
 
   .wiki-link-referenced:hover {
     background: hsl(var(--link-referenced) / 0.2);
-    border-bottom-style: solid;
   }
 
-  /* Ghost — new / unreferenced */
+  .wiki-link-referenced:focus-visible {
+    outline: 2px solid hsl(var(--link-referenced) / 0.6);
+    outline-offset: 1px;
+  }
+
+  /* Ghost — new / unreferenced. Faintest orange in the family (#932).
+   * ゴースト: 一番薄いオレンジで表現（#932）。 */
   .wiki-link-ghost {
     color: hsl(var(--link-ghost));
     background: hsl(var(--link-ghost) / 0.1);
-    border-bottom: 1px dashed currentcolor;
     padding: 1px 4px;
     margin: 0 -2px;
     border-radius: 3px;
@@ -875,7 +888,11 @@
 
   .wiki-link-ghost:hover {
     background: hsl(var(--link-ghost) / 0.2);
-    border-bottom-style: solid;
+  }
+
+  .wiki-link-ghost:focus-visible {
+    outline: 2px solid hsl(var(--link-ghost) / 0.6);
+    outline-offset: 1px;
   }
 
   /* Wiki link typing state */
@@ -925,8 +942,11 @@
     background: hsl(var(--link-color) / 0.2);
   }
 
+  /* Tag referenced/ghost share the WikiLink design (#725, #932): faint orange
+   * only, no dashed underline. Distinguished by lightness only.
+   * Tag の referenced/ghost も WikiLink と同じ「薄いオレンジのみ」設計（#725, #932）。 */
   .tag-referenced {
-    @apply text-link-referenced -mx-0.5 cursor-pointer rounded border-b border-dashed border-current px-0.5 font-medium transition-colors duration-200 hover:border-solid;
+    @apply text-link-referenced -mx-0.5 cursor-pointer rounded px-0.5 font-medium transition-colors duration-200;
 
     background: hsl(var(--link-referenced) / 0.1);
   }
@@ -935,14 +955,24 @@
     background: hsl(var(--link-referenced) / 0.2);
   }
 
+  .tag-referenced:focus-visible {
+    outline: 2px solid hsl(var(--link-referenced) / 0.6);
+    outline-offset: 1px;
+  }
+
   .tag-ghost {
-    @apply border-ghost-link/50 text-ghost-link hover:border-ghost-link -mx-0.5 cursor-pointer rounded border-b border-dashed px-0.5 font-medium transition-colors duration-200;
+    @apply text-ghost-link -mx-0.5 cursor-pointer rounded px-0.5 font-medium transition-colors duration-200;
 
     background: hsl(var(--link-ghost) / 0.1);
   }
 
   .tag-ghost:hover {
     background: hsl(var(--link-ghost) / 0.2);
+  }
+
+  .tag-ghost:focus-visible {
+    outline: 2px solid hsl(var(--link-ghost) / 0.6);
+    outline-offset: 1px;
   }
 
   /* Tag typing state (while the user is composing `#name`). */
