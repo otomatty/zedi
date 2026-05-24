@@ -14,13 +14,13 @@ function makeCtx(overrides: Partial<PageActionContext> = {}): PageActionContext 
 }
 
 describe("PageActionHub registry", () => {
-  it("登録されているのは thumbnail.search と thumbnail.generate の 2 件 / exposes both thumbnail actions", () => {
+  it("登録されているアクション ID / exposes registered action ids", () => {
     const ids = PAGE_ACTIONS.map((a) => a.id);
-    expect(ids).toEqual(["thumbnail.search", "thumbnail.generate"]);
+    expect(ids).toEqual(["thumbnail.search", "thumbnail.generate", "wiki.compose"]);
   });
 
-  it("両アクションは insertStrategy=head / both thumbnail actions are head-insert", () => {
-    for (const action of PAGE_ACTIONS) {
+  it("サムネイル系は insertStrategy=head / thumbnail actions are head-insert", () => {
+    for (const action of PAGE_ACTIONS.filter((a) => a.category === "thumbnail")) {
       expect(action.insertStrategy).toBe("head");
       expect(action.category).toBe("thumbnail");
     }
@@ -56,14 +56,39 @@ describe("PageActionHub registry", () => {
   );
 
   it("getAvailablePageActions は利用可能なアクションのみ返す / returns only available actions", () => {
-    const allow = getAvailablePageActions(makeCtx());
-    expect(allow.map((a) => a.id)).toEqual(["thumbnail.search", "thumbnail.generate"]);
+    const allow = getAvailablePageActions(makeCtx({ wikiComposeHref: "/notes/n/p/compose" }));
+    expect(allow.map((a) => a.id)).toEqual([
+      "thumbnail.search",
+      "thumbnail.generate",
+      "wiki.compose",
+    ]);
 
     const blockedReadOnly = getAvailablePageActions(makeCtx({ isReadOnly: true }));
     expect(blockedReadOnly).toEqual([]);
 
-    const blockedThumb = getAvailablePageActions(makeCtx({ hasThumbnail: true }));
-    expect(blockedThumb).toEqual([]);
+    const blockedThumb = getAvailablePageActions(
+      makeCtx({ hasThumbnail: true, wikiComposeHref: "/notes/n/p/compose" }),
+    );
+    expect(blockedThumb.map((a) => a.id)).toEqual(["wiki.compose"]);
+  });
+
+  describe("wiki.compose availability gates", () => {
+    const action = PAGE_ACTIONS.find((a) => a.id === "wiki.compose");
+    if (!action) throw new Error("missing wiki.compose");
+
+    it("wikiComposeHref があるとき利用可 / available when compose href is set", () => {
+      expect(action.isAvailable(makeCtx({ wikiComposeHref: "/notes/n/p/compose" }))).toBe(true);
+    });
+
+    it("wikiComposeHref が無いときは不可 / blocked without compose href", () => {
+      expect(action.isAvailable(makeCtx())).toBe(false);
+    });
+
+    it("タイトルが空のときは不可 / blocked when title is empty", () => {
+      expect(
+        action.isAvailable(makeCtx({ pageTitle: "", wikiComposeHref: "/notes/n/p/compose" })),
+      ).toBe(false);
+    });
   });
 
   it("getPageActionById は一致 ID の記述を返し、未知 ID は undefined / lookup behavior", () => {

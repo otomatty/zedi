@@ -10,8 +10,8 @@
  * Compose UI shell. The page reads the `useWikiComposeSession` hook for state
  * and routes user submissions back through the hook's mutator methods.
  */
-import React, { useEffect, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, X } from "lucide-react";
 import {
   Alert,
@@ -24,6 +24,7 @@ import {
   useIsMobile,
 } from "@zedi/ui";
 import { useWikiComposeSession } from "@/hooks/useWikiComposeSession";
+import { COMPOSE_SEED_STATE_KEY, type ComposeNavigationSeed } from "@/lib/wikiCompose/navigation";
 import type { DraftedSection } from "@/lib/wikiCompose/types";
 import { EditorPane } from "@/components/wikiCompose/EditorPane";
 import { ComposePanel } from "@/components/wikiCompose/ComposePanel";
@@ -39,17 +40,53 @@ function indexById(items: DraftedSection[]): Record<string, DraftedSection> {
 const WikiComposePage: React.FC = () => {
   const params = useParams<{ noteId: string; pageId: string; sessionId?: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const isMobile = useIsMobile();
 
   const noteId = params.noteId ?? "";
   const pageId = params.pageId ?? "";
   const sessionId = params.sessionId ?? null;
 
+  // Capture chat seed once; clearing `location.state` must not drop it before run.
+  const [composeSeed] = useState((): ComposeNavigationSeed | undefined => {
+    const raw = (location.state as Record<string, unknown> | null)?.[COMPOSE_SEED_STATE_KEY];
+    if (!raw || typeof raw !== "object") return undefined;
+    const s = raw as ComposeNavigationSeed;
+    if (typeof s.outline !== "string" || typeof s.conversationText !== "string") return undefined;
+    return s;
+  });
+
+  const initialInput = useMemo(
+    () =>
+      composeSeed
+        ? {
+            chatSeed: {
+              outline: composeSeed.outline,
+              conversationText: composeSeed.conversationText,
+              userSchema: composeSeed.userSchema,
+              conversationId: composeSeed.conversationId,
+            },
+          }
+        : undefined,
+    [composeSeed],
+  );
+
   const session = useWikiComposeSession({
     pageId,
     sessionId,
     autoStart: Boolean(pageId),
+    composeSeed,
+    initialInput,
   });
+
+  // Drop seed from history so a reload does not re-send chat context.
+  useEffect(() => {
+    if (!composeSeed || !location.state) return;
+    navigate(location.pathname + location.search + location.hash, {
+      replace: true,
+      state: null,
+    });
+  }, [composeSeed, location.hash, location.pathname, location.search, location.state, navigate]);
 
   // Persist the session id in the URL so refresh re-opens the same row.
   useEffect(() => {

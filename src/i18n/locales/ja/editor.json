@@ -254,6 +254,12 @@
         "loading": "画像を生成中...",
         "retry": "再生成",
         "missingTitle": "タイトルを入力してください"
+      },
+      "wikiCompose": {
+        "label": "Wiki Compose",
+        "description": "Brief → 調査 → 構成 → 執筆のガイド付きフローで AI と協働してページを作成します。",
+        "start": "Wiki Compose を開く",
+        "unavailable": "このページでは Wiki Compose を利用できません。"
       }
     }
   },

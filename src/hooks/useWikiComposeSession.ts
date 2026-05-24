@@ -19,6 +19,7 @@ import {
   resumeSession,
   runSession,
 } from "@/lib/wikiCompose/composeService";
+import type { ComposeNavigationSeed } from "@/lib/wikiCompose/navigation";
 import type {
   BriefAnswer,
   BriefQuestion,
@@ -105,8 +106,10 @@ export interface UseWikiComposeSessionArgs {
   pageId: string;
   /** Existing session to resume; pass `null` to create a fresh session on start. */
   sessionId: string | null;
-  /** Optional initial body for the first run (e.g. seed messages). */
+  /** Optional initial body for the first run (e.g. chat seed for Brief). */
   initialInput?: Record<string, unknown>;
+  /** Chat → Compose seed; stored on the session row as metadata. */
+  composeSeed?: ComposeNavigationSeed;
   /** Auto-start the first `run` when the session is created. Default `true`. */
   autoStart?: boolean;
 }
@@ -402,7 +405,7 @@ function reduceInterrupt(
 export function useWikiComposeSession(
   args: UseWikiComposeSessionArgs,
 ): UseWikiComposeSessionReturn {
-  const { pageId, sessionId: initialSessionId, initialInput, autoStart = true } = args;
+  const { pageId, sessionId: initialSessionId, initialInput, composeSeed, autoStart = true } = args;
   const [state, setState] = useState<WikiComposeSessionState>(INITIAL_STATE);
   const sessionRef = useRef<ComposeSession | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -453,7 +456,19 @@ export function useWikiComposeSession(
     try {
       const session = initialSessionId
         ? await getSession(pageId, initialSessionId)
-        : await createSession({ pageId });
+        : await createSession({
+            pageId,
+            metadata: composeSeed
+              ? {
+                  composeSeed: {
+                    outline: composeSeed.outline,
+                    conversationText: composeSeed.conversationText,
+                    userSchema: composeSeed.userSchema,
+                    conversationId: composeSeed.conversationId,
+                  },
+                }
+              : undefined,
+          });
       sessionRef.current = session;
       update({ session, status: session.status, error: null });
       // Only fresh / retriable rows may call `POST /run` with graph input.
@@ -466,7 +481,7 @@ export function useWikiComposeSession(
       const message = err instanceof Error ? err.message : String(err);
       update({ error: message });
     }
-  }, [pageId, initialSessionId, initialInput, streamRun, update]);
+  }, [pageId, initialSessionId, initialInput, composeSeed, streamRun, update]);
 
   const submitBrief = useCallback<UseWikiComposeSessionReturn["submitBrief"]>(
     async (input) => {

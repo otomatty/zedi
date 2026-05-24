@@ -15,6 +15,17 @@ import type { Source } from "../../subgraphs/research/types.js";
 export type { Source };
 
 /**
+ * Optional chat context seeded when entering Compose from AI Chat (#950).
+ * Passed on the first graph `input` and stored on the session row metadata.
+ */
+export interface ComposeChatSeed {
+  outline: string;
+  conversationText: string;
+  userSchema?: string;
+  conversationId?: string;
+}
+
+/**
  * Brief フェーズで Orchestrator が生成する 1 つの構造化質問。
  *
  * One structured Brief question. Brief never opens a free-form chat; the

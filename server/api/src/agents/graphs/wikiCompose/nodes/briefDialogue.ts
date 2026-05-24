@@ -71,7 +71,11 @@ const SYSTEM_PROMPT =
   "make the article unwritable. Most questions should be optional.\n" +
   "Respond as JSON only.";
 
-function buildUserPrompt(title: string, body: string): string {
+function buildUserPrompt(
+  title: string,
+  body: string,
+  chatSeed?: { outline: string; conversationText: string; userSchema?: string } | null,
+): string {
   const parts: string[] = [`[Page title]`, title || "(no title yet)"];
   if (body.trim()) {
     parts.push(
@@ -82,6 +86,22 @@ function buildUserPrompt(title: string, body: string): string {
     );
   } else {
     parts.push("", "(Page body is empty.)");
+  }
+  if (chatSeed?.outline?.trim()) {
+    parts.push("", "[User-approved outline from chat]", chatSeed.outline.trim().slice(0, 2000));
+  }
+  if (chatSeed?.conversationText?.trim()) {
+    parts.push(
+      "",
+      "[Chat transcript excerpt]",
+      chatSeed.conversationText.trim().slice(0, 4000),
+      chatSeed.conversationText.length > 4000
+        ? `\n(…truncated; total ${chatSeed.conversationText.length} chars)`
+        : "",
+    );
+  }
+  if (chatSeed?.userSchema?.trim()) {
+    parts.push("", "[User wiki schema]", chatSeed.userSchema.trim().slice(0, 1500));
   }
   return parts.join("\n");
 }
@@ -120,7 +140,10 @@ export async function briefDialogue(
   try {
     raw = await structured.invoke([
       { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: buildUserPrompt(snapshot.title, snapshot.body) },
+      {
+        role: "user",
+        content: buildUserPrompt(snapshot.title, snapshot.body, state.chatSeed),
+      },
     ]);
   } catch {
     // Defensive fallback: if the LLM call fails, emit an empty Brief so the
