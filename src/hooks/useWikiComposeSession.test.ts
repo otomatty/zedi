@@ -132,6 +132,112 @@ describe("useWikiComposeSession", () => {
     expect(result.current.streamingSectionId).toBeNull();
   });
 
+  it("submitOutline hydrates completion from PATCH resume output without POST /run", async () => {
+    arrangeRun([
+      { type: "started", sessionId: SESSION.id, graphId: SESSION.graphId },
+      { type: "done", status: "interrupted" },
+    ]);
+    mocks.resumeSession.mockResolvedValue({
+      status: "completed",
+      output: {
+        completion: {
+          markdown: "## Overview\n\nBody one\n\n## Details\n\nBody two\n",
+          sections: [
+            {
+              sectionId: "sec-1",
+              heading: "Overview",
+              body: "Body one",
+              citedSourceIds: [],
+              completedAt: "2026-05-24T00:00:00Z",
+            },
+            {
+              sectionId: "sec-2",
+              heading: "Details",
+              body: "Body two",
+              citedSourceIds: [],
+              completedAt: "2026-05-24T00:00:01Z",
+            },
+          ],
+          citedSources: [],
+          completedAt: "2026-05-24T00:00:02Z",
+        },
+        approvedOutline: {
+          sections: [
+            { id: "sec-1", heading: "Overview", depth: 1, intent: "intro" },
+            { id: "sec-2", heading: "Details", depth: 1, intent: "deep" },
+          ],
+        },
+      },
+    });
+
+    const { result } = renderHook(() =>
+      useWikiComposeSession({ pageId: "page-1", sessionId: null }),
+    );
+    await waitFor(() => expect(result.current.session).not.toBeNull());
+
+    await act(async () => {
+      await result.current.submitOutline({
+        sections: [
+          { id: "sec-1", heading: "Overview", depth: 1, intent: "intro" },
+          { id: "sec-2", heading: "Details", depth: 1, intent: "deep" },
+        ],
+      });
+    });
+
+    expect(mocks.runSession).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.status).toBe("completed"));
+    expect(result.current.completedMarkdown).toContain("Body one");
+    expect(result.current.draftedSections["sec-1"]?.body).toBe("Body one");
+    expect(result.current.phase).toBe("completed");
+  });
+
+  it("submitBrief applies research interrupt from PATCH output without POST /run", async () => {
+    arrangeRun([
+      { type: "started", sessionId: SESSION.id, graphId: SESSION.graphId },
+      { type: "done", status: "interrupted" },
+    ]);
+    mocks.resumeSession.mockResolvedValue({
+      status: "interrupted",
+      output: {
+        __interrupt__: [
+          {
+            value: {
+              kind: "human_review_research",
+              batch: {
+                id: "batch-1",
+                iteration: 0,
+                sources: [],
+                createdAt: "2026-05-24T00:00:00Z",
+              },
+              pendingSources: [
+                {
+                  id: "src-1",
+                  kind: "web",
+                  title: "Example",
+                  url: "https://example.com",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    const { result } = renderHook(() =>
+      useWikiComposeSession({ pageId: "page-1", sessionId: null }),
+    );
+    await waitFor(() => expect(result.current.session).not.toBeNull());
+
+    await act(async () => {
+      await result.current.submitBrief({ answers: [], appendToExisting: false });
+    });
+
+    expect(mocks.runSession).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.pendingSources).toHaveLength(1));
+    expect(result.current.pendingSources[0]?.id).toBe("src-1");
+    expect(result.current.phase).toBe("research");
+  });
+
   it("submitBrief calls resumeSession with the answer payload and re-streams", async () => {
     // Initial run: halt at Brief.
     arrangeRun([

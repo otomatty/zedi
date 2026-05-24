@@ -10,7 +10,7 @@
  * Compose UI shell. The page reads the `useWikiComposeSession` hook for state
  * and routes user submissions back through the hook's mutator methods.
  */
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, X } from "lucide-react";
 import {
@@ -50,6 +50,13 @@ const WikiComposePage: React.FC = () => {
     sessionId,
     autoStart: Boolean(pageId),
   });
+
+  // Persist the session id in the URL so refresh re-opens the same row.
+  useEffect(() => {
+    const id = session.session?.id;
+    if (!id || sessionId || !noteId || !pageId) return;
+    navigate(`/notes/${noteId}/${pageId}/compose/${id}`, { replace: true });
+  }, [session.session?.id, sessionId, noteId, pageId, navigate]);
 
   const draftedSectionsById = useMemo(
     () => indexById(Object.values(session.draftedSections)),

@@ -149,8 +149,9 @@ export async function runSession(input: {
  * - `human_review_outline` — `{ sections }`
  *
  * The server returns a JSON body `{ status, output }` on resume completion (no
- * SSE stream — resume is fire-and-forget; the caller must `getSession` to
- * refresh state, or call `runSession` again to follow the next phase live).
+ * SSE stream). Callers must hydrate UI state from `output` (interrupt payloads
+ * in `__interrupt__` or `completion` on the final outline approve). A follow-up
+ * `runSession` is only needed when `output` carries no wire payload.
  */
 export async function resumeSession(input: {
   pageId: string;

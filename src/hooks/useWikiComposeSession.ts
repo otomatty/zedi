@@ -297,6 +297,74 @@ function appendActivity(
   return merged.length > 200 ? merged.slice(merged.length - 200) : merged;
 }
 
+/**
+ * Extract UI state from a non-streaming `PATCH /resume` response body.
+ *
+ * Resume runs the graph via `invoke`, so tokens and interrupts are returned in
+ * `output` rather than over SSE. The hook must hydrate phase slices from that
+ * payload; relying on a follow-up `POST /run` would pass fresh `input` to an
+ * interrupted checkpoint (invalid for LangGraph) and drop `completion` on the
+ * final outline approve path.
+ */
+function reduceResumeOutput(
+  output: unknown,
+  status: ComposeSessionStatus,
+): Partial<WikiComposeSessionState> {
+  if (!output || typeof output !== "object") {
+    return status === "completed" ? { phase: "completed" } : {};
+  }
+  const state = output as Record<string, unknown>;
+  const partial: Partial<WikiComposeSessionState> = {};
+
+  const interrupts = state.__interrupt__;
+  if (Array.isArray(interrupts) && interrupts.length > 0) {
+    const entry = interrupts[0];
+    const value =
+      entry && typeof entry === "object" ? (entry as { value?: unknown }).value : undefined;
+    if (value && typeof value === "object" && "kind" in value) {
+      Object.assign(partial, reduceInterrupt(INITIAL_STATE, value as ComposeInterruptPayload));
+    }
+  }
+
+  const completion = state.completion;
+  if (completion && typeof completion === "object") {
+    const c = completion as {
+      markdown?: string;
+      sections?: DraftedSection[];
+    };
+    if (typeof c.markdown === "string" && c.markdown.length > 0) {
+      partial.completedMarkdown = c.markdown;
+    }
+    if (Array.isArray(c.sections)) {
+      const draftedSections: Record<string, DraftedSection> = {};
+      for (const section of c.sections) {
+        if (!section || typeof section !== "object") continue;
+        const s = section as DraftedSection;
+        if (typeof s.sectionId === "string") draftedSections[s.sectionId] = s;
+      }
+      partial.draftedSections = draftedSections;
+      partial.phase = "completed";
+      const approvedOutline = state.approvedOutline as { sections?: OutlineSection[] } | undefined;
+      if (approvedOutline?.sections?.length) {
+        partial.outlineProposal = approvedOutline.sections;
+      } else if (c.sections.length > 0) {
+        partial.outlineProposal = c.sections.map((s) => ({
+          id: s.sectionId,
+          heading: s.heading,
+          depth: 1,
+          intent: "",
+        }));
+      }
+    }
+  }
+
+  if (status === "completed" && partial.phase !== "completed") {
+    partial.phase = "completed";
+  }
+
+  return partial;
+}
+
 function reduceInterrupt(
   prev: WikiComposeSessionState,
   payload: ComposeInterruptPayload | undefined,
@@ -388,7 +456,12 @@ export function useWikiComposeSession(
         : await createSession({ pageId });
       sessionRef.current = session;
       update({ session, status: session.status, error: null });
-      await streamRun(session, initialInput);
+      // Only fresh / retriable rows may call `POST /run` with graph input.
+      // Interrupted checkpoints require `Command({ resume })`; replaying input
+      // would restart or error, and resume payloads are not stored on the row.
+      if (session.status === "pending" || session.status === "failed") {
+        await streamRun(session, initialInput);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       update({ error: message });
@@ -399,13 +472,15 @@ export function useWikiComposeSession(
     async (input) => {
       const session = sessionRef.current;
       if (!session) throw new Error("Session not initialised");
-      // Resume returns the new status; if interrupted, we re-open the stream
-      // so the next phase's events flow to the UI.
-      // resume が返した時点で次の interrupt まで進んでいる。後続イベントは
-      // 再度 runSession (= SSE 接続) で取りに行く必要がある。
       const result = await resumeSession({ pageId, sessionId: session.id, resume: input });
-      update({ status: result.status });
-      if (result.status === "interrupted" || result.status === "running") {
+      const fromResume = reduceResumeOutput(result.output, result.status);
+      update({ status: result.status, ...fromResume });
+      const needsStream =
+        (result.status === "interrupted" || result.status === "running") &&
+        !fromResume.briefQuestions?.length &&
+        !fromResume.pendingSources?.length &&
+        !fromResume.outlineProposal?.length;
+      if (needsStream) {
         await streamRun(session);
       }
     },
@@ -422,8 +497,14 @@ export function useWikiComposeSession(
       const approved = state.pendingSources.filter((s) => input.approvedSourceIds.includes(s.id));
       update({ approvedSources: approved });
       const result = await resumeSession({ pageId, sessionId: session.id, resume: input });
-      update({ status: result.status });
-      if (result.status === "interrupted" || result.status === "running") {
+      const fromResume = reduceResumeOutput(result.output, result.status);
+      update({ status: result.status, ...fromResume });
+      const needsStream =
+        (result.status === "interrupted" || result.status === "running") &&
+        !fromResume.briefQuestions?.length &&
+        !fromResume.pendingSources?.length &&
+        !fromResume.outlineProposal?.length;
+      if (needsStream) {
         await streamRun(session);
       }
     },
@@ -435,8 +516,13 @@ export function useWikiComposeSession(
       const session = sessionRef.current;
       if (!session) throw new Error("Session not initialised");
       const result = await resumeSession({ pageId, sessionId: session.id, resume: input });
-      update({ status: result.status });
-      if (result.status === "interrupted" || result.status === "running") {
+      const fromResume = reduceResumeOutput(result.output, result.status);
+      update({ status: result.status, ...fromResume });
+      const needsStream =
+        (result.status === "interrupted" || result.status === "running") &&
+        !fromResume.completedMarkdown &&
+        Object.keys(fromResume.draftedSections ?? {}).length === 0;
+      if (needsStream) {
         await streamRun(session);
       }
     },
@@ -474,6 +560,7 @@ export function useWikiComposeSession(
   // でも UI 側で再構築できるよう、フックでも軽量に持つ。
   const completedMarkdown = useMemo(() => {
     if (state.status !== "completed") return state.completedMarkdown;
+    if (state.completedMarkdown) return state.completedMarkdown;
     const sections = state.outlineProposal
       .map((s) => state.draftedSections[s.id])
       .filter((s): s is DraftedSection => Boolean(s));
