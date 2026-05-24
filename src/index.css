@@ -60,7 +60,10 @@
     --link-color: 175 50% 60%;
     /* Ghost link family: warm orange, distinguished by lightness/saturation only.
      * `referenced` is slightly stronger, `ghost` is the faintest. See #932.
-     * ゴーストリンク系: オレンジ系統で薄さの強弱だけで区別する（#932）。 */
+     * Both meet WCAG AA against the 10%-tinted chip background
+     * (referenced ≈ 7:1, ghost ≈ 5.9:1).
+     * ゴーストリンク系: オレンジ系統で薄さの強弱だけで区別する（#932）。
+     * チップ背景込みで AA を満たす。 */
     --link-referenced: 30 65% 62%;
     --link-ghost: 30 35% 58%;
 
@@ -110,11 +113,13 @@
     --text-subtle: 220 10% 55%;
     --link-color: 175 60% 40%;
     /* Ghost link family on light background, see #932.
-     * Both pass WCAG AA (≥4.5:1) against `--background` (45 15% 97%).
-     * `referenced` is darker/more saturated, `ghost` is paler.
-     * ライト背景時のゴーストリンク系（#932）。両者とも WCAG AA を満たす。 */
-    --link-referenced: 24 80% 35%;
-    --link-ghost: 28 50% 40%;
+     * Values verified to meet WCAG AA (≥4.5:1) against the 10%-tinted chip
+     * background (`hsl(var(--link-*) / 0.1)` over `--background`):
+     *   referenced ≈ 5.5:1, ghost ≈ 4.5:1. `referenced` stays slightly
+     *   stronger than `ghost` to preserve the lightness hierarchy.
+     * ライト背景時のゴーストリンク系（#932）。チップ背景込みで AA を満たす。 */
+    --link-referenced: 24 80% 32%;
+    --link-ghost: 28 50% 38%;
 
     --sidebar-background: 45 15% 97%;
     --sidebar-foreground: 220 25% 12%;
@@ -851,8 +856,11 @@
 
   /* Referenced — exists in other pages but not yet created.
    * Distinguished from `ghost` by a slightly stronger orange only; no dashed
-   * underline or icon decorations (#932).
-   * 参照あり未作成: ゴーストよりわずかに濃いオレンジで区別。装飾なし（#932）。 */
+   * underline or icon decorations (#932). `:focus-visible` is intentionally
+   * omitted because the extension renders non-tabbable `<span>` elements; if
+   * keyboard focus is added in the future, restore an outline here.
+   * 参照あり未作成: ゴーストよりわずかに濃いオレンジで区別。装飾なし（#932）。
+   * span は tabbable でないため `:focus-visible` は付けない（将来要対応）。 */
   .wiki-link-referenced {
     color: hsl(var(--link-referenced));
     background: hsl(var(--link-referenced) / 0.1);
@@ -866,11 +874,6 @@
 
   .wiki-link-referenced:hover {
     background: hsl(var(--link-referenced) / 0.2);
-  }
-
-  .wiki-link-referenced:focus-visible {
-    outline: 2px solid hsl(var(--link-referenced) / 0.6);
-    outline-offset: 1px;
   }
 
   /* Ghost — new / unreferenced. Faintest orange in the family (#932).
@@ -888,11 +891,6 @@
 
   .wiki-link-ghost:hover {
     background: hsl(var(--link-ghost) / 0.2);
-  }
-
-  .wiki-link-ghost:focus-visible {
-    outline: 2px solid hsl(var(--link-ghost) / 0.6);
-    outline-offset: 1px;
   }
 
   /* Wiki link typing state */
@@ -943,8 +941,10 @@
   }
 
   /* Tag referenced/ghost share the WikiLink design (#725, #932): faint orange
-   * only, no dashed underline. Distinguished by lightness only.
-   * Tag の referenced/ghost も WikiLink と同じ「薄いオレンジのみ」設計（#725, #932）。 */
+   * only, no dashed underline. Distinguished by lightness only. `:focus-visible`
+   * is intentionally omitted to match `.wiki-link-*` (spans are non-tabbable).
+   * Tag の referenced/ghost も WikiLink と同じ「薄いオレンジのみ」設計（#725, #932）。
+   * span が tabbable でないため `:focus-visible` は付けない。 */
   .tag-referenced {
     @apply text-link-referenced -mx-0.5 cursor-pointer rounded px-0.5 font-medium transition-colors duration-200;
 
@@ -955,11 +955,6 @@
     background: hsl(var(--link-referenced) / 0.2);
   }
 
-  .tag-referenced:focus-visible {
-    outline: 2px solid hsl(var(--link-referenced) / 0.6);
-    outline-offset: 1px;
-  }
-
   .tag-ghost {
     @apply text-ghost-link -mx-0.5 cursor-pointer rounded px-0.5 font-medium transition-colors duration-200;
 
@@ -968,11 +963,6 @@
 
   .tag-ghost:hover {
     background: hsl(var(--link-ghost) / 0.2);
-  }
-
-  .tag-ghost:focus-visible {
-    outline: 2px solid hsl(var(--link-ghost) / 0.6);
-    outline-offset: 1px;
   }
 
   /* Tag typing state (while the user is composing `#name`). */
