@@ -14,6 +14,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../types/index.js";
 
+vi.mock("../../auth.js", () => ({
+  auth: {
+    api: {
+      getSession: async () => null,
+    },
+  },
+}));
+
 vi.mock("../../middleware/auth.js", () => ({
   authRequired: async (c: Context<AppEnv>, next: Next) => {
     const userId = c.req.header("x-test-user-id");
@@ -27,6 +35,10 @@ vi.mock("../../middleware/rateLimit.js", () => ({
   rateLimit: () => async (_c: Context<AppEnv>, next: Next) => {
     await next();
   },
+}));
+
+vi.mock("../../services/subscriptionService.js", () => ({
+  getUserTier: async () => "free" as const,
 }));
 
 import { Hono } from "hono";
@@ -242,6 +254,45 @@ describe("DELETE /api/pages/:pageId/compose-sessions/:id", () => {
     expect(body.status).toBe("completed");
     // 4 chains: 3 page-access + 1 select. No update chain triggered.
     expect(chains.filter((c) => c.startMethod === "update").length).toBe(0);
+  });
+
+  it("marks session failed when resume throws GraphNotRegisteredError", async () => {
+    const interruptedRow = {
+      id: "sess-resume-fail",
+      pageId: PAGE_ID,
+      userId: OWNER_ID,
+      graphId: "graph-removed",
+      phase: "init",
+      backend: "zedi_managed",
+      status: "interrupted",
+      metadata: null,
+      lastError: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      closedAt: null,
+    };
+    const { app, chains } = createComposeApp([
+      ...pageAccessPrefix(),
+      [interruptedRow],
+      [interruptedRow], // atomic claim → running
+      undefined, // GraphNotRegisteredError recovery → failed update
+    ]);
+
+    const res = await app.request(
+      `/api/pages/${PAGE_ID}/compose-sessions/sess-resume-fail/resume`,
+      {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify({ resume: { ok: true } }),
+      },
+    );
+    expect(res.status).toBe(400);
+
+    const failedUpdate = chains
+      .filter((c) => c.startMethod === "update")
+      .map((c) => c.ops.find((op) => op.method === "set")?.args[0] as { status?: string })
+      .find((set) => set?.status === "failed");
+    expect(failedUpdate?.status).toBe("failed");
   });
 
   it("cancels an active session", async () => {
