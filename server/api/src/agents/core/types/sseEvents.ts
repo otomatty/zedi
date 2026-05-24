@@ -168,6 +168,45 @@ export interface SseResearchBatchEvent {
 }
 
 /**
+ * Wiki Compose 全体グラフ (#950) のフェーズ進捗通知。Brief → Research → Structure
+ * → Draft → Completed の遷移時に 1 件ずつ発火し、フロントの PhaseStepper の
+ * 進行表示に使う。`status` フィールドで「開始」「完了」を区別する。
+ *
+ * Orchestrator phase transition event. Emitted on enter / exit of each
+ * top-level phase so the frontend phase stepper can advance without
+ * inspecting state.
+ */
+export interface SseComposePhaseEvent {
+  type: "compose_phase";
+  /** Phase name (matches state.phase). */
+  phase: "brief" | "research" | "structure" | "draft" | "completed";
+  /** Lifecycle hint within the phase. */
+  status: "entered" | "completed";
+}
+
+/**
+ * Wiki Compose 全体グラフ (#950) のセクション ドラフト進捗通知。`draftSections`
+ * が 1 セクションを書き始める前 / 書き終わった後にそれぞれ 1 件発火する。
+ *
+ * Per-section draft progress event. Emitted by `draft_sections` at the start
+ * and end of each section so the editor pane can highlight the section that
+ * is currently streaming.
+ */
+export interface SseComposeSectionEvent {
+  type: "compose_section";
+  /** Matches `OutlineSection.id`. */
+  sectionId: string;
+  /** Final / running heading. */
+  heading: string;
+  /** Lifecycle: `started` before streaming, `completed` after the body is finalised. */
+  status: "started" | "completed";
+  /** 1-based index of this section within the outline. */
+  index: number;
+  /** Total number of sections in the outline. */
+  total: number;
+}
+
+/**
  * Wire-level SSE union.
  */
 export type SseEvent =
@@ -182,7 +221,9 @@ export type SseEvent =
   | SseErrorEvent
   | SseResearchIterationEvent
   | SseResearchEvaluationEvent
-  | SseResearchBatchEvent;
+  | SseResearchBatchEvent
+  | SseComposePhaseEvent
+  | SseComposeSectionEvent;
 
 /**
  * SSE event 名（`event:` 行に流す名前）。`SseEvent["type"]` と同値だが、
@@ -204,4 +245,6 @@ export const SSE_EVENT_NAMES = {
   researchIteration: "research_iteration",
   researchEvaluation: "research_evaluation",
   researchBatch: "research_batch",
+  composePhase: "compose_phase",
+  composeSection: "compose_section",
 } as const satisfies Record<string, SseEvent["type"]>;

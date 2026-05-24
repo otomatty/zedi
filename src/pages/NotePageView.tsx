@@ -502,6 +502,12 @@ function NotePageEditorEditable({
           pageNoteId={page.noteId ?? null}
           initialContent={initialContent}
           onInitialContentApplied={onInitialContentApplied}
+          wikiComposeHref={
+            // Issue #950: surface the Wiki Compose entry point on every
+            // note-native page. `WikiGeneratorButton` itself decides whether to
+            // render based on title presence.
+            page.noteId ? `/notes/${page.noteId}/${page.id}/compose` : undefined
+          }
           bottomBarTrailingAction={
             <PageActionHubFab
               canEdit

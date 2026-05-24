@@ -46,6 +46,7 @@ import internalRoutes from "./routes/internal.js";
 import composeSessionRoutes from "./routes/composeSessions.js";
 import { registerStubGraph } from "./agents/registry/stubGraph.js";
 import { registerResearchLoopGraph } from "./agents/subgraphs/research/index.js";
+import { registerWikiComposeGraph } from "./agents/graphs/wikiCompose/index.js";
 
 /**
  * Creates and configures the Hono API app (routes, CORS, etc.).
@@ -55,11 +56,13 @@ export function createApp(): Hono<AppEnv> {
   // Wiki Compose graphs を registry に登録する。いずれも idempotent。
   // - `wiki-compose-stub` — P0 smoke test (#948)
   // - `wiki-compose-research` — P1 自律調査ループ (#949)
+  // - `wiki-compose` — P2 全体オーケストレータ (#950)
   //
-  // Register all Wiki Compose graphs. Both calls are idempotent across hot
+  // Register all Wiki Compose graphs. Calls are idempotent across hot
   // reloads (registry uses `Map#set` so the latest registration wins).
   registerStubGraph();
   registerResearchLoopGraph();
+  registerWikiComposeGraph();
 
   const app = new Hono<AppEnv>();
   const wildcard = isWildcardCors();
