@@ -164,4 +164,32 @@ describe("MermaidCodeBlockNormalize", () => {
     expect(editor.state.doc.firstChild?.type.name).toBe("mermaid");
     expect(editor.state.doc.firstChild?.attrs.code).toBe("graph TD");
   });
+
+  // CodeRabbit のレビュー (PR #946) で指摘された undo 履歴混入バグの回帰テスト。
+  // 正規化トランザクションが undo 履歴に積まれると、Cmd+Z で `mermaid` → `codeBlock`
+  // に戻り、次の編集で再度プラグインが変換するループになる。
+  // Regression test for the CodeRabbit finding on PR #946: normalisation
+  // transactions must not enter the undo history, otherwise Cmd+Z would
+  // revert `mermaid` back to `codeBlock` and the plugin would re-convert it
+  // on the next edit, causing an undo/redo bounce.
+  it("does not push the migration transaction onto the undo history", async () => {
+    const editor = createEditor({
+      type: "doc",
+      content: [
+        {
+          type: "codeBlock",
+          attrs: { language: "mermaid" },
+          content: [{ type: "text", text: "graph TD" }],
+        },
+      ],
+    });
+    await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
+    expect(editor.state.doc.firstChild?.type.name).toBe("mermaid");
+
+    // Tiptap (StarterKit) の undo コマンドを実行しても、正規化は元に戻らない。
+    // Invoking the editor's undo command must not roll the migration back.
+    editor.commands.undo();
+    expect(editor.state.doc.firstChild?.type.name).toBe("mermaid");
+    expect(editor.state.doc.firstChild?.attrs.code).toBe("graph TD");
+  });
 });

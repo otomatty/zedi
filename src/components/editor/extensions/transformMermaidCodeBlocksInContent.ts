@@ -89,12 +89,17 @@ function extractCodeText(nodes: NodeJSON[] | undefined): string {
 
 /**
  * 1 つのノードに対して、Mermaid コードブロックを `mermaid` ノードに置換する。
- * テキスト末尾の改行は表示時のノイズになるため削除する。
+ * テキスト末尾の改行は表示時のノイズになるため削除する。子ノードに変更が
+ * 無い場合は同一参照を返し、構造共有によって不要な配列・オブジェクト生成を
+ * 避ける（入力は不変）。
  *
  * Replace a `codeBlock` with `language: "mermaid"` by an equivalent `mermaid`
  * node, or recurse into the node's children otherwise. Trailing newlines in
  * the extracted source are stripped because Mermaid does not require them and
- * they would otherwise leak into the rendered diagram's caption area.
+ * they would otherwise leak into the rendered diagram's caption area. The
+ * function returns the original reference whenever no descendant was rewritten,
+ * which lets callers rely on referential equality to detect changes and avoids
+ * unnecessary allocations (the input is never mutated either way).
  *
  * @param node - 走査対象のノード / The node to inspect.
  * @returns 変換後のノード / The (possibly transformed) node.
@@ -108,32 +113,48 @@ function transformNode(node: NodeJSON): NodeJSON {
     };
   }
 
-  if (!node.content || node.content.length === 0) {
+  const content = node.content;
+  if (!content || content.length === 0) {
     return node;
   }
 
-  const newContent = node.content.map((child) => transformNode(child));
-  return { ...node, content: newContent };
+  let changedContent: NodeJSON[] | null = null;
+  for (let i = 0; i < content.length; i += 1) {
+    const child = content[i];
+    const transformed = transformNode(child);
+    if (transformed !== child) {
+      // 最初の変更を検出した時点で配列を複製し、先行する未変更ノードをコピーする。
+      // Lazily clone the array on the first change, preserving prior children.
+      if (!changedContent) {
+        changedContent = content.slice(0, i);
+      }
+      changedContent.push(transformed);
+    } else if (changedContent) {
+      changedContent.push(child);
+    }
+  }
+
+  return changedContent ? { ...node, content: changedContent } : node;
 }
 
 /**
  * ProseMirror JSON ドキュメント全体を走査し、`language === "mermaid"` の
  * コードブロックを `mermaid` ノードに置換した新しいドキュメントを返す。
- * 入力は不変。
+ * 入力は不変。変換対象が無い場合は同一参照を返す。
  *
  * Walk a ProseMirror JSON document, replacing every `codeBlock` whose
  * `language` is `"mermaid"` (case-insensitive) with a `mermaid` node so it
- * renders as a diagram. The input is not mutated.
+ * renders as a diagram. The input is not mutated. When no mermaid block is
+ * found, the original reference is returned unchanged—`transformNode` only
+ * allocates along the path of actual changes, so large pasted/loaded docs
+ * without diagrams incur zero copying.
  *
  * @param content - `editor.markdown.parse()` などで得た ProseMirror JSON。
  *                  Document JSON produced by e.g. `editor.markdown.parse()`.
  * @returns 変換後の JSON（入力は不変）/ Transformed JSON (input untouched).
  */
 export function transformMermaidCodeBlocksInContent<T extends NodeJSON>(content: T): T {
-  // 入力を不変に保つためディープクローン
-  // Deep-clone to keep the input immutable
-  const cloned = JSON.parse(JSON.stringify(content)) as T;
-  return transformNode(cloned) as T;
+  return transformNode(content) as T;
 }
 
 /**

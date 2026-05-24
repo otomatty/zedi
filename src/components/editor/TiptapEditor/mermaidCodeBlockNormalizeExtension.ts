@@ -85,7 +85,17 @@ function buildMermaidNormalizeTr(state: EditorState): Transaction | null {
     // whitespace, matching the paste-side `transformMermaidCodeBlocksInContent`.
     const trimmedCode = code.replace(/\n+$/u, "");
     const mermaidNode = mermaidType.create({ code: trimmedCode });
-    tr ??= state.tr;
+    if (!tr) {
+      tr = state.tr;
+      // 自動的なフォーマット移行（lazy migration）はユーザー操作ではないため、
+      // undo 履歴に積まない。これを忘れると Cmd+Z で `mermaid` → `codeBlock` に
+      // 戻ってしまい、再度プラグインが変換してループする恐れがある。
+      // The lazy migration is a passive normalisation, not a user edit, so it
+      // must stay out of the undo stack—otherwise Cmd+Z would revert the
+      // `mermaid` node back to a `codeBlock`, only for the plugin to convert
+      // it again on the next transaction (potential undo/redo bounce).
+      tr.setMeta("addToHistory", false);
+    }
     tr.replaceWith(pos, pos + nodeSize, mermaidNode);
   }
   return tr;

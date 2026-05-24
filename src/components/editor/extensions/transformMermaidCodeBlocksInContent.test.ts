@@ -265,6 +265,62 @@ describe("transformMermaidCodeBlocksInContent", () => {
     expect(doc).toEqual(snapshot);
   });
 
+  // ディープクローンを削除し、変更が無いノードは同一参照のまま返す構造共有方式に
+  // した（gemini-code-assist のレビュー、PR #946 高優先）。大きなドキュメントで
+  // 不要なメモリ確保と GC 圧を避けるため、参照同値性で検証する。
+  // The transform now returns the original reference when nothing changes
+  // (structural sharing) instead of deep-cloning up front, per the high-priority
+  // gemini-code-assist review on PR #946. Verify via reference equality.
+  it("returns the same reference when there is no mermaid block", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "plain" }],
+        },
+      ],
+    };
+
+    expect(transformMermaidCodeBlocksInContent(doc)).toBe(doc);
+  });
+
+  it("shares structure for unaffected sibling subtrees", () => {
+    const untouchedList = {
+      type: "bulletList",
+      content: [
+        {
+          type: "listItem",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "item" }],
+            },
+          ],
+        },
+      ],
+    };
+    const doc = {
+      type: "doc",
+      content: [
+        untouchedList,
+        {
+          type: "codeBlock",
+          attrs: { language: "mermaid" },
+          content: [{ type: "text", text: "graph TD" }],
+        },
+      ],
+    };
+
+    const result = transformMermaidCodeBlocksInContent(doc) as unknown as {
+      content: Array<unknown>;
+    };
+    // ルートと content 配列は新しく作られるが、変更されていない兄弟は同一参照を共有する。
+    // The root and content array are reallocated, but unchanged siblings share refs.
+    expect(result).not.toBe(doc);
+    expect(result.content[0]).toBe(untouchedList);
+  });
+
   it("transforms multiple mermaid code blocks in the same document", () => {
     const doc = {
       type: "doc",
