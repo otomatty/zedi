@@ -110,7 +110,7 @@ export interface CollaborationExtensionsOptions {
  */
 export interface EditorExtensionsOptions {
   placeholder: string;
-  onLinkClick: (title: string) => void;
+  onLinkClick: (title: string, options?: { newTab?: boolean }) => void;
   /**
    * Click handler for tag marks (`#name`). Receives the tag name without `#`
    * so the caller can navigate to the corresponding page. See issue #725.
@@ -164,7 +164,7 @@ export interface EditorExtensionsOptions {
 
 interface CommonEditorExtensionsOptions {
   placeholder?: string;
-  onLinkClick: (title: string) => void;
+  onLinkClick: (title: string, options?: { newTab?: boolean }) => void;
   onTagClick?: (name: string) => void;
   onStateChange?: (state: WikiLinkSuggestionState) => void;
   onSlashStateChange?: (state: SlashSuggestionState) => void;

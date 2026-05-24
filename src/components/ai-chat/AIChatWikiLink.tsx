@@ -92,7 +92,31 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
         e.preventDefault();
         return;
       }
-      navigateWikiLinkByTitle(normalizedTitle);
+      // Issue #931: Cmd/Ctrl+クリックは新タブ意図として渡す。`<button>` は
+      // ネイティブリンクではないので、修飾キーの判定はここで行う。
+      // Issue #931: forward Cmd/Ctrl+click as a new-tab intent. The ghost
+      // trigger is a `<button>` rather than an anchor, so the browser does
+      // not honor modifier keys for us — we detect them explicitly.
+      const newTab = e.metaKey || e.ctrlKey;
+      navigateWikiLinkByTitle(normalizedTitle, { newTab });
+    },
+    [normalizedTitle, navigateWikiLinkByTitle],
+  );
+
+  // Issue #931: 中クリック（button === 1）も新タブ扱い。`<button>` 要素は
+  // 中クリックで `click` イベントを発火しないため `onAuxClick` で受ける。
+  // Issue #931: middle-click on the ghost trigger should also open in a new
+  // tab. `<button>` does not fire `click` for the middle button, so we hook
+  // `onAuxClick`.
+  const handleGhostTriggerAuxClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button !== 1) return;
+      if (preventClickRef.current) {
+        e.preventDefault();
+        return;
+      }
+      e.preventDefault();
+      navigateWikiLinkByTitle(normalizedTitle, { newTab: true });
     },
     [normalizedTitle, navigateWikiLinkByTitle],
   );
@@ -159,6 +183,7 @@ export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
             type="button"
             className="text-muted-foreground decoration-muted-foreground/60 inline cursor-pointer rounded border-0 bg-transparent px-0.5 font-medium underline decoration-dashed underline-offset-2"
             onClick={handleGhostTriggerClick}
+            onAuxClick={handleGhostTriggerAuxClick}
             {...touchProps}
           >
             [[{normalizedTitle}]]
