@@ -97,6 +97,9 @@ export const WikiComposeState = Annotation.Root({
 
   // ── Brief phase ───────────────────────────────────────────────────────────
   /**
+   * チャット由来 seed（outline + 会話）。AI Chat / Promote to Wiki からの
+   * 初回 `POST /run` input でセットする (#950)。
+   *
    * Chat → Compose seed (outline + conversation). Set on the first `POST /run`
    * input when the user arrives from AI Chat / Promote to Wiki (#950).
    */

@@ -47,7 +47,8 @@ const WikiComposePage: React.FC = () => {
   const pageId = params.pageId ?? "";
   const sessionId = params.sessionId ?? null;
 
-  // Capture chat seed once; clearing `location.state` must not drop it before run.
+  // チャット seed は mount 時に 1 回だけ保持。`location.state` を消しても hook 側に残す。
+  // Capture chat seed once on mount; survives clearing `location.state` for the hook.
   const [composeSeed] = useState((): ComposeNavigationSeed | undefined => {
     const raw = (location.state as Record<string, unknown> | null)?.[COMPOSE_SEED_STATE_KEY];
     if (!raw || typeof raw !== "object") return undefined;
@@ -79,14 +80,24 @@ const WikiComposePage: React.FC = () => {
     initialInput,
   });
 
-  // Drop seed from history so a reload does not re-send chat context.
+  // Clear history seed only after the session row left `pending` (first run claimed).
+  // `pending` のまま state を消すと失敗時リロードで chatSeed が届かなくなる (#950)。
   useEffect(() => {
     if (!composeSeed || !location.state) return;
+    if (session.status === "idle" || session.status === "pending") return;
     navigate(location.pathname + location.search + location.hash, {
       replace: true,
       state: null,
     });
-  }, [composeSeed, location.hash, location.pathname, location.search, location.state, navigate]);
+  }, [
+    composeSeed,
+    location.hash,
+    location.pathname,
+    location.search,
+    location.state,
+    navigate,
+    session.status,
+  ]);
 
   // Persist the session id in the URL so refresh re-opens the same row.
   useEffect(() => {

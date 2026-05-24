@@ -10,7 +10,12 @@
  * built around the wire spec produced by `streamSSE` on the server (each event
  * is `event: <name>\n` + `data: <JSON>\n\n`).
  */
-import type { ComposeSession, ComposeSseEvent, ComposeSessionStatus } from "./types";
+import type {
+  ComposeSession,
+  ComposeSessionUiProjection,
+  ComposeSseEvent,
+  ComposeSessionStatus,
+} from "./types";
 import { WIKI_COMPOSE_GRAPH_ID } from "./types";
 
 const getApiBaseUrl = () => (import.meta.env.VITE_API_BASE_URL as string) ?? "";
@@ -70,15 +75,27 @@ export async function createSession(input: CreateSessionInput): Promise<ComposeS
   return data.session;
 }
 
-/** Fetch a compose session row. */
-export async function getSession(pageId: string, sessionId: string): Promise<ComposeSession> {
+/** Response of `GET /compose-sessions/:id` (session row + optional checkpoint projection). */
+export interface GetComposeSessionResult {
+  session: ComposeSession;
+  projection: ComposeSessionUiProjection | null;
+}
+
+/** Fetch a compose session row and optional UI projection for reload (#950). */
+export async function getSession(
+  pageId: string,
+  sessionId: string,
+): Promise<GetComposeSessionResult> {
   const apiBase = getApiBaseUrl();
   const res = await fetch(
     `${apiBase}/api/pages/${encodeURIComponent(pageId)}/compose-sessions/${encodeURIComponent(sessionId)}`,
     { ...REST_OPTS, method: "GET" },
   );
-  const data = await jsonOrThrow<{ session: ComposeSession }>(res, "getSession");
-  return data.session;
+  const data = await jsonOrThrow<{
+    session: ComposeSession;
+    projection?: ComposeSessionUiProjection | null;
+  }>(res, "getSession");
+  return { session: data.session, projection: data.projection ?? null };
 }
 
 /** Cancel a compose session (sets status=cancelled). */

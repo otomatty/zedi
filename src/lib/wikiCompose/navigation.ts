@@ -11,12 +11,22 @@
 import type { NavigateFunction } from "react-router-dom";
 import type { PendingChatPageGenerationState } from "@/types/chatPageGeneration";
 
-/** Location state key for Compose seed data (chat → page → compose). */
+/**
+ * `location.state` に載せる Compose seed のキー（チャット → ページ → compose）。
+ * Location state key for Compose seed data (chat → page → compose).
+ */
 export const COMPOSE_SEED_STATE_KEY = "composeSeed" as const;
 
-/** Seed payload stored on `location.state` when entering Compose from chat. */
+/**
+ * チャット経由で Compose に入るときの seed。
+ * Seed payload stored on `location.state` when entering Compose from chat.
+ */
 export type ComposeNavigationSeed = PendingChatPageGenerationState;
 
+/**
+ * `navigateToWikiCompose` の引数。
+ * Parameters for {@link navigateToWikiCompose}.
+ */
 export interface NavigateToWikiComposeParams {
   navigate: NavigateFunction;
   noteId: string;

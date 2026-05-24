@@ -15,6 +15,9 @@ import type { Source } from "../../subgraphs/research/types.js";
 export type { Source };
 
 /**
+ * チャットから Compose に入ったときの任意 seed (#950)。
+ * 初回 `POST /run` の input とセッション行 `metadata` に載せる。
+ *
  * Optional chat context seeded when entering Compose from AI Chat (#950).
  * Passed on the first graph `input` and stored on the session row metadata.
  */

@@ -26,6 +26,7 @@ import type {
   ComposeInterruptPayload,
   ComposeSession,
   ComposeSessionStatus,
+  ComposeSessionUiProjection,
   ComposeSseEvent,
   DraftedSection,
   OutlineSection,
@@ -106,9 +107,15 @@ export interface UseWikiComposeSessionArgs {
   pageId: string;
   /** Existing session to resume; pass `null` to create a fresh session on start. */
   sessionId: string | null;
-  /** Optional initial body for the first run (e.g. chat seed for Brief). */
+  /**
+   * 初回 `POST /run` に渡す graph input（例: `chatSeed`）。
+   * Initial graph input for the first `POST /run` (e.g. `{ chatSeed }`).
+   */
   initialInput?: Record<string, unknown>;
-  /** Chat → Compose seed; stored on the session row as metadata. */
+  /**
+   * チャット由来 seed。セッション行 `metadata` にも保存する。
+   * Chat-origin seed; also persisted on the session row metadata.
+   */
   composeSeed?: ComposeNavigationSeed;
   /** Auto-start the first `run` when the session is created. Default `true`. */
   autoStart?: boolean;
@@ -309,6 +316,32 @@ function appendActivity(
  * interrupted checkpoint (invalid for LangGraph) and drop `completion` on the
  * final outline approve path.
  */
+/**
+ * Merge `GET /compose-sessions/:id` checkpoint projection into hook state (#950).
+ * `GET` の projection をフック state にマージする（リロード再開用）。
+ */
+function hydrateFromProjection(
+  projection: ComposeSessionUiProjection,
+): Partial<WikiComposeSessionState> {
+  const partial: Partial<WikiComposeSessionState> = {};
+  if (projection.phase) partial.phase = projection.phase;
+  if (projection.briefQuestions?.length) partial.briefQuestions = projection.briefQuestions;
+  if (projection.pageSnapshot) partial.pageSnapshot = projection.pageSnapshot;
+  if (projection.latestBatch !== undefined) partial.latestBatch = projection.latestBatch;
+  if (projection.pendingSources?.length) partial.pendingSources = projection.pendingSources;
+  if (projection.approvedSources?.length) partial.approvedSources = projection.approvedSources;
+  if (projection.outlineProposal?.length) partial.outlineProposal = projection.outlineProposal;
+  if (projection.completedMarkdown) partial.completedMarkdown = projection.completedMarkdown;
+  if (projection.draftedSections?.length) {
+    const draftedSections: Record<string, DraftedSection> = {};
+    for (const section of projection.draftedSections) {
+      if (section?.sectionId) draftedSections[section.sectionId] = section;
+    }
+    partial.draftedSections = draftedSections;
+  }
+  return partial;
+}
+
 function reduceResumeOutput(
   output: unknown,
   status: ComposeSessionStatus,
@@ -454,28 +487,55 @@ export function useWikiComposeSession(
   /** Create or resume the session, then begin streaming. */
   const start = useCallback(async () => {
     try {
-      const session = initialSessionId
-        ? await getSession(pageId, initialSessionId)
-        : await createSession({
-            pageId,
-            metadata: composeSeed
-              ? {
-                  composeSeed: {
-                    outline: composeSeed.outline,
-                    conversationText: composeSeed.conversationText,
-                    userSchema: composeSeed.userSchema,
-                    conversationId: composeSeed.conversationId,
-                  },
-                }
-              : undefined,
-          });
+      const loaded = initialSessionId ? await getSession(pageId, initialSessionId) : null;
+      const session =
+        loaded?.session ??
+        (await createSession({
+          pageId,
+          metadata: composeSeed
+            ? {
+                composeSeed: {
+                  outline: composeSeed.outline,
+                  conversationText: composeSeed.conversationText,
+                  userSchema: composeSeed.userSchema,
+                  conversationId: composeSeed.conversationId,
+                },
+              }
+            : undefined,
+        }));
+      const projectionHydration = loaded?.projection
+        ? hydrateFromProjection(loaded.projection)
+        : {};
+
       sessionRef.current = session;
-      update({ session, status: session.status, error: null });
+      update({ session, status: session.status, error: null, ...projectionHydration });
+
+      const metadataSeed = session.metadata?.composeSeed as
+        | {
+            outline?: string;
+            conversationText?: string;
+            userSchema?: string;
+            conversationId?: string;
+          }
+        | undefined;
+      const runInput =
+        initialInput ??
+        (metadataSeed?.outline && metadataSeed.conversationText
+          ? {
+              chatSeed: {
+                outline: metadataSeed.outline,
+                conversationText: metadataSeed.conversationText,
+                userSchema: metadataSeed.userSchema,
+                conversationId: metadataSeed.conversationId,
+              },
+            }
+          : undefined);
+
       // Only fresh / retriable rows may call `POST /run` with graph input.
       // Interrupted checkpoints require `Command({ resume })`; replaying input
       // would restart or error, and resume payloads are not stored on the row.
       if (session.status === "pending" || session.status === "failed") {
-        await streamRun(session, initialInput);
+        await streamRun(session, runInput);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

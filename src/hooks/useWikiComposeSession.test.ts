@@ -238,6 +238,33 @@ describe("useWikiComposeSession", () => {
     expect(result.current.phase).toBe("research");
   });
 
+  it("hydrates interrupted session from GET projection without POST /run", async () => {
+    mocks.createSession.mockReset();
+    mocks.getSession.mockResolvedValue({
+      session: { ...SESSION, status: "interrupted", phase: "brief:await_user" },
+      projection: {
+        phase: "brief",
+        briefQuestions: [
+          {
+            id: "q1",
+            question: "Reloaded?",
+            required: false,
+            options: [],
+          },
+        ],
+        pageSnapshot: { pageId: "page-1", title: "T", body: "", hasContent: false },
+      },
+    });
+
+    const { result } = renderHook(() =>
+      useWikiComposeSession({ pageId: "page-1", sessionId: "sess-1" }),
+    );
+
+    await waitFor(() => expect(result.current.briefQuestions).toHaveLength(1));
+    expect(result.current.briefQuestions[0]?.question).toBe("Reloaded?");
+    expect(mocks.runSession).not.toHaveBeenCalled();
+  });
+
   it("submitBrief calls resumeSession with the answer payload and re-streams", async () => {
     // Initial run: halt at Brief.
     arrangeRun([
