@@ -63,13 +63,16 @@ export const FloatingWikiLinkInputBar: React.FC<FloatingWikiLinkInputBarProps> =
       data-testid="floating-wiki-link-input-bar"
       className={cn(
         "pointer-events-none fixed right-0 bottom-0 left-0 z-40",
-        !isKeyboardOpen &&
-          "pb-[calc(env(safe-area-inset-bottom)+var(--app-bottom-nav-height,0px)+0.5rem)] md:pb-[calc(env(safe-area-inset-bottom)+1.5rem)]",
+        !isKeyboardOpen && "pb-[var(--floating-bar-pb)] md:pb-[var(--floating-bar-pb-md)]",
       )}
-      style={{
-        bottom: bottomStyle,
-        ...(isKeyboardOpen ? { paddingBottom: "0.5rem" } : {}),
-      }}
+      style={
+        {
+          bottom: bottomStyle,
+          "--floating-bar-pb": FLOATING_WIKI_LINK_BAR_PADDING_BOTTOM,
+          "--floating-bar-pb-md": FLOATING_WIKI_LINK_BAR_PADDING_BOTTOM_DESKTOP,
+          ...(isKeyboardOpen ? { paddingBottom: "0.5rem" } : {}),
+        } as React.CSSProperties
+      }
     >
       <Container className="pointer-events-auto flex items-end gap-2">
         <WikiLinkInputBar {...props} fillWidth className="min-w-0 flex-1" />
