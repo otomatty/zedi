@@ -29,6 +29,10 @@ vi.mock("../../middleware/rateLimit.js", () => ({
   },
 }));
 
+vi.mock("../../services/subscriptionService.js", () => ({
+  getUserTier: async () => "free" as const,
+}));
+
 import { Hono } from "hono";
 import composeSessionRoutes from "../../routes/composeSessions.js";
 import { errorHandler } from "../../middleware/errorHandler.js";
@@ -244,6 +248,35 @@ describe("DELETE /api/pages/:pageId/compose-sessions/:id", () => {
     expect(chains.filter((c) => c.startMethod === "update").length).toBe(0);
   });
 
+  it("returns 400 when resume revalidates an unsupported backend", async () => {
+    const interruptedRow = {
+      id: "sess-resume-backend",
+      pageId: PAGE_ID,
+      userId: OWNER_ID,
+      graphId: GRAPH_ID,
+      phase: "init",
+      backend: "byok",
+      status: "interrupted",
+      metadata: null,
+      lastError: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      closedAt: null,
+    };
+    const { app, chains } = createComposeApp([...pageAccessPrefix(), [interruptedRow]]);
+
+    const res = await app.request(
+      `/api/pages/${PAGE_ID}/compose-sessions/sess-resume-backend/resume`,
+      {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify({ resume: { ok: true } }),
+      },
+    );
+    expect(res.status).toBe(400);
+    expect(chains.filter((c) => c.startMethod === "update").length).toBe(0);
+  });
+
   it("marks session failed when resume throws GraphNotRegisteredError", async () => {
     const interruptedRow = {
       id: "sess-resume-fail",
@@ -262,7 +295,6 @@ describe("DELETE /api/pages/:pageId/compose-sessions/:id", () => {
     const { app, chains } = createComposeApp([
       ...pageAccessPrefix(),
       [interruptedRow],
-      [], // getUserTier subscription lookup
       [interruptedRow], // atomic claim → running
       undefined, // GraphNotRegisteredError recovery → failed update
     ]);

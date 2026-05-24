@@ -321,6 +321,15 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
   const tier = await getUserTier(userId, db);
   const runner = new GraphRunner();
 
+  try {
+    assertSupportedBackendP0(session.backend);
+  } catch (err) {
+    if (err instanceof UnsupportedBackendError) {
+      throw new HTTPException(400, { message: err.message });
+    }
+    throw err;
+  }
+
   const [claimed] = await db
     .update(wikiComposeSessions)
     .set({ status: "running", updatedAt: new Date() })
@@ -371,7 +380,7 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
         updatedAt: new Date(),
       })
       .where(eq(wikiComposeSessions.id, id));
-    if (err instanceof GraphNotRegisteredError) {
+    if (err instanceof GraphNotRegisteredError || err instanceof UnsupportedBackendError) {
       throw new HTTPException(400, { message: err.message });
     }
     throw err;
