@@ -170,6 +170,18 @@ export function useWikiLinkNavigation(
   // page in a new tab. Preserved separately from `pendingLinkActionRef`
   // because that ref is cleared once navigation resolution finishes.
   const pendingCreatePageNewTabRef = useRef<boolean>(false);
+  // Issue #931: ユーザー操作の同期スタック内で `window.open("about:blank")`
+  // を呼んで取得しておく WindowProxy。後続の `useEffect` / `await` 後の
+  // `window.open` はブラウザのポップアップブロッカ（特に Safari / Firefox）
+  // でユーザーアクティベーション切れと判定されるため、クリック時に空タブを
+  // 確保しておき、解決後に `location.href` を差し替える方式を採用する。
+  //
+  // Pre-opened `about:blank` WindowProxy captured during the synchronous
+  // click handler. Calling `window.open` after a `useEffect` or `await`
+  // boundary loses transient user activation, so Safari and Firefox block
+  // the popup. Opening synchronously here and updating `location.href`
+  // once the navigation target resolves preserves the gesture.
+  const pendingNewTabWindowRef = useRef<Window | null>(null);
 
   // Create page confirmation dialog state
   const [createPageDialogOpen, setCreatePageDialogOpen] = useState(false);
@@ -178,8 +190,44 @@ export function useWikiLinkNavigation(
   // Handle link click - navigate to page or create new
   // WikiLinkクリック時は常に既存ページの存在をチェック（byTitle キャッシュに依存、createdPageIdsRef は廃止）
   const handleLinkClick = useCallback((title: string, options?: WikiLinkNavigationOptions) => {
-    pendingLinkActionRef.current = { title, newTab: options?.newTab ?? false };
+    const newTab = options?.newTab ?? false;
+    if (newTab) {
+      // Issue #931: ユーザー操作中に同期で空タブを開く。ポップアップが
+      // ブロックされた場合は `null` が返るので後続処理は skip する。
+      // Issue #931: open the blank tab synchronously while the user
+      // gesture is still live. If the popup is blocked, `window.open`
+      // returns `null` and downstream handlers silently no-op.
+      pendingNewTabWindowRef.current = window.open("about:blank", "_blank", "noopener,noreferrer");
+    }
+    pendingLinkActionRef.current = { title, newTab };
     setLinkTitleToFind(title);
+  }, []);
+
+  /**
+   * 確保した about:blank タブに最終 URL を設定する。`null` の場合（ブロック
+   * 済み）は何もしない。
+   *
+   * Assign the final URL to the previously opened `about:blank` tab.
+   * No-op when popup was blocked (`null`).
+   */
+  const navigateNewTab = useCallback((targetUrl: string) => {
+    const w = pendingNewTabWindowRef.current;
+    pendingNewTabWindowRef.current = null;
+    if (w) {
+      w.location.href = targetUrl;
+    }
+  }, []);
+
+  /**
+   * 確保した about:blank タブを閉じる（キャンセル / 失敗 / note-scope no-op 用）。
+   *
+   * Close the reserved `about:blank` tab. Used by cancel, failed
+   * mutations, and the note-scope no-op confirmation path.
+   */
+  const closePendingNewTabWindow = useCallback(() => {
+    const w = pendingNewTabWindowRef.current;
+    pendingNewTabWindowRef.current = null;
+    w?.close();
   }, []);
 
   // Navigate when found page changes
@@ -209,9 +257,13 @@ export function useWikiLinkNavigation(
         // `foundPage.noteId` so this branch unifies cleanly.
         const targetUrl = `/notes/${foundPage.noteId}/${foundPage.id}`;
         if (newTab) {
-          // Issue #931: Cmd/Ctrl+クリックや中クリックでは新タブで開く。
-          // Issue #931: open in a new tab for Cmd/Ctrl+click or middle click.
-          window.open(targetUrl, "_blank", "noopener,noreferrer");
+          // Issue #931: クリック時に同期で開いた about:blank タブの location を
+          // 上書きする。`window.open` をここで呼ぶとポップアップブロッカに
+          // 引っかかるため不可（Safari / Firefox）。
+          // Issue #931: rewrite the pre-opened `about:blank` tab. Calling
+          // `window.open` here would be blocked by Safari/Firefox popup
+          // policies because the user gesture has expired.
+          navigateNewTab(targetUrl);
         } else {
           navigate(targetUrl, {
             replace: false,
@@ -221,8 +273,11 @@ export function useWikiLinkNavigation(
       } else {
         // ページが見つからなかった場合は確認ダイアログを表示。
         // 新タブ意図はダイアログ確定時に消費するので別 ref に退避する（Issue #931）。
+        // 確保済みの about:blank タブはダイアログの確定／キャンセル時に
+        // 消費／クローズされる。
         // Stash the new-tab intent so the create-dialog confirmation can
-        // honor it later (Issue #931).
+        // honor it later (Issue #931). The reserved `about:blank` window
+        // is consumed on confirm or closed on cancel.
         pendingCreatePageNewTabRef.current = newTab;
         setPendingCreatePageTitle(title);
         setCreatePageDialogOpen(true);
@@ -234,7 +289,7 @@ export function useWikiLinkNavigation(
     };
 
     handleNavigation();
-  }, [foundPage, isFetched, linkTitleToFind, navigate, pageNoteId]);
+  }, [foundPage, isFetched, linkTitleToFind, navigate, navigateNewTab, pageNoteId]);
 
   // Handle create page confirmation
   // 新規ページ作成は `useCreatePage` 経由でデフォルトノートまたは指定ノートに
@@ -250,7 +305,11 @@ export function useWikiLinkNavigation(
   const handleConfirmCreate = useCallback(async () => {
     if (!pendingCreatePageTitle) return;
     if (pageNoteId) {
-      // ノートスコープ内での新規作成は未対応。今は何もせずダイアログを閉じる。
+      // ノートスコープ内での新規作成は未対応。確保済み about:blank タブは
+      // 閉じてダイアログだけ閉じる。
+      // Note-scope creation is not yet wired up. Close the reserved blank
+      // tab so the user is not left with an empty popup.
+      closePendingNewTabWindow();
       setCreatePageDialogOpen(false);
       setPendingCreatePageTitle(null);
       pendingCreatePageNewTabRef.current = false;
@@ -268,11 +327,13 @@ export function useWikiLinkNavigation(
       const newTab = pendingCreatePageNewTabRef.current;
       pendingCreatePageNewTabRef.current = false;
       if (newTab) {
-        // Issue #931: Cmd/Ctrl+クリックや中クリックで開いたゴーストリンクは
-        // ダイアログ確定後も新タブで開く。
-        // Issue #931: ghost links opened with Cmd/Ctrl+click or middle click
-        // should land in a new tab after the create dialog is confirmed.
-        window.open(targetUrl, "_blank", "noopener,noreferrer");
+        // Issue #931: クリック時に確保した about:blank タブの location を
+        // 上書きする。await 後に `window.open` を呼ぶとポップアップブロッカ
+        // でブロックされる（Safari / Firefox / Chrome の strict 設定）。
+        // Issue #931: rewrite the pre-opened blank tab. A fresh
+        // `window.open` after `await` is treated as a gesture-less popup
+        // and blocked.
+        navigateNewTab(targetUrl);
       } else {
         navigate(targetUrl, {
           replace: false,
@@ -280,15 +341,30 @@ export function useWikiLinkNavigation(
         });
       }
     } catch (error) {
+      // ミューテーション失敗時は確保しておいた about:blank タブを閉じて
+      // 空白タブが残らないようにする。
+      // Close the reserved blank tab on failure to avoid leaving a stray
+      // popup behind.
+      closePendingNewTabWindow();
       console.error("Failed to create page:", error);
     }
-  }, [pendingCreatePageTitle, createPageMutation, navigate, pageNoteId]);
+  }, [
+    pendingCreatePageTitle,
+    createPageMutation,
+    navigate,
+    navigateNewTab,
+    closePendingNewTabWindow,
+    pageNoteId,
+  ]);
 
   const handleCancelCreate = useCallback(() => {
+    // 確保済み about:blank タブを閉じる（Issue #931）。
+    // Close the reserved blank tab so cancelling does not leave a popup.
+    closePendingNewTabWindow();
     setCreatePageDialogOpen(false);
     setPendingCreatePageTitle(null);
     pendingCreatePageNewTabRef.current = false;
-  }, []);
+  }, [closePendingNewTabWindow]);
 
   return {
     handleLinkClick,

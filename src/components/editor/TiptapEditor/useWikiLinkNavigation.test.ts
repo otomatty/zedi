@@ -178,12 +178,17 @@ describe("useWikiLinkNavigation", () => {
     expect(result.current.pendingCreatePageTitle).toBe(null);
   });
 
-  // Issue #931: 既存個人ページに対する Cmd/Ctrl+クリックは新タブで開き、
-  // ルータには遷移しない。
-  // Issue #931: Cmd/Ctrl+click on an existing personal page opens a new tab
-  // via `window.open` and must not invoke the router.
-  it("既存個人ページに対する newTab クリックは window.open を呼び navigate は呼ばない", async () => {
-    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+  // Issue #931: 既存個人ページに対する Cmd/Ctrl+クリックは、クリック時に
+  // 同期で `window.open("about:blank")` を呼んでユーザーアクティベーション
+  // を確保し、ページ解決後にそのタブの `location.href` を差し替える。
+  // ルータは呼ばないこと。
+  // Issue #931: Cmd/Ctrl+click on an existing personal page opens an
+  // `about:blank` tab synchronously to preserve user activation and
+  // updates its `location.href` once the page resolves. The router must
+  // not be invoked.
+  it("既存個人ページに対する newTab クリックは about:blank を同期で開き、解決後に location を上書きする", async () => {
+    const mockWindow = { location: { href: "" }, close: vi.fn() };
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(mockWindow as unknown as Window);
     vi.mocked(usePageByTitle).mockImplementation(
       (title: string) =>
         ({
@@ -203,24 +208,27 @@ describe("useWikiLinkNavigation", () => {
       result.current.handleLinkClick("Existing Page", { newTab: true });
     });
 
+    // The blank tab is reserved synchronously inside the click handler.
+    expect(openSpy).toHaveBeenCalledWith("about:blank", "_blank", "noopener,noreferrer");
+
     await waitFor(() => {
-      expect(openSpy).toHaveBeenCalledWith(
-        `/notes/${DEFAULT_NOTE_ID}/existing-id`,
-        "_blank",
-        "noopener,noreferrer",
-      );
+      expect(mockWindow.location.href).toBe(`/notes/${DEFAULT_NOTE_ID}/existing-id`);
     });
     expect(mockNavigate).not.toHaveBeenCalled();
+    expect(mockWindow.close).not.toHaveBeenCalled();
 
     openSpy.mockRestore();
   });
 
-  // Issue #931: ゴーストリンクを Cmd/Ctrl+クリックすると確認ダイアログは
-  // 通常通り開き、確定後の遷移だけが新タブになる。
-  // Issue #931: Cmd/Ctrl+click on a ghost link still opens the confirm
-  // dialog. Only the post-confirm navigation switches to a new tab.
-  it("newTab で開いたゴーストリンクは Dialog 経由で window.open に到達する", async () => {
-    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+  // Issue #931: ゴーストリンクを Cmd/Ctrl+クリックすると、クリック時に
+  // about:blank タブを確保 → 確認ダイアログを表示 → 確定後にそのタブの
+  // `location.href` を新規ページに差し替える。
+  // Issue #931: Cmd/Ctrl+click on a ghost link reserves an `about:blank`
+  // tab during the user gesture, shows the confirm dialog, and rewrites
+  // the tab's `location.href` after the mutation succeeds.
+  it("newTab で開いたゴーストリンクは Dialog 確定で about:blank の location を上書きする", async () => {
+    const mockWindow = { location: { href: "" }, close: vi.fn() };
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(mockWindow as unknown as Window);
     mockMutateAsync.mockResolvedValue({ id: "new-page-id", noteId: DEFAULT_NOTE_ID });
     vi.mocked(usePageByTitle).mockImplementation(
       (title: string) =>
@@ -237,6 +245,7 @@ describe("useWikiLinkNavigation", () => {
     act(() => {
       result.current.handleLinkClick("Brand New", { newTab: true });
     });
+    expect(openSpy).toHaveBeenCalledWith("about:blank", "_blank", "noopener,noreferrer");
 
     await waitFor(() => {
       expect(result.current.createPageDialogOpen).toBe(true);
@@ -248,23 +257,22 @@ describe("useWikiLinkNavigation", () => {
     });
 
     expect(mockMutateAsync).toHaveBeenCalledWith({ title: "Brand New", content: "" });
-    expect(openSpy).toHaveBeenCalledWith(
-      `/notes/${DEFAULT_NOTE_ID}/new-page-id`,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    expect(mockWindow.location.href).toBe(`/notes/${DEFAULT_NOTE_ID}/new-page-id`);
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(result.current.createPageDialogOpen).toBe(false);
+    expect(mockWindow.close).not.toHaveBeenCalled();
 
     openSpy.mockRestore();
   });
 
-  // Issue #931: newTab で開いたあとキャンセル → 次回の通常クリックで
-  // 新タブ意図が漏れないことを確認する（ダイアログ確定経路の漏洩対策）。
-  // Issue #931: cancelling a new-tab ghost dialog must not leak the intent
-  // into a subsequent normal-click flow.
-  it("newTab ゴーストをキャンセルすると次の通常クリックは navigate にフォールバックする", async () => {
-    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+  // Issue #931: newTab で開いたゴーストをキャンセルすると、確保済みの
+  // about:blank タブを閉じる。次の通常クリックでは navigate にフォール
+  // バックすること。
+  // Issue #931: cancelling a new-tab ghost dialog must close the reserved
+  // `about:blank` tab and leave subsequent normal clicks untouched.
+  it("newTab ゴーストをキャンセルすると about:blank を閉じ、次の通常クリックは navigate にフォールバックする", async () => {
+    const cancelledWindow = { location: { href: "" }, close: vi.fn() };
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(cancelledWindow as unknown as Window);
     mockMutateAsync.mockResolvedValue({ id: "second-id", noteId: DEFAULT_NOTE_ID });
     vi.mocked(usePageByTitle).mockImplementation(
       (title: string) =>
@@ -281,16 +289,27 @@ describe("useWikiLinkNavigation", () => {
     act(() => {
       result.current.handleLinkClick("Ghost A", { newTab: true });
     });
+    // 初回クリックでは about:blank を確保する。
+    // The initial click reserves an `about:blank` tab.
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    expect(openSpy).toHaveBeenCalledWith("about:blank", "_blank", "noopener,noreferrer");
     await waitFor(() => {
       expect(result.current.createPageDialogOpen).toBe(true);
     });
     act(() => {
       result.current.handleCancelCreate();
     });
+    // キャンセル時は確保したタブを閉じる。
+    // Cancel closes the reserved tab.
+    expect(cancelledWindow.close).toHaveBeenCalledTimes(1);
 
+    openSpy.mockClear();
     act(() => {
       result.current.handleLinkClick("Ghost B");
     });
+    // newTab なしのクリックは window.open を呼ばない。
+    // A normal click must not invoke `window.open`.
+    expect(openSpy).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(result.current.createPageDialogOpen).toBe(true);
       expect(result.current.pendingCreatePageTitle).toBe("Ghost B");
@@ -304,9 +323,46 @@ describe("useWikiLinkNavigation", () => {
       replace: false,
       flushSync: true,
     });
-    expect(openSpy).not.toHaveBeenCalled();
 
     openSpy.mockRestore();
+  });
+
+  // Issue #931: ミューテーション失敗時は確保した about:blank を閉じる。
+  // Issue #931: a failed mutation must close the reserved blank tab so
+  // the user is not left with a stray popup.
+  it("newTab ゴーストでミューテーションが失敗したら about:blank を閉じる", async () => {
+    const mockWindow = { location: { href: "" }, close: vi.fn() };
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(mockWindow as unknown as Window);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockMutateAsync.mockRejectedValue(new Error("network down"));
+    vi.mocked(usePageByTitle).mockImplementation(
+      (title: string) =>
+        ({
+          data: undefined,
+          isFetched: title !== "",
+        }) as ReturnType<typeof usePageByTitle>,
+    );
+
+    const { result } = renderHook(() => useWikiLinkNavigation(), {
+      wrapper: createHookWrapper(),
+    });
+
+    act(() => {
+      result.current.handleLinkClick("Fails", { newTab: true });
+    });
+    await waitFor(() => {
+      expect(result.current.createPageDialogOpen).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.handleConfirmCreate();
+    });
+
+    expect(mockWindow.close).toHaveBeenCalledTimes(1);
+    expect(mockWindow.location.href).toBe("");
+
+    openSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
   });
 
   it("re-clicking a just-created title navigates immediately without reopening dialog", async () => {
@@ -430,12 +486,15 @@ describe("useWikiLinkNavigation", () => {
       expect(result.current.pendingCreatePageTitle).toBe(null);
     });
 
-    // Issue #931: Cmd/Ctrl+クリックや中クリックは新タブで開く。
-    // `window.open` が呼ばれ、`navigate` は呼ばれないことを検証する。
-    // Issue #931: Cmd/Ctrl+click and middle-click should open in a new tab
-    // via `window.open` and must not call `navigate`.
-    it("既存ノートページに対する newTab クリックは window.open を呼び navigate は呼ばない", async () => {
-      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    // Issue #931: Cmd/Ctrl+クリックや中クリックでは、クリック時に同期で
+    // `about:blank` を確保 → 解決後に `location.href` を上書きする。
+    // ルータは呼ばないこと。
+    // Issue #931: modifier / middle-click clicks reserve an `about:blank`
+    // tab synchronously and rewrite its `location.href` once the note
+    // page resolves. The router must not be invoked.
+    it("既存ノートページに対する newTab クリックは about:blank を同期で開き、解決後に location を上書きする", async () => {
+      const mockWindow = { location: { href: "" }, close: vi.fn() };
+      const openSpy = vi.spyOn(window, "open").mockReturnValue(mockWindow as unknown as Window);
       vi.mocked(useNoteTitleIndex).mockReturnValue({
         data: [{ id: "note-page-1", title: "Note Page A", isDeleted: false, updatedAt: 0 }],
         isFetched: true,
@@ -449,15 +508,13 @@ describe("useWikiLinkNavigation", () => {
       act(() => {
         result.current.handleLinkClick("Note Page A", { newTab: true });
       });
+      expect(openSpy).toHaveBeenCalledWith("about:blank", "_blank", "noopener,noreferrer");
 
       await waitFor(() => {
-        expect(openSpy).toHaveBeenCalledWith(
-          `/notes/${noteId}/note-page-1`,
-          "_blank",
-          "noopener,noreferrer",
-        );
+        expect(mockWindow.location.href).toBe(`/notes/${noteId}/note-page-1`);
       });
       expect(mockNavigate).not.toHaveBeenCalled();
+      expect(mockWindow.close).not.toHaveBeenCalled();
 
       openSpy.mockRestore();
     });
