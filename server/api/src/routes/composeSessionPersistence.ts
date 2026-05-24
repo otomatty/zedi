@@ -30,9 +30,7 @@ export async function persistOutcomeIfStillRunning(
       closedAt: outcome.status === "interrupted" ? null : new Date(),
       updatedAt: new Date(),
     })
-    .where(
-      and(eq(wikiComposeSessions.id, sessionId), eq(wikiComposeSessions.status, "running")),
-    )
+    .where(and(eq(wikiComposeSessions.id, sessionId), eq(wikiComposeSessions.status, "running")))
     .returning({ id: wikiComposeSessions.id });
   return row !== undefined;
 }
