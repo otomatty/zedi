@@ -16,6 +16,7 @@
 import { Annotation } from "@langchain/langgraph";
 import { BaseState } from "../../core/state/baseState.js";
 import type {
+  AdditionalResearchRequest,
   Evaluation,
   ExitReason,
   PlannedQuery,
@@ -99,6 +100,18 @@ export const ResearchLoopState = Annotation.Root({
   rejectedResearch: Annotation<Source[]>({
     reducer: (_prev, next) => next,
     default: () => [],
+  }),
+  /**
+   * 追加調査リクエスト。`POST /run` の `body.input.kind === "additional_research"`
+   * を route 層が詰め直す（LangGraph は未定義の top-level input キーを落とすため
+   * 仲介フィールドが必要）。`plan_queries` が消費後 `null` にクリアする。
+   *
+   * Additional-research seed populated by the route from `body.input`; cleared
+   * to null by `plan_queries` after one read.
+   */
+  additionalRequest: Annotation<AdditionalResearchRequest | null>({
+    reducer: (prev, next) => (next === undefined ? prev : next),
+    default: () => null,
   }),
 });
 

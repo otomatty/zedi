@@ -84,7 +84,13 @@ function buildUserPrompt(query: string, limit: number, recencyDays: number | und
 
 /** Hit shape emitted on the wire (serialised as JSON). */
 interface WebSearchToolHit {
-  /** Stable Source id: `web:<sha256(url)>`. */
+  /**
+   * Stable Source id: `src:<sha256(url)>`. Shared with `kind:"fetched"` so the
+   * reducer (`mergeSourcesById`) upgrades the row in place when Readability
+   * succeeds on the same URL.
+   * web/fetched は同じ id 体系 (`src:<sha>`) を使うことで reducer が in-place
+   * 昇格できる（codex review #956 P2 / gemini #4）。
+   */
   id: string;
   kind: "web";
   title: string;
@@ -164,7 +170,7 @@ export const webSearchTool = tool(
       ]);
       const results: WebSearchToolHit[] = await Promise.all(
         parsed.results.slice(0, limit).map(async (r) => ({
-          id: `web:${await sha256Hex(r.url)}`,
+          id: `src:${await sha256Hex(r.url)}`,
           kind: "web",
           title: r.title,
           url: r.url,

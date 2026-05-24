@@ -114,7 +114,7 @@ describe("researchLoopSubgraph — autonomous loop", () => {
     }));
     webSearch.mockImplementation(async (_state, _config) => ({
       pendingSources: [
-        { id: "web:a", kind: "web", title: "A", url: "https://a/" },
+        { id: "src:a", kind: "web", title: "A", url: "https://a/" },
       ],
     }));
     wikiSearch.mockImplementation(async (_state, _config) => ({ pendingSources: [] }));

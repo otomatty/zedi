@@ -34,14 +34,15 @@ function state(overrides: Partial<ResearchLoopStateType>): ResearchLoopStateType
     maxIterations: 3,
     queries: [{ id: "q1", query: "q", channels: ["web"] }],
     pendingSources: [
-      { id: "web:a", kind: "web", title: "A", url: "https://a/" },
-      { id: "web:b", kind: "web", title: "B", url: "https://b/" },
+      { id: "src:a", kind: "web", title: "A", url: "https://a/" },
+      { id: "src:b", kind: "web", title: "B", url: "https://b/" },
     ],
     lastEvaluation: null,
     exitReason: null,
     batches: [],
     approvedResearch: [],
     rejectedResearch: [],
+    additionalRequest: null,
     ...overrides,
   };
 }

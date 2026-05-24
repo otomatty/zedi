@@ -61,6 +61,37 @@ import { RESEARCH_GRAPH_ID } from "../agents/subgraphs/research/index.js";
 import type { AppEnv } from "../types/index.js";
 
 /**
+ * Translate the documented `body.input.kind === "additional_research"` shape
+ * into a state-compatible payload for the research graph. LangGraph's strict
+ * state schema drops top-level input keys that have no annotation; without
+ * this translation the `kind` / `instruction` / `carryOverApprovedIds` fields
+ * would silently vanish and the loop would behave like a normal initial run.
+ * (codex review #956 P1.)
+ *
+ * For graphs other than `wiki-compose-research`, the input passes through
+ * unchanged.
+ */
+function translateGraphInput(graphId: string, raw: unknown): unknown {
+  if (graphId !== RESEARCH_GRAPH_ID) return raw;
+  if (!raw || typeof raw !== "object") return raw;
+  const r = raw as {
+    kind?: unknown;
+    instruction?: unknown;
+    carryOverApprovedIds?: unknown;
+    brief?: unknown;
+  };
+  if (r.kind !== "additional_research") return raw;
+  const instruction = typeof r.instruction === "string" ? r.instruction : "";
+  const carryOverApprovedIds = Array.isArray(r.carryOverApprovedIds)
+    ? r.carryOverApprovedIds.filter((x): x is string => typeof x === "string")
+    : undefined;
+  const brief = typeof r.brief === "string" ? r.brief : undefined;
+  return {
+    additionalRequest: { instruction, carryOverApprovedIds, brief },
+  };
+}
+
+/**
  * Per-graph recursion limit. LangGraph's default of 25 is enough for the stub
  * graph but tight for `wiki-compose-research`, which runs up to ~5 iterations
  * × ~6 nodes ≈ 30 node executions. We bump it for that graph only rather than
@@ -267,7 +298,7 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
             feature: `wiki_compose:${session.graphId}`,
           },
         },
-        { kind: "input", value: body.input ?? {} },
+        { kind: "input", value: translateGraphInput(session.graphId, body.input ?? {}) },
       );
 
       for await (const raw of events) {

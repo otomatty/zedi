@@ -70,7 +70,9 @@ export async function evaluateSufficiency(
     feature: `${ctx.feature}:evaluate`,
     backend: ctx.backend,
     temperature: 0.1,
-    maxTokens: 512,
+    // 1024 leaves enough room for a verbose `rationale` + `missingAspects`
+    // array without truncating mid-JSON (gemini review #956).
+    maxTokens: 1024,
   });
   const structured = model.withStructuredOutput(evaluationSchema, {
     name: "research_evaluation",

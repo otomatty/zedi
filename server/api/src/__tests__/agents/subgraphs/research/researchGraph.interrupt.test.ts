@@ -95,7 +95,7 @@ describe("researchLoopSubgraph — interrupt at human_review_research", () => {
       phase: "research:plan",
     }));
     webSearch.mockImplementation(async () => ({
-      pendingSources: [{ id: "web:abc", kind: "web", title: "A", url: "https://a/" }],
+      pendingSources: [{ id: "src:abc", kind: "web", title: "A", url: "https://a/" }],
     }));
     wikiSearch.mockImplementation(async () => ({ pendingSources: [] }));
     fetchArticles.mockImplementation(async () => ({ pendingSources: [] }));

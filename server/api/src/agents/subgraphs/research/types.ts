@@ -14,25 +14,41 @@
  * 取得した記事本文プレビュー、いずれも同じ shape にまとめる。
  *
  * `id` は安定する単一値で、reducer が dedup するキーになる:
- * - `web:<sha256(url)>`
- * - `wiki:<pageId>`
- * - `fetched:<sha256(finalUrl)>`
+ * - `src:<sha256(url)>` — web / fetched で **共通** に使う。同じ URL を後段で
+ *   Readability に通すと、reducer (`mergeSourcesById`) が新値で上書きして
+ *   `kind: "web"` → `kind: "fetched"` にインプレース昇格する。リダイレクト後の
+ *   `finalUrl` は別フィールド (`finalUrl`) に格納し、id は常に **元 URL** の
+ *   sha256 で安定させる（codex review #956: URL 正規化の問題対策）。
+ * - `wiki:<pageId>` — Wiki ページ。pageId 自体が安定 ID なので hash は不要。
  *
- * `kind` は同 id で `web` → `fetched` に遷移可能（reducer は新値で上書き）。
- *
- * A single research source. The same shape covers web search hits, internal
- * wiki search hits, and Readability-extracted articles so the reducer can
- * dedup across iterations via a stable `id`.
+ * A single research source. Web and fetched share the SAME `id` scheme
+ * (`src:<sha256(originalUrl)>`) so the reducer dedups them across iterations
+ * — fetched literally overwrites the matching web row by id. `finalUrl` is
+ * stored separately so redirect / canonicalisation does not break dedup
+ * (codex review #956).
  */
 export interface Source {
-  /** Stable id (`web:<sha>`, `wiki:<pageId>`, `fetched:<sha>`). */
+  /** Stable id (`src:<sha256(url)>` for web/fetched, `wiki:<pageId>` for wiki). */
   id: string;
   /** Discriminator. `fetched` upgrades `web` after Readability succeeds. */
   kind: "web" | "wiki" | "fetched";
   /** Human-readable title. */
   title: string;
-  /** Present for `web` / `fetched`. */
+  /**
+   * Original URL of the search hit. Present for `web` / `fetched`.
+   * Stable across the loop — `id` is derived from this value, NOT from
+   * `finalUrl`, so redirect URLs do not break id-based dedup.
+   * 元の URL。`fetched` でも `finalUrl` ではなくこちらを id 計算に使う。
+   */
   url?: string;
+  /**
+   * Post-redirect / Readability-resolved canonical URL.
+   * Present only for `kind === "fetched"`. Used for display / citation; not
+   * used for dedup so a redirect chain does not split a single article into
+   * two state rows.
+   * リダイレクト後の URL（表示・引用用、dedup には使わない）。
+   */
+  finalUrl?: string;
   /** Snippet from the search result (pre-fetch). */
   snippet?: string;
   /** Readability excerpt (post-fetch). Populated for `kind === "fetched"`. */
@@ -121,4 +137,21 @@ export interface ResearchResumeInput {
   approvedSourceIds: string[];
   rejectedSourceIds?: string[];
   note?: string;
+}
+
+/**
+ * 追加調査リクエスト。`POST /run` の `body.input.kind === "additional_research"`
+ * を route 層が `state.additionalRequest` に詰め替えて graph に渡す。
+ * `plan_queries` が消費した後 `null` にクリアする。
+ *
+ * Additional-research seed. The route translates the documented
+ * `body.input.kind === "additional_research"` payload into this field so
+ * `plan_queries` can detect it from state (LangGraph drops unknown top-level
+ * input keys, so a free-form `kind` field would not survive the boundary).
+ * Cleared to `null` after `plan_queries` consumes it.
+ */
+export interface AdditionalResearchRequest {
+  instruction: string;
+  carryOverApprovedIds?: string[];
+  brief?: string;
 }

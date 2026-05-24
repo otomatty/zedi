@@ -25,6 +25,7 @@ function state(overrides: Partial<ResearchLoopStateType>): ResearchLoopStateType
     batches: [],
     approvedResearch: [],
     rejectedResearch: [],
+    additionalRequest: null,
     ...overrides,
   };
 }

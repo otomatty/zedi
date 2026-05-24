@@ -52,48 +52,7 @@ const SYSTEM_PROMPT =
   "Prefer 'wiki' for queries likely answered by the user's own knowledge base " +
   "and 'web' for queries needing fresh public information. Output JSON only.";
 
-/**
- * Input shape recognised when the node sees `state.messages[0].content` parses
- * as JSON with `kind === "additional_research"`. Drives the "re-run" branch.
- *
- * Carried-over IDs are projected into `pendingSources` as bare entries; the
- * full record will be re-materialised when the LLM re-plans.
- */
-interface AdditionalResearchInput {
-  kind: "additional_research";
-  instruction: string;
-  carryOverApprovedIds?: string[];
-  /** Optional brief carryover so the LLM has full context. */
-  brief?: string;
-}
-
-function tryParseAdditional(state: ResearchLoopStateType): AdditionalResearchInput | null {
-  // Look for an explicit messages[0] payload of the additional_research shape.
-  // We accept either a parsed object (LangGraph state can carry arbitrary
-  // entries) or a stringified one — frontends may send either.
-  // messages の最初のメッセージから additional_research 構造を取り出す。
-  const first = state.messages?.[0];
-  if (!first) return null;
-  const raw = (first as { content?: unknown }).content;
-  if (raw && typeof raw === "object" && (raw as { kind?: unknown }).kind === "additional_research") {
-    return raw as AdditionalResearchInput;
-  }
-  if (typeof raw === "string") {
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (
-        parsed &&
-        typeof parsed === "object" &&
-        (parsed as { kind?: unknown }).kind === "additional_research"
-      ) {
-        return parsed as AdditionalResearchInput;
-      }
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
+import type { AdditionalResearchRequest } from "../types.js";
 
 function clampMaxIterations(raw: unknown): number {
   if (typeof raw !== "number" || !Number.isFinite(raw)) return 3;
@@ -101,12 +60,12 @@ function clampMaxIterations(raw: unknown): number {
   return Math.min(Math.max(truncated, 1), 5);
 }
 
-function briefFromState(state: ResearchLoopStateType, additional: AdditionalResearchInput | null): string {
+function briefFromState(
+  state: ResearchLoopStateType,
+  additional: AdditionalResearchRequest | null,
+): string {
   if (additional) {
-    const parts = [
-      "[Additional research request]",
-      additional.instruction,
-    ];
+    const parts = ["[Additional research request]", additional.instruction];
     if (additional.brief) parts.push("", "[Original brief]", additional.brief);
     return parts.join("\n");
   }
@@ -131,7 +90,12 @@ export async function planQueries(
   config: LangGraphRunnableConfig,
 ): Promise<ResearchLoopStateUpdate> {
   const ctx = getGraphContext(config);
-  const additional = tryParseAdditional(state);
+  // Detect additional-research input from the dedicated state field. The route
+  // layer translates `body.input.kind === "additional_research"` into this
+  // shape so LangGraph's strict state schema does not drop unknown top-level
+  // input keys (codex review #956 P1).
+  // 追加調査の検出は state.additionalRequest 専用フィールドで行う。
+  const additional = state.additionalRequest ?? null;
   const brief = briefFromState(state, additional);
 
   // Resolve maxIterations: input override > existing state > default(3); clamp 1..5.
@@ -164,11 +128,7 @@ export async function planQueries(
   const carriedSources: Source[] = additional?.carryOverApprovedIds
     ? additional.carryOverApprovedIds.map((id) => ({
         id,
-        kind: id.startsWith("wiki:")
-          ? "wiki"
-          : id.startsWith("fetched:")
-            ? "fetched"
-            : "web",
+        kind: id.startsWith("wiki:") ? "wiki" : "fetched",
         title: "(carried over)",
       }))
     : [];
@@ -185,6 +145,10 @@ export async function planQueries(
     lastEvaluation: null,
     exitReason: null,
     phase: "research:plan",
+    // Consume the additional-research seed so a subsequent re-plan inside the
+    // same session (defensive) does not loop on the same instruction.
+    // 追加調査リクエストは 1 度読んだら null にクリアする。
+    additionalRequest: null,
   };
   if (additional) {
     // Additional-research re-run: reset accumulators except for explicit carryover.

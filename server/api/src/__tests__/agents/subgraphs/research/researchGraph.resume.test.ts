@@ -87,8 +87,8 @@ describe("researchLoopSubgraph — resume projects approvedResearch", () => {
 
   it("populates approvedResearch / rejectedResearch from the resume payload", async () => {
     const pending = [
-      { id: "web:a", kind: "web" as const, title: "A", url: "https://a/" },
-      { id: "web:b", kind: "web" as const, title: "B", url: "https://b/" },
+      { id: "src:a", kind: "web" as const, title: "A", url: "https://a/" },
+      { id: "src:b", kind: "web" as const, title: "B", url: "https://b/" },
       { id: "wiki:p", kind: "wiki" as const, title: "P", pageId: "p", noteId: "n" },
     ];
 
@@ -159,8 +159,8 @@ describe("researchLoopSubgraph — resume projects approvedResearch", () => {
     const finalState = (await compiled.invoke(
       new Command({
         resume: {
-          approvedSourceIds: ["web:a", "wiki:p"],
-          rejectedSourceIds: ["web:b"],
+          approvedSourceIds: ["src:a", "wiki:p"],
+          rejectedSourceIds: ["src:b"],
         },
       }),
       config,
@@ -170,8 +170,8 @@ describe("researchLoopSubgraph — resume projects approvedResearch", () => {
       phase: string;
     };
 
-    expect(finalState.approvedResearch.map((s) => s.id).sort()).toEqual(["web:a", "wiki:p"].sort());
-    expect(finalState.rejectedResearch.map((s) => s.id)).toEqual(["web:b"]);
+    expect(finalState.approvedResearch.map((s) => s.id).sort()).toEqual(["src:a", "wiki:p"].sort());
+    expect(finalState.rejectedResearch.map((s) => s.id)).toEqual(["src:b"]);
     expect(finalState.phase).toBe("completed");
   });
 
