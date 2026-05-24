@@ -82,6 +82,26 @@ export interface WikiComposeSessionState {
   isStreaming: boolean;
 }
 
+/** Build graph `chatSeed` input from session metadata saved at create time. */
+function chatSeedInputFromMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | undefined {
+  const raw = metadata?.composeSeed;
+  if (!raw || typeof raw !== "object") return undefined;
+  const seed = raw as ComposeNavigationSeed;
+  if (typeof seed.outline !== "string" || typeof seed.conversationText !== "string") {
+    return undefined;
+  }
+  return {
+    chatSeed: {
+      outline: seed.outline,
+      conversationText: seed.conversationText,
+      userSchema: seed.userSchema,
+      conversationId: seed.conversationId,
+    },
+  };
+}
+
 const INITIAL_STATE: WikiComposeSessionState = {
   session: null,
   status: "idle",
@@ -475,7 +495,10 @@ export function useWikiComposeSession(
       // Interrupted checkpoints require `Command({ resume })`; replaying input
       // would restart or error, and resume payloads are not stored on the row.
       if (session.status === "pending" || session.status === "failed") {
-        await streamRun(session, initialInput);
+        const runInput =
+          initialInput ??
+          chatSeedInputFromMetadata(session.metadata as Record<string, unknown> | null | undefined);
+        await streamRun(session, runInput);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
