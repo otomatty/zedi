@@ -23,5 +23,8 @@ export {
   type SseInterruptEvent,
   type SseDoneEvent,
   type SseErrorEvent,
+  type SseResearchIterationEvent,
+  type SseResearchEvaluationEvent,
+  type SseResearchBatchEvent,
   SSE_EVENT_NAMES,
 } from "./sseEvents.js";

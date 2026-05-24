@@ -10,7 +10,12 @@
  * route layer is responsible for actually writing to the SSE response; this
  * file only describes the shape transformation so unit tests can pin it.
  */
-import type { SseEvent } from "../core/types/sseEvents.js";
+import type {
+  SseEvent,
+  SseResearchBatchEvent,
+  SseResearchEvaluationEvent,
+  SseResearchIterationEvent,
+} from "../core/types/sseEvents.js";
 
 /**
  * 起動時 SSE。`event: started` で投げる。
@@ -96,6 +101,8 @@ export function mapLangGraphEvent(event: LangGraphRuntimeEvent): SseEvent[] {
       return mapToolEnd(event);
     case "on_chain_end":
       return mapChainEnd(event);
+    case "on_custom_event":
+      return mapCustomEvent(event);
     default:
       return [];
   }
@@ -149,14 +156,106 @@ function mapToolEnd(event: LangGraphRuntimeEvent): SseEvent[] {
 }
 
 function mapChainEnd(event: LangGraphRuntimeEvent): SseEvent[] {
-  // Only emit a status update when the chain end belongs to the top-level
-  // graph (no parent ids in metadata). Nested chain ends would generate noise.
-  // トップレベル graph の終了のみ status を吐く。ネストした chain は無視する。
+  // Only emit a status / interrupt update when the chain end belongs to the
+  // top-level graph. Nested chain ends would generate noise.
+  // トップレベル graph の終了のみ拾う。ネストした chain は無視する。
   const data = asRecord(event.data);
   if (!data) return [];
   const output = asRecord(data.output);
   if (!output) return [];
+  const events: SseEvent[] = [];
+
+  // LangGraph ≥ 1.x: interrupts surface as a `__interrupt__: Interrupt[]`
+  // array on the final state, not as a throw. Convert each entry to its own
+  // `interrupt` SSE event so the frontend sees the same wire shape it would
+  // get from the legacy throw path. Route layer reads `interrupt` events to
+  // flip the session status to "interrupted".
+  // LangGraph 1.x の `__interrupt__` 配列を SSE interrupt イベントに変換する。
+  const interrupts = (output as { __interrupt__?: unknown }).__interrupt__;
+  if (Array.isArray(interrupts) && interrupts.length > 0) {
+    for (const entry of interrupts) {
+      const value =
+        entry && typeof entry === "object" ? (entry as { value?: unknown }).value : undefined;
+      events.push({ type: "interrupt", payload: value });
+    }
+  }
+
   const phase = typeof output.phase === "string" ? output.phase : undefined;
-  if (!phase) return [];
-  return [{ type: "status", phase }];
+  if (phase) events.push({ type: "status", phase });
+  return events;
+}
+
+/**
+ * Map `on_custom_event` (LangGraph's hook for `dispatchCustomEvent` from
+ * `@langchain/core/callbacks/dispatch`) to typed Sse events. Used by the
+ * research loop subgraph (#949) to surface `research_iteration` /
+ * `research_evaluation` / `research_batch` without inventing a new transport.
+ *
+ * `dispatchCustomEvent(name, data, config)` で吐かれる runtime event を SSE に
+ * 変換する。`event.name` でイベント種別を分岐し、`event.data` は信頼せず構造
+ * 的に検証してから dispatch する（ペイロードが壊れていれば空配列を返して
+ * フロントを壊さない）。
+ */
+function mapCustomEvent(event: LangGraphRuntimeEvent): SseEvent[] {
+  const name = event.name;
+  if (!name) return [];
+  const data = asRecord(event.data);
+  if (!data) return [];
+  switch (name) {
+    case "research_iteration":
+      return mapResearchIteration(data);
+    case "research_evaluation":
+      return mapResearchEvaluation(data);
+    case "research_batch":
+      return mapResearchBatch(data);
+    default:
+      // Unknown custom event names are dropped silently; emitting them as `status`
+      // would risk leaking implementation detail to the wire.
+      // 未知 name は静かに捨てる。`status` 等に流すと内部詳細が漏れる。
+      return [];
+  }
+}
+
+function mapResearchIteration(data: Record<string, unknown>): SseResearchIterationEvent[] {
+  const iteration = typeof data.iteration === "number" ? data.iteration : null;
+  const status = data.status === "planned" || data.status === "refined" ? data.status : null;
+  const queryCount = typeof data.queryCount === "number" ? data.queryCount : null;
+  if (iteration === null || status === null || queryCount === null) return [];
+  return [{ type: "research_iteration", iteration, status, queryCount }];
+}
+
+function mapResearchEvaluation(data: Record<string, unknown>): SseResearchEvaluationEvent[] {
+  const iteration = typeof data.iteration === "number" ? data.iteration : null;
+  const score = typeof data.score === "number" ? data.score : null;
+  const rationale = typeof data.rationale === "string" ? data.rationale : null;
+  const missingAspectsCount =
+    typeof data.missingAspectsCount === "number" ? data.missingAspectsCount : null;
+  if (iteration === null || score === null || rationale === null || missingAspectsCount === null) {
+    return [];
+  }
+  return [{ type: "research_evaluation", iteration, score, rationale, missingAspectsCount }];
+}
+
+function mapResearchBatch(data: Record<string, unknown>): SseResearchBatchEvent[] {
+  const batchId = typeof data.batchId === "string" ? data.batchId : null;
+  const iteration = typeof data.iteration === "number" ? data.iteration : null;
+  const sourceCount = typeof data.sourceCount === "number" ? data.sourceCount : null;
+  const score = data.score === null || typeof data.score === "number" ? data.score : null;
+  const exitReason =
+    data.exitReason === "score_threshold" || data.exitReason === "max_iterations"
+      ? data.exitReason
+      : null;
+  if (batchId === null || iteration === null || sourceCount === null || exitReason === null) {
+    return [];
+  }
+  return [
+    {
+      type: "research_batch",
+      batchId,
+      iteration,
+      sourceCount,
+      score,
+      exitReason,
+    },
+  ];
 }

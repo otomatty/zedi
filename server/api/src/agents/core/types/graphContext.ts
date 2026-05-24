@@ -27,6 +27,10 @@ import type { ExecutionBackend } from "./executionBackend.js";
  * @property tier      ユーザー tier（usage 上限判定で使う）。User tier for budget checks.
  * @property db        Drizzle DB ハンドル。Drizzle DB handle.
  * @property feature   `recordUsage` の feature ラベル。`recordUsage` feature label.
+ * @property userEmail 実行ユーザーのメール（domain ベース共有スコープ判定で使う）。
+ *                     Executing user's email; used by `wikiSearchService` to
+ *                     apply the `note_domain_access` predicate without an
+ *                     extra DB roundtrip per tool call.
  */
 export interface GraphContext {
   threadId: string;
@@ -38,6 +42,7 @@ export interface GraphContext {
   tier: UserTier;
   db: Database;
   feature: string;
+  userEmail: string | null;
 }
 
 /**

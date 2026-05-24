@@ -1,11 +1,14 @@
 /**
  * Tools (web_search / wiki_search / fetch_article / image_search) のスキーマと
- * `bindTools` 互換性を確認するテスト。本実装は #949 以降だが、スキーマ・名前が
- * P0 段階で固まっていることをテストで担保する。
+ * `bindTools` 互換性を確認するテスト。`wiki_search` / `web_search` /
+ * `fetch_article` は #949 で本実装に置き換わったため、sentinel 応答テストは
+ * 削除し、graph context 欠落時のエラー shape（JSON envelope `{ ok:false }`）を
+ * 確認する単体テストに差し替えた。詳細な挙動は
+ * `__tests__/agents/subgraphs/research/tools/*.test.ts` 側で検証する。
  *
- * Pin the public surface of the shared tool set so P1+ subgraph PRs cannot
- * silently rename or restructure a tool. Behaviour itself is stubbed and not
- * asserted here beyond "returns the sentinel string".
+ * Pin the public surface of the shared tool set so subgraph PRs cannot silently
+ * rename or restructure a tool. Stub `image_search` still returns a sentinel;
+ * other tools return JSON envelopes (parsed back by their caller nodes).
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -79,21 +82,22 @@ describe("SHARED_TOOLS", () => {
   });
 });
 
-describe("stub tool bodies", () => {
-  it("web_search returns the not-implemented sentinel", async () => {
-    const out = (await webSearchTool.invoke({ query: "ripgrep" })) as unknown;
-    expect(typeof out).toBe("string");
-    expect(out).toMatch(/WEB_SEARCH_NOT_IMPLEMENTED/);
+describe("tool bodies — minimal envelopes", () => {
+  it("wiki_search returns a JSON envelope and reports missing context", async () => {
+    const raw = (await wikiSearchTool.invoke({ query: "ripgrep" })) as unknown;
+    expect(typeof raw).toBe("string");
+    const parsed = JSON.parse(raw as string) as { ok: boolean; error?: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toBe("missing_graph_context");
   });
-  it("wiki_search returns the not-implemented sentinel", async () => {
-    const out = (await wikiSearchTool.invoke({ query: "ripgrep" })) as unknown;
-    expect(out).toMatch(/WIKI_SEARCH_NOT_IMPLEMENTED/);
+  it("web_search returns a JSON envelope and reports missing context", async () => {
+    const raw = (await webSearchTool.invoke({ query: "ripgrep" })) as unknown;
+    expect(typeof raw).toBe("string");
+    const parsed = JSON.parse(raw as string) as { ok: boolean; error?: string };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toBe("missing_graph_context");
   });
-  it("fetch_article returns the not-implemented sentinel", async () => {
-    const out = (await fetchArticleTool.invoke({ url: "https://example.com" })) as unknown;
-    expect(out).toMatch(/FETCH_ARTICLE_NOT_IMPLEMENTED/);
-  });
-  it("image_search returns the not-implemented sentinel", async () => {
+  it("image_search still returns the not-implemented sentinel (#949 scope)", async () => {
     const out = (await imageSearchTool.invoke({ query: "cat" })) as unknown;
     expect(out).toMatch(/IMAGE_SEARCH_NOT_IMPLEMENTED/);
   });

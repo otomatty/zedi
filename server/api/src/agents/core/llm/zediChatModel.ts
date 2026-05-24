@@ -41,7 +41,13 @@ import type { BaseMessage } from "@langchain/core/messages";
 import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
 import { ChatGenerationChunk, type ChatResult } from "@langchain/core/outputs";
 import { callProvider, streamProvider } from "../../../services/aiProviders.js";
-import type { AIProviderType, ApiMode, Database, UserTier } from "../../../types/index.js";
+import type {
+  AIChatOptions,
+  AIProviderType,
+  ApiMode,
+  Database,
+  UserTier,
+} from "../../../types/index.js";
 import { recordZediUsage, toZediMessages } from "./usageCallback.js";
 
 /**
@@ -80,6 +86,16 @@ export interface StreamProviderFn {
  * @property apiMode           "system" / "user_key"。P0 では "system"。BYOK 時に切替。
  * @property callProvider      `callProvider` の差し替え（任意）。Optional override.
  * @property streamProvider    `streamProvider` の差し替え（任意）。Optional override.
+ * @property extraProviderOptions  `callProvider` / `streamProvider` に追加で渡す
+ *                                 オプション。`useWebSearch` / `useGoogleSearch` /
+ *                                 `webSearchOptions` などプロバイダ固有ノブを
+ *                                 LangGraph ノードから通すための薄い pass-through。
+ *                                 Per-provider pass-through options merged into
+ *                                 the `AIChatOptions` bag passed to
+ *                                 `callProvider` / `streamProvider`. Lets nodes
+ *                                 enable provider-side web search etc. without
+ *                                 widening the constructor surface for every
+ *                                 future knob.
  */
 export interface ZediChatModelParams extends BaseChatModelParams {
   provider: AIProviderType;
@@ -98,7 +114,23 @@ export interface ZediChatModelParams extends BaseChatModelParams {
   /** モデル呼び出しオプション。temperature / maxTokens 等。Provider options. */
   temperature?: number;
   maxTokens?: number;
+  extraProviderOptions?: ExtraProviderOptions;
 }
+
+/**
+ * `callProvider` / `streamProvider` に追加で渡すプロバイダ固有オプションの
+ * サブセット。`AIChatOptions` から `feature`/`temperature`/`maxTokens`/`stream`
+ * を除いた pass-through ノブ群（web 検索フラグ等）。
+ *
+ * Subset of {@link AIChatOptions} containing provider-specific knobs that
+ * subgraphs may need to flip per call (e.g. `useWebSearch` for the research
+ * loop's `web_search` tool). Kept narrow so the model class doesn't accept
+ * arbitrary call options that would bypass usage accounting.
+ */
+export type ExtraProviderOptions = Pick<
+  AIChatOptions,
+  "useWebSearch" | "useGoogleSearch" | "webSearchOptions"
+>;
 
 /**
  * Concrete `BaseChatModel` implementation routing through Zedi providers.
@@ -125,6 +157,7 @@ export class ZediChatModel extends BaseChatModel<BaseChatModelCallOptions> {
   private readonly streamProviderFn: StreamProviderFn;
   private readonly temperature?: number;
   private readonly maxTokens?: number;
+  private readonly extraProviderOptions?: ExtraProviderOptions;
 
   constructor(fields: ZediChatModelParams) {
     super(fields);
@@ -143,6 +176,7 @@ export class ZediChatModel extends BaseChatModel<BaseChatModelCallOptions> {
     this.streamProviderFn = fields.streamProvider ?? streamProvider;
     this.temperature = fields.temperature;
     this.maxTokens = fields.maxTokens;
+    this.extraProviderOptions = fields.extraProviderOptions;
   }
 
   /**
@@ -172,6 +206,7 @@ export class ZediChatModel extends BaseChatModel<BaseChatModelCallOptions> {
         temperature: this.temperature,
         maxTokens: this.maxTokens,
         feature: this.feature,
+        ...this.extraProviderOptions,
       },
     );
 
@@ -241,6 +276,7 @@ export class ZediChatModel extends BaseChatModel<BaseChatModelCallOptions> {
       temperature: this.temperature,
       maxTokens: this.maxTokens,
       feature: this.feature,
+      ...this.extraProviderOptions,
     });
 
     let accumulated = "";
