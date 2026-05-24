@@ -117,6 +117,22 @@ Object.assign(nodeHandlers, {
     const langAttr = language ? ` class="language-${escapeHtmlAttr(language)}"` : "";
     return `<pre><code${langAttr}>${escapeHtml(codeText)}</code></pre>`;
   },
+  mermaid: (n) => {
+    // PDF エクスポートは html2pdf.js / html2canvas で静的レンダリングするため、
+    // 実際の SVG を生成するには Mermaid の非同期 API を呼ぶ必要がある。エクスポート
+    // 経路を同期に保つ目的で、ここでは Mermaid ソースをコードブロック相当の
+    // プレースホルダー (`<pre><code class="language-mermaid">…</code></pre>`) として
+    // 出力する。少なくとも図のソースが PDF 上で失われず、必要に応じて後続パスで
+    // 事前レンダリングへ差し替えやすい形にしておく（Issue #945）。
+    // Render `mermaid` nodes as a `<pre><code class="language-mermaid">` block.
+    // Generating a real SVG would require an async call into Mermaid; this
+    // exporter is synchronous (html2pdf.js consumes the DOM immediately) so we
+    // emit the source verbatim as a placeholder. The diagram source is then
+    // preserved in the PDF and can be upgraded to pre-rendered SVG later
+    // without touching call sites (Issue #945).
+    const code = typeof n.attrs?.code === "string" ? n.attrs.code : "";
+    return `<pre><code class="language-mermaid">${escapeHtml(code)}</code></pre>`;
+  },
   horizontalRule: () => "<hr />",
   hardBreak: () => "<br />",
   text: (n) => applyMarks(escapeHtml(n.text || ""), n.marks || []),

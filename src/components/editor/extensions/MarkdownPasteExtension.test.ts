@@ -318,3 +318,103 @@ describe("MarkdownPaste extension - wiki links", () => {
     expect(mockEditor.commands.insertContent).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Mermaid コードブロックペーストの統合テスト / Mermaid code block paste integration tests
+// ---------------------------------------------------------------------------
+
+describe("MarkdownPaste extension - mermaid code blocks", () => {
+  /**
+   * `@tiptap/markdown` の `parse` が Mermaid フェンスを `codeBlock` +
+   * `language: "mermaid"` として返す挙動をモックする。
+   * Mocks `@tiptap/markdown` parsing a mermaid fence into a `codeBlock`
+   * node with `language: "mermaid"`.
+   */
+  function createMermaidParse(code: string) {
+    return vi.fn(() => ({
+      type: "doc",
+      content: [
+        {
+          type: "codeBlock",
+          attrs: { language: "mermaid" },
+          content: [{ type: "text", text: code }],
+        },
+      ],
+    }));
+  }
+
+  it("converts a pasted mermaid fence into a mermaid node", () => {
+    const code = "graph TD\n  A-->B";
+    const { handlePaste, mockEditor } = getHandlePaste({
+      parse: createMermaidParse(code),
+    });
+
+    const event = createMockPasteEvent("```mermaid\ngraph TD\n  A-->B\n```");
+    expect(handlePaste(null, event, null)).toBe(true);
+
+    const inserted = mockEditor.commands.insertContent.mock.calls[0]?.[0] as {
+      content: Array<{ type: string; attrs?: { code?: string } }>;
+    };
+    expect(inserted.content[0]).toEqual({
+      type: "mermaid",
+      attrs: { code },
+    });
+  });
+
+  it("leaves non-mermaid fenced code blocks untouched", () => {
+    const parsed = {
+      type: "doc",
+      content: [
+        {
+          type: "codeBlock",
+          attrs: { language: "ts" },
+          content: [{ type: "text", text: "const x = 1" }],
+        },
+      ],
+    };
+    const { handlePaste, mockEditor } = getHandlePaste({
+      parse: vi.fn(() => parsed),
+    });
+
+    const event = createMockPasteEvent("```ts\nconst x = 1\n```");
+    expect(handlePaste(null, event, null)).toBe(true);
+    expect(mockEditor.commands.insertContent).toHaveBeenCalledWith(parsed);
+  });
+
+  it("handles mermaid fences mixed with wiki links in one paste", () => {
+    const { handlePaste, mockEditor } = getHandlePaste({
+      parse: vi.fn(() => ({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "see [[Ref]]" }],
+          },
+          {
+            type: "codeBlock",
+            attrs: { language: "mermaid" },
+            content: [{ type: "text", text: "graph TD" }],
+          },
+        ],
+      })),
+    });
+
+    const event = createMockPasteEvent("see [[Ref]]\n\n```mermaid\ngraph TD\n```");
+    expect(handlePaste(null, event, null)).toBe(true);
+
+    const inserted = mockEditor.commands.insertContent.mock.calls[0]?.[0] as {
+      content: Array<{
+        type: string;
+        attrs?: { code?: string };
+        content?: Array<{ marks?: Array<{ type: string }> }>;
+      }>;
+    };
+    // Wiki link がマーク付きで残り、Mermaid ブロックが `mermaid` ノードに置換される。
+    // Wiki link survives as a marked text node, mermaid block becomes a mermaid node.
+    expect(inserted.content[0].content?.[1]?.marks?.[0]?.type).toBe("wikiLink");
+    expect(inserted.content[1]).toEqual({
+      type: "mermaid",
+      attrs: { code: "graph TD" },
+    });
+  });
+});

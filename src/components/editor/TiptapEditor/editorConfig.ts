@@ -43,6 +43,7 @@ import {
   type WikiLinkGhostCompletionState,
 } from "../extensions/wikiLinkGhostCompletionPlugin";
 import { HeadingLevelClamp } from "./headingLevelClampExtension";
+import { MermaidCodeBlockNormalize } from "./mermaidCodeBlockNormalizeExtension";
 import type { Extension } from "@tiptap/core";
 import type * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
@@ -338,6 +339,13 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
     // --- 統合メディア挿入プレースホルダー（/image、/video スラッシュコマンド） ---
     MediaPlaceholderExtension,
     Mermaid,
+    // ``` ```mermaid ``` ``` 由来の codeBlock を mermaid ノードに正規化する。
+    // Mermaid 拡張より後に登録することで、変換先の `mermaid` ノードがスキーマに
+    // 存在することを保証する（Issue #945）。
+    // Lazy-migrate legacy `codeBlock(language=mermaid)` to `mermaid` nodes.
+    // Registered after `Mermaid` so the target node is guaranteed to be in the
+    // schema (Issue #945).
+    MermaidCodeBlockNormalize,
     // --- YouTube Embed ---
     YouTubeEmbed,
     McpResource,

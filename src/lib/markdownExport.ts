@@ -70,6 +70,17 @@ Object.assign(nodeHandlers, {
     const code = convertChildren(n).trim();
     return `\`\`\`${language}\n${code}\n\`\`\`\n\n`;
   },
+  mermaid: (n) => {
+    // `mermaid` ノードは Markdown 上では ``` ```mermaid ``` ``` フェンスへ戻す。
+    // ハンドラ未登録のままだと `code` 属性が落ちて空エクスポートになるため、
+    // ここで往復対称性を担保する（Issue #945）。
+    // Serialize a `mermaid` node back to a ``` ```mermaid ``` ``` fence so the
+    // Markdown export round-trips with the paste-side normalisation. Without a
+    // handler the `code` attribute would be silently dropped (Issue #945).
+    const code = typeof n.attrs?.code === "string" ? n.attrs.code : "";
+    const trimmed = code.replace(/\n+$/u, "");
+    return `\`\`\`mermaid\n${trimmed}\n\`\`\`\n\n`;
+  },
   horizontalRule: () => "---\n\n",
   hardBreak: () => "\n",
   text: (n) => applyMarks(n.text || "", n.marks || []),

@@ -127,6 +127,43 @@ describe("tiptapToHtml", () => {
     expect(html).not.toContain("<script>alert(1)</script>");
   });
 
+  // PDF エクスポートは同期的にレンダリングするため、`mermaid` ノードは Mermaid の
+  // 非同期 API を呼ばずに「ソースをコードブロック相当のプレースホルダー」として
+  // 残す。図のソースが PDF 上で失われないことだけ保証する (Issue #945)。
+  // The PDF exporter is synchronous, so `mermaid` nodes are rendered as a
+  // placeholder code block that preserves the diagram source instead of a real
+  // SVG (Issue #945).
+  it("renders mermaid node as a language-mermaid code block placeholder", () => {
+    const json = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "mermaid",
+          attrs: { code: "graph TD\n  A-->B" },
+        },
+      ],
+    });
+    const html = tiptapToHtml(json);
+    expect(html).toContain('<pre><code class="language-mermaid">');
+    expect(html).toContain("graph TD");
+    expect(html).toContain("A--&gt;B");
+  });
+
+  it("escapes mermaid source when it contains HTML-significant characters", () => {
+    const json = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "mermaid",
+          attrs: { code: "<script>alert(1)</script>" },
+        },
+      ],
+    });
+    const html = tiptapToHtml(json);
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).not.toContain("<script>alert(1)</script>");
+  });
+
   it("applies bold, italic, strike, inline-code, and link marks", () => {
     const json = JSON.stringify({
       type: "doc",
