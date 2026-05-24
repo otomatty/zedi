@@ -218,6 +218,36 @@ describe("GET /api/pages/:pageId/compose-sessions/:id", () => {
   });
 });
 
+describe("POST /api/pages/:pageId/compose-sessions/:id/run", () => {
+  it("returns 409 when the session is interrupted (must use PATCH /resume)", async () => {
+    const { app } = createComposeApp([
+      ...pageAccessPrefix(),
+      [
+        {
+          id: "sess-interrupted",
+          pageId: PAGE_ID,
+          userId: OWNER_ID,
+          graphId: GRAPH_ID,
+          phase: "research",
+          backend: "zedi_managed",
+          status: "interrupted",
+          metadata: null,
+          lastError: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          closedAt: null,
+        },
+      ],
+    ]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-interrupted/run`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ input: {} }),
+    });
+    expect(res.status).toBe(409);
+  });
+});
+
 describe("DELETE /api/pages/:pageId/compose-sessions/:id", () => {
   it("returns 404 when the session does not exist", async () => {
     const { app } = createComposeApp([...pageAccessPrefix(), []]);

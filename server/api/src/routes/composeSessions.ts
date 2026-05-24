@@ -197,6 +197,11 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
   if (session.status === "running") {
     throw new HTTPException(409, { message: "Session is already running" });
   }
+  if (session.status === "interrupted") {
+    throw new HTTPException(409, {
+      message: "Session is interrupted; use PATCH /resume to continue",
+    });
+  }
   if (session.status === "completed" || session.status === "cancelled") {
     throw new HTTPException(409, { message: `Session is ${session.status}` });
   }
@@ -233,10 +238,14 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
       await stream.writeSSE({ event: ev.type, data: JSON.stringify(ev) });
     };
 
-    await send(startedEvent(id, session.graphId, session.phase));
+    let finalStatus: WikiComposeSessionStatus = "failed";
+    let lastError: string | null = "compose_run_stream_aborted";
 
-    let finalStatus: WikiComposeSessionStatus = "completed";
-    let lastError: string | null = null;
+    try {
+      await send(startedEvent(id, session.graphId, session.phase));
+
+      finalStatus = "completed";
+      lastError = null;
 
     // `DATABASE_URL` が設定された本番経路では `PostgresSaver` を取得して
     // checkpoint 保存・再開を有効化する。テスト / CI では未設定なので `false`
@@ -283,6 +292,7 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
           // emitted した時点で finalStatus を interrupted にする。
           if (mapped.type === "interrupt") {
             finalStatus = "interrupted";
+            lastError = null;
           }
           await send(mapped);
         }
@@ -292,6 +302,7 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
       // 古い throw 経路の保険として残す。
       if (isInterruptError(err)) {
         finalStatus = "interrupted";
+        lastError = null;
         await send({ type: "interrupt", payload: extractInterruptPayload(err) });
       } else {
         finalStatus = "failed";
@@ -300,27 +311,33 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
       }
     }
 
-    if (finalStatus === "completed") {
-      await send(statusEvent("completed"));
+      if (finalStatus === "completed") {
+        await send(statusEvent("completed"));
+      }
+      await send(doneEvent(finalStatus));
+    } catch (err) {
+      if (finalStatus !== "interrupted") {
+        finalStatus = "failed";
+        lastError = err instanceof Error ? err.message : String(err);
+      }
+    } finally {
+      // Persist terminal status even when the SSE client disconnects mid-stream.
+      // `interrupted` stays resumable: `closedAt` must remain null (see PATCH /resume).
+      await db
+        .update(wikiComposeSessions)
+        .set({
+          status: finalStatus,
+          lastError: finalStatus === "failed" ? lastError : null,
+          closedAt: finalStatus === "interrupted" ? null : new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(wikiComposeSessions.id, id));
+
+      // Hush unused-import warning when running without exporting names; keeps the
+      // import grouped with the SSE writes for readability.
+      void SSE_EVENT_NAMES;
+      void GRAPH_CONTEXT_CONFIG_KEY;
     }
-    await send(doneEvent(finalStatus));
-
-    // Both branches of the run loop set finalStatus to a terminal value
-    // (completed / interrupted / failed); always stamp `closedAt`.
-    await db
-      .update(wikiComposeSessions)
-      .set({
-        status: finalStatus,
-        lastError: finalStatus === "failed" ? lastError : null,
-        closedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(wikiComposeSessions.id, id));
-
-    // Hush unused-import warning when running without exporting names; keeps the
-    // import grouped with the SSE writes for readability.
-    void SSE_EVENT_NAMES;
-    void GRAPH_CONTEXT_CONFIG_KEY;
   });
 });
 
