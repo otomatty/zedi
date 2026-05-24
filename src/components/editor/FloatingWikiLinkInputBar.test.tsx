@@ -23,8 +23,18 @@ vi.mock("@/hooks/usePageQueries", () => ({
   useCheckGhostLinkReferenced: () => ({ checkReferenced: vi.fn().mockResolvedValue(false) }),
 }));
 
+vi.mock("@zedi/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@zedi/ui")>();
+  return {
+    ...actual,
+    useIsMobile: vi.fn(() => true),
+  };
+});
+
 import type { Editor } from "@tiptap/core";
+import { useIsMobile } from "@zedi/ui";
 import { FloatingWikiLinkInputBar } from "./FloatingWikiLinkInputBar";
+import { PageActionHubFab } from "./PageActionHub/PageActionHubFab";
 
 /**
  * 最小限のエディタモック。`WikiLinkInputBar` が `disabled={!editor}` で
@@ -113,6 +123,7 @@ describe("FloatingWikiLinkInputBar - visualViewport 追従 / virtual keyboard tr
 
   beforeEach(() => {
     env = installMockVisualViewport();
+    vi.mocked(useIsMobile).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -164,7 +175,7 @@ describe("FloatingWikiLinkInputBar - visualViewport 追従 / virtual keyboard tr
     expect(wrapper.style.bottom).toBe("200px");
   });
 
-  it("blur でオフセットをリセットし通常配置に戻る / resets to default placement on blur", () => {
+  it("blur 後もキーボードが残る間はオフセットを維持し、閉じたら戻る / keeps the offset until the keyboard closes, not on input blur", () => {
     env.setMetrics({ height: 500 });
     render(<FloatingWikiLinkInputBar editor={createDummyEditor()} pageId="p1" pageNoteId={null} />);
     const wrapper = screen.getByTestId("floating-wiki-link-input-bar");
@@ -176,9 +187,35 @@ describe("FloatingWikiLinkInputBar - visualViewport 追従 / virtual keyboard tr
     expect(wrapper.style.bottom).toBe("300px");
 
     act(() => {
-      // 入力欄から外へ完全に focus が外れたケース。
-      // Focus leaves the bar entirely (no relatedTarget inside the wrapper).
       fireEvent.blur(input, { relatedTarget: null });
+    });
+    expect(wrapper.style.bottom).toBe("300px");
+
+    act(() => {
+      env.setMetrics({ height: 800 });
+      env.fire("resize");
+    });
+    expect(wrapper.style.bottom).toBe("");
+  });
+
+  it("デスクトップで FAB クリックしてもキーボード追従を開始しない / does not start keyboard tracking when the FAB is clicked on desktop", async () => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+    env.setMetrics({ height: 460 });
+
+    render(
+      <FloatingWikiLinkInputBar
+        editor={createDummyEditor()}
+        pageId="p1"
+        pageNoteId={null}
+        trailingAction={<PageActionHubFab canEdit isSignedIn onOpen={vi.fn()} />}
+      />,
+    );
+
+    const wrapper = screen.getByTestId("floating-wiki-link-input-bar");
+    expect(wrapper.style.bottom).toBe("");
+
+    await act(async () => {
+      screen.getByTestId("page-action-hub-fab").click();
     });
     expect(wrapper.style.bottom).toBe("");
   });

@@ -34,6 +34,15 @@ export interface WikiLinkInputBarProps {
   /** 追加でルートに付ける className。 / Optional class name for the outer container. */
   className?: string;
   /**
+   * `true` のとき input を親 flex 行の残り幅いっぱいに広げる（画面下部固定
+   * バー + Container レイアウト向け）。既定は従来の固定幅ピル。
+   *
+   * When `true`, the input stretches to fill the remaining width in a flex row
+   * (used by the fixed bottom bar inside `Container`). Defaults to the legacy
+   * fixed-width pill.
+   */
+  fillWidth?: boolean;
+  /**
    * バーの input にフォーカスを移すための imperative ハンドル。`focusContentRef`
    * 等と同じ `MutableRefObject<(() => void) | null>` 規約。`useEditorWikiLinkShortcuts`
    * の `Cmd/Ctrl+K` 経由で外部からフォーカスを移すために使う（issue #928）。
@@ -66,6 +75,7 @@ export const WikiLinkInputBar: React.FC<WikiLinkInputBarProps> = ({
   pageId,
   pageNoteId,
   className,
+  fillWidth = false,
   focusInputBarRef,
 }) => {
   const { t } = useTranslation();
@@ -136,7 +146,8 @@ export const WikiLinkInputBar: React.FC<WikiLinkInputBarProps> = ({
         aria-label={t("common.wikiLinkInputBar.ariaLabel")}
         disabled={!editor}
         className={cn(
-          "h-12 w-[min(20rem,calc(100vw-7rem))] rounded-full px-5",
+          "h-12 rounded-full px-5",
+          fillWidth ? "w-full min-w-0" : "w-[min(20rem,calc(100vw-7rem))]",
           "bg-secondary/80 text-secondary-foreground placeholder:text-muted-foreground",
           "shadow-lg backdrop-blur-sm",
           "border border-transparent",

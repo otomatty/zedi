@@ -119,6 +119,11 @@ interface PageEditorContentProps {
    * same note. See issue #713 Phase 4.
    */
   pageNoteId?: string | null;
+  /**
+   * 画面下部の Wiki Link 入力バー右隣に並べるアクション（例: PageActionHub FAB）。
+   * Trailing control rendered beside the floating Wiki Link input bar.
+   */
+  bottomBarTrailingAction?: React.ReactNode;
 }
 
 /**
@@ -151,6 +156,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   insertAtCursorRef,
   pageActionHubRef,
   pageNoteId = null,
+  bottomBarTrailingAction,
 }) => {
   const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
   const hasContent = useMemo(() => isContentNotEmpty(content), [content]);
@@ -232,6 +238,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
                 wikiContentForCollab={wikiContentForCollab ?? undefined}
                 onWikiContentApplied={onWikiContentApplied}
                 pageNoteId={pageNoteId}
+                bottomBarTrailingAction={bottomBarTrailingAction}
               />
             </>
           )}

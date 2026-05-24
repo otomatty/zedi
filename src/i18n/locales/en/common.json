@@ -133,7 +133,7 @@
     "clickToCreate": "Click to create"
   },
   "wikiLinkInputBar": {
-    "placeholder": "Create a page",
+    "placeholder": "Write a note",
     "ariaLabel": "Create or link a page"
   }
 }

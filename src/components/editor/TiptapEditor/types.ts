@@ -1,4 +1,4 @@
-import type { MutableRefObject } from "react";
+import type { MutableRefObject, ReactNode } from "react";
 import type * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
 import type { PageActionHubHandle } from "../PageActionHub/types";
@@ -82,6 +82,11 @@ export interface TiptapEditorProps {
    * Phase 4.
    */
   pageNoteId?: string | null;
+  /**
+   * 画面下部の Wiki Link 入力バー右隣に並べるアクション（例: PageActionHub FAB）。
+   * Trailing control rendered beside the floating Wiki Link input bar.
+   */
+  bottomBarTrailingAction?: ReactNode;
 }
 
 /**
