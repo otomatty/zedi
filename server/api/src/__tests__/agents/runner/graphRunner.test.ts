@@ -30,6 +30,7 @@ function fakeContext(): GraphContext {
     tier: "free",
     db: {} as Database,
     feature: "test",
+    userEmail: null,
   };
 }
 

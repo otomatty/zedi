@@ -108,6 +108,66 @@ export interface SseErrorEvent {
 }
 
 /**
+ * 調査ループ subgraph (#949) の iteration 通知。`plan_queries` / `refine_queries`
+ * 終了時に 1 件発火し、UI が「N 回目を計画中…」と「N 回目を refine 中…」を
+ * 出し分けられるよう `status` を持つ。
+ *
+ * Per-iteration heartbeat from the research loop subgraph. Emitted by
+ * `plan_queries` (`status:"planned"`) and `refine_queries` (`status:"refined"`).
+ */
+export interface SseResearchIterationEvent {
+  type: "research_iteration";
+  /** 0-based iteration index at dispatch time. */
+  iteration: number;
+  /** Phase that produced this iteration's query set. */
+  status: "planned" | "refined";
+  /** Number of queries planned for this iteration. */
+  queryCount: number;
+}
+
+/**
+ * 調査ループ subgraph (#949) の充足度評価通知。`evaluate_sufficiency` 終了時に
+ * 1 件発火。0..1 のスコアと欠落数を含むが、`rationale` も同梱して UI が
+ * tooltip 等で利用できるようにする。
+ *
+ * Sufficiency evaluation result. Emitted by `evaluate_sufficiency`; carries the
+ * 0..1 score, a short rationale, and the missing-aspect count.
+ */
+export interface SseResearchEvaluationEvent {
+  type: "research_evaluation";
+  /** Iteration index after post-increment in `evaluate_sufficiency`. */
+  iteration: number;
+  /** 0..1. ≥ 0.75 → loop exits next. */
+  score: number;
+  /** Short natural-language rationale. */
+  rationale: string;
+  /** Count of missing aspects (full list lives in state, not on the wire). */
+  missingAspectsCount: number;
+}
+
+/**
+ * 調査ループ subgraph (#949) のバッチ完成通知。`compile_batch` 終了時に 1 件
+ * 発火。バッチ本体は state に乗っているので wire 上は ID + サマリのみ。
+ *
+ * One-shot batch summary emitted by `compile_batch`. The full batch lives in
+ * state; this event only carries the id + counts so the frontend knows when to
+ * fetch / render.
+ */
+export interface SseResearchBatchEvent {
+  type: "research_batch";
+  /** Stable batch uuid. */
+  batchId: string;
+  /** Iteration that produced the batch. */
+  iteration: number;
+  /** Snapshot size at compile time. */
+  sourceCount: number;
+  /** Last evaluation score (null only if compile fired before any evaluate). */
+  score: number | null;
+  /** Reason the loop exited. */
+  exitReason: "score_threshold" | "max_iterations";
+}
+
+/**
  * Wire-level SSE union.
  */
 export type SseEvent =
@@ -119,7 +179,10 @@ export type SseEvent =
   | SseUsageEvent
   | SseInterruptEvent
   | SseDoneEvent
-  | SseErrorEvent;
+  | SseErrorEvent
+  | SseResearchIterationEvent
+  | SseResearchEvaluationEvent
+  | SseResearchBatchEvent;
 
 /**
  * SSE event 名（`event:` 行に流す名前）。`SseEvent["type"]` と同値だが、
@@ -138,4 +201,7 @@ export const SSE_EVENT_NAMES = {
   interrupt: "interrupt",
   done: "done",
   error: "error",
+  researchIteration: "research_iteration",
+  researchEvaluation: "research_evaluation",
+  researchBatch: "research_batch",
 } as const satisfies Record<string, SseEvent["type"]>;

@@ -41,8 +41,7 @@ import { Hono } from "hono";
 import { sql } from "drizzle-orm";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
-import { extractEmailDomain } from "../lib/freeEmailDomains.js";
-import { getDefaultNoteOrNull } from "../services/defaultNoteService.js";
+import { searchUserWikiPages } from "../services/wikiSearchService.js";
 
 function escapeLike(input: string): string {
   return input.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
@@ -79,123 +78,40 @@ app.get("/", authRequired, async (c) => {
   const limit = clampLimit(c.req.query("limit"));
   const pattern = `%${escapeLike(query)}%`;
 
-  // 検索条件用にだけ `content_text` を WHERE に登場させるが、SELECT には含めない。
-  // SELECT に流すと API 経由でページ本文が丸ごと露出し得る（PR #873 review:
-  // CodeRabbit）。クライアントが消費するのは `content_preview` のみ。
+  // ページ検索は `services/wikiSearchService.ts` に切り出した純粋関数を経由する。
+  // SQL は元 route と同一を維持しつつ、tool / subgraph (#949) からも再利用可能に
+  // するための移譲。`content_text` を SELECT に出さないポリシー、scope=shared での
+  // owner / accepted member / domain rule 結合、`scope=own` の default-note 絞り込み
+  // はすべて service 側で踏襲する。
   //
-  // `content_text` is used in the WHERE clause for matching but is NOT in the
-  // SELECT list — otherwise the API would leak full page bodies (PR #873 review:
-  // CodeRabbit). Clients only consume `content_preview`.
-  const searchColumns = sql`p.id, p.title, p.content_preview, p.updated_at, p.note_id`;
+  // Page search is delegated to `wikiSearchService.searchUserWikiPages` so the
+  // research-loop subgraph (#949) can call the same data set without going
+  // through Hono context. The SQL is preserved verbatim; the previously-reviewed
+  // safety properties (no full body in SELECT, default-note scoping, domain
+  // predicate) live in the service module now.
+  const userEmail = typeof userEmailRaw === "string" ? userEmailRaw : null;
+  const pageHits =
+    scope === "shared"
+      ? await searchUserWikiPages(db, userId, userEmail, query, "shared", limit)
+      : await searchUserWikiPages(db, userId, userEmail, query, "own", limit);
 
-  const normalizedEmail = typeof userEmailRaw === "string" ? userEmailRaw.trim().toLowerCase() : "";
-  const emailDomain = extractEmailDomain(normalizedEmail);
-
-  const domainPredicate =
-    emailDomain !== null
-      ? sql`OR EXISTS (
-          SELECT 1
-          FROM notes n
-          INNER JOIN note_domain_access nda ON nda.note_id = n.id
-          WHERE n.id = p.note_id
-            AND n.is_deleted = false
-            AND nda.is_deleted = false
-            AND nda.domain = ${emailDomain}
-        )`
-      : sql``;
-
-  let pageRows: unknown[] = [];
-
-  if (scope === "shared") {
-    const sharedResults = await db.execute(sql`
-      SELECT ${searchColumns}
-      FROM pages p
-      LEFT JOIN page_contents pc ON pc.page_id = p.id
-      WHERE p.is_deleted = false
-        AND (
-          EXISTS (
-            SELECT 1 FROM notes n
-            WHERE n.id = p.note_id AND n.is_deleted = false AND n.owner_id = ${userId}
-          )
-          OR EXISTS (
-            SELECT 1
-            FROM notes n
-            INNER JOIN note_members nm ON nm.note_id = n.id
-            INNER JOIN "user" u ON LOWER(u.email) = LOWER(nm.member_email)
-            WHERE n.id = p.note_id
-              AND u.id = ${userId}
-              AND nm.status = 'accepted'
-              AND nm.is_deleted = false
-              AND n.is_deleted = false
-          )
-          ${domainPredicate}
-        )
-        AND (
-          p.title ILIKE ${pattern}
-          OR pc.content_text ILIKE ${pattern}
-        )
-      ORDER BY p.updated_at DESC
-      LIMIT ${limit}
-    `);
-    pageRows = sharedResults.rows;
-  } else {
-    const defaultNote = await getDefaultNoteOrNull(db, userId);
-    if (!defaultNote) {
-      // デフォルトノートが無い場合でもハイライト検索は走り得るので、ページ部だけ空配列に。
-      // Even without a default note, highlight search can still run, so only the
-      // page branch short-circuits here.
-      const highlightRows = await runPdfHighlightSearch(db, userId, pattern, limit);
-      return c.json({ results: highlightRows });
-    }
-    const ownResults = await db.execute(sql`
-      SELECT ${searchColumns}
-      FROM pages p
-      LEFT JOIN page_contents pc ON pc.page_id = p.id
-      WHERE p.is_deleted = false
-        AND p.note_id = ${defaultNote.id}
-        AND (
-          p.title ILIKE ${pattern}
-          OR pc.content_text ILIKE ${pattern}
-        )
-      ORDER BY p.updated_at DESC
-      LIMIT ${limit}
-    `);
-    pageRows = ownResults.rows;
-  }
-
-  // 契約フィールドのみを明示マップして response に流す。SQL の SELECT に直接含まれない
-  // カラム (owner_id / thumbnail_url / source_url) は明示的に null/undefined で埋めて
-  // 型 (`SearchPageResultRow`) との整合を取る。raw row を spread で流すと将来 SELECT
-  // を増やしたとき静かに API が漏れるので、PR #873 review (CodeRabbit) で明示化した。
-  //
-  // Map only the contracted fields explicitly. We do not spread raw SQL rows
-  // because any future SELECT addition would silently widen the API payload
-  // (PR #873 review: CodeRabbit). Columns not in the current SELECT are
-  // emitted as `null`/`undefined` to stay aligned with `SearchPageResultRow`.
-  const taggedPageRows = pageRows.map((row) => {
-    const r = row as {
-      id: string;
-      note_id: string;
-      title: string | null;
-      content_preview: string | null;
-      updated_at: string;
-    };
-    return {
-      kind: "page" as const,
-      id: r.id,
-      note_id: r.note_id,
-      // `owner_id` / `thumbnail_url` / `source_url` は将来 SELECT に追加する想定の
-      // プレースホルダ。現状の SQL では返らないので明示的に null/undefined を入れる。
-      // Placeholders for columns not yet in SELECT; emitted explicitly so the
-      // payload shape stays stable for the discriminated union.
-      owner_id: null,
-      title: r.title,
-      content_preview: r.content_preview,
-      thumbnail_url: null,
-      source_url: null,
-      updated_at: r.updated_at,
-    };
-  });
+  // `scope=own` でデフォルトノートが無いユーザーは pageHits === [] になる。
+  // ハイライト検索は所有さえあれば走り得るので、ページ無しでも続行する。
+  // For `scope=own` with no default note, `pageHits` is empty; highlight search
+  // is still meaningful since highlights are owner-keyed.
+  const taggedPageRows = pageHits.map((hit) => ({
+    kind: "page" as const,
+    id: hit.pageId,
+    note_id: hit.noteId,
+    // `owner_id` / `thumbnail_url` / `source_url` は将来 SELECT に追加する想定の
+    // プレースホルダ。Placeholders for columns not yet in SELECT.
+    owner_id: null,
+    title: hit.title,
+    content_preview: hit.contentPreview,
+    thumbnail_url: null,
+    source_url: null,
+    updated_at: hit.updatedAt,
+  }));
 
   const highlightRows = await runPdfHighlightSearch(db, userId, pattern, limit);
 

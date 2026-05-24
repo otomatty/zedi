@@ -2,8 +2,9 @@
  * `/api/pages/:pageId/compose-sessions` — Wiki Compose session API.
  *
  * Wiki Compose の P0 ルートスケルトン。`wiki_compose_sessions` テーブルの CRUD と、
- * `GraphRunner` 経由でのスタブグラフ実行 (run / resume) を提供する。SSE 形式は
- * `agents/core/types/sseEvents.ts` の `SseEvent` に従う。
+ * `GraphRunner` 経由でのグラフ実行 (run / resume) を提供する。SSE 形式は
+ * `agents/core/types/sseEvents.ts` の `SseEvent` に従う。本ファイル自体は graph
+ * 中立で、入力 / 再開ペイロードの shape は各 graph のノードが zod で検証する。
  *
  * - `POST   /api/pages/:pageId/compose-sessions`              — Create
  * - `GET    /api/pages/:pageId/compose-sessions/:id`          — Read
@@ -11,7 +12,23 @@
  * - `PATCH  /api/pages/:pageId/compose-sessions/:id/resume`   — Resume from interrupt
  * - `DELETE /api/pages/:pageId/compose-sessions/:id`          — Cancel
  *
- * Issue: otomatty/zedi#948
+ * # Per-graph contracts
+ *
+ * `wiki-compose-research` (#949 / P1):
+ * - `POST /run` body.input shapes:
+ *   - Initial run: `{ messages?: [...], maxIterations?: number }` (or any
+ *     object; the graph reads `state.messages` set by LangGraph from
+ *     `body.input`).
+ *   - Additional research (re-run on a *new* session of the same graph id):
+ *     `{ kind: "additional_research", instruction: string, brief?: string,
+ *        carryOverApprovedIds?: string[] }`
+ *     The `plan_queries` node detects this shape, resets the loop, and seeds
+ *     `pendingSources` from `carryOverApprovedIds`.
+ * - `PATCH /resume` body.resume shape:
+ *   `{ approvedSourceIds: string[], rejectedSourceIds?: string[], note?: string }`
+ *   (validated by `researchResumeSchema`; ill-formed payload fails the run.)
+ *
+ * Issue: otomatty/zedi#948 (P0), otomatty/zedi#949 (P1)
  */
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -40,7 +57,22 @@ import {
 import { SSE_EVENT_NAMES, type SseEvent } from "../agents/core/types/sseEvents.js";
 import { GRAPH_CONTEXT_CONFIG_KEY } from "../agents/core/types/graphContext.js";
 import { resolveCheckpointerForRun } from "../agents/core/checkpoint/index.js";
+import { RESEARCH_GRAPH_ID } from "../agents/subgraphs/research/index.js";
 import type { AppEnv } from "../types/index.js";
+
+/**
+ * Per-graph recursion limit. LangGraph's default of 25 is enough for the stub
+ * graph but tight for `wiki-compose-research`, which runs up to ~5 iterations
+ * × ~6 nodes ≈ 30 node executions. We bump it for that graph only rather than
+ * raising the global default at `graphRunner.ts:147`.
+ *
+ * 調査ループは最大 5 イテレーション × 約 6 ノード = ~30 node 実行になり得るため、
+ * 既定の 25 では不足する。該当 graph だけ 60 に引き上げる。
+ */
+function recursionLimitFor(graphId: string): number | undefined {
+  if (graphId === RESEARCH_GRAPH_ID) return 60;
+  return undefined;
+}
 
 const app = new Hono<AppEnv>();
 
@@ -63,7 +95,16 @@ interface RunSessionBody {
 }
 
 interface ResumeSessionBody {
-  /** Interrupt に渡す再開値。HITL の場合は通常ユーザー応答。 */
+  /**
+   * Interrupt に渡す再開値。HITL の場合は通常ユーザー応答。
+   *
+   * Per-graph contract (validated inside the graph's HITL node):
+   * - `wiki-compose-research` (#949):
+   *   `{ approvedSourceIds: string[], rejectedSourceIds?: string[], note?: string }`
+   *
+   * Per-graph contract; the graph node validates the shape and rejects on
+   * mismatch. The route itself is shape-agnostic.
+   */
   resume: unknown;
 }
 
@@ -141,6 +182,7 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
   const pageId = c.req.param("pageId");
   const id = c.req.param("id");
   const userId = c.get("userId");
+  const userEmail = c.get("userEmail") ?? null;
   const db = c.get("db");
 
   await assertPageEditAccess(db, pageId, userId);
@@ -206,14 +248,17 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
     const checkpointer = await resolveCheckpointerForRun();
 
     try {
+      const recursionLimit = recursionLimitFor(session.graphId);
       const events = runner.streamEvents(
         {
           graphId: session.graphId,
           checkpointer,
+          ...(recursionLimit !== undefined ? { recursionLimit } : {}),
           context: {
             threadId: id,
             sessionId: id,
             userId,
+            userEmail,
             pageId,
             graphId: session.graphId,
             backend: assertSupportedBackendP0(session.backend),
@@ -228,10 +273,23 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
       for await (const raw of events) {
         const ev = raw as LangGraphRuntimeEvent;
         for (const mapped of mapLangGraphEvent(ev)) {
+          // LangGraph ≥ 1.x emits interrupts as a `__interrupt__` field on the
+          // final `on_chain_end` event rather than as a throw; sseMapper turns
+          // those into `SseInterruptEvent` rows. Treat any emitted interrupt
+          // event as terminal — flip status to "interrupted" so the route
+          // persists `closedAt=null` and surfaces resume affordance.
+          // LangGraph 1.x では interrupt は throw されず on_chain_end の output
+          // 内で来る。sseMapper が interrupt SSE に変換するので、ここでは
+          // emitted した時点で finalStatus を interrupted にする。
+          if (mapped.type === "interrupt") {
+            finalStatus = "interrupted";
+          }
           await send(mapped);
         }
       }
     } catch (err) {
+      // Legacy throw path (LangGraph might re-introduce, version skew etc.).
+      // 古い throw 経路の保険として残す。
       if (isInterruptError(err)) {
         finalStatus = "interrupted";
         await send({ type: "interrupt", payload: extractInterruptPayload(err) });
@@ -271,6 +329,7 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
   const pageId = c.req.param("pageId");
   const id = c.req.param("id");
   const userId = c.get("userId");
+  const userEmail = c.get("userEmail") ?? null;
   const db = c.get("db");
 
   await assertPageEditAccess(db, pageId, userId);
@@ -307,14 +366,17 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
 
   let result;
   try {
+    const recursionLimit = recursionLimitFor(session.graphId);
     result = await runner.resume(
       {
         graphId: session.graphId,
         checkpointer,
+        ...(recursionLimit !== undefined ? { recursionLimit } : {}),
         context: {
           threadId: id,
           sessionId: id,
           userId,
+          userEmail,
           pageId,
           graphId: session.graphId,
           backend: assertSupportedBackendP0(session.backend),

@@ -1,19 +1,26 @@
 /**
- * `fetch_article` tool stub.
+ * `fetch_article` tool — fetches and Readability-extracts a URL into a
+ * preview-sized excerpt.
  *
- * URL を渡すと Readability ベースで本文を抽出する tool（既存 `extractArticleFromUrl`
- * を将来流用する想定）。P0 ではスキーマだけ確定。
+ * LangGraph tool wrapping {@link extractArticleFromUrl}. SSRF-guarded with the
+ * same `isClipUrlAllowedAfterDns` check that `/api/clip` and `clipServerFetch`
+ * use. Returns a JSON-stringified envelope `{ ok, ...fields | error }`. Errors
+ * (block, fetch timeout, parse failure) never throw — the caller node maps
+ * `ok:false` to a removed source so a single bad URL does not abort the
+ * research iteration.
  *
- * Article extractor by URL. Real implementation reuses `extractArticleFromUrl`
- * in `lib/articleExtractor.ts`; P0 only fixes the contract.
+ * `extractArticleFromUrl` を tool 化した版。SSRF 防御は `clipUrlPolicy` の
+ * `isClipUrlAllowedAfterDns` を流用する。失敗時は `{ ok:false, error }` を
+ * JSON 文字列で返す（throw しない）ことで、調査ループの 1 イテレーションが
+ * 1 件の URL 不調で停止しないようにする。
  */
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
+import { extractArticleFromUrl, ClipFetchBlockedError } from "../../../lib/articleExtractor.js";
+import { isClipUrlAllowedAfterDns } from "../../../lib/clipUrlPolicy.js";
 
 /** Tool name. */
 export const FETCH_ARTICLE_TOOL_NAME = "fetch_article" as const;
-
-const STUB_RESPONSE_PREFIX = "FETCH_ARTICLE_NOT_IMPLEMENTED";
 
 /**
  * Input schema. URL は http/https のみ。previewLength は 500〜8000。
@@ -35,17 +42,57 @@ export const fetchArticleInputSchema = z.object({
 });
 
 /**
- * P0 stub. Real implementation routes through `extractArticleFromUrl` with the
- * same SSRF guards (`isAllowedUrlForArticleFetch`) already used by `/api/clip`
- * and `/api/ingest/plan`.
+ * 成功時 JSON 包絡型。失敗時は `{ ok:false, error }` で返す。
  *
- * P0 スタブ。実装は `extractArticleFromUrl` を経由し、`/api/clip` 等と同じ
- * SSRF 防御 (`isAllowedUrlForArticleFetch`) を通す。
+ * Success envelope; failure shape is `{ ok:false, error }`. The caller node
+ * always `JSON.parse`s and branches on `ok`.
  */
+interface FetchArticleSuccess {
+  ok: true;
+  url: string;
+  finalUrl: string;
+  title: string;
+  excerpt: string;
+  contentHash: string;
+  thumbnailUrl: string | null;
+}
+
+interface FetchArticleFailure {
+  ok: false;
+  url: string;
+  error: string;
+}
+
 export const fetchArticleTool = tool(
   async (input) => {
-    const summary = `${STUB_RESPONSE_PREFIX} url=${JSON.stringify(input.url)}`;
-    return summary;
+    const url = input.url;
+    const previewLength = input.previewLength ?? 4000;
+    if (!(await isClipUrlAllowedAfterDns(url))) {
+      const fail: FetchArticleFailure = { ok: false, url, error: "url_blocked" };
+      return JSON.stringify(fail);
+    }
+    try {
+      const article = await extractArticleFromUrl({ url, previewLength });
+      const ok: FetchArticleSuccess = {
+        ok: true,
+        url,
+        finalUrl: article.finalUrl,
+        title: article.title,
+        excerpt: article.contentText,
+        contentHash: article.contentHash,
+        thumbnailUrl: article.thumbnailUrl,
+      };
+      return JSON.stringify(ok);
+    } catch (err) {
+      const error =
+        err instanceof ClipFetchBlockedError
+          ? "url_blocked"
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      const fail: FetchArticleFailure = { ok: false, url, error };
+      return JSON.stringify(fail);
+    }
   },
   {
     name: FETCH_ARTICLE_TOOL_NAME,

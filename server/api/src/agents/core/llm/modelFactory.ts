@@ -18,7 +18,7 @@ import {
   SUPPORTED_BACKENDS_P0,
   type ExecutionBackend,
 } from "../types/executionBackend.js";
-import { ZediChatModel } from "./zediChatModel.js";
+import { ZediChatModel, type ExtraProviderOptions } from "./zediChatModel.js";
 
 /**
  * `createZediChatModel` の入力。
@@ -48,6 +48,8 @@ export interface CreateZediChatModelInput {
   apiKey?: string;
   temperature?: number;
   maxTokens?: number;
+  /** プロバイダ固有 pass-through。`useWebSearch` 等。Optional provider knobs. */
+  extraProviderOptions?: ExtraProviderOptions;
 }
 
 /**
@@ -115,6 +117,7 @@ export async function createZediChatModel(input: CreateZediChatModelInput): Prom
     apiMode,
     temperature: input.temperature,
     maxTokens: input.maxTokens,
+    extraProviderOptions: input.extraProviderOptions,
   });
 }
 

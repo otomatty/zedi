@@ -71,11 +71,21 @@ export class GraphRunner {
     const config = this.buildConfig(input);
     try {
       const result = await graph.invoke(this.unwrapPayload(payload), config);
+      // LangGraph ≥ 1.x: interrupts surface as a `__interrupt__` array on the
+      // returned state, NOT as a thrown error. Detect that shape and translate
+      // to `{ status: "interrupted" }`. Legacy throw-based GraphInterrupt is
+      // also handled below for safety (kept for forward-compat / version skew).
+      // LangGraph 1.x では interrupt は throw されず、結果 state の
+      // `__interrupt__` フィールドに乗る。ここで検出して status を訳す。
+      if (hasInterruptOnResult(result)) {
+        return { status: "interrupted", output: result };
+      }
       return { status: "completed", output: result };
     } catch (err) {
-      // Interrupts surface as throws in LangGraph; the route layer maps these
-      // back to a 200 with `status: "interrupted"` so we do the same here.
-      // LangGraph の interrupt は例外として伝搬する。`isGraphInterrupt` で判定。
+      // Interrupts surface as throws in some older LangGraph paths; keep the
+      // catch for safety so a version that re-introduces the throw doesn't
+      // regress to a failed run.
+      // 古い LangGraph パスでは throw する可能性があるので catch を残す。
       if (isInterruptError(err)) {
         return { status: "interrupted", interruptedAt: extractInterruptNode(err) };
       }
@@ -169,4 +179,19 @@ function extractInterruptNode(err: unknown): string | undefined {
   if (!err || typeof err !== "object") return undefined;
   const node = (err as { node?: unknown }).node;
   return typeof node === "string" ? node : undefined;
+}
+
+/**
+ * LangGraph ≥ 1.x leaves a `__interrupt__: Interrupt[]` array on the final
+ * state when an `interrupt(value)` call is awaiting resume. This helper
+ * surfaces that for `GraphRunner.invoke` / `.resume` so they can return
+ * `{ status: "interrupted" }` without inspecting the LangChain payload type.
+ *
+ * LangGraph 1.x の `__interrupt__` フィールドを検出する。型は意図的に緩い
+ * （構造的）にしてバージョン差を吸収する。
+ */
+function hasInterruptOnResult(result: unknown): boolean {
+  if (!result || typeof result !== "object") return false;
+  const arr = (result as { __interrupt__?: unknown }).__interrupt__;
+  return Array.isArray(arr) && arr.length > 0;
 }
