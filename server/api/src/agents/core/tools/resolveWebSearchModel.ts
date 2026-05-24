@@ -3,7 +3,7 @@
  *
  * `webSearchTool` は provider 内蔵の web 検索 (`useWebSearch` for OpenAI,
  * `useGoogleSearch` for Google) を呼ぶため、Anthropic-only な選択では成立しない。
- * 本ヘルパは next の優先順で model を選ぶ:
+ * 本ヘルパは次の優先順で model を選ぶ:
  *
  * 1. `process.env.WIKI_COMPOSE_WEB_SEARCH_MODEL_ID` (explicit override; `ai_models.id`)
  * 2. `ai_models` の active な OpenAI モデルで最安 (`input_cost_units` ASC, `output_cost_units` ASC)
@@ -16,8 +16,8 @@
  * easy to revisit.
  */
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { aiModels } from "../../../../../schema/index.js";
-import type { Database } from "../../../../../types/index.js";
+import { aiModels } from "../../../schema/index.js";
+import type { Database } from "../../../types/index.js";
 
 const ENV_OVERRIDE = "WIKI_COMPOSE_WEB_SEARCH_MODEL_ID";
 

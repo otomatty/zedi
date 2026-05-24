@@ -23,14 +23,16 @@
  */
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import {
   GRAPH_CONTEXT_CONFIG_KEY,
   type GraphContext,
 } from "../types/graphContext.js";
 import { createZediChatModel } from "../llm/modelFactory.js";
-import { resolveWebSearchModelId } from "../../subgraphs/research/nodes/shared/resolveWebSearchModel.js";
+import { resolveWebSearchModelId } from "./resolveWebSearchModel.js";
 import type { ExtraProviderOptions } from "../llm/zediChatModel.js";
+import { aiModels } from "../../../schema/index.js";
 
 /** Tool name shared across subgraphs. 全 subgraph 共通の tool 名。 */
 export const WEB_SEARCH_TOOL_NAME = "web_search" as const;
@@ -207,8 +209,6 @@ async function detectProviderForModelId(
   ctx: GraphContext,
   modelId: string,
 ): Promise<"openai" | "anthropic" | "google"> {
-  const { aiModels } = await import("../../../schema/index.js");
-  const { eq } = await import("drizzle-orm");
   const [row] = await ctx.db
     .select({ provider: aiModels.provider })
     .from(aiModels)

@@ -13,17 +13,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { resolveWebSearchModelId } = vi.hoisted(() => ({ resolveWebSearchModelId: vi.fn() }));
 
-vi.mock(
-  "../../../../../agents/subgraphs/research/nodes/shared/resolveWebSearchModel.js",
-  () => ({
-    resolveWebSearchModelId: (...args: unknown[]) =>
-      resolveWebSearchModelId(
-        ...(args as Parameters<
-          typeof import("../../../../../agents/subgraphs/research/nodes/shared/resolveWebSearchModel.js").resolveWebSearchModelId
-        >),
-      ),
-  }),
-);
+vi.mock("../../../../../agents/core/tools/resolveWebSearchModel.js", () => ({
+  resolveWebSearchModelId: (...args: unknown[]) =>
+    resolveWebSearchModelId(
+      ...(args as Parameters<
+        typeof import("../../../../../agents/core/tools/resolveWebSearchModel.js").resolveWebSearchModelId
+      >),
+    ),
+}));
 
 import { webSearchTool } from "../../../../../agents/core/tools/webSearch.js";
 import { GRAPH_CONTEXT_CONFIG_KEY } from "../../../../../agents/core/types/graphContext.js";
