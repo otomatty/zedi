@@ -43,12 +43,19 @@ import lintRoutes from "./routes/lint.js";
 import activityRoutes from "./routes/activity.js";
 import onboardingRoutes from "./routes/onboarding.js";
 import internalRoutes from "./routes/internal.js";
+import composeSessionRoutes from "./routes/composeSessions.js";
+import { registerStubGraph } from "./agents/registry/stubGraph.js";
 
 /**
  * Creates and configures the Hono API app (routes, CORS, etc.).
  * Hono APIアプリを作成・設定する（ルート・CORS等）。
  */
 export function createApp(): Hono<AppEnv> {
+  // Wiki Compose (#948) のスタブグラフを registry に登録する。idempotent。
+  // Register the Wiki Compose P0 smoke-test graph. Idempotent across calls so
+  // hot-reload during dev does not duplicate entries.
+  registerStubGraph();
+
   const app = new Hono<AppEnv>();
   const wildcard = isWildcardCors();
   const allowedOrigins = getAllowedOrigins();
@@ -135,6 +142,10 @@ export function createApp(): Hono<AppEnv> {
 
   // Page Snapshots (version history)
   app.route("/api/pages", pageSnapshotRoutes);
+
+  // Wiki Compose sessions (LangGraph runs) — issue #948.
+  // `/api/pages/:pageId/compose-sessions[/:id[/run|/resume]]`
+  app.route("/api/pages", composeSessionRoutes);
 
   // Sync
   app.route("/api/sync/pages", syncPageRoutes);
