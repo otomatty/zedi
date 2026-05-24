@@ -462,15 +462,7 @@ function NotePageEditorEditable({
 
   return (
     <>
-      <ContentWithAIChat
-        floatingAction={
-          <PageActionHubFab
-            canEdit
-            isSignedIn={editorIsSignedIn}
-            onOpen={() => pageActionHubRef.current?.open()}
-          />
-        }
-      >
+      <ContentWithAIChat>
         <PageEditorHeader
           onBack={onBack}
           menuItems={menuItems}
@@ -510,6 +502,13 @@ function NotePageEditorEditable({
           pageNoteId={page.noteId ?? null}
           initialContent={initialContent}
           onInitialContentApplied={onInitialContentApplied}
+          bottomBarTrailingAction={
+            <PageActionHubFab
+              canEdit
+              isSignedIn={editorIsSignedIn}
+              onOpen={() => pageActionHubRef.current?.open()}
+            />
+          }
         />
       </ContentWithAIChat>
       {historyOpen && (

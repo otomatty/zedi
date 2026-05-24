@@ -50,6 +50,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   wikiContentForCollab,
   onWikiContentApplied,
   pageNoteId = null,
+  bottomBarTrailingAction,
 }) => {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -247,6 +248,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
           pageId={pageId}
           pageNoteId={resolvedPageNoteId}
           focusInputBarRef={focusInputBarRef}
+          trailingAction={bottomBarTrailingAction}
         />
       )}
     </div>

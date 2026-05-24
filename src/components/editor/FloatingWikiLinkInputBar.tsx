@@ -1,76 +1,80 @@
-import React, { useCallback, useState } from "react";
+import React from "react";
+import { cn, useIsMobile } from "@zedi/ui";
+import Container from "@/components/layout/Container";
 import { useVirtualKeyboardOffset } from "@/hooks/useVirtualKeyboardOffset";
 import { WikiLinkInputBar, type WikiLinkInputBarProps } from "./WikiLinkInputBar";
 
+/** 画面下部固定バーの下余白（モバイルのボトムナビ・safe-area 込み）。 / Bottom inset for the fixed bar on mobile. */
+export const FLOATING_WIKI_LINK_BAR_PADDING_BOTTOM =
+  "calc(env(safe-area-inset-bottom) + var(--app-bottom-nav-height, 0px) + 0.5rem)";
+
+/** デスクトップ向けの下余白。画面下端から少し浮かせる。 / Desktop bottom inset — lifts the bar above the viewport edge. */
+export const FLOATING_WIKI_LINK_BAR_PADDING_BOTTOM_DESKTOP =
+  "calc(env(safe-area-inset-bottom) + 1.5rem)";
+
+export interface FloatingWikiLinkInputBarProps extends WikiLinkInputBarProps {
+  /** 入力バー右隣に並べるアクション（例: PageActionHub FAB）。 / Trailing control beside the input bar. */
+  trailingAction?: React.ReactNode;
+}
+
 /**
- * `WikiLinkInputBar` を `ContentWithAIChat` の FAB スタックの左にレイアウト
- * する固定配置コンテナ。`TiptapEditor` から呼び出してエディタ画面でのみ
+ * `WikiLinkInputBar` を `Container` 幅で画面下部に固定配置するラッパー。
+ * エディター本文と同じ max-width / 横 padding に揃え、入力バーは FAB 以外の
+ * 残り幅を自動的に埋める。`TiptapEditor` から呼び出してエディタ画面でのみ
  * マウントする（読み取り専用画面・公開閲覧では呼び出さない）。
  *
- * モバイル向けには `visualViewport` API を使い、入力欄が focus されている
- * 間だけキーボード分の bottom インセットを動的に上乗せして、入力バーと
- * 候補リストが常にキーボード上に見える状態を保つ（issue #927）。focus が
- * 外れたタイミングでリスナーは解除され、通常配置に戻る。
+ * モバイル向けには `visualViewport` API を常時監視し、仮想キーボードが
+ * 表示されている間だけ bottom インセットを動的に上乗せして、入力バーと
+ * 候補リストが常にキーボード上に見える状態を保つ（issue #927）。FAB クリック
+ * 時に input の blur で一瞬下端へ戻る問題を避けるため、追従条件を input
+ * focus ではなく viewport 上のキーボード有無に合わせる。デスクトップでは
+ * 追従しない。
  *
- * Fixed-position wrapper that mounts {@link WikiLinkInputBar} just to the
- * left of the FAB stack rendered by `ContentWithAIChat`. `TiptapEditor`
+ * Fixed-position wrapper that mounts {@link WikiLinkInputBar} at the bottom
+ * inside {@link Container}, matching the editor column width. The input grows
+ * to fill the row while the trailing action keeps its fixed size. `TiptapEditor`
  * decides when to mount the wrapper so the bar appears only on the editor
  * screen (read-only / public views skip it).
  *
- * For mobile (issue #927), while the input is focused the wrapper tracks
- * `visualViewport` and adds the keyboard-covered area as a `bottom` offset
- * so both the input bar and its suggestion popup stay visible above the
- * on-screen keyboard. Listeners are detached on blur and the bar returns to
- * its default position.
+ * For mobile (issue #927), the wrapper always tracks `visualViewport` and
+ * adds the keyboard-covered area as a `bottom` offset while the on-screen
+ * keyboard is visible. Tracking is keyed off the viewport inset — not input
+ * focus — so tapping the adjacent FAB does not briefly snap the bar back to
+ * the resting position before the keyboard finishes closing. Desktop skips
+ * keyboard tracking entirely.
  */
-export const FloatingWikiLinkInputBar: React.FC<WikiLinkInputBarProps> = (props) => {
-  const [isFocusWithin, setIsFocusWithin] = useState(false);
-  const keyboardOffset = useVirtualKeyboardOffset(isFocusWithin);
-
-  const handleFocusCapture = useCallback(() => {
-    setIsFocusWithin(true);
-  }, []);
-  const handleBlurCapture = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
-    // フォーカスがバー内の別要素（候補リスト等）へ移っただけなら focus 状態を
-    // 維持する。バーの外に出た場合のみキーボード追従を停止する。
-    // Stay focused while focus moves between bar internals (input ↔ suggestion
-    // list). Only clear the flag when focus leaves the wrapper entirely so we
-    // don't tear down the visualViewport listener mid-interaction.
-    const nextTarget = event.relatedTarget as Node | null;
-    if (nextTarget && event.currentTarget.contains(nextTarget)) return;
-    setIsFocusWithin(false);
-  }, []);
+export const FloatingWikiLinkInputBar: React.FC<FloatingWikiLinkInputBarProps> = ({
+  trailingAction,
+  ...props
+}) => {
+  const isMobile = useIsMobile();
+  const keyboardOffset = useVirtualKeyboardOffset(isMobile);
 
   // キーボードが出ているときは下部ナビ・safe-area の余白は無効化する
   // （キーボードに既に隠れているため）。0.5rem だけ視覚的なすき間を確保。
   // When the keyboard is up the bottom-nav and safe-area paddings are
   // hidden behind the keyboard anyway, so collapse them to a single 0.5rem
   // gap to keep the bar visually pinned to the keyboard top edge.
-  const isKeyboardOpen = keyboardOffset > 0;
+  const isKeyboardOpen = isMobile && keyboardOffset > 0;
   const bottomStyle = isKeyboardOpen ? `${keyboardOffset}px` : undefined;
-  const paddingBottomStyle = isKeyboardOpen
-    ? "0.5rem"
-    : "calc(env(safe-area-inset-bottom) + var(--app-bottom-nav-height, 0px) + 0.5rem)";
 
   return (
     <div
       data-testid="floating-wiki-link-input-bar"
-      className="pointer-events-none fixed bottom-0 z-40 flex items-end p-2 pb-[env(safe-area-inset-bottom)]"
-      onFocusCapture={handleFocusCapture}
-      onBlurCapture={handleBlurCapture}
+      className={cn(
+        "pointer-events-none fixed right-0 bottom-0 left-0 z-40",
+        !isKeyboardOpen &&
+          "pb-[calc(env(safe-area-inset-bottom)+var(--app-bottom-nav-height,0px)+0.5rem)] md:pb-[calc(env(safe-area-inset-bottom)+1.5rem)]",
+      )}
       style={{
-        // FAB は約 64px 幅 + p-2 + safe-area-inset-right を取るため、バーを
-        // FAB の左隣にレイアウトするには 5rem 程度のオフセットが必要。
-        // ボトムナビ高さ (`--app-bottom-nav-height`) はモバイルでのみ非ゼロ。
-        // FAB occupies ~64px plus padding/safe-area. Offset the bar by
-        // ~5rem so it lands immediately to the left. The bottom-nav
-        // variable only contributes on mobile builds that mount it.
-        right: "calc(5rem + env(safe-area-inset-right))",
         bottom: bottomStyle,
-        paddingBottom: paddingBottomStyle,
+        ...(isKeyboardOpen ? { paddingBottom: "0.5rem" } : {}),
       }}
     >
-      <WikiLinkInputBar {...props} />
+      <Container className="pointer-events-auto flex items-end gap-2">
+        <WikiLinkInputBar {...props} fillWidth className="min-w-0 flex-1" />
+        {trailingAction}
+      </Container>
     </div>
   );
 };

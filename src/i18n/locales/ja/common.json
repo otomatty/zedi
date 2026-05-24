@@ -133,7 +133,7 @@
     "clickToCreate": "クリックして作成"
   },
   "wikiLinkInputBar": {
-    "placeholder": "ページを作成",
+    "placeholder": "メモを書く",
     "ariaLabel": "ページを作成またはリンク"
   }
 }

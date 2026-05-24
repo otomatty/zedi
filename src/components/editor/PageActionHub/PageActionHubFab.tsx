@@ -1,7 +1,10 @@
 import React from "react";
-import { Plus } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from "@zedi/ui";
+
+/** 入力バーと FAB の高さを揃えるための共有値。 / Shared height aligned with the Wiki Link input bar. */
+export const PAGE_ACTION_HUB_FAB_SIZE_CLASS = "h-12 w-12";
 
 interface PageActionHubFabProps {
   /** クリック時に `PageActionHub.open()` を叩くためのハンドラ。 / Opens the hub. */
@@ -37,18 +40,21 @@ export const PageActionHubFab: React.FC<PageActionHubFabProps> = ({
             data-testid="page-action-hub-fab"
             aria-label={t("editor.pageActionHub.openAriaLabel")}
             onClick={onOpen}
+            variant="ghost"
             className={cn(
-              "pointer-events-auto h-16 w-16 rounded-full",
-              "shadow-elevated",
-              "transition-all duration-300 ease-in-out",
-              "hover:bg-primary hover:scale-105",
-              "[&_svg]:size-4",
+              "pointer-events-auto shrink-0 rounded-full p-0",
+              PAGE_ACTION_HUB_FAB_SIZE_CLASS,
+              "bg-secondary/80 text-secondary-foreground shadow-lg backdrop-blur-sm",
+              "border border-transparent",
+              "transition-colors duration-150",
+              "hover:bg-secondary hover:text-secondary-foreground",
+              "[&_svg]:size-5",
             )}
           >
-            <Plus />
+            <Menu />
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="left">{t("editor.pageActionHub.openAriaLabel")}</TooltipContent>
+        <TooltipContent side="top">{t("editor.pageActionHub.openAriaLabel")}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
