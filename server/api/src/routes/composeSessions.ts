@@ -16,7 +16,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { streamSSE } from "hono/streaming";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { authRequired } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { assertPageEditAccess, assertPageViewAccess } from "../services/pageAccessService.js";
@@ -152,9 +152,6 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
     .limit(1);
   if (!session) throw new HTTPException(404, { message: "Session not found" });
 
-  if (session.status === "running") {
-    throw new HTTPException(409, { message: "Session is already running" });
-  }
   if (session.status === "completed" || session.status === "cancelled") {
     throw new HTTPException(409, { message: `Session is ${session.status}` });
   }
@@ -181,31 +178,69 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
     throw err;
   }
 
-  await db
+  // Atomically claim the session so concurrent POST /run cannot both pass a
+  // read-then-write race and double-bill LLM usage.
+  const [claimed] = await db
     .update(wikiComposeSessions)
     .set({ status: "running" satisfies WikiComposeSessionStatus, updatedAt: new Date() })
-    .where(eq(wikiComposeSessions.id, id));
+    .where(
+      and(
+        eq(wikiComposeSessions.id, id),
+        eq(wikiComposeSessions.pageId, pageId),
+        inArray(wikiComposeSessions.status, ["pending", "interrupted", "failed"]),
+      ),
+    )
+    .returning();
+  if (!claimed) {
+    throw new HTTPException(409, {
+      message:
+        session.status === "running"
+          ? "Session is already running"
+          : `Session is ${session.status}`,
+    });
+  }
 
   return streamSSE(c, async (stream) => {
     const send = async (ev: SseEvent) => {
       await stream.writeSSE({ event: ev.type, data: JSON.stringify(ev) });
     };
 
-    await send(startedEvent(id, session.graphId, session.phase));
-
-    let finalStatus: WikiComposeSessionStatus = "completed";
+    let finalStatus: WikiComposeSessionStatus = "failed";
     let lastError: string | null = null;
+    let persisted = false;
+
+    const persistSession = async () => {
+      if (persisted) return;
+      persisted = true;
+      await db
+        .update(wikiComposeSessions)
+        .set({
+          status: finalStatus,
+          lastError: finalStatus === "failed" ? lastError : null,
+          closedAt: finalStatus === "interrupted" ? null : new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(wikiComposeSessions.id, id));
+    };
+
+    stream.onAbort(() => {
+      if (persisted) return;
+      // Preserve terminal outcomes decided before the client disconnected.
+      if (finalStatus !== "completed" && finalStatus !== "interrupted") {
+        finalStatus = "failed";
+        lastError = lastError ?? "Client disconnected";
+      }
+      void persistSession();
+    });
 
     // `DATABASE_URL` が設定された本番経路では `PostgresSaver` を取得して
     // checkpoint 保存・再開を有効化する。テスト / CI では未設定なので `false`
     // を返し、LangGraph の checkpoint 機構を無効化したまま smoke-test で走る。
-    // In production we hand the run a `PostgresSaver` so the LangGraph
-    // checkpointer persists per-thread state; in test / CI environments
-    // `resolveCheckpointerForRun` returns `false` to keep the path runnable
-    // without DDL.
     const checkpointer = await resolveCheckpointerForRun();
 
     try {
+      await send(startedEvent(id, session.graphId, session.phase));
+
       const events = runner.streamEvents(
         {
           graphId: session.graphId,
@@ -231,6 +266,8 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
           await send(mapped);
         }
       }
+
+      finalStatus = "completed";
     } catch (err) {
       if (isInterruptError(err)) {
         finalStatus = "interrupted";
@@ -240,29 +277,18 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
         lastError = err instanceof Error ? err.message : String(err);
         await send(errorEvent(lastError));
       }
+    } finally {
+      if (finalStatus === "completed") {
+        await send(statusEvent("completed"));
+      }
+      await send(doneEvent(finalStatus));
+      await persistSession();
+
+      // Hush unused-import warning when running without exporting names; keeps the
+      // import grouped with the SSE writes for readability.
+      void SSE_EVENT_NAMES;
+      void GRAPH_CONTEXT_CONFIG_KEY;
     }
-
-    if (finalStatus === "completed") {
-      await send(statusEvent("completed"));
-    }
-    await send(doneEvent(finalStatus));
-
-    // Both branches of the run loop set finalStatus to a terminal value
-    // (completed / interrupted / failed); always stamp `closedAt`.
-    await db
-      .update(wikiComposeSessions)
-      .set({
-        status: finalStatus,
-        lastError: finalStatus === "failed" ? lastError : null,
-        closedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(wikiComposeSessions.id, id));
-
-    // Hush unused-import warning when running without exporting names; keeps the
-    // import grouped with the SSE writes for readability.
-    void SSE_EVENT_NAMES;
-    void GRAPH_CONTEXT_CONFIG_KEY;
   });
 });
 
@@ -295,14 +321,32 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
   const tier = await getUserTier(userId, db);
   const runner = new GraphRunner();
 
-  await db
+  try {
+    assertSupportedBackendP0(session.backend);
+  } catch (err) {
+    if (err instanceof UnsupportedBackendError) {
+      throw new HTTPException(400, { message: err.message });
+    }
+    throw err;
+  }
+
+  const [claimed] = await db
     .update(wikiComposeSessions)
     .set({ status: "running", updatedAt: new Date() })
-    .where(eq(wikiComposeSessions.id, id));
+    .where(
+      and(
+        eq(wikiComposeSessions.id, id),
+        eq(wikiComposeSessions.pageId, pageId),
+        eq(wikiComposeSessions.status, "interrupted"),
+      ),
+    )
+    .returning();
+  if (!claimed) {
+    throw new HTTPException(409, { message: "Session is not interrupted" });
+  }
 
   // Resume relies on the checkpointer to fetch the suspended thread; production
   // routes load `PostgresSaver` here, tests/smoke runs get `false`.
-  // resume は checkpoint から thread を引き直すため、本番では PostgresSaver を渡す。
   const checkpointer = await resolveCheckpointerForRun();
 
   let result;
@@ -326,7 +370,17 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
       body.resume,
     );
   } catch (err) {
-    if (err instanceof GraphNotRegisteredError) {
+    const message = err instanceof Error ? err.message : String(err);
+    await db
+      .update(wikiComposeSessions)
+      .set({
+        status: "failed",
+        lastError: message,
+        closedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(wikiComposeSessions.id, id));
+    if (err instanceof GraphNotRegisteredError || err instanceof UnsupportedBackendError) {
       throw new HTTPException(400, { message: err.message });
     }
     throw err;
