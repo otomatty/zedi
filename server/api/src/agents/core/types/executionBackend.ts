@@ -133,6 +133,9 @@ export async function resolveWebSearchExecutionBackendForRun(
   if (!isUserByokBackend(sessionBackend) || candidate === sessionBackend) {
     return candidate;
   }
+  if (!isUserByokBackend(candidate)) {
+    return "zedi_managed";
+  }
   const crossProvider = backendToCredentialProvider(candidate);
   const key = await getUserAiCredentialPlaintext(userId, crossProvider, db);
   if (key?.trim()) return candidate;
