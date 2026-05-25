@@ -40,12 +40,13 @@ export default function AiModels() {
     }
   }, []);
 
-  const { handleModelUpdate, handleToggleActive, handleTierChange } = useAiModelActions({
-    setModels,
-    setError,
-    isMountedRef,
-    originalModelsRef,
-  });
+  const { handleModelUpdate, handleToggleActive, handleTierChange, handleSetSystemDefault } =
+    useAiModelActions({
+      setModels,
+      setError,
+      isMountedRef,
+      originalModelsRef,
+    });
 
   const dragReorder = useAiModelsDragReorder({
     models,
@@ -126,6 +127,7 @@ export default function AiModels() {
       onModelUpdate={handleModelUpdate}
       onTierChange={handleTierChange}
       onToggleActive={handleToggleActive}
+      onSetSystemDefault={handleSetSystemDefault}
       onDragStart={dragReorder.handleDragStart}
       onDragOver={dragReorder.handleDragOver}
       onDragLeave={dragReorder.handleDragLeave}

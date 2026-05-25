@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { toast as sonnerToast } from "@zedi/ui/components/sonner";
 import { isTauriDesktop } from "@/lib/platform";
 import { fetchServerModels, FetchServerModelsError } from "@/lib/aiService";
+import { resolvePreferredServerModel } from "@/lib/resolveServerModel";
 import type { AIModel } from "@/types/ai";
 
 const SAVED_INDICATOR_MS = 3000;
@@ -94,6 +95,7 @@ export function useClaudeCodeAvailability(): boolean | null {
 export function useServerModels() {
   const { t } = useTranslation();
   const [models, setModels] = useState<AIModel[]>([]);
+  const [systemDefaultModelId, setSystemDefaultModelId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,8 +104,10 @@ export function useServerModels() {
       setError(null);
       setLoading(true);
       try {
-        const { models: fetched } = await fetchServerModels(forceRefresh);
+        const { models: fetched, systemDefaultModelId: defaultId } =
+          await fetchServerModels(forceRefresh);
         setModels(fetched ?? []);
+        setSystemDefaultModelId(defaultId);
         if (!fetched?.length) {
           setError(t("aiSettings.modelsEmpty"));
         }
@@ -116,6 +120,7 @@ export function useServerModels() {
               : String(e);
         setError(message);
         setModels([]);
+        setSystemDefaultModelId(null);
       } finally {
         setLoading(false);
       }
@@ -123,5 +128,17 @@ export function useServerModels() {
     [t],
   );
 
-  return { models, loading, error, load };
+  return { models, systemDefaultModelId, loading, error, load };
+}
+
+/**
+ * Resolves the settings model from available server models and system default.
+ * 利用可能なサーバーモデルとシステム既定から設定用モデルを解決する。
+ */
+export function resolvePreferredForSettings(
+  available: AIModel[],
+  savedModelId: string | undefined,
+  systemDefaultModelId: string | null,
+): AIModel | undefined {
+  return resolvePreferredServerModel(available, { savedModelId, systemDefaultModelId });
 }

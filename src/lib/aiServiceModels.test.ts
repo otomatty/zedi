@@ -315,7 +315,11 @@ describe("aiServiceModels", () => {
         throw new Error("quota exceeded");
       });
 
-      await expect(fetchServerModels()).resolves.toEqual({ models: [], tier: "free" });
+      await expect(fetchServerModels()).resolves.toEqual({
+        models: [],
+        tier: "free",
+        systemDefaultModelId: null,
+      });
       expect(setItemSpy).toHaveBeenCalled();
     });
   });

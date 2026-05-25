@@ -25,7 +25,7 @@ vi.mock("../../../middleware/rateLimit.js", () => ({
 
 const {
   mockGetUserTier,
-  mockValidateModelAccess,
+  mockResolveModelAccessWithFallback,
   mockCheckUsage,
   mockCalculateCost,
   mockRecordUsage,
@@ -34,7 +34,7 @@ const {
   mockGetProviderApiKeyName,
 } = vi.hoisted(() => ({
   mockGetUserTier: vi.fn(),
-  mockValidateModelAccess: vi.fn(),
+  mockResolveModelAccessWithFallback: vi.fn(),
   mockCheckUsage: vi.fn(),
   mockCalculateCost: vi.fn(),
   mockRecordUsage: vi.fn(),
@@ -49,9 +49,12 @@ vi.mock("../../../services/subscriptionService.js", () => ({
 
 vi.mock("../../../services/usageService.js", () => ({
   checkUsage: mockCheckUsage,
-  validateModelAccess: mockValidateModelAccess,
   calculateCost: mockCalculateCost,
   recordUsage: mockRecordUsage,
+}));
+
+vi.mock("../../../services/modelResolverService.js", () => ({
+  resolveModelAccessWithFallback: mockResolveModelAccessWithFallback,
 }));
 
 vi.mock("../../../services/aiProviders.js", () => ({
@@ -89,11 +92,13 @@ function authHeaders(): Record<string, string> {
 
 beforeEach(() => {
   mockGetUserTier.mockReset().mockResolvedValue("pro");
-  mockValidateModelAccess.mockReset().mockResolvedValue({
+  mockResolveModelAccessWithFallback.mockReset().mockResolvedValue({
+    modelId: "gpt-4o",
     provider: "openai",
     apiModelId: "gpt-4o",
     inputCostUnits: 5,
     outputCostUnits: 15,
+    didFallback: false,
   });
   mockCheckUsage.mockReset().mockResolvedValue({
     allowed: true,
@@ -203,10 +208,11 @@ describe("POST /api/chat — usage and API key gating", () => {
     expect(res.status).toBe(503);
   });
 
-  it("propagates 'Model not found or inactive' as a 500 by default", async () => {
+  it("returns 503 when no model is available for the tier", async () => {
     process.env.OPENAI_API_KEY = "sk-test";
-    mockValidateModelAccess.mockRejectedValueOnce(new Error("Model not found or inactive"));
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockResolveModelAccessWithFallback.mockRejectedValueOnce(
+      new Error("No available model for tier"),
+    );
     const app = createTestApp();
 
     const res = await app.request("/api/chat", {
@@ -215,24 +221,7 @@ describe("POST /api/chat — usage and API key gating", () => {
       body: JSON.stringify(validBody),
     });
 
-    expect(res.status).toBe(500);
-  });
-
-  it("maps a FORBIDDEN error from validateModelAccess to 403", async () => {
-    process.env.OPENAI_API_KEY = "sk-test";
-    mockValidateModelAccess.mockRejectedValueOnce(new Error("FORBIDDEN"));
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    const app = createTestApp();
-
-    const res = await app.request("/api/chat", {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify(validBody),
-    });
-
-    // errorHandler の statusMap で FORBIDDEN → 403。
-    // statusMap in errorHandler maps the literal "FORBIDDEN" message to 403.
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(503);
   });
 });
 

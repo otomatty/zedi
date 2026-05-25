@@ -12,7 +12,13 @@ interface UseAiModelActionsArgs {
 type ModelUpdates = Partial<
   Pick<
     AiModelAdmin,
-    "displayName" | "tierRequired" | "inputCostUnits" | "outputCostUnits" | "isActive" | "sortOrder"
+    | "displayName"
+    | "tierRequired"
+    | "inputCostUnits"
+    | "outputCostUnits"
+    | "isActive"
+    | "isSystemDefault"
+    | "sortOrder"
   >
 >;
 
@@ -68,5 +74,34 @@ export function useAiModelActions({
     [handleModelUpdate, originalModelsRef],
   );
 
-  return { handleModelUpdate, handleToggleActive, handleTierChange };
+  const handleSetSystemDefault = useCallback(
+    async (m: AiModelAdmin) => {
+      if (m.isSystemDefault || !m.isActive) return;
+      const originalModel = originalModelsRef.current.find((om) => om.id === m.id);
+      if (!originalModel) return;
+
+      if (!isMountedRef.current) return;
+      setError(null);
+      setModels((prevModels) =>
+        prevModels.map((x) => ({
+          ...x,
+          isSystemDefault: x.id === m.id,
+        })),
+      );
+      try {
+        await patchAiModel(m.id, { isSystemDefault: true });
+        originalModelsRef.current = originalModelsRef.current.map((x) => ({
+          ...x,
+          isSystemDefault: x.id === m.id,
+        }));
+      } catch (e) {
+        if (!isMountedRef.current) return;
+        setModels(originalModelsRef.current);
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [setModels, setError, isMountedRef, originalModelsRef],
+  );
+
+  return { handleModelUpdate, handleToggleActive, handleTierChange, handleSetSystemDefault };
 }

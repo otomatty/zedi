@@ -4,12 +4,8 @@ import { HTTPException } from "hono/http-exception";
 import { authRequired } from "../../middleware/auth.js";
 import { rateLimit } from "../../middleware/rateLimit.js";
 import { getUserTier } from "../../services/subscriptionService.js";
-import {
-  checkUsage,
-  validateModelAccess,
-  calculateCost,
-  recordUsage,
-} from "../../services/usageService.js";
+import { checkUsage, calculateCost, recordUsage } from "../../services/usageService.js";
+import { resolveModelAccessWithFallback } from "../../services/modelResolverService.js";
 import { callProvider, streamProvider, getProviderApiKeyName } from "../../services/aiProviders.js";
 import type { AppEnv, AIChatRequest, SSEPayload, AIProviderType } from "../../types/index.js";
 
@@ -26,13 +22,18 @@ app.post("/", authRequired, rateLimit(), async (c) => {
   }
 
   const tier = await getUserTier(userId, db);
-  const modelInfo = await validateModelAccess(body.model, tier, db);
+  let modelInfo;
+  try {
+    modelInfo = await resolveModelAccessWithFallback(body.model, tier, db);
+  } catch {
+    throw new HTTPException(503, { message: "No available model for tier" });
+  }
   const usageCheck = await checkUsage(userId, tier, db);
   if (!usageCheck.allowed) {
     throw new HTTPException(429, { message: "Monthly budget exceeded" });
   }
 
-  const apiKeyName = getProviderApiKeyName(body.provider);
+  const apiKeyName = getProviderApiKeyName(modelInfo.provider as AIProviderType);
   const apiKey = process.env[apiKeyName];
   if (!apiKey) {
     throw new HTTPException(503, { message: `API key not configured: ${apiKeyName}` });
@@ -90,7 +91,7 @@ app.post("/", authRequired, rateLimit(), async (c) => {
 
             await recordUsage(
               userId,
-              body.model,
+              modelInfo.modelId,
               feature,
               { inputTokens, outputTokens },
               costUnits,
@@ -122,7 +123,7 @@ app.post("/", authRequired, rateLimit(), async (c) => {
     modelInfo.inputCostUnits,
     modelInfo.outputCostUnits,
   );
-  await recordUsage(userId, body.model, feature, result.usage, costUnits, "system", db);
+  await recordUsage(userId, modelInfo.modelId, feature, result.usage, costUnits, "system", db);
   const updatedUsage = await checkUsage(userId, tier, db);
 
   return c.json({

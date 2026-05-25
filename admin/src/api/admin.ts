@@ -52,6 +52,7 @@ export interface AiModelAdmin {
   inputCostUnits: number;
   outputCostUnits: number;
   isActive: boolean;
+  isSystemDefault: boolean;
   sortOrder: number;
   createdAt: string;
 }
@@ -104,6 +105,7 @@ export async function patchAiModel(
       | "inputCostUnits"
       | "outputCostUnits"
       | "isActive"
+      | "isSystemDefault"
       | "sortOrder"
     >
   >,

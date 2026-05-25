@@ -18,6 +18,7 @@ interface AiModelCardProps {
   onDisplayNameBlur: (value: string) => void;
   onTierChange: (tier: "free" | "pro") => void;
   onToggleActive: () => void;
+  onSetSystemDefault: () => void;
 }
 
 /**
@@ -30,6 +31,7 @@ export function AiModelCard({
   onDisplayNameBlur,
   onTierChange,
   onToggleActive,
+  onSetSystemDefault,
 }: AiModelCardProps) {
   const { t } = useTranslation();
   return (
@@ -82,6 +84,21 @@ export function AiModelCard({
           >
             {m.isActive ? "ON" : "OFF"}
           </Button>
+          {m.isSystemDefault ? (
+            <span className="text-primary text-xs font-medium">
+              {t("aiModels.systemDefaultBadge")}
+            </span>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!m.isActive}
+              onClick={onSetSystemDefault}
+            >
+              {t("aiModels.setSystemDefault")}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
