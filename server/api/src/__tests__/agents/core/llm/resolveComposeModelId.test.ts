@@ -39,9 +39,7 @@ describe("resolveComposeModelId", () => {
   it("ignores env override when provider mismatches BYOK backend", async () => {
     process.env.WIKI_COMPOSE_ORCHESTRATOR_MODEL_ID = "claude-3-5-haiku";
     mockDb.select
-      .mockReturnValueOnce(
-        chainLimit([{ id: "claude-3-5-haiku", provider: "anthropic" }]),
-      )
+      .mockReturnValueOnce(chainLimit([{ id: "claude-3-5-haiku", provider: "anthropic" }]))
       .mockReturnValueOnce(chainLimit([{ id: "openai:gpt-4o-mini" }]));
     const id = await resolveComposeModelId("orchestrator", "user_openai", "free", mockDb as never);
     expect(id).toBe("openai:gpt-4o-mini");
