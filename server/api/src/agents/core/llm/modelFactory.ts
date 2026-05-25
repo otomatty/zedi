@@ -41,6 +41,7 @@ export interface CreateZediChatModelInput {
 
 /**
  * Thrown when a caller hands in a backend that is not yet wired up.
+ * 未対応 backend が渡されたときに投げる。
  */
 export class UnsupportedBackendError extends Error {
   readonly code = "UNSUPPORTED_BACKEND";
@@ -54,6 +55,7 @@ export class UnsupportedBackendError extends Error {
 
 /**
  * Thrown when BYOK backend is selected but no credential is stored.
+ * BYOK だが credential 未登録のときに投げる。
  */
 export class MissingUserCredentialError extends Error {
   readonly code = "MISSING_USER_CREDENTIAL";
@@ -67,6 +69,7 @@ export class MissingUserCredentialError extends Error {
 
 /**
  * Thrown when the model's provider does not match the BYOK backend.
+ * モデル provider と BYOK backend が一致しないときに投げる。
  */
 export class BackendProviderMismatchError extends Error {
   readonly code = "BACKEND_PROVIDER_MISMATCH";

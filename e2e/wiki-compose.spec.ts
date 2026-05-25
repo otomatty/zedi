@@ -274,6 +274,8 @@ test.describe("Wiki Compose P2 happy path", () => {
 
     await page.goto(`/notes/${NOTE_ID}/${PAGE_ID}/compose`);
 
+    await page.getByTestId("compose-start").click();
+
     // Brief interrupt — question card appears.
     const briefCard = page.getByTestId(`brief-card-${BRIEF_QUESTION_ID}`);
     await expect(briefCard).toBeVisible();

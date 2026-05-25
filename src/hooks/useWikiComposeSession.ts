@@ -19,6 +19,7 @@ import {
   resumeSession,
   runSession,
 } from "@/lib/wikiCompose/composeService";
+import type { ComposeExecutionBackend } from "@/lib/wikiCompose/backends";
 import type { ComposeNavigationSeed } from "@/lib/wikiCompose/navigation";
 import type {
   BriefAnswer,
@@ -123,7 +124,7 @@ export interface UseWikiComposeSessionArgs {
    * 実行 backend（セッション作成時に固定）。省略時は `zedi_managed`。
    * Execution backend fixed at session create; defaults to `zedi_managed`.
    */
-  backend?: string;
+  backend?: ComposeExecutionBackend;
 }
 
 /** Hook return shape. */
