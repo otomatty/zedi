@@ -93,11 +93,14 @@ export async function resolveWebSearchModelId(
 
   if (rows.length === 0) return null;
 
+  const [first] = rows;
+  if (!first) return null;
+
   // Prefer OpenAI only among cheapest rows (cost tie-break), since `useWebSearch`
   // is well-tested in `aiProviders.ts`.
   // 最安行の中でのみ OpenAI を優先（`aiProviders.ts` の useWebSearch 経路が安定）。
-  const cheapestInput = rows[0].inputCostUnits;
-  const cheapestOutput = rows[0].outputCostUnits;
+  const cheapestInput = first.inputCostUnits;
+  const cheapestOutput = first.outputCostUnits;
   const cheapest = rows.filter(
     (r) => r.inputCostUnits === cheapestInput && r.outputCostUnits === cheapestOutput,
   );
