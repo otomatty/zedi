@@ -109,6 +109,12 @@ export {
   type NewWikiComposeSession,
   type WikiComposeSessionStatus,
 } from "./wikiComposeSessions.js";
+export {
+  userAiCredentials,
+  type UserAiCredential,
+  type NewUserAiCredential,
+  type UserAiCredentialProvider,
+} from "./userAiCredentials.js";
 
 export {
   usersRelations,

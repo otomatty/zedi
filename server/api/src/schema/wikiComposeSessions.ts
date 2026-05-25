@@ -71,8 +71,8 @@ export const wikiComposeSessions = pgTable(
      */
     phase: text("phase").notNull().default("init"),
     /**
-     * 実行 backend。P0 では常に `zedi_managed`。BYOK 対応 (#951) で拡張。
-     * Execution backend; `zedi_managed` only in P0.
+     * 実行 backend。`zedi_managed` または `user_*`（#951 BYOK）。セッション作成時に固定。
+     * Execution backend; `zedi_managed` or `user_*` BYOK backends (#951), fixed at create.
      */
     backend: text("backend").notNull().default("zedi_managed"),
     /**

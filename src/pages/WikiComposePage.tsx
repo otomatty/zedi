@@ -28,6 +28,8 @@ import { COMPOSE_SEED_STATE_KEY, type ComposeNavigationSeed } from "@/lib/wikiCo
 import type { DraftedSection } from "@/lib/wikiCompose/types";
 import { EditorPane } from "@/components/wikiCompose/EditorPane";
 import { ComposePanel } from "@/components/wikiCompose/ComposePanel";
+import { ComposeBackendSelector } from "@/components/wikiCompose/ComposeBackendSelector";
+import type { ComposeExecutionBackend } from "@/lib/wikiCompose/backends";
 
 /** Map drafted section list to a quick lookup. */
 function indexById(items: DraftedSection[]): Record<string, DraftedSection> {
@@ -46,6 +48,7 @@ const WikiComposePage: React.FC = () => {
   const noteId = params.noteId ?? "";
   const pageId = params.pageId ?? "";
   const sessionId = params.sessionId ?? null;
+  const [composeBackend, setComposeBackend] = useState<ComposeExecutionBackend>("zedi_managed");
 
   // チャット seed は mount 時に 1 回だけ保持。`location.state` を消しても hook 側に残す。
   // Capture chat seed once on mount; survives clearing `location.state` for the hook.
@@ -75,10 +78,16 @@ const WikiComposePage: React.FC = () => {
   const session = useWikiComposeSession({
     pageId,
     sessionId,
-    autoStart: Boolean(pageId),
+    // Fresh compose: user picks backend then clicks Start (#951).
+    autoStart: Boolean(sessionId && pageId),
     composeSeed,
     initialInput,
+    backend: composeBackend,
   });
+
+  const awaitingComposeStart =
+    !sessionId && session.status === "idle" && !session.session && !session.isStreaming;
+  const showBackendSelector = awaitingComposeStart;
 
   // Clear history seed only after the session row left `pending` (first run claimed).
   // `pending` のまま state を消すと失敗時リロードで chatSeed が届かなくなる (#950)。
@@ -222,6 +231,24 @@ const WikiComposePage: React.FC = () => {
       {header}
       {session.error ? (
         <div className="bg-destructive/10 text-destructive px-4 py-2 text-xs">{session.error}</div>
+      ) : null}
+      {showBackendSelector ? (
+        <div className="border-border space-y-3 border-b px-4 py-3">
+          <ComposeBackendSelector
+            value={composeBackend}
+            onChange={setComposeBackend}
+            disabled={session.isStreaming}
+          />
+          <Button
+            type="button"
+            size="sm"
+            data-testid="compose-start"
+            onClick={() => void session.start()}
+            disabled={session.isStreaming}
+          >
+            Start compose
+          </Button>
+        </div>
       ) : null}
       <div className="min-h-0 flex-1">
         <ResizablePanelGroup direction={isMobile ? "vertical" : "horizontal"} className="h-full">

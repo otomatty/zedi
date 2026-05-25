@@ -19,7 +19,10 @@ export {
 } from "./core/llm/zediChatModel.js";
 export {
   createZediChatModel,
+  assertSupportedComposeBackend,
   assertSupportedBackendP0,
+  MissingUserCredentialError,
+  BackendProviderMismatchError,
   UnsupportedBackendError,
   type CreateZediChatModelInput,
 } from "./core/llm/modelFactory.js";
