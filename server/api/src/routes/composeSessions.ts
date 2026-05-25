@@ -554,12 +554,7 @@ app.delete("/:pageId/compose-sessions/:id", authRequired, async (c) => {
     return c.json({ status: row.status });
   }
 
-  const cancellable: WikiComposeSessionStatus[] = [
-    "pending",
-    "running",
-    "interrupted",
-    "failed",
-  ];
+  const cancellable: WikiComposeSessionStatus[] = ["pending", "running", "interrupted", "failed"];
 
   const [cancelled] = await db
     .update(wikiComposeSessions)
@@ -568,12 +563,7 @@ app.delete("/:pageId/compose-sessions/:id", authRequired, async (c) => {
       closedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(
-      and(
-        eq(wikiComposeSessions.id, id),
-        inArray(wikiComposeSessions.status, cancellable),
-      ),
-    )
+    .where(and(eq(wikiComposeSessions.id, id), inArray(wikiComposeSessions.status, cancellable)))
     .returning({ status: wikiComposeSessions.status });
 
   if (cancelled) {
