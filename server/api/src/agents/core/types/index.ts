@@ -8,7 +8,12 @@
  */
 export {
   type ExecutionBackend,
+  type UserByokExecutionBackend,
   isExecutionBackend,
+  isUserByokBackend,
+  backendToCredentialProvider,
+  credentialProviderToBackend,
+  SUPPORTED_COMPOSE_BACKENDS,
   SUPPORTED_BACKENDS_P0,
 } from "./executionBackend.js";
 export { type GraphContext, GRAPH_CONTEXT_CONFIG_KEY } from "./graphContext.js";

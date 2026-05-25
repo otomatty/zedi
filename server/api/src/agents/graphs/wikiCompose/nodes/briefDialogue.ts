@@ -15,18 +15,12 @@ import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
+import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
 import { loadPageSnapshot } from "./shared/loadPageSnapshot.js";
 import { dispatchComposePhase } from "./shared/dispatch.js";
 import type { WikiComposeStateType, WikiComposeStateUpdate } from "../state.js";
 import type { BriefQuestion } from "../types.js";
-
-const ORCHESTRATOR_MODEL_ENV = "WIKI_COMPOSE_ORCHESTRATOR_MODEL_ID";
-const ORCHESTRATOR_MODEL_FALLBACK = "claude-3-5-haiku";
-
-function getOrchestratorModelId(): string {
-  return process.env[ORCHESTRATOR_MODEL_ENV]?.trim() || ORCHESTRATOR_MODEL_FALLBACK;
-}
 
 /**
  * Schema for the LLM's structured output. The Orchestrator is told it MAY
@@ -71,7 +65,11 @@ const SYSTEM_PROMPT =
   "make the article unwritable. Most questions should be optional.\n" +
   "Respond as JSON only.";
 
-function buildUserPrompt(title: string, body: string): string {
+function buildUserPrompt(
+  title: string,
+  body: string,
+  chatSeed?: { outline: string; conversationText: string; userSchema?: string } | null,
+): string {
   const parts: string[] = [`[Page title]`, title || "(no title yet)"];
   if (body.trim()) {
     parts.push(
@@ -82,6 +80,22 @@ function buildUserPrompt(title: string, body: string): string {
     );
   } else {
     parts.push("", "(Page body is empty.)");
+  }
+  if (chatSeed?.outline?.trim()) {
+    parts.push("", "[User-approved outline from chat]", chatSeed.outline.trim().slice(0, 2000));
+  }
+  if (chatSeed?.conversationText?.trim()) {
+    parts.push(
+      "",
+      "[Chat transcript excerpt]",
+      chatSeed.conversationText.trim().slice(0, 4000),
+      chatSeed.conversationText.length > 4000
+        ? `\n(…truncated; total ${chatSeed.conversationText.length} chars)`
+        : "",
+    );
+  }
+  if (chatSeed?.userSchema?.trim()) {
+    parts.push("", "[User wiki schema]", chatSeed.userSchema.trim().slice(0, 1500));
   }
   return parts.join("\n");
 }
@@ -102,8 +116,9 @@ export async function briefDialogue(
   // セッション開始時に 1 度だけ読み、以後は state を参照する。
   const snapshot = state.pageSnapshot ?? (await loadPageSnapshot(ctx.db, ctx.pageId));
 
+  const modelId = await resolveComposeModelId("orchestrator", ctx.backend, ctx.tier, ctx.db);
   const model = await createZediChatModel({
-    modelId: getOrchestratorModelId(),
+    modelId,
     userId: ctx.userId,
     tier: ctx.tier,
     db: ctx.db,
@@ -120,7 +135,10 @@ export async function briefDialogue(
   try {
     raw = await structured.invoke([
       { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: buildUserPrompt(snapshot.title, snapshot.body) },
+      {
+        role: "user",
+        content: buildUserPrompt(snapshot.title, snapshot.body, state.chatSeed),
+      },
     ]);
   } catch {
     // Defensive fallback: if the LLM call fails, emit an empty Brief so the

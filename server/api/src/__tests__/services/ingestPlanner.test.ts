@@ -9,6 +9,7 @@ import {
   extractJsonFromResponse,
   IngestPlanParseError,
   parseIngestPlanResponse,
+  parseIngestPlanValue,
   planIngest,
   type CallProviderAdapter,
   type CandidatePage,
@@ -54,6 +55,16 @@ describe("extractJsonFromResponse", () => {
   it("falls back to first { .. last } when there is surrounding prose", () => {
     const raw = `Here is the plan:\n{"a":1, "b":2}\nThanks!`;
     expect(extractJsonFromResponse(raw)).toBe(`{"a":1, "b":2}`);
+  });
+});
+
+describe("parseIngestPlanValue", () => {
+  it("validates structured objects without JSON round-trip", () => {
+    const plan = parseIngestPlanValue({
+      action: "skip",
+      reason: "no value",
+    });
+    expect(plan.action).toBe("skip");
   });
 });
 

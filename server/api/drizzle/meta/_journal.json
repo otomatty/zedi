@@ -218,6 +218,13 @@
       "when": 1779926400000,
       "tag": "0031_add_wiki_compose_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1780012800000,
+      "tag": "0032_add_user_ai_credentials",
+      "breakpoints": true
     }
   ]
 }

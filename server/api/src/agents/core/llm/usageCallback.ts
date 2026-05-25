@@ -66,7 +66,9 @@ export interface RecordZediUsageResult {
  * `recordUsage`. Used by `ZediChatModel` after each provider call.
  */
 export async function recordZediUsage(input: RecordZediUsageInput): Promise<RecordZediUsageResult> {
-  const costUnits = calculateCost(input.usage, input.inputCostUnits, input.outputCostUnits);
+  const rawCostUnits = calculateCost(input.usage, input.inputCostUnits, input.outputCostUnits);
+  // BYOK (#951): audit usage in logs but do not consume Zedi monthly CU.
+  const costUnits = input.apiMode === "user_key" ? 0 : rawCostUnits;
   await recordUsage(
     input.userId,
     input.modelId,

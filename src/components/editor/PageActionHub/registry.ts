@@ -1,6 +1,7 @@
-import { Image as ImageIcon, Wand2 } from "lucide-react";
+import { Image as ImageIcon, Sparkles, Wand2 } from "lucide-react";
 import { ThumbnailSearchAction } from "./actions/ThumbnailSearchAction";
 import { ThumbnailGenerateAction } from "./actions/ThumbnailGenerateAction";
+import { WikiComposeAction } from "./actions/WikiComposeAction";
 import type { PageAction, PageActionContext } from "./types";
 
 /**
@@ -15,6 +16,18 @@ function isThumbnailActionAvailable(ctx: PageActionContext): boolean {
   if (!ctx.isSignedIn) return false;
   if (ctx.hasThumbnail) return false;
   if (ctx.pageTitle.trim().length === 0) return false;
+  return true;
+}
+
+/**
+ * Wiki Compose 入口。タイトルがあり、Compose URL が組み立て可能なときのみ表示。
+ * Available when the page has a title and a Compose route is configured.
+ */
+function isWikiComposeActionAvailable(ctx: PageActionContext): boolean {
+  if (ctx.isReadOnly) return false;
+  if (!ctx.isSignedIn) return false;
+  if (ctx.pageTitle.trim().length === 0) return false;
+  if (!ctx.wikiComposeHref?.trim()) return false;
   return true;
 }
 
@@ -45,6 +58,16 @@ export const PAGE_ACTIONS: ReadonlyArray<PageAction> = [
     insertStrategy: "head",
     isAvailable: isThumbnailActionAvailable,
     Component: ThumbnailGenerateAction,
+  },
+  {
+    id: "wiki.compose",
+    labelI18nKey: "editor.pageActionHub.actions.wikiCompose.label",
+    descriptionI18nKey: "editor.pageActionHub.actions.wikiCompose.description",
+    icon: Sparkles,
+    category: "ai",
+    insertStrategy: "custom",
+    isAvailable: isWikiComposeActionAvailable,
+    Component: WikiComposeAction,
   },
 ];
 

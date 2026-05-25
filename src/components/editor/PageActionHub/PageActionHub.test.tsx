@@ -33,6 +33,10 @@ vi.mock("react-i18next", () => ({
         "editor.pageActionHub.actions.thumbnailGenerate.loading": "Generating image...",
         "editor.pageActionHub.actions.thumbnailGenerate.retry": "Regenerate",
         "editor.pageActionHub.actions.thumbnailGenerate.missingTitle": "Please enter a title",
+        "editor.pageActionHub.actions.wikiCompose.label": "Wiki Compose",
+        "editor.pageActionHub.actions.wikiCompose.description": "Co-author with AI",
+        "editor.pageActionHub.actions.wikiCompose.start": "Open Wiki Compose",
+        "editor.pageActionHub.actions.wikiCompose.unavailable": "Unavailable",
       };
       return map[key] ?? key;
     },

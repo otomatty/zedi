@@ -292,11 +292,10 @@ const App = () => (
                       <Route path="/notes/:noteId/members" element={<LegacyMembersRedirect />} />
                       <Route path="/notes/:noteId/:pageId" element={<NotePageView />} />
                       {/* Wiki Compose split-screen UI (issue #950).
-                          `/notes/:noteId/:pageId/compose` で新規セッション、
-                          `/notes/:noteId/:pageId/compose/:sessionId` で再開。 */}
-                      <Route path="/notes/:noteId/:pageId/compose" element={<WikiComposePage />} />
+                          Optional `:sessionId` keeps one route element so URL
+                          persistence does not remount and abort the first SSE run. */}
                       <Route
-                        path="/notes/:noteId/:pageId/compose/:sessionId"
+                        path="/notes/:noteId/:pageId/compose/:sessionId?"
                         element={<WikiComposePage />}
                       />
                       {/* Legacy path — redirect `/notes/:noteId/pages/:pageId` to

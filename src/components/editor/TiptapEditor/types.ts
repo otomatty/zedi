@@ -83,6 +83,11 @@ export interface TiptapEditorProps {
    */
   pageNoteId?: string | null;
   /**
+   * Wiki Compose 画面 URL。PageActionHub の `wiki.compose` と同経路 (#950)。
+   * Route to the Wiki Compose UI; used by PageActionHub `wiki.compose`.
+   */
+  wikiComposeHref?: string;
+  /**
    * 画面下部の Wiki Link 入力バー右隣に並べるアクション（例: PageActionHub FAB）。
    * Trailing control rendered beside the floating Wiki Link input bar.
    */

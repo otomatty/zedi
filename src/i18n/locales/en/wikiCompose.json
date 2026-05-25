@@ -1,0 +1,27 @@
+{
+  "backend": {
+    "label": "Execution backend",
+    "zediManaged": "Zedi managed",
+    "zediManagedDesc": "Uses Zedi API keys; consumes monthly CU.",
+    "userAnthropic": "Your Anthropic key",
+    "userAnthropicDesc": "Runs with your Anthropic API key stored on the server (encrypted).",
+    "userOpenai": "Your OpenAI key",
+    "userOpenaiDesc": "Runs with your OpenAI API key stored on the server (encrypted).",
+    "userGoogle": "Your Google key",
+    "userGoogleDesc": "Runs with your Google API key stored on the server (encrypted).",
+    "usesCu": "Uses Zedi monthly CU.",
+    "credentialRequired": "Register this provider's API key in Settings → AI first."
+  },
+  "credentials": {
+    "title": "Wiki Compose API keys (BYOK)",
+    "description": "Store provider API keys on the server for Wiki Compose. Keys are encrypted at rest and never returned in API responses.",
+    "anthropic": "Anthropic",
+    "openai": "OpenAI",
+    "google": "Google",
+    "placeholder": "Paste API key",
+    "configured": "Configured",
+    "remove": "Remove",
+    "storageDisabled": "Server-side credential storage is not enabled on this environment.",
+    "localStorageNote": "General AI chat may still use browser-local keys; Wiki Compose BYOK uses the credentials above when you pick a user_* backend."
+  }
+}

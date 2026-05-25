@@ -254,6 +254,12 @@
         "loading": "Generating image...",
         "retry": "Regenerate",
         "missingTitle": "Please enter a title"
+      },
+      "wikiCompose": {
+        "label": "Wiki Compose",
+        "description": "Co-author this page with AI in a guided Brief → research → outline → draft flow.",
+        "start": "Open Wiki Compose",
+        "unavailable": "Wiki Compose is not available for this page."
       }
     }
   },

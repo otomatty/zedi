@@ -19,7 +19,10 @@ export {
 } from "./core/llm/zediChatModel.js";
 export {
   createZediChatModel,
+  assertSupportedComposeBackend,
   assertSupportedBackendP0,
+  MissingUserCredentialError,
+  BackendProviderMismatchError,
   UnsupportedBackendError,
   type CreateZediChatModelInput,
 } from "./core/llm/modelFactory.js";
@@ -86,6 +89,14 @@ export {
   type ResearchResumeParsed,
   type HumanReviewInterruptPayload,
 } from "./subgraphs/research/index.js";
+export {
+  INGEST_PLANNER_GRAPH_ID,
+  INGEST_PLANNER_GRAPH_VERSION,
+  registerIngestPlannerGraph,
+  IngestPlannerState,
+  type IngestPlannerStateType,
+  type IngestPlannerStateUpdate,
+} from "./graphs/ingest/index.js";
 export {
   WIKI_COMPOSE_GRAPH_ID,
   WIKI_COMPOSE_GRAPH_VERSION,

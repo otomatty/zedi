@@ -22,7 +22,7 @@ import { callAIService } from "@/lib/aiService";
 import { loadAISettings } from "@/lib/aiSettings";
 import { useCreatePage } from "@/hooks/usePageQueries";
 import { useWikiSchema } from "@/hooks/useWikiSchema";
-import type { PendingChatPageGenerationState } from "@/types/chatPageGeneration";
+import { navigateToWikiCompose } from "@/lib/wikiCompose/navigation";
 import { EntityRow } from "./EntityRow";
 
 /**
@@ -258,19 +258,18 @@ function PromoteToWikiDialogBody({
       if (!firstCreated) throw new Error("no pages created");
 
       const firstEntity = selectedEntities[created.indexOf(firstCreated)];
-      const pending: PendingChatPageGenerationState = {
-        outline: `- ${firstEntity.summary}`,
-        conversationText,
-        userSchema: schemaData?.content,
-        conversationId,
-      };
       toast({ title: t("aiChat.notifications.promoteSuccess") });
       onClose();
-      // Issue #889 Phase 3: `/pages/:id` 撤去のため `/notes/:noteId/:pageId` に遷移。
-      // Issue #889 Phase 3: route to `/notes/:noteId/:pageId` after `/pages/:id`
-      // was retired.
-      navigate(`/notes/${firstCreated.noteId}/${firstCreated.id}`, {
-        state: { pendingChatPageGeneration: pending },
+      navigateToWikiCompose({
+        navigate,
+        noteId: firstCreated.noteId,
+        pageId: firstCreated.id,
+        seed: {
+          outline: `- ${firstEntity.summary}`,
+          conversationText,
+          userSchema: schemaData?.content,
+          conversationId,
+        },
       });
     } catch {
       toast({ title: t("aiChat.notifications.promoteFailed"), variant: "destructive" });
