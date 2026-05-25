@@ -174,6 +174,17 @@ export const WikiComposeState = Annotation.Root({
     reducer: (prev, next) => (next === undefined ? prev : next),
     default: () => null,
   }),
+  /**
+   * P5 conflict-resolution marker. Populated before `conflict_resolution` interrupt;
+   * cleared on resume. Routing uses `rejectedResearch` counts; this channel is for
+   * future explicit conflict metadata from evaluate / resume payloads.
+   *
+   * P5 矛盾解消用マーカー。将来 evaluate や resume から明示的な矛盾リストを載せる。
+   */
+  researchConflicts: Annotation<string[]>({
+    reducer: (_prev, next) => next,
+    default: () => [],
+  }),
 
   // ── Structure phase ──────────────────────────────────────────────────────
   /** Orchestrator が提案する初期アウトライン。 */

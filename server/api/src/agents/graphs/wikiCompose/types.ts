@@ -200,10 +200,18 @@ export interface ComposeCompletion {
  * 各 interrupt ノードが `interrupt(value)` で渡すペイロード。フロントは
  * `kind` で分岐して UI を出し分ける。
  */
+/** Lightweight conflict summary for the P5 `conflict_resolution` interrupt. */
+export interface ResearchConflictSummary {
+  approved: Array<{ id: string; title: string }>;
+  rejected: Array<{ id: string; title: string }>;
+  rationale: string;
+}
+
 export type WikiComposeInterruptPayload =
   | { kind: "human_review_brief"; questions: BriefQuestion[]; pageSnapshot: PageSnapshot }
   | { kind: "human_review_research"; batchId: string | null; pendingSources: Source[] }
-  | { kind: "human_review_outline"; outline: OutlineSection[]; approvedSources: Source[] };
+  | { kind: "human_review_outline"; outline: OutlineSection[]; approvedSources: Source[] }
+  | { kind: "conflict_resolution"; conflicts: ResearchConflictSummary };
 
 /**
  * Resume payloads expected at each interrupt point. Each is validated at the

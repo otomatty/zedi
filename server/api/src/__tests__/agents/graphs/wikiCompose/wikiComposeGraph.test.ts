@@ -1,5 +1,5 @@
 /**
- * Wiki Compose orchestrator graph (#950) — wiring + interrupt tests.
+ * Wiki Compose orchestrator graph (#950, #953) — wiring + interrupt tests.
  *
  * 受け入れ条件 #1 / #6 / 技術 #1:
  * - `wikiComposeGraph` が P1 subgraph を組み込んでいる (channels 共有で表現)
@@ -284,5 +284,77 @@ describe("wikiComposeGraph — orchestrator wiring", () => {
     expect(finalState.completion?.sections).toHaveLength(2);
     expect(finalState.completion?.markdown).toMatch(/Overview/);
     expect(finalState.completion?.markdown).toMatch(/Details/);
+  });
+
+  it("skips research when Brief emits zero questions (P5)", async () => {
+    briefDialogue.mockImplementation(async () => ({
+      briefQuestions: [],
+      pageSnapshot: { pageId: "page-1", title: "Self-evident Title", body: "", hasContent: false },
+      phase: "brief:await_user",
+    }));
+
+    const checkpointer = new MemorySaver();
+    const runner = new GraphRunner();
+    const ctx = fakeContext("thread-skip-research");
+
+    await runner.invoke(
+      { graphId: WIKI_COMPOSE_GRAPH_ID, context: ctx, checkpointer, recursionLimit: 120 },
+      { kind: "input", value: { messages: [{ role: "user", content: "title: Obvious" }] } },
+    );
+
+    const afterBrief = await runner.resume(
+      { graphId: WIKI_COMPOSE_GRAPH_ID, context: ctx, checkpointer, recursionLimit: 120 },
+      { answers: [], appendToExisting: false },
+    );
+
+    expect(afterBrief.status).toBe("interrupted");
+    expect(planQueries).not.toHaveBeenCalled();
+    expect(compileBatch).not.toHaveBeenCalled();
+    expect(structureDialogue).toHaveBeenCalledTimes(1);
+  });
+
+  it("halts at conflict_resolution when many sources are rejected (P5)", async () => {
+    webSearch.mockImplementation(async () => ({
+      pendingSources: [
+        { id: "src:a", kind: "web", title: "A", url: "https://a/" },
+        { id: "src:b", kind: "web", title: "B", url: "https://b/" },
+        { id: "src:c", kind: "web", title: "C", url: "https://c/" },
+      ],
+    }));
+
+    const checkpointer = new MemorySaver();
+    const runner = new GraphRunner();
+    const ctx = fakeContext("thread-conflict");
+
+    await runner.invoke(
+      { graphId: WIKI_COMPOSE_GRAPH_ID, context: ctx, checkpointer, recursionLimit: 120 },
+      { kind: "input", value: { messages: [{ role: "user", content: "title: Hello" }] } },
+    );
+    await runner.resume(
+      { graphId: WIKI_COMPOSE_GRAPH_ID, context: ctx, checkpointer, recursionLimit: 120 },
+      { answers: [], appendToExisting: false },
+    );
+
+    const conflictHalt = await runner.resume(
+      { graphId: WIKI_COMPOSE_GRAPH_ID, context: ctx, checkpointer, recursionLimit: 120 },
+      {
+        approvedSourceIds: ["src:a"],
+        rejectedSourceIds: ["src:b", "src:c"],
+      },
+    );
+
+    expect(conflictHalt.status).toBe("interrupted");
+    const interruptState = conflictHalt.output as {
+      __interrupt__?: Array<{ value: { kind?: string } }>;
+    };
+    expect(interruptState.__interrupt__?.[0]?.value?.kind).toBe("conflict_resolution");
+    expect(structureDialogue).not.toHaveBeenCalled();
+
+    const afterConflict = await runner.resume(
+      { graphId: WIKI_COMPOSE_GRAPH_ID, context: ctx, checkpointer, recursionLimit: 120 },
+      { acknowledged: true },
+    );
+    expect(afterConflict.status).toBe("interrupted");
+    expect(structureDialogue).toHaveBeenCalledTimes(1);
   });
 });

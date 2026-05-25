@@ -60,6 +60,7 @@ import { GRAPH_CONTEXT_CONFIG_KEY } from "../agents/core/types/graphContext.js";
 import { resolveCheckpointerForRun } from "../agents/core/checkpoint/index.js";
 import { RESEARCH_GRAPH_ID } from "../agents/subgraphs/research/index.js";
 import { WIKI_COMPOSE_GRAPH_ID } from "../agents/graphs/wikiCompose/index.js";
+import { WIKI_MAINTENANCE_GRAPH_ID } from "../agents/graphs/wikiMaintenance/index.js";
 import type { AppEnv } from "../types/index.js";
 import { persistOutcomeIfStillRunning } from "./composeSessionPersistence.js";
 import { loadComposeSessionProjection } from "./composeSessionProjection.js";
@@ -109,6 +110,7 @@ function translateGraphInput(graphId: string, raw: unknown): unknown {
 function recursionLimitFor(graphId: string): number | undefined {
   if (graphId === RESEARCH_GRAPH_ID) return 60;
   if (graphId === WIKI_COMPOSE_GRAPH_ID) return 120;
+  if (graphId === WIKI_MAINTENANCE_GRAPH_ID) return 40;
   return undefined;
 }
 

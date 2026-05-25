@@ -1,31 +1,36 @@
 /**
- * Wiki Compose P2 — `wikiComposeGraph` orchestrator (issue #950).
+ * Wiki Compose P2/P5 — `wikiComposeGraph` orchestrator (#950, #953).
  *
- * Brief → Research → Structure → Draft → Completed の全体フローを担う
- * LangGraph オーケストレータ。`researchLoopSubgraph` (#949 / P1) を **subgraph
- * as node** として組み込み、ループ内 interrupt
- * (`human_review_research`) は親グラフから見ても通常の interrupt として伝播する
- * （状態は `WikiComposeState` の superset 設計により自動共有）。
+ * Brief → (optional Research) → (optional Conflict resolution) → Structure →
+ * Draft → Completed の全体フローを担う LangGraph オーケストレータ。
  *
- * Top-level orchestrator. The research subgraph composes as a node so a
- * single PostgresSaver thread services Brief → Research → Outline → Draft.
- * Each interrupt halts the same `thread_id` and resumes through the same
- * `PATCH /resume` route.
+ * P5 adds conditional edges:
+ * - After Brief: skip research when questions are empty or chat seeded an outline.
+ * - After Research HITL: conflict resolution when many sources were rejected.
+ *
+ * Top-level orchestrator. Research nodes are inlined so state channels are shared
+ * and interrupts halt the same `thread_id`. See `routing.ts` for branch predicates.
  *
  * Pipeline:
  *
  * ```
- * START
- *   → brief_dialogue
- *   → human_review_brief                       [interrupt #1]
- *   → research_subgraph (= researchLoopSubgraph)
- *       └── plan → search → fetch → eval → … → human_review_research  [interrupt #2]
- *   → structure_dialogue
- *   → human_review_outline                     [interrupt #3]
- *   → draft_sections
- *   → completed
- *   → END
+ * START → brief_dialogue → human_review_brief
+ *   ├─[research]→ plan_queries → … → human_review_research
+ *   └─[skip_research]→ skip_research ────────────────┐
+ *                                                    ↓
+ * human_review_research ─┬─[structure]──────────────┤
+ *                        └─[conflict_resolution]→ conflict_resolution
+ *                                                    ↓
+ *                              structure_dialogue → human_review_outline
+ *                              → draft_sections → completed → END
  * ```
+ *
+ * ## Non-goals (P5 / #953)
+ * - `media_curator` subgraph, draft failure escalation, session TTL GC — tracked separately.
+ *
+ * ## Extension points
+ * - Add `routeAfterOutline` for image-slot sections.
+ * - Register sibling graphs via `GraphRegistry` (`wiki-maintenance`, template compose, …).
  */
 import { END, START, StateGraph } from "@langchain/langgraph";
 import { WikiComposeState } from "./state.js";
@@ -52,31 +57,23 @@ import {
   humanReviewOutline,
   draftSections,
   completed,
+  skipResearch,
+  conflictResolution,
 } from "./nodes/index.js";
 import { shouldRefine } from "../../subgraphs/research/researchGraph.js";
+import { routeAfterBrief, routeAfterResearch } from "./routing.js";
 
 /** Registered graph id. */
 export const WIKI_COMPOSE_GRAPH_ID = "wiki-compose" as const;
 /** Registered graph version. Bump when behaviour changes meaningfully. */
-export const WIKI_COMPOSE_GRAPH_VERSION = "1.0.0";
+export const WIKI_COMPOSE_GRAPH_VERSION = "1.1.0";
 
-/**
- * Inlined research nodes vs separate subgraph: we inline the research nodes
- * at the orchestrator level so the parent state's `iteration` / `queries` /
- * `pendingSources` channels are written directly and the interrupt at
- * `human_review_research` halts the parent thread_id without a translation
- * layer. This is equivalent to subgraph-as-node composition since the
- * orchestrator state is a strict superset of `ResearchLoopState` (see
- * `state.ts`).
- *
- * 研究ノードは orchestrator state 上に直接配置する。state を superset 設計に
- * したので state は自動共有され、interrupt は親 thread_id で halt する。
- */
 const factory: GraphFactory = ({ checkpointer }: GraphFactoryInput): CompiledGraphLike => {
   const builder = new StateGraph(WikiComposeState)
     // Brief phase
     .addNode("brief_dialogue", briefDialogue)
     .addNode("human_review_brief", humanReviewBrief)
+    .addNode("skip_research", skipResearch)
     // Research phase (inlined research subgraph nodes, sharing state)
     .addNode("plan_queries", planQueries)
     .addNode("web_search", webSearch)
@@ -86,6 +83,7 @@ const factory: GraphFactory = ({ checkpointer }: GraphFactoryInput): CompiledGra
     .addNode("refine_queries", refineQueries)
     .addNode("compile_batch", compileBatch)
     .addNode("human_review_research", humanReviewResearch)
+    .addNode("conflict_resolution", conflictResolution)
     // Structure phase
     .addNode("structure_dialogue", structureDialogue)
     .addNode("human_review_outline", humanReviewOutline)
@@ -95,7 +93,11 @@ const factory: GraphFactory = ({ checkpointer }: GraphFactoryInput): CompiledGra
     // Edges
     .addEdge(START, "brief_dialogue")
     .addEdge("brief_dialogue", "human_review_brief")
-    .addEdge("human_review_brief", "plan_queries")
+    .addConditionalEdges("human_review_brief", routeAfterBrief, {
+      research: "plan_queries",
+      skip_research: "skip_research",
+    })
+    .addEdge("skip_research", "structure_dialogue")
     // Research loop (mirrors researchLoopSubgraph wiring).
     .addEdge("plan_queries", "web_search")
     .addEdge("plan_queries", "wiki_search")
@@ -109,7 +111,11 @@ const factory: GraphFactory = ({ checkpointer }: GraphFactoryInput): CompiledGra
     .addEdge("refine_queries", "web_search")
     .addEdge("refine_queries", "wiki_search")
     .addEdge("compile_batch", "human_review_research")
-    .addEdge("human_review_research", "structure_dialogue")
+    .addConditionalEdges("human_review_research", routeAfterResearch, {
+      structure: "structure_dialogue",
+      conflict_resolution: "conflict_resolution",
+    })
+    .addEdge("conflict_resolution", "structure_dialogue")
     // Structure phase.
     .addEdge("structure_dialogue", "human_review_outline")
     .addEdge("human_review_outline", "draft_sections")
@@ -122,9 +128,6 @@ const factory: GraphFactory = ({ checkpointer }: GraphFactoryInput): CompiledGra
 
 /**
  * Register the Wiki Compose orchestrator graph. Idempotent.
- *
- * `app.ts` から `registerResearchLoopGraph()` と並べて呼ぶ。再登録は registry が
- * 上書きで吸収する。
  */
 export function registerWikiComposeGraph(): void {
   registerGraph({
@@ -132,10 +135,10 @@ export function registerWikiComposeGraph(): void {
     version: WIKI_COMPOSE_GRAPH_VERSION,
     phase: "orchestrator",
     description:
-      "Wiki Compose P2: full orchestrator. Brief → research → structure → draft → completed. " +
-      "Embeds the P1 research loop in-place via shared state (orchestrator state is a strict " +
-      "superset of ResearchLoopState). Three interrupt points: human_review_brief, " +
-      "human_review_research, human_review_outline.",
+      "Wiki Compose P2+P5 orchestrator. Brief → optional research → optional conflict resolution → " +
+      "structure → draft → completed. Conditional: skip research (empty Brief / chat outline seed), " +
+      "conflict resolution (≥2 rejected sources with ≥1 approved). Interrupts: brief, research, " +
+      "conflict (conditional), outline.",
     factory,
   });
 }
