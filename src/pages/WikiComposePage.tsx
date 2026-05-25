@@ -225,6 +225,7 @@ const WikiComposePage: React.FC = () => {
       onSubmitResearchApproval={session.submitResearchApproval}
       onSubmitConflictAck={session.submitConflictAck}
       onSubmitOutline={session.submitOutline}
+      onSubmitConflictAck={session.submitConflictAck}
     />
   );
 

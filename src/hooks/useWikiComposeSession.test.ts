@@ -191,6 +191,49 @@ describe("useWikiComposeSession", () => {
     expect(result.current.phase).toBe("completed");
   });
 
+  it("submitResearchApproval stops at conflict_resolution without POST /run", async () => {
+    arrangeRun([
+      { type: "started", sessionId: SESSION.id, graphId: SESSION.graphId },
+      { type: "done", status: "interrupted" },
+    ]);
+    mocks.resumeSession.mockResolvedValue({
+      status: "interrupted",
+      output: {
+        __interrupt__: [
+          {
+            value: {
+              kind: "conflict_resolution",
+              conflicts: {
+                approved: [{ id: "src:a", title: "A" }],
+                rejected: [
+                  { id: "src:b", title: "B" },
+                  { id: "src:c", title: "C" },
+                ],
+                rationale: "Confirm approved set.",
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const { result } = renderHook(() =>
+      useWikiComposeSession({ pageId: "page-1", sessionId: null }),
+    );
+    await waitFor(() => expect(result.current.session).not.toBeNull());
+
+    await act(async () => {
+      await result.current.submitResearchApproval({
+        approvedSourceIds: ["src:a"],
+        rejectedSourceIds: ["src:b", "src:c"],
+      });
+    });
+
+    expect(mocks.runSession).toHaveBeenCalledTimes(1);
+    expect(result.current.researchConflictSummary?.approved).toHaveLength(1);
+    expect(result.current.phase).toBe("conflict");
+  });
+
   it("submitBrief applies research interrupt from PATCH output without POST /run", async () => {
     arrangeRun([
       { type: "started", sessionId: SESSION.id, graphId: SESSION.graphId },

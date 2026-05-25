@@ -162,6 +162,21 @@ export interface UseWikiComposeSessionReturn extends WikiComposeSessionState {
   cancel: () => Promise<void>;
 }
 
+/** First interrupt kind on a LangGraph checkpoint output, if any. */
+function interruptKindFromOutput(output: unknown): string | undefined {
+  if (!output || typeof output !== "object") return undefined;
+  const interrupts = (output as { __interrupt__?: unknown }).__interrupt__;
+  if (!Array.isArray(interrupts) || interrupts.length === 0) return undefined;
+  const entry = interrupts[0];
+  const value =
+    entry && typeof entry === "object" ? (entry as { value?: unknown }).value : undefined;
+  if (value && typeof value === "object" && "kind" in value) {
+    const kind = (value as { kind?: unknown }).kind;
+    return typeof kind === "string" ? kind : undefined;
+  }
+  return undefined;
+}
+
 /**
  * Returns a unique id for an activity row. Uses crypto.randomUUID when
  * available (modern browsers); falls back to a coarse fallback for old
@@ -496,6 +511,7 @@ function reduceInterrupt(
       return {
         outlineProposal: payload.outline,
         approvedSources: payload.approvedSources,
+        researchConflictSummary: null,
         phase: "structure",
       };
     case "conflict_resolution":
@@ -649,6 +665,11 @@ export function useWikiComposeSession(
       const approved = state.pendingSources.filter((s) => input.approvedSourceIds.includes(s.id));
       update({ approvedSources: approved });
       const result = await resumeSession({ pageId, sessionId: session.id, resume: input });
+      if (interruptKindFromOutput(result.output) === "conflict_resolution") {
+        const fromResume = reduceResumeOutput(result.output, result.status);
+        update({ status: result.status, ...fromResume });
+        return;
+      }
       const fromResume = reduceResumeOutput(result.output, result.status);
       update({ status: result.status, ...fromResume });
       const needsStream =
@@ -758,6 +779,7 @@ export function useWikiComposeSession(
     submitResearchApproval,
     submitConflictAck,
     submitOutline,
+    submitConflictAck,
     cancel,
   };
 }

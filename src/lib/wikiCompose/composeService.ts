@@ -170,6 +170,7 @@ export async function runSession(input: {
  * - `human_review_brief` — `{ answers, appendToExisting?, researchMaxIterations? }`
  * - `human_review_research` — `{ approvedSourceIds, rejectedSourceIds?, note? }`
  * - `human_review_outline` — `{ sections }`
+ * - `conflict_resolution` — `{ acknowledged: true, note?: string }`
  *
  * The server returns a JSON body `{ status, output }` on resume completion (no
  * SSE stream). Callers must hydrate UI state from `output` (interrupt payloads
