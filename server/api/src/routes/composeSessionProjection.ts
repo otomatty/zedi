@@ -24,6 +24,8 @@ export interface ComposeSessionUiProjection {
   pendingSources?: unknown[];
   latestBatch?: unknown;
   approvedSources?: unknown[];
+  /** P5 research conflict summary when halted at `conflict_resolution` (#953). */
+  researchConflictSummary?: unknown;
   outlineProposal?: unknown[];
   draftedSections?: unknown[];
   completedMarkdown?: string | null;
@@ -99,6 +101,7 @@ export function projectComposeStateValues(
         pendingSources?: unknown[];
         outline?: unknown[];
         approvedSources?: unknown[];
+        conflicts?: unknown;
       };
       switch (payload.kind) {
         case "human_review_brief":
@@ -115,6 +118,13 @@ export function projectComposeStateValues(
           if (payload.outline) projection.outlineProposal = payload.outline;
           if (payload.approvedSources) projection.approvedSources = payload.approvedSources;
           projection.phase = "structure";
+          break;
+        case "conflict_resolution":
+          if (payload.conflicts) projection.researchConflictSummary = payload.conflicts;
+          if (Array.isArray(state.approvedResearch)) {
+            projection.approvedSources = state.approvedResearch;
+          }
+          projection.phase = "research";
           break;
         default:
           break;

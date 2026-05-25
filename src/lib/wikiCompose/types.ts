@@ -118,6 +118,13 @@ export interface ComposeSession {
  * Checkpoint projection returned by `GET /compose-sessions/:id` for reload (#950).
  * チェックポイントから復元した UI 用スライス。
  */
+/** Summary shown at the P5 `conflict_resolution` interrupt (#953). */
+export interface ResearchConflictSummary {
+  approved: Array<{ id: string; title: string }>;
+  rejected: Array<{ id: string; title: string }>;
+  rationale: string;
+}
+
 export interface ComposeSessionUiProjection {
   phase?: "brief" | "research" | "structure" | "draft" | "completed";
   briefQuestions?: BriefQuestion[];
@@ -125,6 +132,7 @@ export interface ComposeSessionUiProjection {
   pendingSources?: ResearchSource[];
   latestBatch?: ResearchBatch | null;
   approvedSources?: ResearchSource[];
+  researchConflictSummary?: ResearchConflictSummary;
   outlineProposal?: OutlineSection[];
   draftedSections?: DraftedSection[];
   completedMarkdown?: string | null;
@@ -146,6 +154,10 @@ export type ComposeInterruptPayload =
       kind: "human_review_outline";
       outline: OutlineSection[];
       approvedSources: ResearchSource[];
+    }
+  | {
+      kind: "conflict_resolution";
+      conflicts: ResearchConflictSummary;
     };
 
 // ── SSE event union (mirrors backend `SseEvent`) ───────────────────────────

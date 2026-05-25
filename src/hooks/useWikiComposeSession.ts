@@ -33,6 +33,7 @@ import type {
   OutlineSection,
   PageSnapshot,
   ResearchBatch,
+  ResearchConflictSummary,
   ResearchSource,
 } from "@/lib/wikiCompose/types";
 
@@ -66,6 +67,8 @@ export interface WikiComposeSessionState {
   pendingSources: ResearchSource[];
   /** Approved sources after research resume. */
   approvedSources: ResearchSource[];
+  /** Set when the graph halts at `conflict_resolution` (#953). */
+  researchConflictSummary: ResearchConflictSummary | null;
   /** Proposed outline from the structure interrupt. */
   outlineProposal: OutlineSection[];
   /** Drafted section bodies — keyed by sectionId. */
@@ -93,6 +96,7 @@ const INITIAL_STATE: WikiComposeSessionState = {
   latestBatch: null,
   pendingSources: [],
   approvedSources: [],
+  researchConflictSummary: null,
   outlineProposal: [],
   draftedSections: {},
   streamingSectionId: null,
@@ -145,8 +149,25 @@ export interface UseWikiComposeSessionReturn extends WikiComposeSessionState {
   }) => Promise<void>;
   /** Submit outline approval and continue streaming. */
   submitOutline: (input: { sections: OutlineSection[] }) => Promise<void>;
+  /** Acknowledge research conflicts and continue to Structure (#953). */
+  submitConflictAck: () => Promise<void>;
   /** Cancel the session (DELETE). */
   cancel: () => Promise<void>;
+}
+
+/** First interrupt kind on a LangGraph checkpoint output, if any. */
+function interruptKindFromOutput(output: unknown): string | undefined {
+  if (!output || typeof output !== "object") return undefined;
+  const interrupts = (output as { __interrupt__?: unknown }).__interrupt__;
+  if (!Array.isArray(interrupts) || interrupts.length === 0) return undefined;
+  const entry = interrupts[0];
+  const value =
+    entry && typeof entry === "object" ? (entry as { value?: unknown }).value : undefined;
+  if (value && typeof value === "object" && "kind" in value) {
+    const kind = (value as { kind?: unknown }).kind;
+    return typeof kind === "string" ? kind : undefined;
+  }
+  return undefined;
 }
 
 /**
@@ -373,6 +394,9 @@ function hydrateFromProjection(
   if (projection.latestBatch !== undefined) partial.latestBatch = projection.latestBatch;
   if (projection.pendingSources?.length) partial.pendingSources = projection.pendingSources;
   if (projection.approvedSources?.length) partial.approvedSources = projection.approvedSources;
+  if (projection.researchConflictSummary) {
+    partial.researchConflictSummary = projection.researchConflictSummary;
+  }
   if (projection.outlineProposal?.length) partial.outlineProposal = projection.outlineProposal;
   if (projection.completedMarkdown) partial.completedMarkdown = projection.completedMarkdown;
   if (projection.draftedSections?.length) {
@@ -466,10 +490,18 @@ function reduceInterrupt(
       return {
         outlineProposal: payload.outline,
         approvedSources: payload.approvedSources,
+        researchConflictSummary: null,
         phase: "structure",
       };
+    case "conflict_resolution":
+      return {
+        researchConflictSummary: payload.conflicts,
+        approvedSources: prev.approvedSources,
+        pendingSources: [],
+        phase: "research",
+      };
     default:
-      return prev;
+      return {};
   }
 }
 
@@ -611,6 +643,11 @@ export function useWikiComposeSession(
       const approved = state.pendingSources.filter((s) => input.approvedSourceIds.includes(s.id));
       update({ approvedSources: approved });
       const result = await resumeSession({ pageId, sessionId: session.id, resume: input });
+      if (interruptKindFromOutput(result.output) === "conflict_resolution") {
+        const fromResume = reduceResumeOutput(result.output, result.status);
+        update({ status: result.status, ...fromResume });
+        return;
+      }
       const fromResume = reduceResumeOutput(result.output, result.status);
       update({ status: result.status, ...fromResume });
       const needsStream =
@@ -624,6 +661,26 @@ export function useWikiComposeSession(
     },
     [pageId, state.pendingSources, streamRun, update],
   );
+
+  const submitConflictAck = useCallback(async () => {
+    const session = sessionRef.current;
+    if (!session) throw new Error("Session not initialised");
+    const result = await resumeSession({
+      pageId,
+      sessionId: session.id,
+      resume: { acknowledged: true as const },
+    });
+    const fromResume = reduceResumeOutput(result.output, result.status);
+    update({ status: result.status, researchConflictSummary: null, ...fromResume });
+    const needsStream =
+      (result.status === "interrupted" || result.status === "running") &&
+      !fromResume.briefQuestions?.length &&
+      !fromResume.pendingSources?.length &&
+      !fromResume.outlineProposal?.length;
+    if (needsStream) {
+      await streamRun(session);
+    }
+  }, [pageId, streamRun, update]);
 
   const submitOutline = useCallback<UseWikiComposeSessionReturn["submitOutline"]>(
     async (input) => {
@@ -689,6 +746,7 @@ export function useWikiComposeSession(
     submitBrief,
     submitResearchApproval,
     submitOutline,
+    submitConflictAck,
     cancel,
   };
 }

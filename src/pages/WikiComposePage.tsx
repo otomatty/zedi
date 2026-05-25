@@ -218,11 +218,13 @@ const WikiComposePage: React.FC = () => {
       latestBatch={session.latestBatch}
       pendingSources={session.pendingSources}
       approvedSources={session.approvedSources}
+      researchConflictSummary={session.researchConflictSummary}
       outlineProposal={session.outlineProposal}
       activity={session.activity}
       onSubmitBrief={session.submitBrief}
       onSubmitResearchApproval={session.submitResearchApproval}
       onSubmitOutline={session.submitOutline}
+      onSubmitConflictAck={session.submitConflictAck}
     />
   );
 
