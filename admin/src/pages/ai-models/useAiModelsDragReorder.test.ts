@@ -29,6 +29,7 @@ const makeModel = (id: string, sortOrder: number): AiModelAdmin => ({
   inputCostUnits: 100,
   outputCostUnits: 100,
   isActive: true,
+  isSystemDefault: false,
   sortOrder,
   createdAt: "2026-01-01T00:00:00Z",
 });

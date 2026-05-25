@@ -55,6 +55,10 @@ export interface SSEPayload {
   done?: boolean;
   finishReason?: string;
   error?: string;
+  /** Resolved model id after fallback / フォールバック後に解決されたモデル ID */
+  modelId?: string;
+  /** True when a different model was used than requested / 要求と異なるモデルが使われた */
+  didFallback?: boolean;
   usage?: {
     inputTokens: number;
     outputTokens: number;

@@ -1,5 +1,9 @@
 import type { AIModel } from "@/types/ai";
 
+/**
+ * Options used to resolve the preferred server model.
+ * 優先サーバーモデルの解決に使うオプション。
+ */
 export type ResolvePreferredServerModelOptions = {
   /** Current chat-store selection id / チャットストアの選択 ID */
   currentId?: string | null;

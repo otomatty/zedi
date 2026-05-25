@@ -91,6 +91,9 @@ adminApp.patch("/models/:id", async (c) => {
     if (typeof body.isActive !== "boolean")
       return c.json({ error: "isActive must be a boolean" }, 400);
     updates.isActive = body.isActive;
+    if (body.isActive === false) {
+      updates.isSystemDefault = false;
+    }
   }
   if (body.sortOrder !== undefined) {
     if (typeof body.sortOrder !== "number")
@@ -102,6 +105,9 @@ adminApp.patch("/models/:id", async (c) => {
     if (typeof body.isSystemDefault !== "boolean")
       return c.json({ error: "isSystemDefault must be a boolean" }, 400);
     if (body.isSystemDefault) {
+      if (Object.keys(updates).length > 0) {
+        return c.json({ error: "isSystemDefault=true cannot be combined with other fields" }, 400);
+      }
       try {
         const model = await setSystemDefaultModel(id, db);
         return c.json({ model });

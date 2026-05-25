@@ -25,8 +25,12 @@ app.post("/", authRequired, rateLimit(), async (c) => {
   let modelInfo;
   try {
     modelInfo = await resolveModelAccessWithFallback(body.model, tier, db);
-  } catch {
-    throw new HTTPException(503, { message: "No available model for tier" });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/No available model for tier/i.test(msg)) {
+      throw new HTTPException(503, { message: "No available model for tier" });
+    }
+    throw e;
   }
   const usageCheck = await checkUsage(userId, tier, db);
   if (!usageCheck.allowed) {
@@ -80,6 +84,8 @@ app.post("/", authRequired, rateLimit(), async (c) => {
             const donePayload: SSEPayload = {
               done: true,
               finishReason: chunk.finishReason,
+              modelId: modelInfo.modelId,
+              didFallback: modelInfo.didFallback,
               usage: {
                 inputTokens,
                 outputTokens,
@@ -129,6 +135,8 @@ app.post("/", authRequired, rateLimit(), async (c) => {
   return c.json({
     content: result.content,
     finishReason: result.finishReason,
+    modelId: modelInfo.modelId,
+    didFallback: modelInfo.didFallback,
     usage: {
       inputTokens: result.usage.inputTokens,
       outputTokens: result.usage.outputTokens,

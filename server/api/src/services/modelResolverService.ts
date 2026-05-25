@@ -106,15 +106,15 @@ function toResolvedAccess(model: AiModel, didFallback: boolean): ResolvedModelAc
  * システム既定モデルを設定する（他行の既定フラグをトランザクションで解除）。
  */
 export async function setSystemDefaultModel(modelId: string, db: Database): Promise<AiModel> {
-  const [target] = await db.select().from(aiModels).where(eq(aiModels.id, modelId)).limit(1);
-  if (!target) {
-    throw new Error("NOT_FOUND");
-  }
-  if (!target.isActive) {
-    throw new Error("INACTIVE");
-  }
-
   const result = await db.transaction(async (tx) => {
+    const [target] = await tx.select().from(aiModels).where(eq(aiModels.id, modelId)).limit(1);
+    if (!target) {
+      throw new Error("NOT_FOUND");
+    }
+    if (!target.isActive) {
+      throw new Error("INACTIVE");
+    }
+
     await tx
       .update(aiModels)
       .set({ isSystemDefault: false })
