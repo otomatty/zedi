@@ -225,7 +225,7 @@ describe("ZediChatModel._streamResponseChunks", () => {
   });
 
   it("uses 'incomplete' finishReason when the provider stream ends without done=true", async () => {
-    const { db } = asDb([undefined, undefined]);
+    const { db, chains } = asDb([undefined, undefined]);
     const model = new ZediChatModel({
       provider: "openai",
       apiKey: "k",
@@ -250,6 +250,35 @@ describe("ZediChatModel._streamResponseChunks", () => {
       response_metadata?: { finishReason?: string };
     };
     expect(last.response_metadata?.finishReason).toBe("incomplete");
+    expect(chains.length).toBe(0);
+  });
+
+  it("does not record usage when the provider stream throws", async () => {
+    const { db, chains } = asDb([undefined, undefined]);
+    const model = new ZediChatModel({
+      provider: "openai",
+      apiKey: "k",
+      apiModelId: "m",
+      modelRowId: "m",
+      inputCostUnits: 1,
+      outputCostUnits: 2,
+      userId: "u",
+      tier: "free",
+      db,
+      feature: "x",
+      streamProvider: async function* () {
+        yield { content: "partial" };
+        throw new Error("provider 502");
+      },
+    });
+
+    const stream = await model.stream([new HumanMessage("hi")]);
+    await expect(async () => {
+      for await (const _chunk of stream) {
+        /* drain */
+      }
+    }).rejects.toThrow("provider 502");
+    expect(chains.length).toBe(0);
   });
 });
 
