@@ -172,6 +172,7 @@ export function useTiptapEditorController({
   wikiContentForCollab,
   onWikiContentApplied,
   pageNoteId = null,
+  wikiComposeHref,
 }: TiptapEditorProps) {
   const { editorFontSizePx } = useGeneralSettings();
   const { isSignedIn } = useAuth();
@@ -287,8 +288,9 @@ export function useTiptapEditorController({
       isSignedIn,
       hasThumbnail,
       insertThumbnail: handleInsertThumbnailImage,
+      wikiComposeHref,
     }),
-    [pageTitle, isReadOnly, isSignedIn, hasThumbnail, handleInsertThumbnailImage],
+    [pageTitle, isReadOnly, isSignedIn, hasThumbnail, handleInsertThumbnailImage, wikiComposeHref],
   );
 
   return {

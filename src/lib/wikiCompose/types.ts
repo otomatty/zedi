@@ -114,6 +114,22 @@ export interface ComposeSession {
   updatedAt: string;
 }
 
+/**
+ * Checkpoint projection returned by `GET /compose-sessions/:id` for reload (#950).
+ * チェックポイントから復元した UI 用スライス。
+ */
+export interface ComposeSessionUiProjection {
+  phase?: "brief" | "research" | "structure" | "draft" | "completed";
+  briefQuestions?: BriefQuestion[];
+  pageSnapshot?: PageSnapshot;
+  pendingSources?: ResearchSource[];
+  latestBatch?: ResearchBatch | null;
+  approvedSources?: ResearchSource[];
+  outlineProposal?: OutlineSection[];
+  draftedSections?: DraftedSection[];
+  completedMarkdown?: string | null;
+}
+
 // ── Interrupt payloads (discriminated union) ───────────────────────────────
 export type ComposeInterruptPayload =
   | {

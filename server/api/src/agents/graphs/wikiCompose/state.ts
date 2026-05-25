@@ -31,6 +31,7 @@ import type {
   ApprovedOutline,
   BriefQuestion,
   BriefResult,
+  ComposeChatSeed,
   ComposeCompletion,
   DraftedSection,
   OutlineSection,
@@ -95,6 +96,17 @@ export const WikiComposeState = Annotation.Root({
   ...BaseState.spec,
 
   // ── Brief phase ───────────────────────────────────────────────────────────
+  /**
+   * チャット由来 seed（outline + 会話）。AI Chat / Promote to Wiki からの
+   * 初回 `POST /run` input でセットする (#950)。
+   *
+   * Chat → Compose seed (outline + conversation). Set on the first `POST /run`
+   * input when the user arrives from AI Chat / Promote to Wiki (#950).
+   */
+  chatSeed: Annotation<ComposeChatSeed | null>({
+    reducer: (prev, next) => (next === undefined ? prev : next),
+    default: () => null,
+  }),
   /** Page snapshot loaded once at session start. */
   pageSnapshot: Annotation<PageSnapshot | null>({
     reducer: (prev, next) => (next === undefined ? prev : next),

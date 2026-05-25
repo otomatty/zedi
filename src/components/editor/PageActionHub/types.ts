@@ -27,6 +27,11 @@ export interface PageActionContext {
    * to the existing `useThumbnailController`'s `handleInsertThumbnailImage`.
    */
   insertThumbnail: (imageUrl: string, alt: string, previewUrl?: string) => void;
+  /**
+   * Wiki Compose 画面 URL。ノートネイティブページでのみ設定される (#950)。
+   * Route to the Wiki Compose split-screen; set only on note-native pages.
+   */
+  wikiComposeHref?: string;
 }
 
 /**

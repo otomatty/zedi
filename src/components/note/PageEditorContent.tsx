@@ -257,6 +257,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
                 wikiContentForCollab={wikiContentForCollab ?? undefined}
                 onWikiContentApplied={onWikiContentApplied}
                 pageNoteId={pageNoteId}
+                wikiComposeHref={wikiComposeHref}
                 bottomBarTrailingAction={bottomBarTrailingAction}
               />
             </>

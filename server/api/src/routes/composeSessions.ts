@@ -61,6 +61,7 @@ import { RESEARCH_GRAPH_ID } from "../agents/subgraphs/research/index.js";
 import { WIKI_COMPOSE_GRAPH_ID } from "../agents/graphs/wikiCompose/index.js";
 import type { AppEnv } from "../types/index.js";
 import { persistOutcomeIfStillRunning } from "./composeSessionPersistence.js";
+import { loadComposeSessionProjection } from "./composeSessionProjection.js";
 
 /**
  * Translate the documented `body.input.kind === "additional_research"` shape
@@ -210,7 +211,40 @@ app.get("/:pageId/compose-sessions/:id", authRequired, async (c) => {
     .limit(1);
   if (!row) throw new HTTPException(404, { message: "Session not found" });
 
-  return c.json({ session: row });
+  const tier = await getUserTier(userId, db);
+
+  // Stale / unsupported backend rows must still be readable; skip projection
+  // instead of turning GET into a 500 (CodeRabbit P1 on reload path).
+  // 古い backend 行でもセッション行は返し、projection だけ省略する。
+  let projection = null;
+  try {
+    const backend = assertSupportedBackendP0(row.backend);
+    projection = await loadComposeSessionProjection({
+      sessionId: row.id,
+      pageId: row.pageId,
+      graphId: row.graphId,
+      status: row.status,
+      phase: row.phase,
+      context: {
+        threadId: row.id,
+        sessionId: row.id,
+        userId,
+        userEmail: c.get("userEmail") ?? null,
+        pageId: row.pageId,
+        graphId: row.graphId,
+        backend,
+        tier,
+        db,
+        feature: `wiki_compose:${row.graphId}`,
+      },
+    });
+  } catch (err) {
+    if (!(err instanceof UnsupportedBackendError)) {
+      throw err;
+    }
+  }
+
+  return c.json({ session: row, projection });
 });
 
 // ── POST /:id/run — SSE run ─────────────────────────────────────────────────

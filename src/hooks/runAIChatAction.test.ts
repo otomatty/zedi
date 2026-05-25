@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { runAIChatAction, type RunAIChatActionDeps } from "./runAIChatAction";
+import { COMPOSE_SEED_STATE_KEY } from "@/lib/wikiCompose/navigation";
 import type { ChatMessage } from "@/types/aiChat";
 
 const t = ((key: string, opts?: Record<string, unknown>) => {
@@ -46,7 +47,7 @@ describe("runAIChatAction — create", () => {
     vi.clearAllMocks();
   });
 
-  it("create-page: creates empty page and navigates with pendingChatPageGeneration state", async () => {
+  it("create-page: creates empty page and navigates to Wiki Compose with chat seed", async () => {
     const createPageMutateAsync = vi.fn().mockResolvedValue({ id: "new-page-1", noteId: "note-1" });
     const navigate = vi.fn();
     const messages: ChatMessage[] = [{ id: "1", role: "user", content: "hello", timestamp: 1 }];
@@ -64,9 +65,9 @@ describe("runAIChatAction — create", () => {
       title: "Wiki Topic",
       content: "",
     });
-    expect(navigate).toHaveBeenCalledWith("/notes/note-1/new-page-1", {
+    expect(navigate).toHaveBeenCalledWith("/notes/note-1/new-page-1/compose", {
       state: {
-        pendingChatPageGeneration: {
+        [COMPOSE_SEED_STATE_KEY]: {
           outline: "- A\n- B",
           conversationText: expect.stringContaining("hello"),
         },
@@ -97,9 +98,9 @@ describe("runAIChatAction — create", () => {
     });
 
     expect(createPageMutateAsync).toHaveBeenCalledTimes(2);
-    expect(navigate).toHaveBeenCalledWith("/notes/note-1/p1", {
+    expect(navigate).toHaveBeenCalledWith("/notes/note-1/p1/compose", {
       state: {
-        pendingChatPageGeneration: {
+        [COMPOSE_SEED_STATE_KEY]: {
           outline: "- o1",
           conversationText: expect.stringContaining("ctx"),
         },
@@ -129,9 +130,9 @@ describe("runAIChatAction — create", () => {
       reason: "multi",
     });
 
-    expect(navigate).toHaveBeenCalledWith("/notes/note-1/p1", {
+    expect(navigate).toHaveBeenCalledWith("/notes/note-1/p1/compose", {
       state: {
-        pendingChatPageGeneration: {
+        [COMPOSE_SEED_STATE_KEY]: {
           outline: "- from-second",
           conversationText: expect.stringContaining("ctx"),
         },

@@ -10,7 +10,7 @@ import type {
   SuggestWikiLinksAction,
 } from "@/types/aiChat";
 import type { PageContext } from "@/types/aiChat";
-import type { PendingChatPageGenerationState } from "@/types/chatPageGeneration";
+import { navigateToWikiCompose } from "@/lib/wikiCompose/navigation";
 import {
   buildSuggestedWikiLinksMarkdown,
   getCreatePageOutline,
@@ -53,20 +53,19 @@ async function handleCreatePage(
 ): Promise<void> {
   const outline = getCreatePageOutline(action);
   const conversationText = serializeChatMessagesForPageGeneration(deps.messages);
-  const pending: PendingChatPageGenerationState = { outline, conversationText };
   const result = await deps.createPageMutateAsync({
     title: action.title,
     content: "",
   });
   if (result?.id && result.noteId) {
-    // Issue #889 Phase 3: `/pages/:id` 撤去のため `/notes/:noteId/:pageId` に遷移。
-    // `noteId` が無い場合は不正な URL になるので遷移しない（バックエンドの
-    // 想定外応答に対する防御）。
-    // Issue #889 Phase 3: route to `/notes/:noteId/:pageId` (legacy
-    // `/pages/:id` route was retired). Skip navigation when `noteId` is
-    // missing so we never build `/notes/undefined/...`.
-    deps.navigate(`/notes/${result.noteId}/${result.id}`, {
-      state: { pendingChatPageGeneration: pending },
+    // Issue #950: 旧 `pendingChatPageGeneration` インライン生成の代わりに
+    // Wiki Compose 分割画面へ遷移し、チャット文脈を seed する。
+    // Issue #950: open Wiki Compose instead of inline generation on the page.
+    navigateToWikiCompose({
+      navigate: deps.navigate,
+      noteId: result.noteId,
+      pageId: result.id,
+      seed: { outline, conversationText },
     });
   }
 }
@@ -98,17 +97,11 @@ async function handleCreateMultiplePages(
     }
   }
   if (firstCreated?.id && firstCreated.noteId) {
-    const pending: PendingChatPageGenerationState = {
-      outline: firstOutline,
-      conversationText,
-    };
-    // Issue #889 Phase 3: `/pages/:id` 撤去のため `/notes/:noteId/:pageId` に遷移。
-    // `noteId` 欠落時は不正な URL になるため遷移を打ち切る。
-    // Issue #889 Phase 3: route to `/notes/:noteId/:pageId` (legacy
-    // `/pages/:id` route was retired). Skip navigation when `noteId` is
-    // missing so we never build `/notes/undefined/...`.
-    deps.navigate(`/notes/${firstCreated.noteId}/${firstCreated.id}`, {
-      state: { pendingChatPageGeneration: pending },
+    navigateToWikiCompose({
+      navigate: deps.navigate,
+      noteId: firstCreated.noteId,
+      pageId: firstCreated.id,
+      seed: { outline: firstOutline, conversationText },
     });
   }
 }
