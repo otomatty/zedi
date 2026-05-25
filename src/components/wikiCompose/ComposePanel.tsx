@@ -13,6 +13,7 @@ import React from "react";
 import { PhaseStepper } from "./PhaseStepper";
 import { DialogueSection } from "./DialogueSection";
 import { ResearchSection } from "./ResearchSection";
+import { ConflictResolutionSection } from "./ConflictResolutionSection";
 import { ActivitySection } from "./ActivitySection";
 import type {
   BriefAnswer,
@@ -20,6 +21,7 @@ import type {
   OutlineSection,
   PageSnapshot,
   ResearchBatch,
+  ResearchConflictSummary,
   ResearchSource,
 } from "@/lib/wikiCompose/types";
 import type { ComposeActivity, ComposePhase } from "@/hooks/useWikiComposeSession";
@@ -34,6 +36,7 @@ export interface ComposePanelProps {
   latestBatch: ResearchBatch | null;
   pendingSources: ResearchSource[];
   approvedSources: ResearchSource[];
+  researchConflictSummary: ResearchConflictSummary | null;
 
   outlineProposal: OutlineSection[];
 
@@ -50,6 +53,7 @@ export interface ComposePanelProps {
     note?: string;
   }) => Promise<void>;
   onSubmitOutline: (input: { sections: OutlineSection[] }) => Promise<void>;
+  onSubmitConflictAck: (input?: { note?: string }) => Promise<void>;
 }
 
 /** Right pane container. */
@@ -62,11 +66,13 @@ export const ComposePanel: React.FC<ComposePanelProps> = (props) => {
     latestBatch,
     pendingSources,
     approvedSources,
+    researchConflictSummary,
     outlineProposal,
     activity,
     onSubmitBrief,
     onSubmitResearchApproval,
     onSubmitOutline,
+    onSubmitConflictAck,
   } = props;
 
   return (
@@ -90,9 +96,18 @@ export const ComposePanel: React.FC<ComposePanelProps> = (props) => {
           onSubmitOutline={onSubmitOutline}
         />
 
+        {phase === "conflict" && researchConflictSummary ? (
+          <ConflictResolutionSection
+            conflicts={researchConflictSummary}
+            isStreaming={isStreaming}
+            onSubmit={onSubmitConflictAck}
+          />
+        ) : null}
+
         {/* Research review: visible during research interrupt and as a
             read-only summary in later phases. */}
-        {phase === "research" || (phase !== "brief" && approvedSources.length > 0) ? (
+        {phase === "research" ||
+        (phase !== "brief" && phase !== "conflict" && approvedSources.length > 0) ? (
           <ResearchSection
             batch={latestBatch}
             pendingSources={pendingSources}

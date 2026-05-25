@@ -4,7 +4,7 @@
  * Full Y.Doc bodies live in Hocuspocus; `pages.content_preview` is the best
  * server-side heuristic for "stub" pages without pulling every document.
  */
-import { and, eq, or, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, or, isNull, sql } from "drizzle-orm";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { pages } from "../../../../schema/pages.js";
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
@@ -32,6 +32,7 @@ export async function scanStubPages(
         ),
       ),
     )
+    .orderBy(asc(pages.id))
     .limit(200);
 
   const stubPageFindings: MaintenanceFinding[] = rows.map((p) => ({
@@ -39,8 +40,10 @@ export async function scanStubPages(
     severity: "info",
     pageIds: [p.id],
     detail: {
-      title: p.title ?? "(untitled)",
-      suggestion: "Page preview is empty or very short. Consider expanding or linking this stub.",
+      title: p.title ?? "(無題 / untitled)",
+      suggestion:
+        "プレビューが空または極端に短いです。本文の拡充やスタブへのリンクを検討してください / " +
+        "Page preview is empty or very short. Consider expanding or linking this stub.",
     },
   }));
 

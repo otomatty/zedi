@@ -39,6 +39,30 @@ describe("projectComposeStateValues", () => {
     expect(projection.phase).toBe("research");
   });
 
+  it("projects a conflict_resolution interrupt (#953)", () => {
+    const projection = projectComposeStateValues({
+      approvedResearch: [{ id: "src:a", kind: "web", title: "A" }],
+      __interrupt__: [
+        {
+          value: {
+            kind: "conflict_resolution",
+            conflicts: {
+              approved: [{ id: "src:a", title: "A" }],
+              rejected: [
+                { id: "src:b", title: "B" },
+                { id: "src:c", title: "C" },
+              ],
+              rationale: "Mixed approval",
+            },
+          },
+        },
+      ],
+    });
+    expect(projection.phase).toBe("conflict");
+    expect(projection.researchConflictSummary).toMatchObject({ rationale: "Mixed approval" });
+    expect(projection.approvedSources).toHaveLength(1);
+  });
+
   it("projects completion markdown from checkpoint values", () => {
     const projection = projectComposeStateValues({
       phase: "completed",

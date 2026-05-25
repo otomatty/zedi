@@ -1,5 +1,6 @@
 /**
  * Wiki Compose P5 routing predicates (#953).
+ * Wiki Compose P5 ルーティング述語のテスト (#953)。
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -19,6 +20,7 @@ function minimalState(overrides: Partial<WikiComposeStateType> = {}): WikiCompos
     pageSnapshot: null,
     briefQuestions: [],
     brief: null,
+    briefDegraded: false,
     iteration: 0,
     maxIterations: 3,
     queries: [],
@@ -52,6 +54,12 @@ describe("routeAfterBrief", () => {
         }),
       ),
     ).toBe("skip_research");
+  });
+
+  it("routes to research when Brief is empty due to LLM degradation flag", () => {
+    expect(routeAfterBrief(minimalState({ briefQuestions: [], briefDegraded: true }))).toBe(
+      "research",
+    );
   });
 
   it("routes to research when Brief has questions and no chat outline seed", () => {

@@ -31,7 +31,10 @@ export interface PhaseStepperProps {
 
 /** Render the 5-step phase stepper. */
 export const PhaseStepper: React.FC<PhaseStepperProps> = ({ phase }) => {
-  const currentIndex = Math.max(0, PHASE_ORDER.indexOf(phase));
+  // P5 conflict interrupt sits between Research and Structure on the graph, but
+  // the stepper keeps five labels — highlight Research while resolving conflicts.
+  const stepPhase: ComposePhase = phase === "conflict" ? "research" : phase;
+  const currentIndex = Math.max(0, PHASE_ORDER.indexOf(stepPhase));
   return (
     <ol className="flex items-center gap-1 text-xs" aria-label="Compose phase progress">
       {PHASE_ORDER.map((p, i) => {

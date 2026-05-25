@@ -24,6 +24,8 @@ export interface ComposeSessionUiProjection {
   pendingSources?: unknown[];
   latestBatch?: unknown;
   approvedSources?: unknown[];
+  /** P5 conflict-resolution interrupt summary (#953). */
+  researchConflictSummary?: unknown;
   outlineProposal?: unknown[];
   draftedSections?: unknown[];
   completedMarkdown?: string | null;
@@ -33,6 +35,7 @@ function phaseFromSessionRow(phase: string, status: WikiComposeSessionStatus): s
   if (status === "completed") return "completed";
   if (phase.startsWith("brief")) return "brief";
   if (phase.startsWith("research")) return "research";
+  if (phase.startsWith("conflict")) return "conflict";
   if (phase.startsWith("structure")) return "structure";
   if (phase.startsWith("draft")) return "draft";
   return "brief";
@@ -99,6 +102,7 @@ export function projectComposeStateValues(
         pendingSources?: unknown[];
         outline?: unknown[];
         approvedSources?: unknown[];
+        conflicts?: unknown;
       };
       switch (payload.kind) {
         case "human_review_brief":
@@ -115,6 +119,13 @@ export function projectComposeStateValues(
           if (payload.outline) projection.outlineProposal = payload.outline;
           if (payload.approvedSources) projection.approvedSources = payload.approvedSources;
           projection.phase = "structure";
+          break;
+        case "conflict_resolution":
+          if (payload.conflicts) projection.researchConflictSummary = payload.conflicts;
+          if (Array.isArray(state.approvedResearch)) {
+            projection.approvedSources = state.approvedResearch;
+          }
+          projection.phase = "conflict";
           break;
         default:
           break;
