@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.22.0 (2026-05-25)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🔧 Maintenance
+* chore(deps): bump the minor-and-patch group with 2 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/963
+* chore(deps-dev): bump eslint-plugin-jsdoc from 62.9.0 to 63.0.0 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/964
+
+## New Contributors
+* @cursor[bot] made their first contribution in https://github.com/otomatty/zedi/pull/955
+
+**Full Changelog**: https://github.com/otomatty/zedi/compare/zedi-v0.21.0...zedi-v0.22.0
+
 ## 0.21.0 (2026-05-19)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
