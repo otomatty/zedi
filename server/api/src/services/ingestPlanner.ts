@@ -264,27 +264,19 @@ function parseConflicts(value: unknown): IngestConflict[] | undefined {
 }
 
 /**
- * LLM の生応答を厳格にパース・バリデーションして {@link IngestPlan} を返す。
- * Strictly validates an LLM raw response and returns a typed {@link IngestPlan}.
+ * Validates a parsed ingest plan object (structured LLM output or `JSON.parse` result).
+ * パース済み ingest プランオブジェクトを検証する（structured output または JSON.parse 結果）。
  *
- * @param raw - LLM の生テキスト応答。Raw LLM text response.
- * @param options - 候補ページ ID の集合（merge 時の整合性チェック用）。Set of candidate IDs.
- * @returns 検証済みプラン。Validated ingest plan.
- * @throws {@link IngestPlanParseError} when JSON is malformed or fields are invalid.
+ * @param parsed - Already-parsed plan object. / パース済みプランオブジェクト。
+ * @param options - Optional candidate id set for merge target validation.
+ *                  / merge 先検証用の候補 ID 集合（任意）。
+ * @throws {@link IngestPlanParseError} when fields are invalid.
+ *         / フィールドが不正な場合。
  */
-export function parseIngestPlanResponse(
-  raw: string,
+export function parseIngestPlanValue(
+  parsed: unknown,
   options: { validCandidateIds?: ReadonlySet<string> } = {},
 ): IngestPlan {
-  const jsonText = extractJsonFromResponse(raw);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(jsonText);
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    throw new IngestPlanParseError(`Invalid JSON in LLM response: ${reason}`);
-  }
-
   if (!isRecord(parsed)) {
     throw new IngestPlanParseError("Plan must be a JSON object");
   }
@@ -330,6 +322,28 @@ export function parseIngestPlanResponse(
   }
 
   return plan;
+}
+
+/**
+ * LLM の生応答を厳格にパース・バリデーションして {@link IngestPlan} を返す。
+ *
+ * @param raw - LLM の生テキスト応答。Raw LLM text response.
+ * @param options - 候補ページ ID の集合（merge 時の整合性チェック用）。Set of candidate IDs.
+ * @throws {@link IngestPlanParseError} when JSON is malformed or fields are invalid.
+ */
+export function parseIngestPlanResponse(
+  raw: string,
+  options: { validCandidateIds?: ReadonlySet<string> } = {},
+): IngestPlan {
+  const jsonText = extractJsonFromResponse(raw);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new IngestPlanParseError(`Invalid JSON in LLM response: ${reason}`);
+  }
+  return parseIngestPlanValue(parsed, options);
 }
 
 /**

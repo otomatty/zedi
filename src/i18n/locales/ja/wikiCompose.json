@@ -1,0 +1,27 @@
+{
+  "backend": {
+    "label": "実行バックエンド",
+    "zediManaged": "Zedi 管理",
+    "zediManagedDesc": "Zedi の API キーで実行。月次 CU を消費します。",
+    "userAnthropic": "自分の Anthropic キー",
+    "userAnthropicDesc": "サーバーに保存した Anthropic API キーで実行（暗号化保管）。",
+    "userOpenai": "自分の OpenAI キー",
+    "userOpenaiDesc": "サーバーに保存した OpenAI API キーで実行（暗号化保管）。",
+    "userGoogle": "自分の Google キー",
+    "userGoogleDesc": "サーバーに保存した Google API キーで実行（暗号化保管）。",
+    "usesCu": "Zedi の月次 CU を使用します。",
+    "credentialRequired": "先に 設定 → AI でこのプロバイダの API キーを登録してください。"
+  },
+  "credentials": {
+    "title": "Wiki Compose 用 API キー（BYOK）",
+    "description": "Wiki Compose で使うプロバイダ API キーをサーバーに保存します。キーは暗号化され、API レスポンスでは返しません。",
+    "anthropic": "Anthropic",
+    "openai": "OpenAI",
+    "google": "Google",
+    "placeholder": "API キーを貼り付け",
+    "configured": "登録済み",
+    "remove": "削除",
+    "storageDisabled": "この環境ではサーバー側の credential 保管が有効になっていません。",
+    "localStorageNote": "通常の AI チャットはブラウザ localStorage のキーを使う場合があります。Wiki Compose で user_* バックエンドを選んだときは、上記の登録キーを使います。"
+  }
+}

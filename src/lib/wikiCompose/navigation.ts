@@ -11,23 +11,36 @@
 import type { NavigateFunction } from "react-router-dom";
 import type { PendingChatPageGenerationState } from "@/types/chatPageGeneration";
 
-/** Location state key for Compose seed data (chat → page → compose). */
+/**
+ * `location.state` に載せる Compose seed のキー（チャット → ページ → compose）。
+ * Location state key for Compose seed data (chat → page → compose).
+ */
 export const COMPOSE_SEED_STATE_KEY = "composeSeed" as const;
 
-/** Seed payload stored on `location.state` when entering Compose from chat. */
+/**
+ * チャット経由で Compose に入るときの seed。
+ * Seed payload stored on `location.state` when entering Compose from chat.
+ */
 export type ComposeNavigationSeed = PendingChatPageGenerationState;
 
+/**
+ * `navigateToWikiCompose` の引数。
+ * Parameters for {@link navigateToWikiCompose}.
+ */
 export interface NavigateToWikiComposeParams {
   navigate: NavigateFunction;
   noteId: string;
   pageId: string;
-  /** Optional chat context to seed the Brief / research phases. */
+  /**
+   * Brief / 調査に渡す任意のチャット文脈。
+   * Optional chat context to seed the Brief / research phases.
+   */
   seed?: ComposeNavigationSeed;
 }
 
 /**
- * Navigate to the Wiki Compose split-screen for a page.
- * When `seed` is provided it is stored on location state for `WikiComposePage`.
+ * ページの Wiki Compose 分割画面へ遷移する。`seed` があるときは location state に載せる。
+ * Navigate to the Wiki Compose split-screen; `seed` is stored on location state when set.
  */
 export function navigateToWikiCompose({
   navigate,
@@ -41,6 +54,7 @@ export function navigateToWikiCompose({
 }
 
 /**
+ * ノートネイティブページ向け Compose URL（ツールバー / PageActionHub 入口）。
  * Build the Compose URL for a note-native page (toolbar / PageActionHub entry).
  */
 export function wikiComposePath(noteId: string, pageId: string): string {

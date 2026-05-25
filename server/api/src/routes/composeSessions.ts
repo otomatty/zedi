@@ -51,9 +51,10 @@ import {
 } from "../agents/runner/sseMapper.js";
 import { GraphNotRegisteredError, getRegisteredGraph } from "../agents/registry/graphRegistry.js";
 import {
-  assertSupportedBackendP0,
+  assertSupportedComposeBackend,
   UnsupportedBackendError,
 } from "../agents/core/llm/modelFactory.js";
+import { assertComposeBackendReady } from "../agents/core/composeBackendValidation.js";
 import { SSE_EVENT_NAMES, type SseEvent } from "../agents/core/types/sseEvents.js";
 import { GRAPH_CONTEXT_CONFIG_KEY } from "../agents/core/types/graphContext.js";
 import { resolveCheckpointerForRun } from "../agents/core/checkpoint/index.js";
@@ -61,6 +62,7 @@ import { RESEARCH_GRAPH_ID } from "../agents/subgraphs/research/index.js";
 import { WIKI_COMPOSE_GRAPH_ID } from "../agents/graphs/wikiCompose/index.js";
 import type { AppEnv } from "../types/index.js";
 import { persistOutcomeIfStillRunning } from "./composeSessionPersistence.js";
+import { loadComposeSessionProjection } from "./composeSessionProjection.js";
 
 /**
  * Translate the documented `body.input.kind === "additional_research"` shape
@@ -168,15 +170,18 @@ app.post("/:pageId/compose-sessions", authRequired, rateLimit(), async (c) => {
     throw new HTTPException(400, { message: `Unknown graphId: ${graphId}` });
   }
 
-  let backend: ReturnType<typeof assertSupportedBackendP0>;
+  let backend: ReturnType<typeof assertSupportedComposeBackend>;
   try {
-    backend = assertSupportedBackendP0(body.backend ?? "zedi_managed");
+    backend = assertSupportedComposeBackend(body.backend ?? "zedi_managed");
   } catch (err) {
     if (err instanceof UnsupportedBackendError) {
       throw new HTTPException(400, { message: err.message });
     }
     throw err;
   }
+
+  const tier = await getUserTier(userId, db);
+  await assertComposeBackendReady({ backend, graphId, userId, tier, db });
 
   const [row] = await db
     .insert(wikiComposeSessions)
@@ -210,7 +215,40 @@ app.get("/:pageId/compose-sessions/:id", authRequired, async (c) => {
     .limit(1);
   if (!row) throw new HTTPException(404, { message: "Session not found" });
 
-  return c.json({ session: row });
+  const tier = await getUserTier(userId, db);
+
+  // Stale / unsupported backend rows must still be readable; skip projection
+  // instead of turning GET into a 500 (CodeRabbit P1 on reload path).
+  // 古い backend 行でもセッション行は返し、projection だけ省略する。
+  let projection = null;
+  try {
+    const backend = assertSupportedComposeBackend(row.backend);
+    projection = await loadComposeSessionProjection({
+      sessionId: row.id,
+      pageId: row.pageId,
+      graphId: row.graphId,
+      status: row.status,
+      phase: row.phase,
+      context: {
+        threadId: row.id,
+        sessionId: row.id,
+        userId,
+        userEmail: c.get("userEmail") ?? null,
+        pageId: row.pageId,
+        graphId: row.graphId,
+        backend,
+        tier,
+        db,
+        feature: `wiki_compose:${row.graphId}`,
+      },
+    });
+  } catch (err) {
+    if (!(err instanceof UnsupportedBackendError)) {
+      throw err;
+    }
+  }
+
+  return c.json({ session: row, projection });
 });
 
 // ── POST /:id/run — SSE run ─────────────────────────────────────────────────
@@ -248,7 +286,7 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
   // no longer permitted (future BYOK downgrade scenarios). Fail fast here.
   // 行作成後に backend サポートが変わった場合への保険。
   try {
-    assertSupportedBackendP0(session.backend);
+    assertSupportedComposeBackend(session.backend);
   } catch (err) {
     if (err instanceof UnsupportedBackendError) {
       throw new HTTPException(400, { message: err.message });
@@ -327,7 +365,7 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
             userEmail,
             pageId,
             graphId: session.graphId,
-            backend: assertSupportedBackendP0(session.backend),
+            backend: assertSupportedComposeBackend(session.backend),
             tier,
             db,
             feature: `wiki_compose:${session.graphId}`,
@@ -419,7 +457,7 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
   const runner = new GraphRunner();
 
   try {
-    assertSupportedBackendP0(session.backend);
+    assertSupportedComposeBackend(session.backend);
   } catch (err) {
     if (err instanceof UnsupportedBackendError) {
       throw new HTTPException(400, { message: err.message });
@@ -461,7 +499,7 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
           userEmail,
           pageId,
           graphId: session.graphId,
-          backend: assertSupportedBackendP0(session.backend),
+          backend: assertSupportedComposeBackend(session.backend),
           tier,
           db,
           feature: `wiki_compose:${session.graphId}`,

@@ -44,9 +44,11 @@ import activityRoutes from "./routes/activity.js";
 import onboardingRoutes from "./routes/onboarding.js";
 import internalRoutes from "./routes/internal.js";
 import composeSessionRoutes from "./routes/composeSessions.js";
+import userAiCredentialRoutes from "./routes/userAiCredentials.js";
 import { registerStubGraph } from "./agents/registry/stubGraph.js";
 import { registerResearchLoopGraph } from "./agents/subgraphs/research/index.js";
 import { registerWikiComposeGraph } from "./agents/graphs/wikiCompose/index.js";
+import { registerIngestPlannerGraph } from "./agents/graphs/ingest/index.js";
 
 /**
  * Creates and configures the Hono API app (routes, CORS, etc.).
@@ -57,12 +59,14 @@ export function createApp(): Hono<AppEnv> {
   // - `wiki-compose-stub` — P0 smoke test (#948)
   // - `wiki-compose-research` — P1 自律調査ループ (#949)
   // - `wiki-compose` — P2 全体オーケストレータ (#950)
+  // - `ingest-planner` — P4 ingest + shared research loop (#952)
   //
   // Register all Wiki Compose graphs. Calls are idempotent across hot
   // reloads (registry uses `Map#set` so the latest registration wins).
   registerStubGraph();
   registerResearchLoopGraph();
   registerWikiComposeGraph();
+  registerIngestPlannerGraph();
 
   const app = new Hono<AppEnv>();
   const wildcard = isWildcardCors();
@@ -136,6 +140,9 @@ export function createApp(): Hono<AppEnv> {
 
   // Users
   app.route("/api/users", userRoutes);
+
+  // BYOK credentials for Wiki Compose (#951)
+  app.route("/api/user/ai-credentials", userAiCredentialRoutes);
 
   // Onboarding wizard completion + status
   // セットアップウィザード完了・状況取得

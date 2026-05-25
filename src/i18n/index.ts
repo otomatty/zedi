@@ -26,6 +26,7 @@ import jaShortcuts from "./locales/ja/shortcuts.json";
 import jaSeedData from "./locales/ja/seedData.json";
 import jaMermaid from "./locales/ja/mermaid.json";
 import jaAiPrompt from "./locales/ja/aiPrompt.json";
+import jaWikiCompose from "./locales/ja/wikiCompose.json";
 import enCommon from "./locales/en/common.json";
 import enSettings from "./locales/en/settings.json";
 import enGeneralSettings from "./locales/en/generalSettings.json";
@@ -48,6 +49,7 @@ import enShortcuts from "./locales/en/shortcuts.json";
 import enSeedData from "./locales/en/seedData.json";
 import enMermaid from "./locales/en/mermaid.json";
 import enAiPrompt from "./locales/en/aiPrompt.json";
+import enWikiCompose from "./locales/en/wikiCompose.json";
 
 const ja = {
   common: jaCommon,
@@ -72,6 +74,7 @@ const ja = {
   seedData: jaSeedData,
   mermaid: jaMermaid,
   aiPrompt: jaAiPrompt,
+  wikiCompose: jaWikiCompose,
 };
 
 const en = {
@@ -97,6 +100,7 @@ const en = {
   seedData: enSeedData,
   mermaid: enMermaid,
   aiPrompt: enAiPrompt,
+  wikiCompose: enWikiCompose,
 };
 
 // localStorage の設定から初期言語を取得

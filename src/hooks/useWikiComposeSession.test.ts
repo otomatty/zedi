@@ -238,6 +238,52 @@ describe("useWikiComposeSession", () => {
     expect(result.current.phase).toBe("research");
   });
 
+  it("ignores malformed metadata.composeSeed when building run input", async () => {
+    mocks.createSession.mockResolvedValue({
+      ...SESSION,
+      metadata: { composeSeed: { outline: 1, conversationText: true } },
+    });
+    arrangeRun([{ type: "done", status: "completed" }]);
+
+    const { result } = renderHook(() =>
+      useWikiComposeSession({ pageId: "page-1", sessionId: null }),
+    );
+    await waitFor(() => expect(result.current.session).not.toBeNull());
+
+    expect(mocks.runSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: undefined,
+      }),
+    );
+  });
+
+  it("hydrates interrupted session from GET projection without POST /run", async () => {
+    mocks.createSession.mockReset();
+    mocks.getSession.mockResolvedValue({
+      session: { ...SESSION, status: "interrupted", phase: "brief:await_user" },
+      projection: {
+        phase: "brief",
+        briefQuestions: [
+          {
+            id: "q1",
+            question: "Reloaded?",
+            required: false,
+            options: [],
+          },
+        ],
+        pageSnapshot: { pageId: "page-1", title: "T", body: "", hasContent: false },
+      },
+    });
+
+    const { result } = renderHook(() =>
+      useWikiComposeSession({ pageId: "page-1", sessionId: "sess-1" }),
+    );
+
+    await waitFor(() => expect(result.current.briefQuestions).toHaveLength(1));
+    expect(result.current.briefQuestions[0]?.question).toBe("Reloaded?");
+    expect(mocks.runSession).not.toHaveBeenCalled();
+  });
+
   it("submitBrief calls resumeSession with the answer payload and re-streams", async () => {
     // Initial run: halt at Brief.
     arrangeRun([
@@ -266,14 +312,17 @@ describe("useWikiComposeSession", () => {
 
   it("retries a failed session with chatSeed from row metadata when initialInput is absent", async () => {
     mocks.getSession.mockResolvedValue({
-      ...SESSION,
-      status: "failed",
-      metadata: {
-        composeSeed: {
-          outline: "- topic",
-          conversationText: "User: seed me",
+      session: {
+        ...SESSION,
+        status: "failed",
+        metadata: {
+          composeSeed: {
+            outline: "- topic",
+            conversationText: "User: seed me",
+          },
         },
       },
+      projection: {},
     });
     arrangeRun([{ type: "done", status: "failed" }]);
 
