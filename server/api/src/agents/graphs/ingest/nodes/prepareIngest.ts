@@ -28,7 +28,7 @@ export async function prepareIngest(
   const ctx = getGraphContext(config);
 
   const article = state.article;
-  if (!article?.title?.trim() || !article.url?.trim()) {
+  if (!article?.title?.trim() || !article.url?.trim() || typeof article.excerpt !== "string") {
     throw new Error("prepare_ingest: article { title, url, excerpt } is required");
   }
 
@@ -36,13 +36,22 @@ export async function prepareIngest(
   const userSchema = state.userSchema;
   const maxIterations = clampMaxIterations(state.maxIterations);
 
+  for (const [i, c] of candidates.entries()) {
+    if (!c?.id?.trim() || typeof c.title !== "string" || !c.title.trim()) {
+      throw new Error(`prepare_ingest: candidates[${i}] requires non-empty { id, title }`);
+    }
+    if (c.excerpt != null && typeof c.excerpt !== "string") {
+      throw new Error(`prepare_ingest: candidates[${i}].excerpt must be a string when provided`);
+    }
+  }
+
   const candidateBlock =
     candidates.length === 0
       ? "(no candidates)"
       : candidates
           .map(
             (c, i) =>
-              `[${i + 1}] id=${c.id}\n    title: ${c.title}\n    excerpt: ${c.excerpt.slice(0, 400)}`,
+              `[${i + 1}] id=${c.id}\n    title: ${c.title}\n    excerpt: ${(c.excerpt ?? "").slice(0, 400)}`,
           )
           .join("\n\n");
 

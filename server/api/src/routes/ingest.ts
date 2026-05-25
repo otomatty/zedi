@@ -56,13 +56,56 @@ const app = new Hono<AppEnv>();
 const INGEST_GRAPH_RECURSION_LIMIT = 60;
 
 /**
+ * Map graph runner failures caused by client/input validation to HTTP 4xx.
+ */
+function httpStatusForGraphFailure(error: string | undefined): 400 | 500 {
+  if (!error) return 500;
+  const clientish =
+    /prepare_ingest|plan_ingest|invalid|required|expected|approvedSourceIds|zod|resume/i.test(
+      error,
+    );
+  return clientish ? 400 : 500;
+}
+
+function assertGraphRunArticle(article: IngestArticleSummary): void {
+  if (!article.title?.trim() || !article.url?.trim() || typeof article.excerpt !== "string") {
+    throw new HTTPException(400, { message: "article { title, url, excerpt } is required" });
+  }
+}
+
+/**
+ * LangGraph `thread_id` scoped per user so shared checkpoint storage cannot collide.
+ * 共有 checkpoint 上での thread_id 衝突を防ぐため userId でスコープする。
+ */
+function scopedIngestGraphThreadId(userId: string, clientThreadId: string): string {
+  return `${userId}:${clientThreadId}`;
+}
+
+function normalizeGraphCandidates(raw: CandidatePage[] | undefined): CandidatePage[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CandidatePage[] = [];
+  for (const entry of raw) {
+    if (typeof entry?.id !== "string" || !entry.id.trim()) continue;
+    if (typeof entry.title !== "string") continue;
+    if (typeof entry.excerpt !== "string") continue;
+    out.push({
+      id: entry.id.trim(),
+      title: entry.title,
+      excerpt: entry.excerpt,
+    });
+  }
+  return out;
+}
+
+/**
  * Read `userId` stored in an ingest-planner checkpoint, if any.
+ * ingest-planner checkpoint に保存された `userId` を読む（あれば）。
  */
 async function readIngestCheckpointUserId(
   threadId: string,
   checkpointer: BaseCheckpointSaver,
 ): Promise<string | null> {
-  const registered = getRegisteredGraph(ING_PLANNER_GRAPH_ID);
+  const registered = getRegisteredGraph(INGEST_PLANNER_GRAPH_ID);
   if (!registered) return null;
   const graph = registered.factory({ checkpointer }) as {
     getState?: (config: unknown) => Promise<{ values?: Record<string, unknown> } | undefined>;
@@ -79,6 +122,7 @@ async function readIngestCheckpointUserId(
 
 /**
  * Reject cross-user access when reusing a `threadId` tied to another user's checkpoint.
+ * 他ユーザーの checkpoint に紐づく `threadId` 再利用を拒否する。
  */
 async function assertIngestThreadAccessible(
   threadId: string,
@@ -363,8 +407,9 @@ interface IngestGraphResumeBody {
  *
  * **Resume**
  *
- * When the graph halts at `human_review_research`, the response includes `threadId`.
- * Call `POST /api/ingest/graph/resume` with the research resume payload
+ * When the graph halts at `human_review_research`, the response includes `threadId`
+ * (client-visible id; checkpoint `thread_id` is scoped as `{userId}:{threadId}`).
+ * Call `POST /api/ingest/graph/resume` with the same `threadId` and research resume payload
  * (`{ approvedSourceIds, rejectedSourceIds?, note? }`, same as compose research).
  */
 app.post("/graph/run", authRequired, rateLimit(), async (c) => {
@@ -379,13 +424,15 @@ app.post("/graph/run", authRequired, rateLimit(), async (c) => {
     throw new HTTPException(400, { message: "Invalid JSON body" });
   }
 
-  if (!body.article || typeof body.article.title !== "string" || !body.article.url?.trim()) {
+  if (!body.article) {
     throw new HTTPException(400, { message: "article { title, url, excerpt } is required" });
   }
+  assertGraphRunArticle(body.article);
 
-  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
-  const threadId =
+  const candidates = normalizeGraphCandidates(body.candidates);
+  const clientThreadId =
     typeof body.threadId === "string" && body.threadId.trim() ? body.threadId.trim() : randomUUID();
+  const threadId = scopedIngestGraphThreadId(userId, clientThreadId);
 
   let backend: ExecutionBackend;
   try {
@@ -406,7 +453,6 @@ app.post("/graph/run", authRequired, rateLimit(), async (c) => {
 
   const checkpointer = await resolveCheckpointerForRun();
   await assertIngestThreadAccessible(threadId, userId, checkpointer);
-
   const runner = new GraphRunner();
   const result = await runner.invoke(
     {
@@ -438,7 +484,8 @@ app.post("/graph/run", authRequired, rateLimit(), async (c) => {
   );
 
   if (result.status === "failed") {
-    throw new HTTPException(500, { message: result.error ?? "Graph run failed" });
+    const status = httpStatusForGraphFailure(result.error);
+    throw new HTTPException(status, { message: result.error ?? "Graph run failed" });
   }
 
   const output = result.output as
@@ -450,7 +497,7 @@ app.post("/graph/run", authRequired, rateLimit(), async (c) => {
 
   return c.json({
     status: result.status,
-    threadId,
+    threadId: clientThreadId,
     graphId: INGEST_PLANNER_GRAPH_ID,
     plan: output?.ingestPlan ?? null,
     output,
@@ -475,7 +522,11 @@ app.post("/graph/resume", authRequired, rateLimit(), async (c) => {
   if (typeof body.threadId !== "string" || !body.threadId.trim()) {
     throw new HTTPException(400, { message: "threadId is required" });
   }
-  const threadId = body.threadId.trim();
+  if (!Object.prototype.hasOwnProperty.call(body, "resume")) {
+    throw new HTTPException(400, { message: "resume is required" });
+  }
+  const clientThreadId = body.threadId.trim();
+  const threadId = scopedIngestGraphThreadId(userId, clientThreadId);
 
   let backend: ExecutionBackend;
   try {
@@ -502,7 +553,6 @@ app.post("/graph/resume", authRequired, rateLimit(), async (c) => {
   }
 
   await assertIngestThreadAccessible(threadId, userId, checkpointer);
-
   const runner = new GraphRunner();
   const result = await runner.resume(
     {
@@ -526,14 +576,15 @@ app.post("/graph/resume", authRequired, rateLimit(), async (c) => {
   );
 
   if (result.status === "failed") {
-    throw new HTTPException(500, { message: result.error ?? "Graph resume failed" });
+    const status = httpStatusForGraphFailure(result.error);
+    throw new HTTPException(status, { message: result.error ?? "Graph resume failed" });
   }
 
   const output = result.output as { ingestPlan?: unknown } | undefined;
 
   return c.json({
     status: result.status,
-    threadId,
+    threadId: clientThreadId,
     graphId: INGEST_PLANNER_GRAPH_ID,
     plan: output?.ingestPlan ?? null,
     output,

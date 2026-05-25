@@ -11,49 +11,10 @@ import { getOrchestratorModelId } from "../../../subgraphs/research/nodes/planQu
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
 import {
   buildIngestPlannerPrompt,
-  parseIngestPlanResponse,
+  parseIngestPlanValue,
 } from "../../../../services/ingestPlanner.js";
-import type { Source } from "../../../subgraphs/research/types.js";
-import type { AIMessage } from "../../../../types/index.js";
 import type { IngestPlannerStateType, IngestPlannerStateUpdate } from "../state.js";
-
-const APPROVED_RESEARCH_MAX_SOURCES = 20;
-const APPROVED_RESEARCH_EXCERPT_MAX = 800;
-
-/**
- * Append HITL-approved research sources to the ingest planner user message (#952).
- * Exported for unit tests.
- */
-export function appendApprovedResearchToPlannerMessages(
-  messages: AIMessage[],
-  approved: Source[],
-): AIMessage[] {
-  if (approved.length === 0) return messages;
-  const block = approved
-    .slice(0, APPROVED_RESEARCH_MAX_SOURCES)
-    .map((s, i) => {
-      const tag = s.kind === "fetched" ? "FETCHED" : s.kind === "wiki" ? "WIKI" : "WEB";
-      const preview = (s.excerpt ?? s.snippet ?? "").slice(0, APPROVED_RESEARCH_EXCERPT_MAX);
-      return `[${i + 1}] (${tag}) ${s.title}\n${preview || "(no preview)"}`;
-    })
-    .join("\n\n");
-  const last = messages.at(-1);
-  if (!last || last.role !== "user") return messages;
-  return [
-    ...messages.slice(0, -1),
-    {
-      ...last,
-      content: [
-        last.content,
-        "",
-        "## APPROVED RESEARCH",
-        "Use these sources when deciding merge / create / skip and when recording conflicts.",
-        "",
-        block,
-      ].join("\n"),
-    },
-  ];
-}
+import { formatResearchForIngest } from "./formatResearchForIngest.js";
 
 const ingestPlanSchema = z.object({
   action: z.enum(["merge", "create", "skip"]),
@@ -84,14 +45,20 @@ export async function planIngest(
     throw new Error("plan_ingest: article is missing from state");
   }
 
-  const messages = appendApprovedResearchToPlannerMessages(
-    buildIngestPlannerPrompt({
-      article: state.article,
-      candidates: state.candidates,
-      userSchema: state.userSchema ?? undefined,
-    }),
-    state.approvedResearch,
-  );
+  const messages = buildIngestPlannerPrompt({
+    article: state.article,
+    candidates: state.candidates,
+    userSchema: state.userSchema ?? undefined,
+  });
+  const researchBlock = formatResearchForIngest(state);
+  if (researchBlock.length > 0) {
+    const last = messages[messages.length - 1];
+    if (last?.role === "user") {
+      last.content = `${last.content}${researchBlock}`;
+    } else {
+      messages.push({ role: "user", content: researchBlock.trimStart() });
+    }
+  }
 
   const model = await createZediChatModel({
     modelId: getOrchestratorModelId(),
@@ -108,7 +75,7 @@ export async function planIngest(
   const raw = await structured.invoke(messages.map((m) => ({ role: m.role, content: m.content })));
 
   const validCandidateIds = new Set(state.candidates.map((c) => c.id));
-  const ingestPlan = parseIngestPlanResponse(JSON.stringify(raw), { validCandidateIds });
+  const ingestPlan = parseIngestPlanValue(raw, { validCandidateIds });
 
   return {
     ingestPlan,
