@@ -11,9 +11,10 @@ import { getOrchestratorModelId } from "../../../subgraphs/research/nodes/planQu
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
 import {
   buildIngestPlannerPrompt,
-  parseIngestPlanResponse,
+  parseIngestPlanValue,
 } from "../../../../services/ingestPlanner.js";
 import type { IngestPlannerStateType, IngestPlannerStateUpdate } from "../state.js";
+import { formatResearchForIngest } from "./formatResearchForIngest.js";
 
 const ingestPlanSchema = z.object({
   action: z.enum(["merge", "create", "skip"]),
@@ -49,6 +50,15 @@ export async function planIngest(
     candidates: state.candidates,
     userSchema: state.userSchema ?? undefined,
   });
+  const researchBlock = formatResearchForIngest(state);
+  if (researchBlock.length > 0) {
+    const last = messages[messages.length - 1];
+    if (last?.role === "user") {
+      last.content = `${last.content}${researchBlock}`;
+    } else {
+      messages.push({ role: "user", content: researchBlock.trimStart() });
+    }
+  }
 
   const model = await createZediChatModel({
     modelId: getOrchestratorModelId(),
@@ -65,7 +75,7 @@ export async function planIngest(
   const raw = await structured.invoke(messages.map((m) => ({ role: m.role, content: m.content })));
 
   const validCandidateIds = new Set(state.candidates.map((c) => c.id));
-  const ingestPlan = parseIngestPlanResponse(JSON.stringify(raw), { validCandidateIds });
+  const ingestPlan = parseIngestPlanValue(raw, { validCandidateIds });
 
   return {
     ingestPlan,

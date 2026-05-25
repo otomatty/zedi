@@ -54,6 +54,40 @@ const app = new Hono<AppEnv>();
 const INGEST_GRAPH_RECURSION_LIMIT = 60;
 
 /**
+ * Map graph runner failures caused by client/input validation to HTTP 4xx.
+ */
+function httpStatusForGraphFailure(error: string | undefined): 400 | 500 {
+  if (!error) return 500;
+  const clientish =
+    /prepare_ingest|plan_ingest|invalid|required|expected|approvedSourceIds|zod|resume/i.test(
+      error,
+    );
+  return clientish ? 400 : 500;
+}
+
+function assertGraphRunArticle(article: IngestArticleSummary): void {
+  if (!article.title?.trim() || !article.url?.trim() || typeof article.excerpt !== "string") {
+    throw new HTTPException(400, { message: "article { title, url, excerpt } is required" });
+  }
+}
+
+function normalizeGraphCandidates(raw: CandidatePage[] | undefined): CandidatePage[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CandidatePage[] = [];
+  for (const entry of raw) {
+    if (typeof entry?.id !== "string" || !entry.id.trim()) continue;
+    if (typeof entry.title !== "string") continue;
+    if (typeof entry.excerpt !== "string") continue;
+    out.push({
+      id: entry.id.trim(),
+      title: entry.title,
+      excerpt: entry.excerpt,
+    });
+  }
+  return out;
+}
+
+/**
  * リクエストボディ。
  * Request body for POST /api/ingest/plan.
  */
@@ -340,11 +374,12 @@ app.post("/graph/run", authRequired, rateLimit(), async (c) => {
     throw new HTTPException(400, { message: "Invalid JSON body" });
   }
 
-  if (!body.article || typeof body.article.title !== "string" || !body.article.url?.trim()) {
+  if (!body.article) {
     throw new HTTPException(400, { message: "article { title, url, excerpt } is required" });
   }
+  assertGraphRunArticle(body.article);
 
-  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
+  const candidates = normalizeGraphCandidates(body.candidates);
   const threadId =
     typeof body.threadId === "string" && body.threadId.trim() ? body.threadId.trim() : randomUUID();
 
@@ -397,7 +432,8 @@ app.post("/graph/run", authRequired, rateLimit(), async (c) => {
   );
 
   if (result.status === "failed") {
-    throw new HTTPException(500, { message: result.error ?? "Graph run failed" });
+    const status = httpStatusForGraphFailure(result.error);
+    throw new HTTPException(status, { message: result.error ?? "Graph run failed" });
   }
 
   const output = result.output as
@@ -483,7 +519,8 @@ app.post("/graph/resume", authRequired, rateLimit(), async (c) => {
   );
 
   if (result.status === "failed") {
-    throw new HTTPException(500, { message: result.error ?? "Graph resume failed" });
+    const status = httpStatusForGraphFailure(result.error);
+    throw new HTTPException(status, { message: result.error ?? "Graph resume failed" });
   }
 
   const output = result.output as { ingestPlan?: unknown } | undefined;
