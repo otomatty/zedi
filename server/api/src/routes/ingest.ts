@@ -137,6 +137,54 @@ async function assertIngestThreadAccessible(
 }
 
 /**
+ * True when the ingest-planner checkpoint is halted at a HITL interrupt.
+ * ingest-planner が HITL で停止しているか。
+ */
+async function ingestThreadHasPendingInterrupt(
+  threadId: string,
+  checkpointer: BaseCheckpointSaver,
+): Promise<boolean> {
+  const registered = getRegisteredGraph(INGEST_PLANNER_GRAPH_ID);
+  if (!registered) return false;
+  const graph = registered.factory({ checkpointer }) as {
+    getState?: (config: unknown) => Promise<
+      | {
+          tasks?: Array<{ interrupts?: unknown[] }>;
+        }
+      | undefined
+    >;
+  };
+  if (typeof graph.getState !== "function") return false;
+  try {
+    const snap = await graph.getState({ configurable: { thread_id: threadId } });
+    const tasks = snap?.tasks;
+    if (!Array.isArray(tasks)) return false;
+    return tasks.some((t) => Array.isArray(t.interrupts) && t.interrupts.length > 0);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Reject `POST /graph/run` when the thread is waiting on `POST /graph/resume`.
+ * 中断済み thread に fresh input を流すと HITL をバイパスするため拒否する。
+ */
+async function assertIngestThreadReadyForRun(
+  threadId: string,
+  checkpointer: BaseCheckpointSaver | false,
+): Promise<void> {
+  if (checkpointer === false) return;
+  const owner = await readIngestCheckpointUserId(threadId, checkpointer);
+  if (owner === null) return;
+  const pending = await ingestThreadHasPendingInterrupt(threadId, checkpointer);
+  if (pending) {
+    throw new HTTPException(409, {
+      message: "Graph is interrupted; use POST /api/ingest/graph/resume",
+    });
+  }
+}
+
+/**
  * リクエストボディ。
  * Request body for POST /api/ingest/plan.
  */
@@ -453,6 +501,7 @@ app.post("/graph/run", authRequired, rateLimit(), async (c) => {
 
   const checkpointer = await resolveCheckpointerForRun();
   await assertIngestThreadAccessible(threadId, userId, checkpointer);
+  await assertIngestThreadReadyForRun(threadId, checkpointer);
   const runner = new GraphRunner();
   const result = await runner.invoke(
     {

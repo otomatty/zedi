@@ -643,16 +643,8 @@ export function useWikiComposeSession(
       const result = await resumeSession({ pageId, sessionId: session.id, resume: input });
       const fromResume = reduceResumeOutput(result.output, result.status);
       update({ status: result.status, ...fromResume });
-      const needsStream =
-        (result.status === "interrupted" || result.status === "running") &&
-        !fromResume.briefQuestions?.length &&
-        !fromResume.pendingSources?.length &&
-        !fromResume.outlineProposal?.length;
-      if (needsStream) {
-        await streamRun(session);
-      }
     },
-    [pageId, streamRun, update],
+    [pageId, update],
   );
 
   const submitResearchApproval = useCallback<UseWikiComposeSessionReturn["submitResearchApproval"]>(
@@ -672,17 +664,8 @@ export function useWikiComposeSession(
       }
       const fromResume = reduceResumeOutput(result.output, result.status);
       update({ status: result.status, ...fromResume });
-      const needsStream =
-        (result.status === "interrupted" || result.status === "running") &&
-        !fromResume.briefQuestions?.length &&
-        !fromResume.pendingSources?.length &&
-        !fromResume.researchConflictSummary &&
-        !fromResume.outlineProposal?.length;
-      if (needsStream) {
-        await streamRun(session);
-      }
     },
-    [pageId, state.pendingSources, streamRun, update],
+    [pageId, state.pendingSources, update],
   );
 
   const submitConflictAck = useCallback<UseWikiComposeSessionReturn["submitConflictAck"]>(
@@ -700,18 +683,8 @@ export function useWikiComposeSession(
         researchConflictSummary: null,
         ...fromResume,
       });
-      const needsStream =
-        (result.status === "interrupted" || result.status === "running") &&
-        !fromResume.briefQuestions?.length &&
-        !fromResume.pendingSources?.length &&
-        !fromResume.researchConflictSummary &&
-        !fromResume.outlineProposal?.length &&
-        !fromResume.completedMarkdown;
-      if (needsStream) {
-        await streamRun(session);
-      }
     },
-    [pageId, streamRun, update],
+    [pageId, update],
   );
 
   const submitOutline = useCallback<UseWikiComposeSessionReturn["submitOutline"]>(
@@ -721,15 +694,8 @@ export function useWikiComposeSession(
       const result = await resumeSession({ pageId, sessionId: session.id, resume: input });
       const fromResume = reduceResumeOutput(result.output, result.status);
       update({ status: result.status, ...fromResume });
-      const needsStream =
-        (result.status === "interrupted" || result.status === "running") &&
-        !fromResume.completedMarkdown &&
-        Object.keys(fromResume.draftedSections ?? {}).length === 0;
-      if (needsStream) {
-        await streamRun(session);
-      }
     },
-    [pageId, streamRun, update],
+    [pageId, update],
   );
 
   const cancel = useCallback(async () => {

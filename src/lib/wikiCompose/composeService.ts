@@ -174,8 +174,8 @@ export async function runSession(input: {
  *
  * The server returns a JSON body `{ status, output }` on resume completion (no
  * SSE stream). Callers must hydrate UI state from `output` (interrupt payloads
- * in `__interrupt__` or `completion` on the final outline approve). A follow-up
- * `runSession` is only needed when `output` carries no wire payload.
+ * in `__interrupt__` or `completion` on the final outline approve). Do not call
+ * `runSession` while the row is `interrupted` — use `PATCH /resume` only.
  */
 export async function resumeSession(input: {
   pageId: string;
