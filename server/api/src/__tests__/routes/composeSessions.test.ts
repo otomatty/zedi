@@ -320,7 +320,7 @@ describe("DELETE /api/pages/:pageId/compose-sessions/:id", () => {
     const { app, chains } = createComposeApp([
       ...pageAccessPrefix(),
       [{ id: "sess-y", status: "running" }],
-      undefined, // update chain
+      [{ status: "cancelled" }], // guarded update → returning
     ]);
     const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-y`, {
       method: "DELETE",
@@ -329,9 +329,25 @@ describe("DELETE /api/pages/:pageId/compose-sessions/:id", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { status: string };
     expect(body.status).toBe("cancelled");
-    // Update chain set status to "cancelled".
     const updateChain = chains.find((c) => c.startMethod === "update");
     const setOp = updateChain?.ops.find((op) => op.method === "set");
     expect((setOp?.args[0] as { status?: string })?.status).toBe("cancelled");
+  });
+
+  it("does not overwrite completed when cancel races with graph finish", async () => {
+    const { app, chains } = createComposeApp([
+      ...pageAccessPrefix(),
+      [{ id: "sess-race", status: "running" }],
+      [], // guarded cancel update — no row (status already completed)
+      [{ status: "completed" }], // re-read after failed cancel
+    ]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-race`, {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string };
+    expect(body.status).toBe("completed");
+    expect(chains.filter((c) => c.startMethod === "update").length).toBe(1);
   });
 });
