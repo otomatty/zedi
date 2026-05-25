@@ -132,6 +132,7 @@ export async function briefDialogue(
   // `structured.invoke` returns the zod input type (pre-default), so we
   // accept it as-is and apply fallbacks at the projection step below.
   let raw: z.input<typeof briefQuestionsSchema>;
+  let briefDegraded = false;
   try {
     raw = await structured.invoke([
       { role: "system", content: SYSTEM_PROMPT },
@@ -142,10 +143,11 @@ export async function briefDialogue(
     ]);
   } catch {
     // Defensive fallback: if the LLM call fails, emit an empty Brief so the
-    // user can still proceed straight to research. The orchestrator must not
-    // become unstartable just because of a transient model error.
-    // LLM 失敗時は Brief 0 件で先へ進ませる安全策。
+    // user can still proceed straight to research. `briefDegraded` prevents
+    // `routeAfterBrief` from skipping research on this path (#953).
+    // LLM 失敗時は Brief 0 件で先へ進ませる。`briefDegraded` で調査スキップと区別する。
     raw = { questions: [] };
+    briefDegraded = true;
   }
 
   const briefQuestions: BriefQuestion[] = raw.questions.map((q) => ({
@@ -163,6 +165,7 @@ export async function briefDialogue(
   return {
     pageSnapshot: snapshot,
     briefQuestions,
+    briefDegraded,
     phase: "brief:await_user",
   };
 }

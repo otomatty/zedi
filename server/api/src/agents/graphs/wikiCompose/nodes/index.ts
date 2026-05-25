@@ -10,3 +10,5 @@ export { structureDialogue } from "./structureDialogue.js";
 export { humanReviewOutline } from "./humanReviewOutline.js";
 export { draftSections } from "./draftSections.js";
 export { completed } from "./completed.js";
+export { skipResearch } from "./skipResearch.js";
+export { conflictResolution } from "./conflictResolution.js";

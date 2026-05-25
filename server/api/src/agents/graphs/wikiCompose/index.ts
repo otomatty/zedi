@@ -28,10 +28,20 @@ export type {
   OutlineSection,
   PageSnapshot,
   WikiComposeInterruptPayload,
+  ResearchConflictSummary,
 } from "./types.js";
 export {
   briefResumeSchema,
   type BriefResumeParsed,
   outlineResumeSchema,
   type OutlineResumeParsed,
+  conflictResumeSchema,
+  type ConflictResumeParsed,
 } from "./resumeSchemas.js";
+export {
+  routeAfterBrief,
+  routeAfterResearch,
+  shouldResolveResearchConflicts,
+  type BriefRoute,
+  type ResearchRoute,
+} from "./routing.js";

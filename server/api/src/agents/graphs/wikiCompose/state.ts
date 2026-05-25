@@ -122,6 +122,17 @@ export const WikiComposeState = Annotation.Root({
     reducer: (prev, next) => (next === undefined ? prev : next),
     default: () => null,
   }),
+  /**
+   * True when `brief_dialogue` used the LLM error fallback (empty questions).
+   * Routing must not treat this as an intentional "skip research" signal (#953).
+   *
+   * `brief_dialogue` が LLM 失敗フォールバックで空質問になったとき true。
+   * ルーティングで調査スキップと混同しない。
+   */
+  briefDegraded: Annotation<boolean>({
+    reducer: (_prev, next) => next,
+    default: () => false,
+  }),
 
   // ── Research mirror (matches ResearchLoopState exactly) ──────────────────
   /** 現在のループ回数（research subgraph が書く）。 */
@@ -173,6 +184,17 @@ export const WikiComposeState = Annotation.Root({
   additionalRequest: Annotation<AdditionalResearchRequest | null>({
     reducer: (prev, next) => (next === undefined ? prev : next),
     default: () => null,
+  }),
+  /**
+   * P5 conflict-resolution marker. Populated before `conflict_resolution` interrupt;
+   * cleared on resume. Routing uses `rejectedResearch` counts; this channel is for
+   * future explicit conflict metadata from evaluate / resume payloads.
+   *
+   * P5 矛盾解消用マーカー。将来 evaluate や resume から明示的な矛盾リストを載せる。
+   */
+  researchConflicts: Annotation<string[]>({
+    reducer: (_prev, next) => next,
+    default: () => [],
   }),
 
   // ── Structure phase ──────────────────────────────────────────────────────

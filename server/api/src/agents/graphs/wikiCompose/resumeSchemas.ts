@@ -64,3 +64,15 @@ export const outlineResumeSchema = z.object({
 });
 
 export type OutlineResumeParsed = z.infer<typeof outlineResumeSchema>;
+
+/**
+ * Resume payload for `conflict_resolution` (#953).
+ *
+ * User acknowledges conflicting sources and opts to continue with the approved set.
+ */
+export const conflictResumeSchema = z.object({
+  acknowledged: z.literal(true),
+  note: z.string().optional(),
+});
+
+export type ConflictResumeParsed = z.infer<typeof conflictResumeSchema>;

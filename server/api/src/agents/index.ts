@@ -98,6 +98,23 @@ export {
   type IngestPlannerStateUpdate,
 } from "./graphs/ingest/index.js";
 export {
+  WIKI_MAINTENANCE_GRAPH_ID,
+  WIKI_MAINTENANCE_GRAPH_VERSION,
+  registerWikiMaintenanceGraph,
+  WikiMaintenanceState,
+  type WikiMaintenanceStateType,
+  type WikiMaintenanceStateUpdate,
+  type MaintenanceFinding,
+  type MaintenancePlan,
+} from "./graphs/wikiMaintenance/index.js";
+export {
+  routeAfterBrief,
+  routeAfterResearch,
+  shouldResolveResearchConflicts,
+  type BriefRoute,
+  type ResearchRoute,
+} from "./graphs/wikiCompose/routing.js";
+export {
   WIKI_COMPOSE_GRAPH_ID,
   WIKI_COMPOSE_GRAPH_VERSION,
   registerWikiComposeGraph,

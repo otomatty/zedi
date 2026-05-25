@@ -49,6 +49,7 @@ import { registerStubGraph } from "./agents/registry/stubGraph.js";
 import { registerResearchLoopGraph } from "./agents/subgraphs/research/index.js";
 import { registerWikiComposeGraph } from "./agents/graphs/wikiCompose/index.js";
 import { registerIngestPlannerGraph } from "./agents/graphs/ingest/index.js";
+import { registerWikiMaintenanceGraph } from "./agents/graphs/wikiMaintenance/index.js";
 
 /**
  * Creates and configures the Hono API app (routes, CORS, etc.).
@@ -60,6 +61,7 @@ export function createApp(): Hono<AppEnv> {
   // - `wiki-compose-research` — P1 自律調査ループ (#949)
   // - `wiki-compose` — P2 全体オーケストレータ (#950)
   // - `ingest-planner` — P4 ingest + shared research loop (#952)
+  // - `wiki-maintenance` — P5 broken links + stub scan (#953)
   //
   // Register all Wiki Compose graphs. Calls are idempotent across hot
   // reloads (registry uses `Map#set` so the latest registration wins).
@@ -67,6 +69,7 @@ export function createApp(): Hono<AppEnv> {
   registerResearchLoopGraph();
   registerWikiComposeGraph();
   registerIngestPlannerGraph();
+  registerWikiMaintenanceGraph();
 
   const app = new Hono<AppEnv>();
   const wildcard = isWildcardCors();

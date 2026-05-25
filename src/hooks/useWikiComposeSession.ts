@@ -33,10 +33,15 @@ import type {
   OutlineSection,
   PageSnapshot,
   ResearchBatch,
+  ResearchConflictSummary,
   ResearchSource,
 } from "@/lib/wikiCompose/types";
 
-export type ComposePhase = "brief" | "research" | "structure" | "draft" | "completed";
+/**
+ * UI phase for Wiki Compose session progression.
+ * Wiki Compose セッション進行を表す UI フェーズ。
+ */
+export type ComposePhase = "brief" | "research" | "conflict" | "structure" | "draft" | "completed";
 
 /** Activity log entry surfaced in the right pane's ActivitySection. */
 export interface ComposeActivity {
@@ -66,6 +71,8 @@ export interface WikiComposeSessionState {
   pendingSources: ResearchSource[];
   /** Approved sources after research resume. */
   approvedSources: ResearchSource[];
+  /** P5 conflict-resolution interrupt payload (#953). */
+  researchConflictSummary: ResearchConflictSummary | null;
   /** Proposed outline from the structure interrupt. */
   outlineProposal: OutlineSection[];
   /** Drafted section bodies — keyed by sectionId. */
@@ -93,6 +100,7 @@ const INITIAL_STATE: WikiComposeSessionState = {
   latestBatch: null,
   pendingSources: [],
   approvedSources: [],
+  researchConflictSummary: null,
   outlineProposal: [],
   draftedSections: {},
   streamingSectionId: null,
@@ -145,6 +153,11 @@ export interface UseWikiComposeSessionReturn extends WikiComposeSessionState {
   }) => Promise<void>;
   /** Submit outline approval and continue streaming. */
   submitOutline: (input: { sections: OutlineSection[] }) => Promise<void>;
+  /**
+   * Acknowledge research conflicts and continue to Structure (#953).
+   * 調査の矛盾を確認し Structure へ進む（#953）。
+   */
+  submitConflictAck: (input?: { note?: string }) => Promise<void>;
   /** Cancel the session (DELETE). */
   cancel: () => Promise<void>;
 }
@@ -373,6 +386,9 @@ function hydrateFromProjection(
   if (projection.latestBatch !== undefined) partial.latestBatch = projection.latestBatch;
   if (projection.pendingSources?.length) partial.pendingSources = projection.pendingSources;
   if (projection.approvedSources?.length) partial.approvedSources = projection.approvedSources;
+  if (projection.researchConflictSummary) {
+    partial.researchConflictSummary = projection.researchConflictSummary;
+  }
   if (projection.outlineProposal?.length) partial.outlineProposal = projection.outlineProposal;
   if (projection.completedMarkdown) partial.completedMarkdown = projection.completedMarkdown;
   if (projection.draftedSections?.length) {
@@ -383,6 +399,17 @@ function hydrateFromProjection(
     partial.draftedSections = draftedSections;
   }
   return partial;
+}
+
+/**
+ * Build hook state context for resume-time interrupt projection.
+ * resume 時の interrupt 投影用に、チェックポイント上の approvedResearch を引き継ぐ。
+ */
+function interruptContextFromCheckpoint(state: Record<string, unknown>): WikiComposeSessionState {
+  const approved = Array.isArray(state.approvedResearch)
+    ? (state.approvedResearch as ResearchSource[])
+    : [];
+  return { ...INITIAL_STATE, approvedSources: approved };
 }
 
 function reduceResumeOutput(
@@ -401,7 +428,10 @@ function reduceResumeOutput(
     const value =
       entry && typeof entry === "object" ? (entry as { value?: unknown }).value : undefined;
     if (value && typeof value === "object" && "kind" in value) {
-      Object.assign(partial, reduceInterrupt(INITIAL_STATE, value as ComposeInterruptPayload));
+      Object.assign(
+        partial,
+        reduceInterrupt(interruptContextFromCheckpoint(state), value as ComposeInterruptPayload),
+      );
     }
   }
 
@@ -468,8 +498,16 @@ function reduceInterrupt(
         approvedSources: payload.approvedSources,
         phase: "structure",
       };
+    case "conflict_resolution":
+      return {
+        researchConflictSummary: payload.conflicts,
+        phase: "conflict",
+        // Keep approvals from `prev` (SSE) or checkpoint context (resume); do not
+        // overwrite with an empty array when `reduceResumeOutput` seeds context.
+        ...(prev.approvedSources.length > 0 ? { approvedSources: prev.approvedSources } : {}),
+      };
     default:
-      return prev;
+      return {};
   }
 }
 
@@ -617,12 +655,42 @@ export function useWikiComposeSession(
         (result.status === "interrupted" || result.status === "running") &&
         !fromResume.briefQuestions?.length &&
         !fromResume.pendingSources?.length &&
+        !fromResume.researchConflictSummary &&
         !fromResume.outlineProposal?.length;
       if (needsStream) {
         await streamRun(session);
       }
     },
     [pageId, state.pendingSources, streamRun, update],
+  );
+
+  const submitConflictAck = useCallback<UseWikiComposeSessionReturn["submitConflictAck"]>(
+    async (input) => {
+      const session = sessionRef.current;
+      if (!session) throw new Error("Session not initialised");
+      const result = await resumeSession({
+        pageId,
+        sessionId: session.id,
+        resume: { acknowledged: true as const, ...(input?.note ? { note: input.note } : {}) },
+      });
+      const fromResume = reduceResumeOutput(result.output, result.status);
+      update({
+        status: result.status,
+        researchConflictSummary: null,
+        ...fromResume,
+      });
+      const needsStream =
+        (result.status === "interrupted" || result.status === "running") &&
+        !fromResume.briefQuestions?.length &&
+        !fromResume.pendingSources?.length &&
+        !fromResume.researchConflictSummary &&
+        !fromResume.outlineProposal?.length &&
+        !fromResume.completedMarkdown;
+      if (needsStream) {
+        await streamRun(session);
+      }
+    },
+    [pageId, streamRun, update],
   );
 
   const submitOutline = useCallback<UseWikiComposeSessionReturn["submitOutline"]>(
@@ -688,6 +756,7 @@ export function useWikiComposeSession(
     start,
     submitBrief,
     submitResearchApproval,
+    submitConflictAck,
     submitOutline,
     cancel,
   };

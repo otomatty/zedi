@@ -124,7 +124,12 @@ export interface ResearchBatch {
  *
  * Reason the loop exited; set by `compile_batch`.
  */
-export type ExitReason = "score_threshold" | "max_iterations" | "manual_stop";
+export type ExitReason =
+  | "score_threshold"
+  | "max_iterations"
+  | "manual_stop"
+  /** Orchestrator skipped the research loop after Brief (#953). */
+  | "brief_skip";
 
 /**
  * `human_review_research` ノードが期待する resume payload の TS 型。
