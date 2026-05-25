@@ -30,12 +30,14 @@ interface AiModelsContentProps {
         | "inputCostUnits"
         | "outputCostUnits"
         | "isActive"
+        | "isSystemDefault"
         | "sortOrder"
       >
     >,
   ) => Promise<void>;
   onTierChange: (m: AiModelAdmin, tier: "free" | "pro") => Promise<void>;
   onToggleActive: (m: AiModelAdmin) => Promise<void>;
+  onSetSystemDefault: (m: AiModelAdmin) => Promise<void>;
   onDragStart: (e: React.DragEvent, id: string) => void;
   onDragOver: (e: React.DragEvent, id: string) => void;
   onDragLeave: () => void;
@@ -68,6 +70,7 @@ export function AiModelsContent({
   onModelUpdate,
   onTierChange,
   onToggleActive,
+  onSetSystemDefault,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -148,6 +151,7 @@ export function AiModelsContent({
               <TableHead className="px-3 py-2">{t("aiModels.columns.displayName")}</TableHead>
               <TableHead className="px-3 py-2">{t("aiModels.columns.tier")}</TableHead>
               <TableHead className="px-3 py-2">{t("aiModels.columns.active")}</TableHead>
+              <TableHead className="px-3 py-2">{t("aiModels.columns.systemDefault")}</TableHead>
               <TableHead className="px-3 py-2">{t("aiModels.columns.sortOrder")}</TableHead>
             </TableRow>
           </TableHeader>
@@ -161,6 +165,7 @@ export function AiModelsContent({
                 {...createDisplayNameHandlers(m)}
                 onTierChange={(tier) => onTierChange(m, tier)}
                 onToggleActive={() => onToggleActive(m)}
+                onSetSystemDefault={() => onSetSystemDefault(m)}
                 onDragStart={onDragStart}
                 onDragOver={onDragOver}
                 onDragLeave={onDragLeave}
@@ -181,6 +186,7 @@ export function AiModelsContent({
             {...createDisplayNameHandlers(m)}
             onTierChange={(tier) => onTierChange(m, tier)}
             onToggleActive={() => onToggleActive(m)}
+            onSetSystemDefault={() => onSetSystemDefault(m)}
           />
         ))}
       </div>

@@ -11,8 +11,11 @@
     "displayName": "表示名",
     "tier": "ティア",
     "active": "有効",
+    "systemDefault": "システム既定",
     "sortOrder": "並び順"
   },
+  "systemDefaultBadge": "既定",
+  "setSystemDefault": "既定に設定",
   "summary": "{{total}} 件（有効: {{active}}）",
   "dragHint": "ドラッグで並び替え",
   "displayNameAriaLabel": "{{modelId}} の表示名",

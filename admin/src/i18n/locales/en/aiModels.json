@@ -11,8 +11,11 @@
     "displayName": "Display name",
     "tier": "Tier",
     "active": "Active",
+    "systemDefault": "System default",
     "sortOrder": "Order"
   },
+  "systemDefaultBadge": "Default",
+  "setSystemDefault": "Set as default",
   "summary": "{{total}} models (active: {{active}})",
   "dragHint": "Drag to reorder",
   "displayNameAriaLabel": "Display name for {{modelId}}",

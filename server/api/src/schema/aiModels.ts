@@ -25,6 +25,8 @@ export const aiModels = pgTable(
     inputCostUnits: integer("input_cost_units").notNull(),
     outputCostUnits: integer("output_cost_units").notNull(),
     isActive: boolean("is_active").notNull().default(true),
+    /** Admin-designated system default; at most one row may be true. / 管理者指定のシステム既定（最大1件） */
+    isSystemDefault: boolean("is_system_default").notNull().default(false),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },

@@ -3,6 +3,7 @@ import { eq, asc } from "drizzle-orm";
 import { aiModels } from "../../schema/index.js";
 import { authOptional } from "../../middleware/auth.js";
 import { getUserTier } from "../../services/subscriptionService.js";
+import { resolveSystemDefaultModelId } from "../../services/modelResolverService.js";
 import type { AppEnv, UserTier } from "../../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -44,6 +45,7 @@ app.get("/", authOptional, async (c) => {
   const toModelTier = (v: string | undefined): "free" | "pro" => (v === "free" ? "free" : "pro");
 
   const clientTier = toClientTier(tier);
+  const systemDefaultModelId = await resolveSystemDefaultModelId(clientTier, db);
   const models = rows.map((m) => {
     const tierRequired = toModelTier(m.tierRequired);
     return {
@@ -58,7 +60,7 @@ app.get("/", authOptional, async (c) => {
     };
   });
 
-  return c.json({ models, tier: clientTier });
+  return c.json({ models, tier: clientTier, systemDefaultModelId });
 });
 
 export default app;

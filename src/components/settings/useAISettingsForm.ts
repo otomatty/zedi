@@ -7,6 +7,7 @@ import {
   useSavedIndicator,
   useClaudeCodeAvailability,
   useServerModels,
+  resolvePreferredForSettings,
 } from "./useAISettingsFormHelpers";
 import type { AIProviderType, AISettings, AIInteractionMode } from "@/types/ai";
 import { DEFAULT_AI_SETTINGS, getInteractionMode } from "@/types/ai";
@@ -124,6 +125,7 @@ export function useAISettingsForm() {
   const claudeCodeAvailable = useClaudeCodeAvailability();
   const {
     models: serverModels,
+    systemDefaultModelId,
     loading: serverModelsLoading,
     error: serverModelsError,
     load: loadServerModels,
@@ -141,6 +143,37 @@ export function useAISettingsForm() {
       loadServerModels();
     }
   }, [isServerMode, loadServerModels]);
+
+  useEffect(() => {
+    if (!isServerMode || serverModelsLoading) return;
+    const available = serverModels.filter((m) => m.available);
+    if (available.length === 0) return;
+
+    const savedStillAvailable =
+      settings.modelId !== "" && available.some((m) => m.id === settings.modelId);
+    if (savedStillAvailable) return;
+
+    const preferred = resolvePreferredForSettings(
+      available,
+      settings.modelId || undefined,
+      systemDefaultModelId,
+    );
+    if (!preferred) return;
+
+    updateSettingsBase({
+      provider: preferred.provider,
+      model: preferred.modelId,
+      modelId: preferred.id,
+    });
+  }, [
+    isServerMode,
+    serverModelsLoading,
+    serverModels,
+    systemDefaultModelId,
+    settings.modelId,
+    settings.provider,
+    updateSettingsBase,
+  ]);
 
   const runSave = useCallback(async () => {
     markSaved(await save());

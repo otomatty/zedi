@@ -9,6 +9,7 @@ import { isTauriDesktop } from "../../lib/platform";
 import type { AIModel, AIInteractionMode, AIProviderType } from "../../types/ai";
 import { getInteractionMode } from "../../types/ai";
 import { cn } from "@zedi/ui";
+import { resolveServerInitialSelection } from "../../lib/resolveServerModel";
 
 interface DisplayModel {
   id: string;
@@ -47,22 +48,6 @@ function resolveClaudeInitialSelection(
   if (matchedCurrent) return undefined;
   const matchedSaved = savedModelId ? claudeModels.find((m) => m.id === savedModelId) : undefined;
   return matchedSaved ?? claudeModels[0];
-}
-
-/**
- * Resolves which server model to select when the current store id is not in the list.
- * ストアの選択が一覧に無いときに選ぶサーバーモデルを解決する。
- */
-function resolveServerInitialSelection(
-  available: AIModel[],
-  current: { id: string } | null,
-  savedModelId: string | undefined,
-): AIModel | undefined {
-  if (available.length === 0) return undefined;
-  const matchedCurrent = current ? available.find((m) => m.id === current.id) : undefined;
-  if (matchedCurrent) return undefined;
-  const matched = savedModelId ? available.find((m) => m.id === savedModelId) : null;
-  return matched ?? available[0];
 }
 
 /**
@@ -126,7 +111,7 @@ export function AIChatModelSelector() {
         return;
       }
 
-      const { models: serverModels } = await fetchServerModels();
+      const { models: serverModels, systemDefaultModelId } = await fetchServerModels();
       let available = serverModels.filter((m) => m.available);
       if (currentMode === "user_api_key" && settings) {
         available = available.filter((m) => m.provider === settings.provider);
@@ -147,7 +132,12 @@ export function AIChatModelSelector() {
       if (available.length === 0) {
         setSelectedModel(null);
       } else {
-        const initial = resolveServerInitialSelection(available, current, settings?.modelId);
+        const initial = resolveServerInitialSelection(
+          available,
+          current,
+          settings?.modelId,
+          systemDefaultModelId,
+        );
         if (initial) {
           setSelectedModel({
             id: initial.id,

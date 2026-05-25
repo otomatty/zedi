@@ -225,6 +225,13 @@
       "when": 1780012800000,
       "tag": "0032_add_user_ai_credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1780099200000,
+      "tag": "0033_add_ai_model_system_default",
+      "breakpoints": true
     }
   ]
 }
