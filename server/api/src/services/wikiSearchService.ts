@@ -82,7 +82,8 @@ export async function searchUserWikiPages(
   const trimmed = query.trim();
   if (!trimmed) return [];
 
-  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+  const normalizedLimit = Number.isFinite(limit) ? Math.trunc(limit) : 10;
+  const safeLimit = Math.min(Math.max(normalizedLimit, 1), 100);
   const pattern = `%${escapeLike(trimmed)}%`;
 
   // `content_text` を WHERE には残しつつ SELECT に出さない方針は route と同じ
@@ -163,13 +164,13 @@ function rowToHit(row: unknown): WikiSearchHit {
     note_id: string;
     title: string | null;
     content_preview: string | null;
-    updated_at: string;
+    updated_at: string | Date;
   };
   return {
     pageId: r.id,
     noteId: r.note_id,
     title: r.title,
     contentPreview: r.content_preview,
-    updatedAt: r.updated_at,
+    updatedAt: r.updated_at instanceof Date ? r.updated_at.toISOString() : String(r.updated_at),
   };
 }

@@ -41,7 +41,7 @@ END $$;
 DO $$ BEGIN
     ALTER TABLE "wiki_compose_sessions"
         ADD CONSTRAINT "wiki_compose_sessions_user_id_users_id_fk"
-        FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE cascade ON UPDATE no action;
+        FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
     WHEN duplicate_object THEN NULL;
 END $$;

@@ -3,7 +3,6 @@
  * Compose グラフのモデル provider と BYOK backend の整合を検証する。
  */
 import { HTTPException } from "hono/http-exception";
-import { validateModelAccess } from "../../services/usageService.js";
 import type { Database, UserTier } from "../../types/index.js";
 import { getComposeModelIdsForGraph } from "./composeModelConfig.js";
 import {
@@ -26,18 +25,12 @@ export async function assertComposeBackendReady(input: {
 }): Promise<void> {
   if (!isUserByokBackend(input.backend)) return;
 
-  const expectedProvider = backendToCredentialProvider(input.backend);
   const modelIds = getComposeModelIdsForGraph(input.graphId);
+  // Model-less graphs (e.g. wiki-maintenance) never call `createZediChatModel`.
+  // Provider matching for BYOK runs is enforced at runtime via `resolveComposeModelId`.
+  if (modelIds.length === 0) return;
 
-  for (const modelId of modelIds) {
-    const modelInfo = await validateModelAccess(modelId, input.tier, input.db);
-    if (modelInfo.provider !== expectedProvider) {
-      throw new HTTPException(400, {
-        message: `Backend "${input.backend}" does not match compose model "${modelId}" (provider ${modelInfo.provider})`,
-      });
-    }
-  }
-
+  const expectedProvider = backendToCredentialProvider(input.backend);
   const key = await getUserAiCredentialPlaintext(input.userId, expectedProvider, input.db);
   if (!key?.trim()) {
     throw new HTTPException(400, {

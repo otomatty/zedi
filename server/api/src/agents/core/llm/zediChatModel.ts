@@ -283,72 +283,74 @@ export class ZediChatModel extends BaseChatModel<BaseChatModelCallOptions> {
     let finishReason: string | undefined;
     let done = false;
 
-    for await (const chunk of gen) {
-      if (chunk.content) {
-        accumulated += chunk.content;
-        const chatChunk = new ChatGenerationChunk({
-          text: chunk.content,
-          message: new AIMessageChunk({ content: chunk.content }),
-        });
-        // Surface incremental tokens to LangChain callback consumers so any
-        // `streamEvents` listener (e.g. SSE mapper) sees deltas before the
-        // final usage event.
-        await runManager?.handleLLMNewToken(
-          chunk.content,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          {
-            chunk: chatChunk,
+    try {
+      for await (const chunk of gen) {
+        if (chunk.content) {
+          accumulated += chunk.content;
+          const chatChunk = new ChatGenerationChunk({
+            text: chunk.content,
+            message: new AIMessageChunk({ content: chunk.content }),
+          });
+          // Surface incremental tokens to LangChain callback consumers so any
+          // `streamEvents` listener (e.g. SSE mapper) sees deltas before the
+          // final usage event.
+          await runManager?.handleLLMNewToken(
+            chunk.content,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            {
+              chunk: chatChunk,
+            },
+          );
+          yield chatChunk;
+        }
+        if (chunk.done) {
+          finishReason = chunk.finishReason;
+          done = true;
+          break;
+        }
+      }
+    } finally {
+      // Streaming providers in this codebase do not return token counts; mirror
+      // chat.ts and estimate. Pre-encoded message length is what the user "paid"
+      // for, response length is what they received.
+      const promptLength = zediMessages.reduce((sum, m) => sum + m.content.length, 0);
+      const inputTokens = Math.ceil(promptLength / 4);
+      const outputTokens = Math.ceil(accumulated.length / 4);
+
+      const usage = await recordZediUsage({
+        db: this.db,
+        userId: this.userId,
+        modelId: this.modelRowId,
+        feature: this.feature,
+        usage: { inputTokens, outputTokens },
+        inputCostUnits: this.inputCostUnits,
+        outputCostUnits: this.outputCostUnits,
+        apiMode: this.apiMode,
+      });
+
+      // Final chunk surfaces aggregate usage so downstream consumers (sseMapper,
+      // LangChain callbacks) can read totals from a single ChatGenerationChunk.
+      yield new ChatGenerationChunk({
+        text: "",
+        message: new AIMessageChunk({
+          content: "",
+          response_metadata: {
+            finishReason: finishReason ?? (done ? "stop" : "incomplete"),
           },
-        );
-        yield chatChunk;
-      }
-      if (chunk.done) {
-        finishReason = chunk.finishReason;
-        done = true;
-        break;
-      }
-    }
-
-    // Streaming providers in this codebase do not return token counts; mirror
-    // chat.ts and estimate. Pre-encoded message length is what the user "paid"
-    // for, response length is what they received.
-    const promptLength = zediMessages.reduce((sum, m) => sum + m.content.length, 0);
-    const inputTokens = Math.ceil(promptLength / 4);
-    const outputTokens = Math.ceil(accumulated.length / 4);
-
-    const usage = await recordZediUsage({
-      db: this.db,
-      userId: this.userId,
-      modelId: this.modelRowId,
-      feature: this.feature,
-      usage: { inputTokens, outputTokens },
-      inputCostUnits: this.inputCostUnits,
-      outputCostUnits: this.outputCostUnits,
-      apiMode: this.apiMode,
-    });
-
-    // Final chunk surfaces aggregate usage so downstream consumers (sseMapper,
-    // LangChain callbacks) can read totals from a single ChatGenerationChunk.
-    yield new ChatGenerationChunk({
-      text: "",
-      message: new AIMessageChunk({
-        content: "",
-        response_metadata: {
+          usage_metadata: {
+            input_tokens: usage.inputTokens,
+            output_tokens: usage.outputTokens,
+            total_tokens: usage.inputTokens + usage.outputTokens,
+          },
+        }),
+        generationInfo: {
           finishReason: finishReason ?? (done ? "stop" : "incomplete"),
+          costUnits: usage.costUnits,
         },
-        usage_metadata: {
-          input_tokens: usage.inputTokens,
-          output_tokens: usage.outputTokens,
-          total_tokens: usage.inputTokens + usage.outputTokens,
-        },
-      }),
-      generationInfo: {
-        finishReason: finishReason ?? (done ? "stop" : "incomplete"),
-        costUnits: usage.costUnits,
-      },
-    });
+      });
+    }
   }
 }

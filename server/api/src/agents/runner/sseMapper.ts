@@ -248,6 +248,7 @@ function mapComposePhase(data: Record<string, unknown>): SseComposePhaseEvent[] 
   if (
     phase !== "brief" &&
     phase !== "research" &&
+    phase !== "conflict" &&
     phase !== "structure" &&
     phase !== "draft" &&
     phase !== "completed"
