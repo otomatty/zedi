@@ -11,13 +11,20 @@ import { Button, Card, CardContent, CardHeader, CardTitle } from "@zedi/ui";
 import { AlertTriangle } from "lucide-react";
 import type { ResearchConflictSummary } from "@/lib/wikiCompose/types";
 
+/**
+ * Props for the conflict acknowledgment panel.
+ * 矛盾解消確認パネルの props。
+ */
 export interface ConflictResolutionSectionProps {
   conflicts: ResearchConflictSummary;
   isStreaming: boolean;
   onSubmit: (input?: { note?: string }) => Promise<void>;
 }
 
-/** Conflict acknowledgment panel between Research and Structure. */
+/**
+ * Conflict acknowledgment panel between Research and Structure.
+ * Research と Structure の間で表示する矛盾解消確認パネル。
+ */
 export const ConflictResolutionSection: React.FC<ConflictResolutionSectionProps> = ({
   conflicts,
   isStreaming,

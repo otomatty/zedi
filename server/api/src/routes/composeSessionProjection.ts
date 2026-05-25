@@ -24,7 +24,7 @@ export interface ComposeSessionUiProjection {
   pendingSources?: unknown[];
   latestBatch?: unknown;
   approvedSources?: unknown[];
-  /** P5 conflict-resolution interrupt summary (#953). */
+  /** P5 conflict-resolution interrupt summary (#953). / P5 conflict-resolution 割り込み要約。 */
   researchConflictSummary?: unknown;
   outlineProposal?: unknown[];
   draftedSections?: unknown[];

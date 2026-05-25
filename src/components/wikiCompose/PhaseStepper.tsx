@@ -33,6 +33,8 @@ export interface PhaseStepperProps {
 export const PhaseStepper: React.FC<PhaseStepperProps> = ({ phase }) => {
   // P5 conflict interrupt sits between Research and Structure on the graph, but
   // the stepper keeps five labels — highlight Research while resolving conflicts.
+  // P5 の conflict interrupt は Research と Structure の間にあるが、
+  // ステッパーは 5 ラベル維持のため conflict 中は Research をハイライトする。
   const stepPhase: ComposePhase = phase === "conflict" ? "research" : phase;
   const currentIndex = Math.max(0, PHASE_ORDER.indexOf(stepPhase));
   return (
