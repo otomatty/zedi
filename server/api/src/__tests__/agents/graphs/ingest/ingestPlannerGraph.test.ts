@@ -1,5 +1,6 @@
 /**
  * Ingest planner graph (#952) — research subgraph wiring + routing tests.
+ * ingest プランナーグラフ — 調査 subgraph 配線とルーティングのテスト。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

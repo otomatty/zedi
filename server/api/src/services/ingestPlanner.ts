@@ -265,10 +265,13 @@ function parseConflicts(value: unknown): IngestConflict[] | undefined {
 
 /**
  * Validates a parsed ingest plan object (structured LLM output or `JSON.parse` result).
+ * パース済み ingest プランオブジェクトを検証する（structured output または JSON.parse 結果）。
  *
- * @param parsed - Already-parsed plan object.
+ * @param parsed - Already-parsed plan object. / パース済みプランオブジェクト。
  * @param options - Optional candidate id set for merge target validation.
+ *                  / merge 先検証用の候補 ID 集合（任意）。
  * @throws {@link IngestPlanParseError} when fields are invalid.
+ *         / フィールドが不正な場合。
  */
 export function parseIngestPlanValue(
   parsed: unknown,

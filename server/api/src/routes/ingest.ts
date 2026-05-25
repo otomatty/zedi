@@ -71,6 +71,14 @@ function assertGraphRunArticle(article: IngestArticleSummary): void {
   }
 }
 
+/**
+ * LangGraph `thread_id` scoped per user so shared checkpoint storage cannot collide.
+ * 共有 checkpoint 上での thread_id 衝突を防ぐため userId でスコープする。
+ */
+function scopedIngestGraphThreadId(userId: string, clientThreadId: string): string {
+  return `${userId}:${clientThreadId}`;
+}
+
 function normalizeGraphCandidates(raw: CandidatePage[] | undefined): CandidatePage[] {
   if (!Array.isArray(raw)) return [];
   const out: CandidatePage[] = [];
@@ -358,8 +366,9 @@ interface IngestGraphResumeBody {
  *
  * **Resume**
  *
- * When the graph halts at `human_review_research`, the response includes `threadId`.
- * Call `POST /api/ingest/graph/resume` with the research resume payload
+ * When the graph halts at `human_review_research`, the response includes `threadId`
+ * (client-visible id; checkpoint `thread_id` is scoped as `{userId}:{threadId}`).
+ * Call `POST /api/ingest/graph/resume` with the same `threadId` and research resume payload
  * (`{ approvedSourceIds, rejectedSourceIds?, note? }`, same as compose research).
  */
 app.post("/graph/run", authRequired, rateLimit(), async (c) => {
@@ -380,8 +389,9 @@ app.post("/graph/run", authRequired, rateLimit(), async (c) => {
   assertGraphRunArticle(body.article);
 
   const candidates = normalizeGraphCandidates(body.candidates);
-  const threadId =
+  const clientThreadId =
     typeof body.threadId === "string" && body.threadId.trim() ? body.threadId.trim() : randomUUID();
+  const threadId = scopedIngestGraphThreadId(userId, clientThreadId);
 
   let backend: ExecutionBackend;
   try {
@@ -445,7 +455,7 @@ app.post("/graph/run", authRequired, rateLimit(), async (c) => {
 
   return c.json({
     status: result.status,
-    threadId,
+    threadId: clientThreadId,
     graphId: INGEST_PLANNER_GRAPH_ID,
     plan: output?.ingestPlan ?? null,
     output,
@@ -470,7 +480,11 @@ app.post("/graph/resume", authRequired, rateLimit(), async (c) => {
   if (typeof body.threadId !== "string" || !body.threadId.trim()) {
     throw new HTTPException(400, { message: "threadId is required" });
   }
-  const threadId = body.threadId.trim();
+  if (!Object.prototype.hasOwnProperty.call(body, "resume")) {
+    throw new HTTPException(400, { message: "resume is required" });
+  }
+  const clientThreadId = body.threadId.trim();
+  const threadId = scopedIngestGraphThreadId(userId, clientThreadId);
 
   let backend: ExecutionBackend;
   try {
@@ -527,7 +541,7 @@ app.post("/graph/resume", authRequired, rateLimit(), async (c) => {
 
   return c.json({
     status: result.status,
-    threadId,
+    threadId: clientThreadId,
     graphId: INGEST_PLANNER_GRAPH_ID,
     plan: output?.ingestPlan ?? null,
     output,

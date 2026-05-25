@@ -36,6 +36,15 @@ export async function prepareIngest(
   const userSchema = state.userSchema;
   const maxIterations = clampMaxIterations(state.maxIterations);
 
+  for (const [i, c] of candidates.entries()) {
+    if (!c?.id?.trim() || typeof c.title !== "string" || !c.title.trim()) {
+      throw new Error(`prepare_ingest: candidates[${i}] requires non-empty { id, title }`);
+    }
+    if (c.excerpt != null && typeof c.excerpt !== "string") {
+      throw new Error(`prepare_ingest: candidates[${i}].excerpt must be a string when provided`);
+    }
+  }
+
   const candidateBlock =
     candidates.length === 0
       ? "(no candidates)"

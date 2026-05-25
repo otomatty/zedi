@@ -1,10 +1,12 @@
 /**
  * Formats approved research + latest batch evaluation for the ingest planner prompt.
+ * 採用調査ソースと最新 batch 評価を ingest プランナープロンプト用に整形する。
  */
 import type { IngestPlannerStateType } from "../state.js";
 
 /**
  * Build a markdown block summarizing research loop output for `plan_ingest`.
+ * `plan_ingest` 向けに調査ループ出力を markdown ブロックにまとめる。
  */
 export function formatResearchForIngest(state: IngestPlannerStateType): string {
   const lines: string[] = [];

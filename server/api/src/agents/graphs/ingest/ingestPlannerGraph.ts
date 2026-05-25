@@ -24,9 +24,9 @@ import {
 import { IngestPlannerState } from "./state.js";
 import { prepareIngest, planIngest } from "./nodes/index.js";
 
-/** Registered graph id. */
+/** Registered graph id. / 登録グラフ ID。 */
 export const INGEST_PLANNER_GRAPH_ID = "ingest-planner" as const;
-/** Registered graph version. */
+/** Registered graph version. / 登録グラフのバージョン。 */
 export const INGEST_PLANNER_GRAPH_VERSION = "1.0.0";
 
 const factory: GraphFactory = ({ checkpointer }) => {
@@ -64,6 +64,7 @@ const factory: GraphFactory = ({ checkpointer }) => {
 
 /**
  * Register the ingest planner graph. Idempotent; call from `app.ts` bootstrap.
+ * ingest プランナーグラフを登録する。`app.ts` 起動時に呼ぶ（冪等）。
  */
 export function registerIngestPlannerGraph(): void {
   registerGraph({
