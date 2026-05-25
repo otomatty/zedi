@@ -309,4 +309,36 @@ describe("useWikiComposeSession", () => {
       }),
     );
   });
+
+  it("retries a failed session with chatSeed from row metadata when initialInput is absent", async () => {
+    mocks.getSession.mockResolvedValue({
+      session: {
+        ...SESSION,
+        status: "failed",
+        metadata: {
+          composeSeed: {
+            outline: "- topic",
+            conversationText: "User: seed me",
+          },
+        },
+      },
+      projection: {},
+    });
+    arrangeRun([{ type: "done", status: "failed" }]);
+
+    renderHook(() => useWikiComposeSession({ pageId: "page-1", sessionId: "sess-1" }));
+
+    await waitFor(() => expect(mocks.runSession).toHaveBeenCalled());
+    expect(mocks.createSession).not.toHaveBeenCalled();
+    expect(mocks.runSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: {
+          chatSeed: {
+            outline: "- topic",
+            conversationText: "User: seed me",
+          },
+        },
+      }),
+    );
+  });
 });
