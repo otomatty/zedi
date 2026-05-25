@@ -7,7 +7,7 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { z } from "zod";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
-import { getOrchestratorModelId } from "../../../subgraphs/research/nodes/planQueries.js";
+import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
 import {
   buildIngestPlannerPrompt,
@@ -60,8 +60,9 @@ export async function planIngest(
     }
   }
 
+  const modelId = await resolveComposeModelId("orchestrator", ctx.backend, ctx.tier, ctx.db);
   const model = await createZediChatModel({
-    modelId: getOrchestratorModelId(),
+    modelId,
     userId: ctx.userId,
     tier: ctx.tier,
     db: ctx.db,

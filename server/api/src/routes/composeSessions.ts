@@ -270,8 +270,17 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
     .limit(1);
   if (!session) throw new HTTPException(404, { message: "Session not found" });
 
-  if (session.status === "completed" || session.status === "cancelled") {
-    throw new HTTPException(409, { message: `Session is ${session.status}` });
+  if (
+    session.status === "completed" ||
+    session.status === "cancelled" ||
+    session.status === "interrupted"
+  ) {
+    throw new HTTPException(409, {
+      message:
+        session.status === "interrupted"
+          ? "Session is interrupted; use PATCH /resume"
+          : `Session is ${session.status}`,
+    });
   }
 
   let body: RunSessionBody;
@@ -305,7 +314,7 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
       and(
         eq(wikiComposeSessions.id, id),
         eq(wikiComposeSessions.pageId, pageId),
-        inArray(wikiComposeSessions.status, ["pending", "interrupted", "failed"]),
+        inArray(wikiComposeSessions.status, ["pending", "failed"]),
       ),
     )
     .returning();
