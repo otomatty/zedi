@@ -554,16 +554,30 @@ app.delete("/:pageId/compose-sessions/:id", authRequired, async (c) => {
     return c.json({ status: row.status });
   }
 
-  await db
+  const cancellable: WikiComposeSessionStatus[] = ["pending", "running", "interrupted", "failed"];
+
+  const [cancelled] = await db
     .update(wikiComposeSessions)
     .set({
       status: "cancelled" satisfies WikiComposeSessionStatus,
       closedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(eq(wikiComposeSessions.id, id));
+    .where(and(eq(wikiComposeSessions.id, id), inArray(wikiComposeSessions.status, cancellable)))
+    .returning({ status: wikiComposeSessions.status });
 
-  return c.json({ status: "cancelled" });
+  if (cancelled) {
+    return c.json({ status: "cancelled" });
+  }
+
+  // Graph may have finished (e.g. `completed`) between the initial read and this update.
+  const [latest] = await db
+    .select({ status: wikiComposeSessions.status })
+    .from(wikiComposeSessions)
+    .where(and(eq(wikiComposeSessions.id, id), eq(wikiComposeSessions.pageId, pageId)))
+    .limit(1);
+
+  return c.json({ status: latest?.status ?? row.status });
 });
 
 function isInterruptError(err: unknown): boolean {
