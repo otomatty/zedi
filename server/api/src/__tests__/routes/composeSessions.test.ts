@@ -35,6 +35,12 @@ vi.mock("../../services/subscriptionService.js", () => ({
 
 const mockGetUserAiCredentialPlaintext = vi.fn();
 
+const mockValidateModelAccess = vi.fn();
+
+vi.mock("../../services/usageService.js", () => ({
+  validateModelAccess: (...args: unknown[]) => mockValidateModelAccess(...args),
+}));
+
 vi.mock("../../services/userAiCredentialService.js", () => ({
   getUserAiCredentialPlaintext: (...args: unknown[]) => mockGetUserAiCredentialPlaintext(...args),
 }));
@@ -99,6 +105,13 @@ function createComposeApp(dbResults: unknown[]) {
 
 beforeEach(() => {
   mockGetUserAiCredentialPlaintext.mockReset();
+  mockValidateModelAccess.mockReset();
+  mockValidateModelAccess.mockResolvedValue({
+    provider: "anthropic",
+    apiModelId: "claude-3-5-haiku",
+    inputCostUnits: 1,
+    outputCostUnits: 2,
+  });
   __resetRegistryForTests();
   // Register a graph the routes can resolve. Body is irrelevant for CRUD tests.
   registerGraph({
@@ -160,6 +173,12 @@ describe("POST /api/pages/:pageId/compose-sessions", () => {
 
   it("returns 400 for user_openai when credential is missing", async () => {
     mockGetUserAiCredentialPlaintext.mockResolvedValue(null);
+    mockValidateModelAccess.mockResolvedValue({
+      provider: "openai",
+      apiModelId: "gpt-4o-mini",
+      inputCostUnits: 1,
+      outputCostUnits: 2,
+    });
     const { app } = createComposeApp([...pageAccessPrefix()]);
     const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions`, {
       method: "POST",
@@ -176,6 +195,12 @@ describe("POST /api/pages/:pageId/compose-sessions", () => {
 
   it("creates a session with user_openai when credential exists", async () => {
     mockGetUserAiCredentialPlaintext.mockResolvedValue("sk-user");
+    mockValidateModelAccess.mockResolvedValue({
+      provider: "openai",
+      apiModelId: "gpt-4o-mini",
+      inputCostUnits: 1,
+      outputCostUnits: 2,
+    });
     const createdRow = {
       id: "sess-byok",
       pageId: PAGE_ID,

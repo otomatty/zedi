@@ -74,7 +74,7 @@ export const ComposeByokCredentialsSection: React.FC = () => {
     setSaving(provider);
     setError(null);
     try {
-      await upsertUserAiCredential(provider, draftKeys[provider]);
+      await upsertUserAiCredential(provider, draftKeys[provider].trim());
       setDraftKeys((prev) => ({ ...prev, [provider]: "" }));
       await reload();
     } catch (err) {

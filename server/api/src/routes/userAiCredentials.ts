@@ -61,8 +61,10 @@ app.put("/:provider", authRequired, rateLimit(), async (c) => {
   try {
     await upsertUserAiCredential(userId, provider, apiKey, db);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    throw new HTTPException(400, { message });
+    if (err instanceof Error && err.message === "API key is required") {
+      throw new HTTPException(400, { message: err.message });
+    }
+    throw err;
   }
   return c.json({ ok: true, provider });
 });

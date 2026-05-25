@@ -38,5 +38,7 @@ export const userAiCredentials = pgTable(
   ],
 );
 
+/** Selected row type for `user_ai_credentials`. `user_ai_credentials` の取得行型。 */
 export type UserAiCredential = typeof userAiCredentials.$inferSelect;
+/** Insert type for `user_ai_credentials`. `user_ai_credentials` の挿入型。 */
 export type NewUserAiCredential = typeof userAiCredentials.$inferInsert;

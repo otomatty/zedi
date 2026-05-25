@@ -54,11 +54,7 @@ import {
   assertSupportedComposeBackend,
   UnsupportedBackendError,
 } from "../agents/core/llm/modelFactory.js";
-import {
-  backendToCredentialProvider,
-  isUserByokBackend,
-} from "../agents/core/types/executionBackend.js";
-import { getUserAiCredentialPlaintext } from "../services/userAiCredentialService.js";
+import { assertComposeBackendReady } from "../agents/core/composeBackendValidation.js";
 import { SSE_EVENT_NAMES, type SseEvent } from "../agents/core/types/sseEvents.js";
 import { GRAPH_CONTEXT_CONFIG_KEY } from "../agents/core/types/graphContext.js";
 import { resolveCheckpointerForRun } from "../agents/core/checkpoint/index.js";
@@ -184,15 +180,8 @@ app.post("/:pageId/compose-sessions", authRequired, rateLimit(), async (c) => {
     throw err;
   }
 
-  if (isUserByokBackend(backend)) {
-    const provider = backendToCredentialProvider(backend);
-    const key = await getUserAiCredentialPlaintext(userId, provider, db);
-    if (!key?.trim()) {
-      throw new HTTPException(400, {
-        message: `No API credential configured for backend "${backend}"`,
-      });
-    }
-  }
+  const tier = await getUserTier(userId, db);
+  await assertComposeBackendReady({ backend, graphId, userId, tier, db });
 
   const [row] = await db
     .insert(wikiComposeSessions)

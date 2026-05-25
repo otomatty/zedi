@@ -115,11 +115,19 @@ export async function getUserAiCredentialPlaintext(
   provider: UserAiCredentialProvider,
   db: Database,
 ): Promise<string | null> {
+  if (!isUserAiCredentialStorageEnabled()) return null;
+
   const [row] = await db
     .select()
     .from(userAiCredentials)
     .where(and(eq(userAiCredentials.userId, userId), eq(userAiCredentials.provider, provider)))
     .limit(1);
   if (!row) return null;
-  return decryptUserAiCredential(row.encryptedApiKey);
+  try {
+    return decryptUserAiCredential(row.encryptedApiKey);
+  } catch {
+    // Master key rotated or corrupted blob — treat as missing so callers return 400.
+    // マスター鍵ローテーション等で復号不能な行は未設定扱い。
+    return null;
+  }
 }
