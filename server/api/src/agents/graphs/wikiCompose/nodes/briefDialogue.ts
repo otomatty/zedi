@@ -15,18 +15,12 @@ import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
+import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
 import { loadPageSnapshot } from "./shared/loadPageSnapshot.js";
 import { dispatchComposePhase } from "./shared/dispatch.js";
 import type { WikiComposeStateType, WikiComposeStateUpdate } from "../state.js";
 import type { BriefQuestion } from "../types.js";
-
-const ORCHESTRATOR_MODEL_ENV = "WIKI_COMPOSE_ORCHESTRATOR_MODEL_ID";
-const ORCHESTRATOR_MODEL_FALLBACK = "claude-3-5-haiku";
-
-function getOrchestratorModelId(): string {
-  return process.env[ORCHESTRATOR_MODEL_ENV]?.trim() || ORCHESTRATOR_MODEL_FALLBACK;
-}
 
 /**
  * Schema for the LLM's structured output. The Orchestrator is told it MAY
@@ -122,8 +116,9 @@ export async function briefDialogue(
   // セッション開始時に 1 度だけ読み、以後は state を参照する。
   const snapshot = state.pageSnapshot ?? (await loadPageSnapshot(ctx.db, ctx.pageId));
 
+  const modelId = await resolveComposeModelId("orchestrator", ctx.backend, ctx.tier, ctx.db);
   const model = await createZediChatModel({
-    modelId: getOrchestratorModelId(),
+    modelId,
     userId: ctx.userId,
     tier: ctx.tier,
     db: ctx.db,

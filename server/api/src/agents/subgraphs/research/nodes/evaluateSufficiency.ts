@@ -11,9 +11,9 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { z } from "zod";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
+import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
 import { getGraphContext } from "./shared/getGraphContext.js";
 import { dispatchResearchEvaluation } from "./shared/dispatchSseCustom.js";
-import { getOrchestratorModelId } from "./planQueries.js";
 import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { Evaluation } from "../types.js";
 
@@ -71,8 +71,9 @@ export async function evaluateSufficiency(
 ): Promise<ResearchLoopStateUpdate> {
   const ctx = getGraphContext(config);
 
+  const modelId = await resolveComposeModelId("orchestrator", ctx.backend, ctx.tier, ctx.db);
   const model = await createZediChatModel({
-    modelId: getOrchestratorModelId(),
+    modelId,
     userId: ctx.userId,
     tier: ctx.tier,
     db: ctx.db,

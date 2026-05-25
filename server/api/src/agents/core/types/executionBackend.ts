@@ -1,4 +1,6 @@
 import type { UserAiCredentialProvider } from "../../../schema/userAiCredentials.js";
+import { getUserAiCredentialPlaintext } from "../../../services/userAiCredentialService.js";
+import type { Database } from "../../../types/index.js";
 
 /**
  * Execution backend identifies where the LangGraph agent runs and which
@@ -94,4 +96,48 @@ export function credentialProviderToBackend(
     case "google":
       return "user_google";
   }
+}
+
+/**
+ * Execution backend for `web_search` given the session backend and resolved model provider.
+ *
+ * - `zedi_managed` sessions always bill web search to Zedi (system keys).
+ * - BYOK sessions use the user's key when the web-search model provider matches, or when
+ *   the user has a stored credential for that provider (cross-provider research).
+ */
+export function resolveWebSearchExecutionBackend(
+  sessionBackend: ExecutionBackend,
+  modelProvider: UserAiCredentialProvider,
+): ExecutionBackend {
+  if (!isUserByokBackend(sessionBackend)) {
+    return "zedi_managed";
+  }
+  const sessionProvider = backendToCredentialProvider(sessionBackend);
+  if (sessionProvider === modelProvider) {
+    return sessionBackend;
+  }
+  return credentialProviderToBackend(modelProvider);
+}
+
+/**
+ * Resolve web-search billing backend after verifying cross-provider BYOK keys exist.
+ * クロスプロバイダ BYOK 時は credential の有無を確認してから backend を決める。
+ */
+export async function resolveWebSearchExecutionBackendForRun(
+  sessionBackend: ExecutionBackend,
+  modelProvider: UserAiCredentialProvider,
+  userId: string,
+  db: Database,
+): Promise<ExecutionBackend> {
+  const candidate = resolveWebSearchExecutionBackend(sessionBackend, modelProvider);
+  if (!isUserByokBackend(sessionBackend) || candidate === sessionBackend) {
+    return candidate;
+  }
+  if (!isUserByokBackend(candidate)) {
+    return "zedi_managed";
+  }
+  const crossProvider = backendToCredentialProvider(candidate);
+  const key = await getUserAiCredentialPlaintext(userId, crossProvider, db);
+  if (key?.trim()) return candidate;
+  return "zedi_managed";
 }

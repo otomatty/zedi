@@ -15,17 +15,11 @@ import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
+import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
 import { dispatchComposePhase } from "./shared/dispatch.js";
 import type { WikiComposeStateType, WikiComposeStateUpdate } from "../state.js";
 import type { OutlineSection } from "../types.js";
-
-const ORCHESTRATOR_MODEL_ENV = "WIKI_COMPOSE_ORCHESTRATOR_MODEL_ID";
-const ORCHESTRATOR_MODEL_FALLBACK = "claude-3-5-haiku";
-
-function getOrchestratorModelId(): string {
-  return process.env[ORCHESTRATOR_MODEL_ENV]?.trim() || ORCHESTRATOR_MODEL_FALLBACK;
-}
 
 /**
  * Structured output schema. 3..10 sections, depth 1..3, each with a short
@@ -85,8 +79,9 @@ export async function structureDialogue(
 
   await dispatchComposePhase({ phase: "structure", status: "entered" }, config);
 
+  const modelId = await resolveComposeModelId("orchestrator", ctx.backend, ctx.tier, ctx.db);
   const model = await createZediChatModel({
-    modelId: getOrchestratorModelId(),
+    modelId,
     userId: ctx.userId,
     tier: ctx.tier,
     db: ctx.db,
