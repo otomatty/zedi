@@ -59,7 +59,10 @@ export function getPostgresCheckpointer(schema: string = "public"): PostgresSave
 export async function ensurePostgresCheckpointerSetup(schema: string = "public"): Promise<void> {
   if (!setupOnce) {
     const saver = getPostgresCheckpointer(schema);
-    setupOnce = saver.setup();
+    setupOnce = saver.setup().catch((error: unknown) => {
+      setupOnce = null;
+      throw error;
+    });
   }
   return setupOnce;
 }

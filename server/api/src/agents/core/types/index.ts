@@ -31,5 +31,7 @@ export {
   type SseResearchIterationEvent,
   type SseResearchEvaluationEvent,
   type SseResearchBatchEvent,
+  type SseComposePhaseEvent,
+  type SseComposeSectionEvent,
   SSE_EVENT_NAMES,
 } from "./sseEvents.js";

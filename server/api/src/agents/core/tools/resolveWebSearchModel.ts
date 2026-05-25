@@ -91,13 +91,19 @@ export async function resolveWebSearchModelId(
     )
     .orderBy(asc(aiModels.inputCostUnits), asc(aiModels.outputCostUnits));
 
-  // Prefer OpenAI when costs tie, since `useWebSearch` (chat completions
-  // `web_search_options`) is well-tested in `aiProviders.ts`; Google's
-  // `googleSearch` tool is also supported but requires the `tools` payload.
-  // 同コストなら OpenAI を優先（`useWebSearch` 経路が安定）。
-  const openai = rows.find((r) => r.provider === "openai");
-  if (openai) return openai.id;
-  const google = rows.find((r) => r.provider === "google");
-  if (google) return google.id;
-  return null;
+  if (rows.length === 0) return null;
+
+  const [first] = rows;
+  if (!first) return null;
+
+  // Prefer OpenAI only among cheapest rows (cost tie-break), since `useWebSearch`
+  // is well-tested in `aiProviders.ts`.
+  // 最安行の中でのみ OpenAI を優先（`aiProviders.ts` の useWebSearch 経路が安定）。
+  const cheapestInput = first.inputCostUnits;
+  const cheapestOutput = first.outputCostUnits;
+  const cheapest = rows.filter(
+    (r) => r.inputCostUnits === cheapestInput && r.outputCostUnits === cheapestOutput,
+  );
+  const preferred = cheapest.find((r) => r.provider === "openai") ?? cheapest[0];
+  return preferred?.id ?? null;
 }

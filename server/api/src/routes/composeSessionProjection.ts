@@ -136,7 +136,9 @@ export function projectComposeStateValues(
   // Interrupt-derived phase wins; row `phase` is only a fallback.
   // interrupt 由来の phase を優先し、行の phase はフォールバックのみ。
   if (typeof state.phase === "string" && projection.phase === undefined) {
-    projection.phase = phaseFromSessionRow(state.phase, "interrupted");
+    projection.phase = state.phase.startsWith("completed")
+      ? "completed"
+      : phaseFromSessionRow(state.phase, "interrupted");
   }
 
   return projection;

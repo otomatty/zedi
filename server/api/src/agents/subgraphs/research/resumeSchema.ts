@@ -23,11 +23,23 @@ import { z } from "zod";
  * required (empty array means "reject all"); `rejectedSourceIds` defaults to
  * the empty array; `note` is free-form metadata.
  */
-export const researchResumeSchema = z.object({
-  approvedSourceIds: z.array(z.string().min(1)).default([]),
-  rejectedSourceIds: z.array(z.string().min(1)).optional().default([]),
-  note: z.string().optional(),
-});
+export const researchResumeSchema = z
+  .object({
+    approvedSourceIds: z.array(z.string().min(1)),
+    rejectedSourceIds: z.array(z.string().min(1)).optional().default([]),
+    note: z.string().optional(),
+  })
+  .superRefine((value, ctx) => {
+    const rejected = new Set(value.rejectedSourceIds);
+    const overlap = value.approvedSourceIds.filter((id) => rejected.has(id));
+    if (overlap.length > 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["rejectedSourceIds"],
+        message: `approvedSourceIds and rejectedSourceIds must not overlap: ${overlap.join(", ")}`,
+      });
+    }
+  });
 
 /** Inferred TS type for the parsed resume payload. */
 export type ResearchResumeParsed = z.infer<typeof researchResumeSchema>;

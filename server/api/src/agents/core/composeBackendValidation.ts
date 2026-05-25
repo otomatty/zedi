@@ -1,9 +1,16 @@
 /**
- * Validate BYOK backend against compose graph model providers (#951).
- * Compose グラフのモデル provider と BYOK backend の整合を検証する。
+ * Pre-flight BYOK checks for Wiki Compose session creation (#951).
+ * Wiki Compose セッション作成前の BYOK 事前チェック（#951）。
+ *
+ * Static env model ids are not validated here — provider matching is enforced at
+ * runtime via {@link resolveComposeModelId}. This function only verifies that
+ * the user has a stored credential when the graph will call an LLM.
+ *
+ * 静的 env モデル id との provider 照合は行わない。実行時の
+ * `resolveComposeModelId` が provider 整合を担保する。本関数は LLM を呼ぶ
+ * グラフで credential が存在するかだけを確認する。
  */
 import { HTTPException } from "hono/http-exception";
-import { validateModelAccess } from "../../services/usageService.js";
 import type { Database, UserTier } from "../../types/index.js";
 import { getComposeModelIdsForGraph } from "./composeModelConfig.js";
 import {
@@ -14,8 +21,8 @@ import {
 import { getUserAiCredentialPlaintext } from "../../services/userAiCredentialService.js";
 
 /**
- * Ensure BYOK backend matches configured compose models and credentials exist.
- * BYOK backend が compose モデルと credential と整合するか検証する。
+ * Ensure a BYOK backend has stored credentials when the target graph uses LLMs.
+ * LLM を使うグラフ向け BYOK backend に credential が存在するか検証する。
  */
 export async function assertComposeBackendReady(input: {
   backend: ExecutionBackend;
@@ -26,18 +33,12 @@ export async function assertComposeBackendReady(input: {
 }): Promise<void> {
   if (!isUserByokBackend(input.backend)) return;
 
-  const expectedProvider = backendToCredentialProvider(input.backend);
   const modelIds = getComposeModelIdsForGraph(input.graphId);
+  // Model-less graphs (e.g. wiki-maintenance) never call `createZediChatModel`.
+  // LLM を呼ばないグラフ（wiki-maintenance 等）は credential 不要。
+  if (modelIds.length === 0) return;
 
-  for (const modelId of modelIds) {
-    const modelInfo = await validateModelAccess(modelId, input.tier, input.db);
-    if (modelInfo.provider !== expectedProvider) {
-      throw new HTTPException(400, {
-        message: `Backend "${input.backend}" does not match compose model "${modelId}" (provider ${modelInfo.provider})`,
-      });
-    }
-  }
-
+  const expectedProvider = backendToCredentialProvider(input.backend);
   const key = await getUserAiCredentialPlaintext(input.userId, expectedProvider, input.db);
   if (!key?.trim()) {
     throw new HTTPException(400, {

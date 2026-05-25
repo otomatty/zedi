@@ -139,6 +139,17 @@ describe("mapLangGraphEvent", () => {
     ]);
   });
 
+  it("maps on_custom_event compose_phase conflict to a typed compose_phase event", () => {
+    const ev: LangGraphRuntimeEvent = {
+      event: "on_custom_event",
+      name: "compose_phase",
+      data: { phase: "conflict", status: "entered" },
+    };
+    expect(mapLangGraphEvent(ev)).toEqual([
+      { type: "compose_phase", phase: "conflict", status: "entered" },
+    ]);
+  });
+
   it("drops compose_phase with an unknown phase value", () => {
     const ev: LangGraphRuntimeEvent = {
       event: "on_custom_event",

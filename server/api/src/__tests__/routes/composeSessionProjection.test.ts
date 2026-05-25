@@ -81,5 +81,6 @@ describe("projectComposeStateValues", () => {
     });
     expect(projection.completedMarkdown).toBe("## A\n\nBody");
     expect(projection.draftedSections).toHaveLength(1);
+    expect(projection.phase).toBe("completed");
   });
 });

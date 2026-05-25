@@ -41,6 +41,7 @@ import type { BaseMessage } from "@langchain/core/messages";
 import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
 import { ChatGenerationChunk, type ChatResult } from "@langchain/core/outputs";
 import { callProvider, streamProvider } from "../../../services/aiProviders.js";
+import { calculateCost } from "../../../services/usageService.js";
 import type {
   AIChatOptions,
   AIProviderType,
@@ -48,7 +49,7 @@ import type {
   Database,
   UserTier,
 } from "../../../types/index.js";
-import { recordZediUsage, toZediMessages } from "./usageCallback.js";
+import { recordZediUsage, toZediMessages, type RecordZediUsageResult } from "./usageCallback.js";
 
 /**
  * `callProvider` / `streamProvider` のインジェクション型。テストでは fake を
@@ -290,9 +291,9 @@ export class ZediChatModel extends BaseChatModel<BaseChatModelCallOptions> {
           text: chunk.content,
           message: new AIMessageChunk({ content: chunk.content }),
         });
+        // LangChain callback / SSE 向けにトークン delta を先に流す。
         // Surface incremental tokens to LangChain callback consumers so any
-        // `streamEvents` listener (e.g. SSE mapper) sees deltas before the
-        // final usage event.
+        // `streamEvents` listener (e.g. SSE mapper) sees deltas before usage.
         await runManager?.handleLLMNewToken(
           chunk.content,
           undefined,
@@ -312,26 +313,49 @@ export class ZediChatModel extends BaseChatModel<BaseChatModelCallOptions> {
       }
     }
 
-    // Streaming providers in this codebase do not return token counts; mirror
-    // chat.ts and estimate. Pre-encoded message length is what the user "paid"
-    // for, response length is what they received.
     const promptLength = zediMessages.reduce((sum, m) => sum + m.content.length, 0);
     const inputTokens = Math.ceil(promptLength / 4);
     const outputTokens = Math.ceil(accumulated.length / 4);
 
-    const usage = await recordZediUsage({
-      db: this.db,
-      userId: this.userId,
-      modelId: this.modelRowId,
-      feature: this.feature,
-      usage: { inputTokens, outputTokens },
-      inputCostUnits: this.inputCostUnits,
-      outputCostUnits: this.outputCostUnits,
-      apiMode: this.apiMode,
-    });
+    let usage: RecordZediUsageResult;
+    if (done) {
+      try {
+        usage = await recordZediUsage({
+          db: this.db,
+          userId: this.userId,
+          modelId: this.modelRowId,
+          feature: this.feature,
+          usage: { inputTokens, outputTokens },
+          inputCostUnits: this.inputCostUnits,
+          outputCostUnits: this.outputCostUnits,
+          apiMode: this.apiMode,
+        });
+      } catch (err) {
+        // Billing failure must not mask a successful stream.
+        // 課金記録失敗で成功ストリームを潰さない。
+        console.error("Failed to record streaming usage", err);
+        usage = {
+          inputTokens,
+          outputTokens,
+          costUnits:
+            this.apiMode === "user_key"
+              ? 0
+              : calculateCost(
+                  { inputTokens, outputTokens },
+                  this.inputCostUnits,
+                  this.outputCostUnits,
+                ),
+        };
+      }
+    } else {
+      // Stream ended without `done` — expose metadata only, no DB billing (chat.ts 同様).
+      // `done` 未到達で終了した incomplete ストリームは DB 課金しない。
+      usage = { inputTokens, outputTokens, costUnits: 0 };
+    }
 
     // Final chunk surfaces aggregate usage so downstream consumers (sseMapper,
     // LangChain callbacks) can read totals from a single ChatGenerationChunk.
+    // 集計 usage を最終チャンクで返し、sseMapper 等が 1 箇所から読めるようにする。
     yield new ChatGenerationChunk({
       text: "",
       message: new AIMessageChunk({
