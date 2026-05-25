@@ -1,12 +1,15 @@
-import { useRef, useState, type MutableRefObject, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from "react";
 import type { Editor } from "@tiptap/core";
 import type { WikiLinkSuggestionState } from "../extensions/wikiLinkSuggestionPlugin";
 import type { SlashSuggestionState } from "../extensions/slashSuggestionPlugin";
 import type { TagSuggestionState } from "../extensions/tagSuggestionPlugin";
+import type { WikiLinkGhostCompletionCandidate } from "../extensions/wikiLinkGhostCompletionPlugin";
 import type { WikiLinkSuggestionHandle } from "../extensions/WikiLinkSuggestion";
 import type { TagSuggestionHandle } from "../extensions/TagSuggestion";
 import type { SlashSuggestionHandle } from "./SlashSuggestionLayer";
+import { useAuth } from "@/hooks/useAuth";
 import { useGeneralSettings } from "@/hooks/useGeneralSettings";
+import { useWikiLinkCandidates } from "@/hooks/useWikiLinkCandidates";
 import { useWikiLinkNavigation } from "./useWikiLinkNavigation";
 import { useEditorSetup } from "./useEditorSetup";
 import { useSuggestionEffects } from "./useSuggestionEffects";
@@ -17,6 +20,7 @@ import { useImageUploadController } from "./useImageUploadController";
 import { useClaudeAgentSlashAvailability } from "./useClaudeAgentSlashAvailability";
 import { useNoteWorkspaceOptional } from "@/contexts/NoteWorkspaceContext";
 import type { TiptapEditorProps } from "./types";
+import type { PageActionContext } from "../PageActionHub/types";
 
 function useEditorControllers(args: {
   content: string;
@@ -68,6 +72,16 @@ function useEditorControllers(args: {
    * checks (issue #713 Phase 4).
    */
   pageNoteId: string | null;
+  /**
+   * インライン・ゴースト補完（issue #930）に渡す候補一覧の getter。
+   * `useTiptapEditorController` で `useWikiLinkCandidates(pageNoteId)` を
+   * ref に保持し `() => ref.current` を渡す。
+   *
+   * Getter returning the latest candidate list for inline ghost completion
+   * (issue #930). Held as a ref in `useTiptapEditorController` to avoid
+   * editor re-creation on candidate updates.
+   */
+  getGhostCompletionCandidates: () => ReadonlyArray<WikiLinkGhostCompletionCandidate>;
 }) {
   const { editor, handleInsertMermaid, isEditorInitializedRef } = useEditorSetup({
     content: args.content,
@@ -98,6 +112,7 @@ function useEditorControllers(args: {
     tagSuggestionRef: args.tagSuggestionRef,
     workspaceRoot: args.workspaceRoot,
     noteId: args.noteId,
+    getGhostCompletionCandidates: args.getGhostCompletionCandidates,
   });
 
   const suggestionUi = useSuggestionEffects({
@@ -150,14 +165,17 @@ export function useTiptapEditorController({
   collaborationConfig,
   focusContentRef,
   insertAtCursorRef,
+  pageActionHubRef,
   initialContent,
   onInitialContentApplied,
   isWikiGenerating = false,
   wikiContentForCollab,
   onWikiContentApplied,
   pageNoteId = null,
+  wikiComposeHref,
 }: TiptapEditorProps) {
   const { editorFontSizePx } = useGeneralSettings();
+  const { isSignedIn } = useAuth();
   const noteWorkspace = useNoteWorkspaceOptional();
   const workspaceRoot = noteWorkspace?.workspaceRoot ?? null;
   const noteIdForWorkspace = noteWorkspace?.noteId ?? null;
@@ -171,6 +189,17 @@ export function useTiptapEditorController({
     handleConfirmCreate,
     handleCancelCreate,
   } = useWikiLinkNavigation({ pageNoteId });
+  // Inline ghost completion (issue #930): keep the latest candidate list in a
+  // ref so the ProseMirror plugin can read it on every transaction without
+  // forcing `useEditor` to re-run when candidates change.
+  // インライン・ゴースト補完（issue #930）の候補一覧を ref に保持。
+  // 候補更新で `useEditor` が再実行されないように getter 経由で渡す。
+  const { pages: ghostCompletionCandidates } = useWikiLinkCandidates(pageNoteId);
+  const ghostCompletionCandidatesRef =
+    useRef<ReadonlyArray<WikiLinkGhostCompletionCandidate>>(ghostCompletionCandidates);
+  useEffect(() => {
+    ghostCompletionCandidatesRef.current = ghostCompletionCandidates;
+  }, [ghostCompletionCandidates]);
   const [mermaidDialogOpen, setMermaidDialogOpen] = useState(false);
   const {
     storageSettings,
@@ -242,11 +271,26 @@ export function useTiptapEditorController({
     workspaceRoot,
     noteId: noteIdForWorkspace,
     pageNoteId,
+    getGhostCompletionCandidates: () => ghostCompletionCandidatesRef.current,
   });
   const { handleInsertThumbnailImage } = useThumbnailController(
     editorRef,
     pageTitle,
     storageSettings,
+  );
+
+  // PageActionHub に渡すコンテキスト。レジストリゲートと各アクションが参照する。
+  // Context object passed to PageActionHub; consumed by registry gates and actions.
+  const pageActionContext: PageActionContext = useMemo(
+    () => ({
+      pageTitle,
+      isReadOnly,
+      isSignedIn,
+      hasThumbnail,
+      insertThumbnail: handleInsertThumbnailImage,
+      wikiComposeHref,
+    }),
+    [pageTitle, isReadOnly, isSignedIn, hasThumbnail, handleInsertThumbnailImage, wikiComposeHref],
   );
 
   return {
@@ -293,5 +337,7 @@ export function useTiptapEditorController({
     claudeWorkspaceRoot: noteWorkspace?.workspaceRoot ?? null,
     claudeWorkspaceNoteId: noteWorkspace?.noteId ?? null,
     pageNoteId,
+    pageActionHubRef,
+    pageActionContext,
   };
 }

@@ -1,20 +1,24 @@
-import React from "react";
+import React, { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { EditorContent } from "@tiptap/react";
-import { cn } from "@zedi/ui";
+import { cn, useIsMobile } from "@zedi/ui";
 import { MermaidGeneratorDialog } from "./MermaidGeneratorDialog";
 import { CreatePageDialog } from "./TiptapEditor/CreatePageDialog";
 import type { TiptapEditorProps } from "./TiptapEditor/types";
 import { StorageSetupDialog } from "./TiptapEditor/StorageSetupDialog";
 import { DragOverlay } from "./TiptapEditor/DragOverlay";
 import { WikiLinkSuggestionLayer } from "./TiptapEditor/WikiLinkSuggestionLayer";
+import { FloatingWikiLinkInputBar } from "./FloatingWikiLinkInputBar";
 import { WikiLinkHoverCardLayer } from "./TiptapEditor/WikiLinkHoverCardLayer";
 import { TagSuggestionLayer } from "./TiptapEditor/TagSuggestionLayer";
 import { SlashSuggestionLayer } from "./TiptapEditor/SlashSuggestionLayer";
 import { EditorBubbleMenu } from "./TiptapEditor/EditorBubbleMenu";
+import { MobileSelectionSheet } from "./TiptapEditor/MobileSelectionSheet";
 import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
-import { EditorRecommendationBar } from "@/components/editor/TiptapEditor/EditorRecommendationBar";
+import { PageActionHub } from "@/components/editor/PageActionHub/PageActionHub";
 import { useTiptapEditorController } from "./TiptapEditor/useTiptapEditorController";
+import { useBubbleMenuWikiLink } from "./TiptapEditor/useBubbleMenuWikiLink";
+import { useEditorWikiLinkShortcuts } from "@/hooks/useEditorWikiLinkShortcuts";
 import { SlashAgentLoadingOverlay } from "./TiptapEditor/SlashAgentLoadingOverlay";
 
 // Re-export types for consumers
@@ -39,14 +43,18 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   collaborationConfig,
   focusContentRef,
   insertAtCursorRef,
+  pageActionHubRef,
   initialContent,
   onInitialContentApplied,
   isWikiGenerating = false,
   wikiContentForCollab,
   onWikiContentApplied,
   pageNoteId = null,
+  wikiComposeHref,
+  bottomBarTrailingAction,
 }) => {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const resolvedPlaceholder = placeholder ?? t("editor.startWritingPlaceholder");
   const {
     editor,
@@ -81,8 +89,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     pendingCreatePageTitle,
     handleConfirmCreate,
     handleCancelCreate,
-    hasThumbnail,
-    handleInsertThumbnailImage,
+    pageActionContext,
     storageSetupDialogOpen,
     setStorageSetupDialogOpen,
     handleGoToStorageSettings,
@@ -104,12 +111,35 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     onContentError,
     focusContentRef,
     insertAtCursorRef,
+    pageActionHubRef,
     initialContent,
     onInitialContentApplied,
     isWikiGenerating,
     wikiContentForCollab,
     onWikiContentApplied,
     pageNoteId,
+    wikiComposeHref,
+  });
+
+  // 入力バーへフォーカスを移すための imperative ハンドル（issue #928 §Cmd+K）。
+  // 入力バー側の `useEffect` がここに focus 関数を割り当てる。
+  // Imperative handle that the bar populates with a focus function (issue
+  // #928 / Cmd+K).
+  const focusInputBarRef = useRef<(() => void) | null>(null);
+
+  // `Cmd/Ctrl+Shift+L` の実体。既存のバブルメニュー実装をそのまま再利用し、
+  // 「選択範囲を Wiki Link 化」操作のロジックを 1 箇所に集約する。
+  // Cmd/Ctrl+Shift+L is wired to the existing bubble-menu conversion so the
+  // "selection → wiki link" logic lives in a single place.
+  const { convertToWikiLink } = useBubbleMenuWikiLink({ editor, pageId });
+  const focusInputBar = useCallback(() => {
+    focusInputBarRef.current?.();
+  }, []);
+  useEditorWikiLinkShortcuts({
+    editor,
+    focusInputBar,
+    convertSelectionToWikiLink: convertToWikiLink,
+    isReadOnly,
   });
 
   return (
@@ -140,7 +170,16 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
       <EditorContent editor={editor} />
       {editor && !isReadOnly && (
         <>
-          <EditorBubbleMenu editor={editor} pageId={pageId} />
+          {/*
+            BubbleMenu はモバイルでは仮想キーボードと干渉するため非表示にし、
+            代わりにキーボード直上のシート (MobileSelectionSheet) で同等の
+            装飾アクションを提供する（issue #924 §2 / #929）。
+            The bubble menu collides with the on-screen keyboard on phones,
+            so we hide it on mobile and route the same actions through the
+            keyboard-aware sheet instead (issue #924 §2 / #929).
+          */}
+          {!isMobile && <EditorBubbleMenu editor={editor} pageId={pageId} />}
+          {isMobile && <MobileSelectionSheet editor={editor} pageId={pageId} />}
           <TableBubbleMenu editor={editor} />
         </>
       )}
@@ -194,19 +233,26 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         onConfirm={handleConfirmCreate}
         onCancel={handleCancelCreate}
       />
-      {showToolbar && (
-        <EditorRecommendationBar
-          pageTitle={pageTitle}
-          isReadOnly={isReadOnly}
-          hasThumbnail={hasThumbnail}
-          onSelectThumbnail={handleInsertThumbnailImage}
-        />
-      )}
+      {showToolbar && <PageActionHub ctx={pageActionContext} hubRef={pageActionHubRef} />}
       <StorageSetupDialog
         open={storageSetupDialogOpen}
         onOpenChange={setStorageSetupDialogOpen}
         onConfirm={handleGoToStorageSettings}
       />
+      {!isReadOnly && (
+        // FAB 左にピル型 Wiki Link 入力バーを常時表示する（issue #924 §2 / #926）。
+        // 役割はゴーストリンク作成 + 入力中の既存ページ候補提示の二役 UI。
+        // Always-on pill input bar mounted to the left of the FAB (issue
+        // #924 §2 / #926). Doubles as ghost-link creation and existing-link
+        // insertion via the shared suggestion popup.
+        <FloatingWikiLinkInputBar
+          editor={editor}
+          pageId={pageId}
+          pageNoteId={resolvedPageNoteId}
+          focusInputBarRef={focusInputBarRef}
+          trailingAction={bottomBarTrailingAction}
+        />
+      )}
     </div>
   );
 };

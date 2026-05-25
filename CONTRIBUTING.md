@@ -1,81 +1,61 @@
+> **Language:** English | [日本語](CONTRIBUTING.ja.md)
+
 # Contributing to Zedi
 
-Zedi へのコントリビューションに興味を持っていただきありがとうございます！
+Thank you for your interest in contributing to Zedi!
 
-このガイドでは、プロジェクトへの貢献方法について説明します。
+This guide explains how to contribute to the project.
 
 ## 📋 Table of Contents
 
-- [Contributing to Zedi](#contributing-to-zedi)
-  - [📋 Table of Contents](#-table-of-contents)
-  - [Code of Conduct](#code-of-conduct)
-  - [Getting Started](#getting-started)
-    - [1. リポジトリをフォーク](#1-リポジトリをフォーク)
-    - [2. ローカルにクローン](#2-ローカルにクローン)
-    - [3. 依存関係をインストール](#3-依存関係をインストール)
-    - [4. 開発サーバーを起動](#4-開発サーバーを起動)
-    - [5. upstream を設定](#5-upstream-を設定)
-  - [Development Workflow](#development-workflow)
-    - [ブランチ命名規則](#ブランチ命名規則)
-    - [開発フロー](#開発フロー)
-  - [Pull Request Process](#pull-request-process)
-    - [PR を作成する前に](#pr-を作成する前に)
-    - [PR テンプレート](#pr-テンプレート)
-    - [レビュープロセス](#レビュープロセス)
-  - [Coding Standards](#coding-standards)
-    - [TypeScript](#typescript)
-    - [React](#react)
-    - [ファイル構成](#ファイル構成)
-    - [スタイリング](#スタイリング)
-  - [Commit Message Guidelines](#commit-message-guidelines)
-    - [フォーマット](#フォーマット)
-    - [Type](#type)
-    - [例](#例)
-  - [Reporting Bugs](#reporting-bugs)
-    - [Issue に含める情報](#issue-に含める情報)
-    - [テンプレート](#テンプレート)
-  - [Suggesting Features](#suggesting-features)
-    - [提案に含める情報](#提案に含める情報)
-  - [Questions?](#questions)
+- [Code of Conduct](#code-of-conduct)
+- [Getting Started](#getting-started)
+- [Development Workflow](#development-workflow)
+- [Pull Request Process](#pull-request-process)
+- [Coding Standards](#coding-standards)
+- [Commit Message Guidelines](#commit-message-guidelines)
+- [Reporting Bugs](#reporting-bugs)
+- [Suggesting Features](#suggesting-features)
+- [Questions?](#questions)
 
 ---
 
 ## Code of Conduct
 
-このプロジェクトでは、すべての参加者に対して敬意を持ち、インクルーシブな環境を維持することを求めています。ハラスメントや差別的な行為は許容されません。
+We expect all participants to treat each other with respect and maintain an inclusive environment. Harassment and discriminatory behavior are not tolerated.
 
 ---
 
 ## Getting Started
 
-### 1. リポジトリをフォーク
+### 1. Fork the repository
 
-GitHub 上でこのリポジトリをフォークしてください。
+Fork this repository on GitHub.
 
-### 2. ローカルにクローン
+### 2. Clone locally
 
 ```bash
 git clone https://github.com/<your-username>/zedi.git
 cd zedi
 ```
 
-### 3. セットアップ
+### 3. Setup
 
 ```bash
-# セットアップスクリプトを実行（推奨）
+# Recommended: run setup script
 bash scripts/setup.sh
 
-# または手動で
+# Or manually
 bun install
 ```
 
-### 4. upstream を設定
+### 4. Configure upstream
 
 ```bash
 git remote add upstream https://github.com/otomatty/zedi.git
 ```
 
-### 5. 開発サーバーを起動
+### 5. Start the dev server
 
 ```bash
 bun run dev
@@ -85,20 +65,20 @@ bun run dev
 
 ## Development Workflow
 
-### ブランチ命名規則
+### Branch naming
 
-| Type          | Format                                                                                                   | Example                 |
-| ------------- | -------------------------------------------------------------------------------------------------------- | ----------------------- |
-| Feature       | `feature/description`                                                                                    | `feature/add-backlinks` |
-| Bug Fix       | `fix/description`                                                                                        | `fix/search-crash`      |
-| Refactor      | `refactor/description`                                                                                   | `refactor/editor-hooks` |
-| Documentation | `chore/description` または `documentation/description`（`docs/` はフォルダ名と誤解されやすいため避ける） | `chore/update-readme`   |
+| Type          | Format                                                                                                 | Example                 |
+| ------------- | ------------------------------------------------------------------------------------------------------ | ----------------------- |
+| Feature       | `feature/description`                                                                                  | `feature/add-backlinks` |
+| Bug Fix       | `fix/description`                                                                                      | `fix/search-crash`      |
+| Refactor      | `refactor/description`                                                                                 | `refactor/editor-hooks` |
+| Documentation | `chore/description` or `documentation/description` (avoid `docs/` — easily confused with folder names) | `chore/update-readme`   |
 
-### 開発フロー
+### Development flow
 
-> 📖 **ブランチ・PR・マージ方法**: ルートの [AGENTS.md](./AGENTS.md) を参照してください。
+> 📖 **Branches, PRs, and merge policy**: See root [AGENTS.md](./AGENTS.md).
 
-1. **develop ブランチから最新を取得**
+1. **Sync latest from `develop`**
 
    ```bash
    git fetch origin
@@ -106,40 +86,40 @@ bun run dev
    git pull origin develop
    ```
 
-2. **機能ブランチを作成**
+2. **Create a feature branch**
 
    ```bash
    git checkout -b feature/your-feature
    ```
 
-3. **変更を実装**
-   - コードを書く
-   - テストを追加
-   - ドキュメントを更新
+3. **Implement changes**
+   - Write code
+   - Add tests
+   - Update documentation (English canonical + Japanese `.ja.md` pair when applicable — see [DOCUMENTATION.md](./DOCUMENTATION.md))
 
-4. **テストとコード品質チェック**
+4. **Run tests and quality checks**
 
    ```bash
-   # ユニットテスト
+   # Unit tests
    bun run test
 
-   # E2E テスト
+   # E2E tests
    bun run test:e2e
 
    # Lint
    bun run lint
 
-   # コードフォーマット
+   # Format
    bun run format
 
-   # フォーマットチェック（CI で実行されるのと同じ）
+   # Format check (same as CI)
    bun run format:check
    ```
 
-   > **Note:** コミット時に [husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/lint-staged/lint-staged) が自動的にリント・フォーマットを実行します。
-   > コミットメッセージは [Conventional Commits](https://www.conventionalcommits.org/) に従う必要があります（[commitlint](https://commitlint.js.org/) で検証）。
+   > **Note:** [husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/lint-staged/lint-staged) run lint and format on commit.
+   > Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) ([commitlint](https://commitlint.js.org/) validates them).
 
-5. **コミットしてプッシュ**
+5. **Commit and push**
 
    ```bash
    git add .
@@ -147,49 +127,49 @@ bun run dev
    git push origin feature/your-feature
    ```
 
-6. **Pull Request を作成**
-   - ベースブランチ: `develop`
-   - CIが自動的に実行され、すべてのチェックが通ることを確認
+6. **Open a Pull Request**
+   - Base branch: `develop`
+   - CI runs automatically — ensure all checks pass
 
 ---
 
 ## Pull Request Process
 
-### PR を作成する前に
+### Before opening a PR
 
-- [ ] テストがすべてパスすることを確認
-- [ ] Lint エラーがないことを確認
-- [ ] 関連する Issue があればリンク
-- [ ] 必要に応じてドキュメントを更新
+- [ ] All tests pass
+- [ ] No lint errors
+- [ ] Link related Issues if any
+- [ ] Update documentation when needed (EN canonical + JA pair if applicable)
 
-### PR テンプレート
+### PR template
 
 ```markdown
-## 概要
+## Summary
 
-変更内容の簡単な説明
+Brief description of changes
 
-## 変更点
+## Changes
 
-- 変更点 1
-- 変更点 2
+- Change 1
+- Change 2
 
-## テスト方法
+## How to test
 
-この変更をテストする手順
+Steps to verify this change
 
-## スクリーンショット（UI 変更がある場合）
+## Screenshots (if UI changes)
 
-## 関連 Issue
+## Related Issue
 
 Closes #123
 ```
 
-### レビュープロセス
+### Review process
 
-1. PR を作成すると、メンテナーがレビューします
-2. フィードバックがあれば対応してください
-3. 承認されたらマージされます
+1. Maintainers review your PR after you open it
+2. Address feedback as needed
+3. Merge after approval
 
 ---
 
@@ -197,9 +177,9 @@ Closes #123
 
 ### TypeScript
 
-- 型定義を明示的に行う
-- `any` の使用は避ける
-- 関数には戻り値の型を指定
+- Use explicit types
+- Avoid `any`
+- Specify return types on functions
 
 ```typescript
 // ✅ Good
@@ -215,9 +195,9 @@ function getPage(id) {
 
 ### React
 
-- 関数コンポーネントを使用
-- カスタムフックで ロジックを分離
-- Props には明示的な型定義
+- Use function components
+- Extract logic into custom hooks
+- Explicit prop types
 
 ```typescript
 // ✅ Good
@@ -231,7 +211,7 @@ export function PageCard({ page, onClick }: PageCardProps) {
 }
 ```
 
-### ファイル構成
+### File layout
 
 ```
 src/
@@ -245,19 +225,19 @@ src/
     └── featureUtils.ts
 ```
 
-### スタイリング
+### Styling
 
-- Tailwind CSS を使用
-- shadcn/ui コンポーネントを活用
-- カスタムスタイルは最小限に
+- Use Tailwind CSS
+- Prefer shadcn/ui components
+- Keep custom styles minimal
 
 ---
 
 ## Commit Message Guidelines
 
-[Conventional Commits](https://www.conventionalcommits.org/) に従います。
+We follow [Conventional Commits](https://www.conventionalcommits.org/).
 
-### フォーマット
+### Format
 
 ```
 <type>(<scope>): <description>
@@ -269,18 +249,18 @@ src/
 
 ### Type
 
-| Type       | Description                                          |
-| ---------- | ---------------------------------------------------- |
-| `feat`     | 新機能                                               |
-| `fix`      | バグ修正                                             |
-| `docs`     | ドキュメントのみの変更                               |
-| `style`    | コードの意味に影響しない変更（空白、フォーマット等） |
-| `refactor` | バグ修正でも機能追加でもないコード変更               |
-| `perf`     | パフォーマンス改善                                   |
-| `test`     | テストの追加・修正                                   |
-| `chore`    | ビルドプロセスやツールの変更                         |
+| Type       | Description                              |
+| ---------- | ---------------------------------------- |
+| `feat`     | New feature                              |
+| `fix`      | Bug fix                                  |
+| `docs`     | Documentation only                       |
+| `style`    | Formatting, no code meaning change       |
+| `refactor` | Code change that is not a fix or feature |
+| `perf`     | Performance improvement                  |
+| `test`     | Add or update tests                      |
+| `chore`    | Build process or tooling                 |
 
-### 例
+### Examples
 
 ```bash
 feat(editor): add WikiLink autocomplete
@@ -293,70 +273,70 @@ refactor(hooks): simplify usePageQueries
 
 ## Reporting Bugs
 
-バグを見つけた場合は、Issue を作成してください。
+Open an Issue when you find a bug.
 
-### Issue に含める情報
+### Include in the Issue
 
-1. **概要** — 何が問題か
-2. **再現手順** — 問題を再現する方法
-3. **期待する動作** — どう動作すべきか
-4. **実際の動作** — 実際に何が起きたか
-5. **環境**
-   - OS とバージョン
-   - ブラウザとバージョン
-   - Zedi のバージョン
-6. **スクリーンショット** — 可能であれば
+1. **Summary** — What is wrong
+2. **Steps to reproduce**
+3. **Expected behavior**
+4. **Actual behavior**
+5. **Environment**
+   - OS and version
+   - Browser and version
+   - Zedi version
+6. **Screenshots** — If possible
 
-### テンプレート
+### Template
 
 ```markdown
-## バグの概要
+## Bug summary
 
-検索結果をクリックしてもページが開かない
+Clicking a search result does not open the page
 
-## 再現手順
+## Steps to reproduce
 
-1. Cmd+K で検索を開く
-2. 「テスト」と入力
-3. 検索結果をクリック
+1. Open search with Cmd+K
+2. Type "test"
+3. Click a result
 
-## 期待する動作
+## Expected behavior
 
-クリックしたページが開く
+The clicked page opens
 
-## 実際の動作
+## Actual behavior
 
-何も起きない
+Nothing happens
 
-## 環境
+## Environment
 
 - OS: macOS Sonoma 14.2
 - Browser: Chrome 120
 - Zedi: v0.1.0
 
-## スクリーンショット
+## Screenshots
 
-[スクリーンショットをここに貼り付け]
+[Paste screenshot here]
 ```
 
 ---
 
 ## Suggesting Features
 
-新機能のアイデアがあれば、Issue を作成してください。
+Open an Issue for feature ideas.
 
-### 提案に含める情報
+### Include in the proposal
 
-1. **概要** — 何を追加したいか
-2. **動機** — なぜこの機能が必要か
-3. **詳細** — 機能の詳しい説明
-4. **代替案** — 検討した他の方法
+1. **Summary** — What you want to add
+2. **Motivation** — Why it is needed
+3. **Details** — Detailed description
+4. **Alternatives** — Other approaches considered
 
 ---
 
 ## Questions?
 
-質問がある場合は、Issue を作成するか、Discussions でお気軽にお問い合わせください。
+Open an Issue or ask in Discussions.
 
 ---
 

@@ -143,6 +143,38 @@ describe("tiptapToMarkdown", () => {
     expect(md).toContain("---");
   });
 
+  // `mermaid` ノードは ` ```mermaid ` フェンスとして出力し、ペースト時の正規化
+  // (`transformMermaidCodeBlocksInContent`) と round-trip が取れるようにする (Issue #945)。
+  // Mermaid nodes must round-trip back to ` ```mermaid ` fences so paste-side
+  // normalisation (`transformMermaidCodeBlocksInContent`) is reversible.
+  it("converts mermaid node back to a ```mermaid fence", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "mermaid",
+          attrs: { code: "graph TD\n  A-->B" },
+        },
+      ],
+    });
+    const md = tiptapToMarkdown(content);
+    expect(md).toContain("```mermaid");
+    expect(md).toContain("graph TD");
+    expect(md).toContain("A-->B");
+    // フェンス開始の直後に空行が入らないこと（読みやすさ）
+    // Source code starts on the line immediately after the opening fence.
+    expect(md).toMatch(/```mermaid\ngraph TD/);
+  });
+
+  it("emits an empty mermaid fence when code attribute is missing", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "mermaid" }],
+    });
+    const md = tiptapToMarkdown(content);
+    expect(md).toMatch(/```mermaid\n\n```/);
+  });
+
   it("handles bold, italic, strike, code marks", () => {
     const content = JSON.stringify({
       type: "doc",

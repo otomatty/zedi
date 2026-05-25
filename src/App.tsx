@@ -32,6 +32,7 @@ import SearchResults from "./pages/SearchResults";
 import NotFound from "./pages/NotFound";
 import NoteView from "./pages/NoteView";
 import NotePageView from "./pages/NotePageView";
+import WikiComposePage from "./pages/WikiComposePage";
 import NoteSettings from "./pages/NoteSettings";
 import GeneralSection from "./pages/NoteSettings/sections/GeneralSection";
 import VisibilitySection from "./pages/NoteSettings/sections/VisibilitySection";
@@ -290,6 +291,13 @@ const App = () => (
                       </Route>
                       <Route path="/notes/:noteId/members" element={<LegacyMembersRedirect />} />
                       <Route path="/notes/:noteId/:pageId" element={<NotePageView />} />
+                      {/* Wiki Compose split-screen UI (issue #950).
+                          Optional `:sessionId` keeps one route element so URL
+                          persistence does not remount and abort the first SSE run. */}
+                      <Route
+                        path="/notes/:noteId/:pageId/compose/:sessionId?"
+                        element={<WikiComposePage />}
+                      />
                       {/* Legacy path — redirect `/notes/:noteId/pages/:pageId` to
                           the shorter `/notes/:noteId/:pageId`.
                           旧パス `/notes/:noteId/pages/:pageId` を短縮形にリダイレクト。 */}

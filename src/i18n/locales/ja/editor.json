@@ -6,6 +6,7 @@
   "collaborationLoading": "エディタを読み込み中",
   "pageMenu": {
     "exportMarkdown": "Markdownでエクスポート",
+    "exportPdf": "PDFで出力",
     "copyMarkdown": "Markdownをコピー",
     "deletePage": "削除"
   },
@@ -232,13 +233,35 @@
       "aliases": "summarize,要約,サマリ"
     }
   },
-  "recommendation": {
-    "next": "次へ",
+  "pageActionHub": {
+    "title": "ページアクション",
+    "openAriaLabel": "ページアクションを開く",
     "back": "戻る",
     "close": "閉じる",
-    "generating": "画像を生成中",
-    "labelRecommendation": "おすすめ",
-    "labelThumbnails": "サムネイル候補"
+    "emptyState": "利用可能なアクションがありません",
+    "actions": {
+      "thumbnailSearch": {
+        "label": "画像を検索",
+        "description": "タイトルから画像を検索してサムネイルとして挿入",
+        "loading": "画像を検索中...",
+        "empty": "候補が見つかりませんでした",
+        "next": "次へ",
+        "retry": "再試行"
+      },
+      "thumbnailGenerate": {
+        "label": "AI で画像生成",
+        "description": "タイトルから AI で画像を生成してサムネイルとして挿入",
+        "loading": "画像を生成中...",
+        "retry": "再生成",
+        "missingTitle": "タイトルを入力してください"
+      },
+      "wikiCompose": {
+        "label": "Wiki Compose",
+        "description": "Brief → 調査 → 構成 → 執筆のガイド付きフローで AI と協働してページを作成します。",
+        "start": "Wiki Compose を開く",
+        "unavailable": "このページでは Wiki Compose を利用できません。"
+      }
+    }
   },
   "webClipper": {
     "title": "URLから取り込み",
@@ -317,5 +340,10 @@
     "downloaded": "Markdownファイルをダウンロードしました",
     "copied": "Markdownをクリップボードにコピーしました",
     "copyFailed": "コピーに失敗しました"
+  },
+  "pdfExport": {
+    "sourceAttribution": "📎 引用元",
+    "downloaded": "PDFをダウンロードしました",
+    "failed": "PDFの生成に失敗しました"
   }
 }

@@ -43,12 +43,34 @@ import lintRoutes from "./routes/lint.js";
 import activityRoutes from "./routes/activity.js";
 import onboardingRoutes from "./routes/onboarding.js";
 import internalRoutes from "./routes/internal.js";
+import composeSessionRoutes from "./routes/composeSessions.js";
+import userAiCredentialRoutes from "./routes/userAiCredentials.js";
+import { registerStubGraph } from "./agents/registry/stubGraph.js";
+import { registerResearchLoopGraph } from "./agents/subgraphs/research/index.js";
+import { registerWikiComposeGraph } from "./agents/graphs/wikiCompose/index.js";
+import { registerIngestPlannerGraph } from "./agents/graphs/ingest/index.js";
+import { registerWikiMaintenanceGraph } from "./agents/graphs/wikiMaintenance/index.js";
 
 /**
  * Creates and configures the Hono API app (routes, CORS, etc.).
  * Hono APIアプリを作成・設定する（ルート・CORS等）。
  */
 export function createApp(): Hono<AppEnv> {
+  // Wiki Compose graphs を registry に登録する。いずれも idempotent。
+  // - `wiki-compose-stub` — P0 smoke test (#948)
+  // - `wiki-compose-research` — P1 自律調査ループ (#949)
+  // - `wiki-compose` — P2 全体オーケストレータ (#950)
+  // - `ingest-planner` — P4 ingest + shared research loop (#952)
+  // - `wiki-maintenance` — P5 broken links + stub scan (#953)
+  //
+  // Register all Wiki Compose graphs. Calls are idempotent across hot
+  // reloads (registry uses `Map#set` so the latest registration wins).
+  registerStubGraph();
+  registerResearchLoopGraph();
+  registerWikiComposeGraph();
+  registerIngestPlannerGraph();
+  registerWikiMaintenanceGraph();
+
   const app = new Hono<AppEnv>();
   const wildcard = isWildcardCors();
   const allowedOrigins = getAllowedOrigins();
@@ -122,6 +144,9 @@ export function createApp(): Hono<AppEnv> {
   // Users
   app.route("/api/users", userRoutes);
 
+  // BYOK credentials for Wiki Compose (#951)
+  app.route("/api/user/ai-credentials", userAiCredentialRoutes);
+
   // Onboarding wizard completion + status
   // セットアップウィザード完了・状況取得
   app.route("/api/onboarding", onboardingRoutes);
@@ -135,6 +160,10 @@ export function createApp(): Hono<AppEnv> {
 
   // Page Snapshots (version history)
   app.route("/api/pages", pageSnapshotRoutes);
+
+  // Wiki Compose sessions (LangGraph runs) — issue #948.
+  // `/api/pages/:pageId/compose-sessions[/:id[/run|/resume]]`
+  app.route("/api/pages", composeSessionRoutes);
 
   // Sync
   app.route("/api/sync/pages", syncPageRoutes);

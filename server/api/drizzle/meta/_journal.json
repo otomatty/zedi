@@ -211,6 +211,20 @@
       "when": 1779840000000,
       "tag": "0030_add_notes_tag_filter_bar",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1779926400000,
+      "tag": "0031_add_wiki_compose_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1780012800000,
+      "tag": "0032_add_user_ai_credentials",
+      "breakpoints": true
     }
   ]
 }

@@ -22,20 +22,20 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-
-      - uses: actions/setup-node@v6
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
         with:
-          node-version-file: ".nvmrc"
+          action: actions/checkout@v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3"
-
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-toolchain
 
       - name: Check formatting
         run: bun run format:check
+
+      - name: Check documentation pairs
+        run: bun run docs:check-pairs
 
       - name: Run linter
         run: bun run lint
@@ -45,17 +45,14 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-
-      - uses: actions/setup-node@v6
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
         with:
-          node-version-file: ".nvmrc"
+          action: actions/checkout@v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3"
-
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-toolchain
 
       - name: Run knip
         run: bun run knip
@@ -65,17 +62,14 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-
-      - uses: actions/setup-node@v6
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
         with:
-          node-version-file: ".nvmrc"
+          action: actions/checkout@v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3"
-
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-toolchain
 
       - run: bunx tsc --noEmit
 
@@ -96,17 +90,14 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-
-      - uses: actions/setup-node@v6
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
         with:
-          node-version-file: ".nvmrc"
+          action: actions/checkout@v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3"
-
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-toolchain
 
       - run: bun run test:coverage
 
@@ -143,17 +134,14 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-
-      - uses: actions/setup-node@v6
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
         with:
-          node-version-file: ".nvmrc"
+          action: actions/checkout@v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3"
-
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-toolchain
 
       - run: bun run build
 
@@ -205,17 +193,14 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-
-      - uses: actions/setup-node@v6
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
         with:
-          node-version-file: ".nvmrc"
+          action: actions/checkout@v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3"
-
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-toolchain
 
       # Playwright のブラウザバイナリ + 必要な OS 依存を入れる。
       # Install Playwright's browser binaries plus the matching OS deps.
@@ -238,17 +223,14 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-
-      - uses: actions/setup-node@v6
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
         with:
-          node-version-file: ".nvmrc"
+          action: actions/checkout@v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3"
-
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-toolchain
 
       # Bun workspaces are not used due to Railway build constraints.
       # Consider migrating to workspaces if Railway adds Bun workspace support.
@@ -273,15 +255,22 @@ jobs:
     if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      # PR ベースとの diff を取るため履歴を全部取得する。
+      # Need full history so the script can diff against the PR base.
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
         with:
-          # PR ベースとの diff を取るため履歴を全部取得する。
-          # Need full history so the script can diff against the PR base.
-          fetch-depth: 0
+          action: actions/checkout@v6.0.2
+          with: |
+            fetch-depth: 0
+          attempt_limit: 3
+          attempt_delay: 5000
 
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup-toolchain
         with:
-          node-version-file: ".nvmrc"
+          # Node スクリプトしか実行しないため Bun は不要。
+          # The job only runs a Node script, so Bun is unnecessary.
+          setup-bun: "false"
 
       - name: Run drizzle migration consistency check
         env:
@@ -305,11 +294,18 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-
-      - uses: actions/setup-node@v6
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
         with:
-          node-version-file: ".nvmrc"
+          action: actions/checkout@v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          # Node スクリプトしか実行しないため Bun は不要。
+          # The job only runs Node scripts, so Bun is unnecessary.
+          setup-bun: "false"
 
       - name: Unit-test drift extractors (regex + allowlist logic)
         run: node --test scripts/check-drizzle-schema-drift.test.mjs
@@ -322,15 +318,18 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-
-      - uses: actions/setup-node@v6
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
         with:
-          node-version-file: ".nvmrc"
+          action: actions/checkout@v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: ./.github/actions/setup-toolchain
         with:
-          bun-version: "1.3"
+          # server/mcp 配下で個別に install するため、ルートの install は不要。
+          # The job installs deps inside server/mcp instead of the root.
+          install-deps: "false"
 
       # server/mcp is not part of the root Bun workspace; install its
       # dependencies locally before type-checking and testing.
@@ -357,17 +356,14 @@ jobs:
       - name: Record job start time
         run: echo "MUTATION_START=$(date +%s)" >> "$GITHUB_ENV"
 
-      - uses: actions/checkout@v6.0.2
-
-      - uses: actions/setup-node@v6
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
         with:
-          node-version-file: ".nvmrc"
+          action: actions/checkout@v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3"
-
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-toolchain
 
       # Golden list of files with stable mutation scores (Phase 1/2 of Epic #468).
       # 安定したスコアを持つファイルを段階的に追加し、PR で退行を早めに検知する。
@@ -400,19 +396,16 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
         with:
-          fetch-depth: 0
+          action: actions/checkout@v6.0.2
+          with: |
+            fetch-depth: 0
+          attempt_limit: 3
+          attempt_delay: 5000
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: ".nvmrc"
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3"
-
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-toolchain
 
       # Dependabot handles vulnerability alerts, but this catches issues in CI.
       # Dependabot は脆弱性アラートを担うが、CI でも依存関係を監査する。

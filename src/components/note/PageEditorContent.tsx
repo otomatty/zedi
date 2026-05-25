@@ -3,6 +3,7 @@ import type { MutableRefObject } from "react";
 import TiptapEditor from "@/components/editor/TiptapEditor";
 import type { ContentError } from "@/components/editor/TiptapEditor/useContentSanitizer";
 import type { CollaborationConfig } from "@/components/editor/TiptapEditor/types";
+import type { PageActionHubHandle } from "@/components/editor/PageActionHub/types";
 import { SourceUrlBadge } from "@/components/editor/SourceUrlBadge";
 import { WikiGeneratorButton } from "@/components/editor/WikiGeneratorButton";
 import { LinkedPagesSection } from "@/components/page/LinkedPagesSection";
@@ -102,6 +103,13 @@ interface PageEditorContentProps {
    */
   insertAtCursorRef?: MutableRefObject<((content: unknown) => boolean) | null>;
   /**
+   * `PageActionHub` を親 (NotePageView の FAB) から開閉するための ref。
+   * TiptapEditor に透過的に渡す。
+   * Ref the NotePageView FAB uses to open/close the PageActionHub.
+   * Forwarded to TiptapEditor.
+   */
+  pageActionHubRef?: MutableRefObject<PageActionHubHandle | null>;
+  /**
    * 編集中ページの noteId。WikiLink 候補・解決のスコープを決定する。
    * `null` は個人ページ、文字列値はそのノートに所属するノートネイティブ
    * ページ。Issue #713 Phase 4 を参照。
@@ -111,6 +119,17 @@ interface PageEditorContentProps {
    * same note. See issue #713 Phase 4.
    */
   pageNoteId?: string | null;
+  /**
+   * 画面下部の Wiki Link 入力バー右隣に並べるアクション（例: PageActionHub FAB）。
+   * Trailing control rendered beside the floating Wiki Link input bar.
+   */
+  bottomBarTrailingAction?: React.ReactNode;
+  /**
+   * Wiki Compose 画面 (`/compose`) への遷移先 URL。指定すると `WikiGeneratorButton`
+   * が Compose 画面に遷移する経路を取り、本文ありでも表示される (#950 U2)。
+   * Pass-through to the WikiGeneratorButton's `composeHref`.
+   */
+  wikiComposeHref?: string;
 }
 
 /**
@@ -141,7 +160,10 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   wikiContentForCollab = null,
   onWikiContentApplied,
   insertAtCursorRef,
+  pageActionHubRef,
   pageNoteId = null,
+  bottomBarTrailingAction,
+  wikiComposeHref,
 }) => {
   const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
   const hasContent = useMemo(() => isContentNotEmpty(content), [content]);
@@ -183,13 +205,25 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
               onEnterMoveToContent={!isEditorReadOnly ? focusContent : undefined}
             />
           </div>
-          {wikiStatus && onGenerateWiki && (
+          {/* Wiki 生成ボタンの表示条件:
+              - 旧経路: `wikiStatus` + `onGenerateWiki` 両方ある場合（インライン生成）
+              - 新経路: `wikiComposeHref` がある場合（Compose 画面に遷移、#950）
+              いずれも `WikiGeneratorButton` 自身がタイトル / 本文条件で更に
+              フィルタする。
+
+              Show the Wiki generation button when either:
+              - legacy: both `wikiStatus` + `onGenerateWiki` are supplied
+                (inline generation), or
+              - new: `wikiComposeHref` is supplied (navigate to Compose, #950).
+              `WikiGeneratorButton` itself filters on title/content state. */}
+          {((wikiStatus && onGenerateWiki) || wikiComposeHref) && (
             <div className="shrink-0">
               <WikiGeneratorButton
                 title={title}
                 hasContent={hasContent}
-                onGenerate={onGenerateWiki}
-                status={wikiStatus}
+                onGenerate={onGenerateWiki ?? (() => undefined)}
+                status={wikiStatus ?? "idle"}
+                composeHref={wikiComposeHref}
               />
             </div>
           )}
@@ -217,11 +251,14 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
                 collaborationConfig={collaborationConfig}
                 focusContentRef={contentFocusRef}
                 insertAtCursorRef={insertAtCursorRef}
+                pageActionHubRef={pageActionHubRef}
                 initialContent={initialContent}
                 onInitialContentApplied={onInitialContentApplied}
                 wikiContentForCollab={wikiContentForCollab ?? undefined}
                 onWikiContentApplied={onWikiContentApplied}
                 pageNoteId={pageNoteId}
+                wikiComposeHref={wikiComposeHref}
+                bottomBarTrailingAction={bottomBarTrailingAction}
               />
             </>
           )}

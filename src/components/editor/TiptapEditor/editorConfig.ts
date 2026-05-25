@@ -37,7 +37,13 @@ import {
   type SlashSuggestionState,
 } from "../extensions/slashSuggestionPlugin";
 import { TagSuggestionPlugin, type TagSuggestionState } from "../extensions/tagSuggestionPlugin";
+import {
+  WikiLinkGhostCompletionPlugin,
+  type WikiLinkGhostCompletionCandidate,
+  type WikiLinkGhostCompletionState,
+} from "../extensions/wikiLinkGhostCompletionPlugin";
 import { HeadingLevelClamp } from "./headingLevelClampExtension";
+import { MermaidCodeBlockNormalize } from "./mermaidCodeBlockNormalizeExtension";
 import type { Extension } from "@tiptap/core";
 import type * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
@@ -105,7 +111,7 @@ export interface CollaborationExtensionsOptions {
  */
 export interface EditorExtensionsOptions {
   placeholder: string;
-  onLinkClick: (title: string) => void;
+  onLinkClick: (title: string, options?: { newTab?: boolean }) => void;
   /**
    * Click handler for tag marks (`#name`). Receives the tag name without `#`
    * so the caller can navigate to the corresponding page. See issue #725.
@@ -123,6 +129,26 @@ export interface EditorExtensionsOptions {
    * changes. See issue #767 (Phase 2).
    */
   onTagSuggestionStateChange: (state: TagSuggestionState) => void;
+  /**
+   * 既存ページタイトルとプレフィックス一致するインライン・ゴースト補完
+   * （issue #930）に渡す候補ソース。`useWikiLinkCandidates` の結果を ref で
+   * 包んで `() => ref.current` の形で渡すことを想定する。
+   *
+   * Inline ghost completion (issue #930) candidate source. Expected to be a
+   * getter over the latest `useWikiLinkCandidates` snapshot held in a ref so
+   * the editor instance does not have to be re-created when candidates
+   * update.
+   */
+  getGhostCompletionCandidates?: () => ReadonlyArray<WikiLinkGhostCompletionCandidate>;
+  /**
+   * Optional state observer for the ghost completion plugin (telemetry /
+   * tests). Confirmation is handled inside the plugin so most callers do
+   * not need this.
+   *
+   * ゴースト補完の状態通知（任意、テレメトリ・テスト用途）。確定処理は
+   * プラグイン内で完結するため通常は省略可。
+   */
+  onGhostCompletionStateChange?: (state: WikiLinkGhostCompletionState) => void;
   imageUploadOptions: Partial<ImageUploadOptions>;
   imageOptions: Partial<StorageImageOptions>;
   /** When set, enables Y.js collaboration and caret; StarterKit history is disabled */
@@ -139,11 +165,15 @@ export interface EditorExtensionsOptions {
 
 interface CommonEditorExtensionsOptions {
   placeholder?: string;
-  onLinkClick: (title: string) => void;
+  onLinkClick: (title: string, options?: { newTab?: boolean }) => void;
   onTagClick?: (name: string) => void;
   onStateChange?: (state: WikiLinkSuggestionState) => void;
   onSlashStateChange?: (state: SlashSuggestionState) => void;
   onTagSuggestionStateChange?: (state: TagSuggestionState) => void;
+  /** Inline ghost completion candidates (issue #930). / ゴースト補完候補ソース */
+  getGhostCompletionCandidates?: () => ReadonlyArray<WikiLinkGhostCompletionCandidate>;
+  /** Optional ghost completion state observer (issue #930). / ゴースト補完状態通知 */
+  onGhostCompletionStateChange?: (state: WikiLinkGhostCompletionState) => void;
   imageUploadOptions?: Partial<ImageUploadOptions>;
   imageOptions?: Partial<StorageImageOptions>;
   fileReference?: EditorExtensionsOptions["fileReference"];
@@ -272,6 +302,17 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
           TagSuggestionPlugin.configure({
             onStateChange: options.onTagSuggestionStateChange ?? (() => undefined),
           }),
+          // --- Inline ghost completion (issue #930) ---
+          // 登録順は WikiLinkSuggestion → TagSuggestion → Ghost にすることで、
+          // 同一トランザクション内で `[[` / `#` のサジェスト状態が先に更新され、
+          // Ghost 側の `apply` がそれらの最新 `active` を参照して自己抑止できる。
+          // Order matters: registered after WikiLinkSuggestion and
+          // TagSuggestion so the ghost's `apply` can read their updated
+          // `active` flags within the same transaction and suppress itself.
+          WikiLinkGhostCompletionPlugin.configure({
+            getCandidates: options.getGhostCompletionCandidates ?? (() => []),
+            onStateChange: options.onGhostCompletionStateChange ?? (() => undefined),
+          }),
         ]
       : []),
     // --- Image ---
@@ -298,6 +339,13 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
     // --- 統合メディア挿入プレースホルダー（/image、/video スラッシュコマンド） ---
     MediaPlaceholderExtension,
     Mermaid,
+    // ``` ```mermaid ``` ``` 由来の codeBlock を mermaid ノードに正規化する。
+    // Mermaid 拡張より後に登録することで、変換先の `mermaid` ノードがスキーマに
+    // 存在することを保証する（Issue #945）。
+    // Lazy-migrate legacy `codeBlock(language=mermaid)` to `mermaid` nodes.
+    // Registered after `Mermaid` so the target node is guaranteed to be in the
+    // schema (Issue #945).
+    MermaidCodeBlockNormalize,
     // --- YouTube Embed ---
     YouTubeEmbed,
     McpResource,
@@ -339,6 +387,8 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
     onStateChange: options.onStateChange,
     onSlashStateChange: options.onSlashStateChange,
     onTagSuggestionStateChange: options.onTagSuggestionStateChange,
+    getGhostCompletionCandidates: options.getGhostCompletionCandidates,
+    onGhostCompletionStateChange: options.onGhostCompletionStateChange,
     imageUploadOptions: options.imageUploadOptions,
     imageOptions: options.imageOptions,
     fileReference: options.fileReference,

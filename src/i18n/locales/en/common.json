@@ -131,5 +131,9 @@
     "notCreated": "This page does not exist yet.",
     "notCreatedWithRefs": "This page does not exist yet, and is referenced from others.",
     "clickToCreate": "Click to create"
+  },
+  "wikiLinkInputBar": {
+    "placeholder": "Write a note",
+    "ariaLabel": "Create or link a page"
   }
 }

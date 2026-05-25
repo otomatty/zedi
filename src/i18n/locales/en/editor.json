@@ -6,6 +6,7 @@
   "collaborationLoading": "Loading editor",
   "pageMenu": {
     "exportMarkdown": "Export Markdown",
+    "exportPdf": "Export as PDF",
     "copyMarkdown": "Copy Markdown",
     "deletePage": "Delete"
   },
@@ -232,13 +233,35 @@
       "aliases": "summarize,summary"
     }
   },
-  "recommendation": {
-    "next": "Next",
+  "pageActionHub": {
+    "title": "Page actions",
+    "openAriaLabel": "Open page actions",
     "back": "Back",
     "close": "Close",
-    "generating": "Generating image",
-    "labelRecommendation": "Recommendations",
-    "labelThumbnails": "Thumbnail candidates"
+    "emptyState": "No actions available",
+    "actions": {
+      "thumbnailSearch": {
+        "label": "Search image",
+        "description": "Search by title and insert as thumbnail",
+        "loading": "Searching images...",
+        "empty": "No candidates found",
+        "next": "Next",
+        "retry": "Retry"
+      },
+      "thumbnailGenerate": {
+        "label": "Generate with AI",
+        "description": "Generate an image with AI and insert as thumbnail",
+        "loading": "Generating image...",
+        "retry": "Regenerate",
+        "missingTitle": "Please enter a title"
+      },
+      "wikiCompose": {
+        "label": "Wiki Compose",
+        "description": "Co-author this page with AI in a guided Brief → research → outline → draft flow.",
+        "start": "Open Wiki Compose",
+        "unavailable": "Wiki Compose is not available for this page."
+      }
+    }
   },
   "webClipper": {
     "title": "Import from URL",
@@ -317,5 +340,10 @@
     "downloaded": "Markdown file downloaded",
     "copied": "Markdown copied to clipboard",
     "copyFailed": "Copy failed"
+  },
+  "pdfExport": {
+    "sourceAttribution": "📎 Source",
+    "downloaded": "PDF downloaded",
+    "failed": "Failed to generate PDF"
   }
 }

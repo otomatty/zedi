@@ -1,6 +1,7 @@
-import type { MutableRefObject } from "react";
+import type { MutableRefObject, ReactNode } from "react";
 import type * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
+import type { PageActionHubHandle } from "../PageActionHub/types";
 
 /**
  * リアルタイムコラボレーション用の設定（useCollaboration の戻り値から渡す）
@@ -54,6 +55,13 @@ export interface TiptapEditorProps {
    * Accepts any content that TipTap's `insertContent` can handle (e.g. array of JSON nodes).
    */
   insertAtCursorRef?: MutableRefObject<((content: unknown) => boolean) | null>;
+  /**
+   * `PageActionHub` を親（FAB）から開閉するための ref。editor の他の ref と
+   * 同じく、ハブのマウント時に `ref.current` に handle が代入される。
+   * Ref to imperatively open/close the `PageActionHub` from a parent FAB.
+   * Assigned by the hub on mount, mirroring the `insertAtCursorRef` pattern.
+   */
+  pageActionHubRef?: MutableRefObject<PageActionHubHandle | null>;
   /** URL から作成時など、Y.Doc が空のときに一度だけ反映する Tiptap JSON 文字列 */
   initialContent?: string;
   /** initialContent をエディタに反映したあとに呼ぶ */
@@ -74,6 +82,16 @@ export interface TiptapEditorProps {
    * Phase 4.
    */
   pageNoteId?: string | null;
+  /**
+   * Wiki Compose 画面 URL。PageActionHub の `wiki.compose` と同経路 (#950)。
+   * Route to the Wiki Compose UI; used by PageActionHub `wiki.compose`.
+   */
+  wikiComposeHref?: string;
+  /**
+   * 画面下部の Wiki Link 入力バー右隣に並べるアクション（例: PageActionHub FAB）。
+   * Trailing control rendered beside the floating Wiki Link input bar.
+   */
+  bottomBarTrailingAction?: ReactNode;
 }
 
 /**
