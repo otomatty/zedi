@@ -24,7 +24,7 @@ export interface ComposeSessionUiProjection {
   pendingSources?: unknown[];
   latestBatch?: unknown;
   approvedSources?: unknown[];
-  /** P5 research conflict summary when halted at `conflict_resolution` (#953). */
+  /** P5 conflict-resolution interrupt summary (#953). / P5 conflict-resolution 割り込み要約。 */
   researchConflictSummary?: unknown;
   outlineProposal?: unknown[];
   draftedSections?: unknown[];
@@ -35,6 +35,7 @@ function phaseFromSessionRow(phase: string, status: WikiComposeSessionStatus): s
   if (status === "completed") return "completed";
   if (phase.startsWith("brief")) return "brief";
   if (phase.startsWith("research")) return "research";
+  if (phase.startsWith("conflict")) return "conflict";
   if (phase.startsWith("structure")) return "structure";
   if (phase.startsWith("draft")) return "draft";
   return "brief";
@@ -124,7 +125,7 @@ export function projectComposeStateValues(
           if (Array.isArray(state.approvedResearch)) {
             projection.approvedSources = state.approvedResearch;
           }
-          projection.phase = "research";
+          projection.phase = "conflict";
           break;
         default:
           break;

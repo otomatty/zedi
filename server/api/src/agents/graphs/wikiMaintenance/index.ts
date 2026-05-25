@@ -1,5 +1,6 @@
 /**
  * Wiki maintenance graph — public barrel (#953).
+ * Wikiメンテナンスグラフの公開バレル（#953）。
  */
 export {
   WIKI_MAINTENANCE_GRAPH_ID,

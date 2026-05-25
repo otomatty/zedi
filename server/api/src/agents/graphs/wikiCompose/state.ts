@@ -122,6 +122,17 @@ export const WikiComposeState = Annotation.Root({
     reducer: (prev, next) => (next === undefined ? prev : next),
     default: () => null,
   }),
+  /**
+   * True when `brief_dialogue` used the LLM error fallback (empty questions).
+   * Routing must not treat this as an intentional "skip research" signal (#953).
+   *
+   * `brief_dialogue` が LLM 失敗フォールバックで空質問になったとき true。
+   * ルーティングで調査スキップと混同しない。
+   */
+  briefDegraded: Annotation<boolean>({
+    reducer: (_prev, next) => next,
+    default: () => false,
+  }),
 
   // ── Research mirror (matches ResearchLoopState exactly) ──────────────────
   /** 現在のループ回数（research subgraph が書く）。 */

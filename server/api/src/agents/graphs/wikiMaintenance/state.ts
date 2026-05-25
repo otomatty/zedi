@@ -21,5 +21,13 @@ export const WikiMaintenanceState = Annotation.Root({
   }),
 });
 
+/**
+ * Materialized state shape for wiki maintenance graph execution.
+ * Wiki メンテナンス graph 実行時の確定 state 形状。
+ */
 export type WikiMaintenanceStateType = typeof WikiMaintenanceState.State;
+/**
+ * Partial update returned by wiki maintenance nodes.
+ * Wiki メンテナンス各ノードが返す部分更新。
+ */
 export type WikiMaintenanceStateUpdate = typeof WikiMaintenanceState.Update;

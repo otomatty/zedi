@@ -231,7 +231,7 @@ describe("useWikiComposeSession", () => {
 
     expect(mocks.runSession).toHaveBeenCalledTimes(1);
     expect(result.current.researchConflictSummary?.approved).toHaveLength(1);
-    expect(result.current.phase).toBe("research");
+    expect(result.current.phase).toBe("conflict");
   });
 
   it("submitBrief applies research interrupt from PATCH output without POST /run", async () => {

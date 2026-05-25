@@ -28,12 +28,13 @@ export type ResearchRoute = "structure" | "conflict_resolution";
 /**
  * Brief 完了後に調査ループへ進むか Structure へ直行するか。
  *
- * Skips research when the Brief emitted zero questions (title/intent already
- * clear) or when the session was seeded from chat with a pre-approved outline.
+ * Skips research when the Brief intentionally emitted zero questions (title
+ * already clear) or when chat seeded a pre-approved outline. When
+ * `briefDegraded` is set (LLM failure fallback), always run research.
  */
 export function routeAfterBrief(state: WikiComposeStateType): BriefRoute {
-  if (state.briefQuestions.length === 0) return "skip_research";
   if (state.chatSeed?.outline?.trim()) return "skip_research";
+  if (state.briefQuestions.length === 0 && !state.briefDegraded) return "skip_research";
   return "research";
 }
 

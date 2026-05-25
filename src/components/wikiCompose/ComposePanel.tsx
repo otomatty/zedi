@@ -13,7 +13,7 @@ import React from "react";
 import { PhaseStepper } from "./PhaseStepper";
 import { DialogueSection } from "./DialogueSection";
 import { ResearchSection } from "./ResearchSection";
-import { ResearchConflictSection } from "./ResearchConflictSection";
+import { ConflictResolutionSection } from "./ConflictResolutionSection";
 import { ActivitySection } from "./ActivitySection";
 import type {
   BriefAnswer,
@@ -53,7 +53,7 @@ export interface ComposePanelProps {
     note?: string;
   }) => Promise<void>;
   onSubmitOutline: (input: { sections: OutlineSection[] }) => Promise<void>;
-  onSubmitConflictAck: () => Promise<void>;
+  onSubmitConflictAck: (input?: { note?: string }) => Promise<void>;
 }
 
 /** Right pane container. */
@@ -96,18 +96,18 @@ export const ComposePanel: React.FC<ComposePanelProps> = (props) => {
           onSubmitOutline={onSubmitOutline}
         />
 
-        {researchConflictSummary ? (
-          <ResearchConflictSection
+        {phase === "conflict" && researchConflictSummary ? (
+          <ConflictResolutionSection
             conflicts={researchConflictSummary}
             isStreaming={isStreaming}
-            onAcknowledge={onSubmitConflictAck}
+            onSubmit={onSubmitConflictAck}
           />
         ) : null}
 
         {/* Research review: visible during research interrupt and as a
             read-only summary in later phases. */}
-        {!researchConflictSummary &&
-        (phase === "research" || (phase !== "brief" && approvedSources.length > 0)) ? (
+        {phase === "research" ||
+        (phase !== "brief" && phase !== "conflict" && approvedSources.length > 0) ? (
           <ResearchSection
             batch={latestBatch}
             pendingSources={pendingSources}

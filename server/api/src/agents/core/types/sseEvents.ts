@@ -179,7 +179,7 @@ export interface SseResearchBatchEvent {
 export interface SseComposePhaseEvent {
   type: "compose_phase";
   /** Phase name (matches state.phase). */
-  phase: "brief" | "research" | "structure" | "draft" | "completed";
+  phase: "brief" | "research" | "conflict" | "structure" | "draft" | "completed";
   /** Lifecycle hint within the phase. */
   status: "entered" | "completed";
 }
