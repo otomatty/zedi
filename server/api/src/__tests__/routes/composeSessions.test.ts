@@ -33,6 +33,12 @@ vi.mock("../../services/subscriptionService.js", () => ({
   getUserTier: async () => "free" as const,
 }));
 
+const mockGetUserAiCredentialPlaintext = vi.fn();
+
+vi.mock("../../services/userAiCredentialService.js", () => ({
+  getUserAiCredentialPlaintext: (...args: unknown[]) => mockGetUserAiCredentialPlaintext(...args),
+}));
+
 import { Hono } from "hono";
 import composeSessionRoutes from "../../routes/composeSessions.js";
 import { errorHandler } from "../../middleware/errorHandler.js";
@@ -92,6 +98,7 @@ function createComposeApp(dbResults: unknown[]) {
 }
 
 beforeEach(() => {
+  mockGetUserAiCredentialPlaintext.mockReset();
   __resetRegistryForTests();
   // Register a graph the routes can resolve. Body is irrelevant for CRUD tests.
   registerGraph({
@@ -141,7 +148,7 @@ describe("POST /api/pages/:pageId/compose-sessions", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 for unsupported backend (BYOK forward-compat)", async () => {
+  it("returns 400 for unsupported backend (legacy byok name)", async () => {
     const { app } = createComposeApp([...pageAccessPrefix()]);
     const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions`, {
       method: "POST",
@@ -149,6 +156,49 @@ describe("POST /api/pages/:pageId/compose-sessions", () => {
       body: JSON.stringify({ graphId: GRAPH_ID, backend: "byok" }),
     });
     expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for user_openai when credential is missing", async () => {
+    mockGetUserAiCredentialPlaintext.mockResolvedValue(null);
+    const { app } = createComposeApp([...pageAccessPrefix()]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ graphId: GRAPH_ID, backend: "user_openai" }),
+    });
+    expect(res.status).toBe(400);
+    expect(mockGetUserAiCredentialPlaintext).toHaveBeenCalledWith(
+      OWNER_ID,
+      "openai",
+      expect.anything(),
+    );
+  });
+
+  it("creates a session with user_openai when credential exists", async () => {
+    mockGetUserAiCredentialPlaintext.mockResolvedValue("sk-user");
+    const createdRow = {
+      id: "sess-byok",
+      pageId: PAGE_ID,
+      userId: OWNER_ID,
+      graphId: GRAPH_ID,
+      phase: "init",
+      backend: "user_openai",
+      status: "pending",
+      metadata: null,
+      lastError: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      closedAt: null,
+    };
+    const { app } = createComposeApp([...pageAccessPrefix(), [createdRow]]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ graphId: GRAPH_ID, backend: "user_openai" }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { session: { backend: string } };
+    expect(body.session.backend).toBe("user_openai");
   });
 
   it("creates a session row with the resolved backend defaulting to zedi_managed", async () => {
@@ -296,7 +346,7 @@ describe("DELETE /api/pages/:pageId/compose-sessions/:id", () => {
       ...pageAccessPrefix(),
       [interruptedRow],
       [interruptedRow], // atomic claim → running
-      undefined, // GraphNotRegisteredError recovery → failed update
+      [], // GraphNotRegisteredError recovery → failed update (no row if already terminal)
     ]);
 
     const res = await app.request(

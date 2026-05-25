@@ -119,6 +119,11 @@ export interface UseWikiComposeSessionArgs {
   composeSeed?: ComposeNavigationSeed;
   /** Auto-start the first `run` when the session is created. Default `true`. */
   autoStart?: boolean;
+  /**
+   * 実行 backend（セッション作成時に固定）。省略時は `zedi_managed`。
+   * Execution backend fixed at session create; defaults to `zedi_managed`.
+   */
+  backend?: string;
 }
 
 /** Hook return shape. */
@@ -475,7 +480,14 @@ function reduceInterrupt(
 export function useWikiComposeSession(
   args: UseWikiComposeSessionArgs,
 ): UseWikiComposeSessionReturn {
-  const { pageId, sessionId: initialSessionId, initialInput, composeSeed, autoStart = true } = args;
+  const {
+    pageId,
+    sessionId: initialSessionId,
+    initialInput,
+    composeSeed,
+    autoStart = true,
+    backend = "zedi_managed",
+  } = args;
   const [state, setState] = useState<WikiComposeSessionState>(INITIAL_STATE);
   const sessionRef = useRef<ComposeSession | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -529,6 +541,7 @@ export function useWikiComposeSession(
         loaded?.session ??
         (await createSession({
           pageId,
+          backend,
           metadata: composeSeed
             ? {
                 composeSeed: {
@@ -566,7 +579,7 @@ export function useWikiComposeSession(
       const message = err instanceof Error ? err.message : String(err);
       update({ error: message });
     }
-  }, [pageId, initialSessionId, initialInput, composeSeed, streamRun, update]);
+  }, [pageId, initialSessionId, initialInput, composeSeed, backend, streamRun, update]);
 
   const submitBrief = useCallback<UseWikiComposeSessionReturn["submitBrief"]>(
     async (input) => {

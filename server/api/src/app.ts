@@ -44,6 +44,7 @@ import activityRoutes from "./routes/activity.js";
 import onboardingRoutes from "./routes/onboarding.js";
 import internalRoutes from "./routes/internal.js";
 import composeSessionRoutes from "./routes/composeSessions.js";
+import userAiCredentialRoutes from "./routes/userAiCredentials.js";
 import { registerStubGraph } from "./agents/registry/stubGraph.js";
 import { registerResearchLoopGraph } from "./agents/subgraphs/research/index.js";
 import { registerWikiComposeGraph } from "./agents/graphs/wikiCompose/index.js";
@@ -136,6 +137,9 @@ export function createApp(): Hono<AppEnv> {
 
   // Users
   app.route("/api/users", userRoutes);
+
+  // BYOK credentials for Wiki Compose (#951)
+  app.route("/api/user/ai-credentials", userAiCredentialRoutes);
 
   // Onboarding wizard completion + status
   // セットアップウィザード完了・状況取得

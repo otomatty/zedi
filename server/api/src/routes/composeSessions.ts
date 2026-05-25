@@ -51,9 +51,14 @@ import {
 } from "../agents/runner/sseMapper.js";
 import { GraphNotRegisteredError, getRegisteredGraph } from "../agents/registry/graphRegistry.js";
 import {
-  assertSupportedBackendP0,
+  assertSupportedComposeBackend,
   UnsupportedBackendError,
 } from "../agents/core/llm/modelFactory.js";
+import {
+  backendToCredentialProvider,
+  isUserByokBackend,
+} from "../agents/core/types/executionBackend.js";
+import { getUserAiCredentialPlaintext } from "../services/userAiCredentialService.js";
 import { SSE_EVENT_NAMES, type SseEvent } from "../agents/core/types/sseEvents.js";
 import { GRAPH_CONTEXT_CONFIG_KEY } from "../agents/core/types/graphContext.js";
 import { resolveCheckpointerForRun } from "../agents/core/checkpoint/index.js";
@@ -169,14 +174,24 @@ app.post("/:pageId/compose-sessions", authRequired, rateLimit(), async (c) => {
     throw new HTTPException(400, { message: `Unknown graphId: ${graphId}` });
   }
 
-  let backend: ReturnType<typeof assertSupportedBackendP0>;
+  let backend: ReturnType<typeof assertSupportedComposeBackend>;
   try {
-    backend = assertSupportedBackendP0(body.backend ?? "zedi_managed");
+    backend = assertSupportedComposeBackend(body.backend ?? "zedi_managed");
   } catch (err) {
     if (err instanceof UnsupportedBackendError) {
       throw new HTTPException(400, { message: err.message });
     }
     throw err;
+  }
+
+  if (isUserByokBackend(backend)) {
+    const provider = backendToCredentialProvider(backend);
+    const key = await getUserAiCredentialPlaintext(userId, provider, db);
+    if (!key?.trim()) {
+      throw new HTTPException(400, {
+        message: `No API credential configured for backend "${backend}"`,
+      });
+    }
   }
 
   const [row] = await db
@@ -218,7 +233,7 @@ app.get("/:pageId/compose-sessions/:id", authRequired, async (c) => {
   // 古い backend 行でもセッション行は返し、projection だけ省略する。
   let projection = null;
   try {
-    const backend = assertSupportedBackendP0(row.backend);
+    const backend = assertSupportedComposeBackend(row.backend);
     projection = await loadComposeSessionProjection({
       sessionId: row.id,
       pageId: row.pageId,
@@ -282,7 +297,7 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
   // no longer permitted (future BYOK downgrade scenarios). Fail fast here.
   // 行作成後に backend サポートが変わった場合への保険。
   try {
-    assertSupportedBackendP0(session.backend);
+    assertSupportedComposeBackend(session.backend);
   } catch (err) {
     if (err instanceof UnsupportedBackendError) {
       throw new HTTPException(400, { message: err.message });
@@ -361,7 +376,7 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
             userEmail,
             pageId,
             graphId: session.graphId,
-            backend: assertSupportedBackendP0(session.backend),
+            backend: assertSupportedComposeBackend(session.backend),
             tier,
             db,
             feature: `wiki_compose:${session.graphId}`,
@@ -453,7 +468,7 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
   const runner = new GraphRunner();
 
   try {
-    assertSupportedBackendP0(session.backend);
+    assertSupportedComposeBackend(session.backend);
   } catch (err) {
     if (err instanceof UnsupportedBackendError) {
       throw new HTTPException(400, { message: err.message });
@@ -495,7 +510,7 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
           userEmail,
           pageId,
           graphId: session.graphId,
-          backend: assertSupportedBackendP0(session.backend),
+          backend: assertSupportedComposeBackend(session.backend),
           tier,
           db,
           feature: `wiki_compose:${session.graphId}`,
