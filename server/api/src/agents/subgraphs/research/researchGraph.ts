@@ -14,7 +14,7 @@
  * node which projects it into `approvedResearch` / `rejectedResearch`.
  */
 import { END, START, StateGraph } from "@langchain/langgraph";
-import { ResearchLoopState, type ResearchLoopStateType } from "./state.js";
+import { ResearchLoopState } from "./state.js";
 import { registerGraph, type GraphFactory } from "../../registry/graphRegistry.js";
 import {
   planQueries,
@@ -27,32 +27,16 @@ import {
   humanReviewResearch,
 } from "./nodes/index.js";
 
+import { shouldRefine } from "./shouldRefine.js";
+
+export { shouldRefine };
+
 /** Registered graph id. */
 export const RESEARCH_GRAPH_ID = "wiki-compose-research" as const;
 /** Registered graph version. Bump when behaviour changes meaningfully. */
 export const RESEARCH_GRAPH_VERSION = "1.0.0";
 
-/**
- * 終了条件判定。`evaluate_sufficiency` の直後に呼ばれる。
- *
- * Conditional edge predicate:
- * - `score >= 0.75` → `"compile"` (exit loop)
- * - `iteration >= maxIterations` → `"compile"` (hard cap)
- * - otherwise → `"refine"` (loop back)
- *
- * Pure function; unit-tested directly in `researchGraph.conditional.test.ts`.
- */
-export function shouldRefine(state: ResearchLoopStateType): "refine" | "compile" {
-  const score = state.lastEvaluation?.score;
-  if (typeof score === "number" && score >= 0.75) return "compile";
-  if (state.iteration >= state.maxIterations) return "compile";
-  return "refine";
-}
-
 const factory: GraphFactory = ({ checkpointer }) => {
-  // LangGraph's `StateGraph` chaining is heavily typed; we let the inference
-  // flow naturally instead of pinning intermediate types, mirroring the stub
-  // graph (`registry/stubGraph.ts`).
   const builder = new StateGraph(ResearchLoopState)
     .addNode("plan_queries", planQueries)
     .addNode("web_search", webSearch)
@@ -63,10 +47,8 @@ const factory: GraphFactory = ({ checkpointer }) => {
     .addNode("compile_batch", compileBatch)
     .addNode("human_review_research", humanReviewResearch)
     .addEdge(START, "plan_queries")
-    // Parallel fan-out from plan_queries.
     .addEdge("plan_queries", "web_search")
     .addEdge("plan_queries", "wiki_search")
-    // Implicit join on fetch_articles (both fan-out branches feed into it).
     .addEdge("web_search", "fetch_articles")
     .addEdge("wiki_search", "fetch_articles")
     .addEdge("fetch_articles", "evaluate_sufficiency")
@@ -74,14 +56,11 @@ const factory: GraphFactory = ({ checkpointer }) => {
       refine: "refine_queries",
       compile: "compile_batch",
     })
-    // refine_queries kicks the next iteration (loop back via web_search).
     .addEdge("refine_queries", "web_search")
     .addEdge("refine_queries", "wiki_search")
     .addEdge("compile_batch", "human_review_research")
     .addEdge("human_review_research", END);
 
-  // `checkpointer === false` is honoured by LangGraph as "no persistence" (the
-  // test path), `BaseCheckpointSaver` enables resume in production.
   return checkpointer ? builder.compile({ checkpointer }) : builder.compile();
 };
 

@@ -13,4 +13,4 @@ export { evaluateSufficiency } from "./evaluateSufficiency.js";
 export { refineQueries } from "./refineQueries.js";
 export { compileBatch } from "./compileBatch.js";
 export { humanReviewResearch } from "./humanReviewResearch.js";
-export { shouldRefine } from "../researchGraph.js";
+export { shouldRefine } from "../shouldRefine.js";

@@ -5,6 +5,7 @@
 import { WIKI_COMPOSE_GRAPH_ID } from "../graphs/wikiCompose/index.js";
 import { getOrchestratorModelId } from "../subgraphs/research/nodes/planQueries.js";
 import { RESEARCH_GRAPH_ID } from "../subgraphs/research/index.js";
+import { INGEST_PLANNER_GRAPH_ID } from "../graphs/ingest/index.js";
 
 const DRAFT_MODEL_ENV = "WIKI_COMPOSE_DRAFT_MODEL_ID";
 const DRAFT_MODEL_FALLBACK = "claude-3-5-sonnet";
@@ -23,7 +24,7 @@ export function getComposeModelIdsForGraph(graphId: string): string[] {
     const draft = getDraftModelId();
     return orchestrator === draft ? [orchestrator] : [orchestrator, draft];
   }
-  if (graphId === RESEARCH_GRAPH_ID) {
+  if (graphId === RESEARCH_GRAPH_ID || graphId === INGEST_PLANNER_GRAPH_ID) {
     return [getOrchestratorModelId()];
   }
   return [getOrchestratorModelId()];

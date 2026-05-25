@@ -1,16 +1,23 @@
 /**
- * /api/ingest — LLM Wiki ingest flow (P1, otomatty/zedi#595).
+ * /api/ingest — LLM Wiki ingest flow (P1 #595, graph P4 #952).
  *
  * POST /api/ingest/plan — dry-run: given a URL, propose how the article should
  * be merged / created / skipped in the user's existing Wiki. Does NOT write
  * to the database. The corresponding apply endpoint is tracked as a follow-up
  * and will reuse the plan shape returned here.
  *
+ * POST /api/ingest/graph/run — invoke graph `ingest-planner` (#952): shared
+ * research loop + structured ingest plan via ZediChatModel. See route TSDoc below.
+ *
+ * POST /api/ingest/graph/resume — resume an interrupted `ingest-planner` run
+ * (HITL at `human_review_research`) using the same `threadId`.
+ *
  * LLM Wiki の ingest フロー。プラン生成までの dry-run エンドポイント。
  * DB への書き込みは行わず、プレビュー用のプラン JSON を返す。
  * apply（実適用）エンドポイントは後続 PR で追加する。
  */
 import { Hono } from "hono";
+import { randomUUID } from "node:crypto";
 import { HTTPException } from "hono/http-exception";
 import { sql } from "drizzle-orm";
 import { authRequired } from "../middleware/auth.js";
@@ -34,8 +41,17 @@ import { pages } from "../schema/pages.js";
 import { pageContents } from "../schema/pageContents.js";
 import { recordActivity } from "../services/activityLogService.js";
 import type { AppEnv, AIProviderType } from "../types/index.js";
+import { GraphRunner } from "../agents/runner/graphRunner.js";
+import { INGEST_PLANNER_GRAPH_ID } from "../agents/graphs/ingest/index.js";
+import type { IngestArticleSummary } from "../services/ingestPlanner.js";
+import { assertSupportedComposeBackend } from "../agents/core/llm/modelFactory.js";
+import { assertComposeBackendReady } from "../agents/core/composeBackendValidation.js";
+import { resolveCheckpointerForRun } from "../agents/core/checkpoint/index.js";
+import type { ExecutionBackend } from "../agents/core/types/executionBackend.js";
 
 const app = new Hono<AppEnv>();
+
+const INGEST_GRAPH_RECURSION_LIMIT = 60;
 
 /**
  * リクエストボディ。
@@ -268,6 +284,216 @@ app.post("/plan", authRequired, rateLimit(), async (c) => {
       contentHash: article.contentHash,
     },
     candidates,
+  });
+});
+
+/**
+ * Request body for `POST /api/ingest/graph/run` (#952).
+ */
+interface IngestGraphRunBody {
+  /** Optional stable thread id for checkpoint resume (defaults to new UUID). */
+  threadId?: string;
+  backend?: ExecutionBackend;
+  article?: IngestArticleSummary;
+  candidates?: CandidatePage[];
+  userSchema?: string;
+  maxIterations?: number;
+}
+
+/**
+ * Request body for `POST /api/ingest/graph/resume` (#952).
+ */
+interface IngestGraphResumeBody {
+  threadId: string;
+  backend?: ExecutionBackend;
+  resume: unknown;
+}
+
+/**
+ * POST /api/ingest/graph/run — LangGraph `ingest-planner` execution (#952).
+ *
+ * **Integration with `POST /api/ingest/plan` (#595)**
+ *
+ * - `/plan` remains the URL-first production path: server-side article extraction,
+ *   candidate SQL search, and `callProvider` via `ingestPlanner.ts` (no research loop).
+ * - `/graph/run` expects the caller to supply `article` + `candidates` (typically the
+ *   same shapes `/plan` returns) and runs graph id {@link INGEST_PLANNER_GRAPH_ID}:
+ *   `prepare_ingest` → shared P1 research nodes → `plan_ingest` (ZediChatModel).
+ * - Both endpoints return the same {@link IngestPlan} JSON shape on success.
+ * - Apply persistence stays on `POST /api/ingest/apply` for either path.
+ *
+ * **Resume**
+ *
+ * When the graph halts at `human_review_research`, the response includes `threadId`.
+ * Call `POST /api/ingest/graph/resume` with the research resume payload
+ * (`{ approvedSourceIds, rejectedSourceIds?, note? }`, same as compose research).
+ */
+app.post("/graph/run", authRequired, rateLimit(), async (c) => {
+  const userId = c.get("userId");
+  const userEmail = c.get("userEmail") ?? null;
+  const db = c.get("db");
+
+  let body: IngestGraphRunBody;
+  try {
+    body = await c.req.json<IngestGraphRunBody>();
+  } catch {
+    throw new HTTPException(400, { message: "Invalid JSON body" });
+  }
+
+  if (!body.article || typeof body.article.title !== "string" || !body.article.url?.trim()) {
+    throw new HTTPException(400, { message: "article { title, url, excerpt } is required" });
+  }
+
+  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
+  const threadId =
+    typeof body.threadId === "string" && body.threadId.trim() ? body.threadId.trim() : randomUUID();
+
+  let backend: ExecutionBackend;
+  try {
+    backend = assertSupportedComposeBackend(body.backend ?? "zedi_managed");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unsupported backend";
+    throw new HTTPException(400, { message: msg });
+  }
+
+  const tier = await getUserTier(userId, db);
+  await assertComposeBackendReady({
+    backend,
+    graphId: INGEST_PLANNER_GRAPH_ID,
+    userId,
+    tier,
+    db,
+  });
+
+  const checkpointer = await resolveCheckpointerForRun();
+  const runner = new GraphRunner();
+  const result = await runner.invoke(
+    {
+      graphId: INGEST_PLANNER_GRAPH_ID,
+      checkpointer,
+      recursionLimit: INGEST_GRAPH_RECURSION_LIMIT,
+      context: {
+        threadId,
+        sessionId: threadId,
+        userId,
+        userEmail,
+        pageId: "",
+        graphId: INGEST_PLANNER_GRAPH_ID,
+        backend,
+        tier,
+        db,
+        feature: "ingest_graph:run",
+      },
+    },
+    {
+      kind: "input",
+      value: {
+        article: body.article,
+        candidates,
+        userSchema: body.userSchema ?? null,
+        maxIterations: body.maxIterations,
+      },
+    },
+  );
+
+  if (result.status === "failed") {
+    throw new HTTPException(500, { message: result.error ?? "Graph run failed" });
+  }
+
+  const output = result.output as
+    | {
+        ingestPlan?: unknown;
+        __interrupt__?: unknown[];
+      }
+    | undefined;
+
+  return c.json({
+    status: result.status,
+    threadId,
+    graphId: INGEST_PLANNER_GRAPH_ID,
+    plan: output?.ingestPlan ?? null,
+    output,
+  });
+});
+
+/**
+ * POST /api/ingest/graph/resume — resume `ingest-planner` after research HITL (#952).
+ */
+app.post("/graph/resume", authRequired, rateLimit(), async (c) => {
+  const userId = c.get("userId");
+  const userEmail = c.get("userEmail") ?? null;
+  const db = c.get("db");
+
+  let body: IngestGraphResumeBody;
+  try {
+    body = await c.req.json<IngestGraphResumeBody>();
+  } catch {
+    throw new HTTPException(400, { message: "Invalid JSON body" });
+  }
+
+  if (typeof body.threadId !== "string" || !body.threadId.trim()) {
+    throw new HTTPException(400, { message: "threadId is required" });
+  }
+  const threadId = body.threadId.trim();
+
+  let backend: ExecutionBackend;
+  try {
+    backend = assertSupportedComposeBackend(body.backend ?? "zedi_managed");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unsupported backend";
+    throw new HTTPException(400, { message: msg });
+  }
+
+  const tier = await getUserTier(userId, db);
+  await assertComposeBackendReady({
+    backend,
+    graphId: INGEST_PLANNER_GRAPH_ID,
+    userId,
+    tier,
+    db,
+  });
+
+  const checkpointer = await resolveCheckpointerForRun();
+  if (checkpointer === false) {
+    throw new HTTPException(503, {
+      message: "Graph resume requires DATABASE_URL checkpointing",
+    });
+  }
+
+  const runner = new GraphRunner();
+  const result = await runner.resume(
+    {
+      graphId: INGEST_PLANNER_GRAPH_ID,
+      checkpointer,
+      recursionLimit: INGEST_GRAPH_RECURSION_LIMIT,
+      context: {
+        threadId,
+        sessionId: threadId,
+        userId,
+        userEmail,
+        pageId: "",
+        graphId: INGEST_PLANNER_GRAPH_ID,
+        backend,
+        tier,
+        db,
+        feature: "ingest_graph:resume",
+      },
+    },
+    body.resume,
+  );
+
+  if (result.status === "failed") {
+    throw new HTTPException(500, { message: result.error ?? "Graph resume failed" });
+  }
+
+  const output = result.output as { ingestPlan?: unknown } | undefined;
+
+  return c.json({
+    status: result.status,
+    threadId,
+    graphId: INGEST_PLANNER_GRAPH_ID,
+    plan: output?.ingestPlan ?? null,
+    output,
   });
 });
 
