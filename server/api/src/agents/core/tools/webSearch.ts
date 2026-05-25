@@ -26,6 +26,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { GRAPH_CONTEXT_CONFIG_KEY, type GraphContext } from "../types/graphContext.js";
+import { resolveWebSearchExecutionBackend } from "../types/executionBackend.js";
 import { createZediChatModel } from "../llm/modelFactory.js";
 import { resolveWebSearchModelId } from "./resolveWebSearchModel.js";
 import type { ExtraProviderOptions } from "../llm/zediChatModel.js";
@@ -147,13 +148,14 @@ export const webSearchTool = tool(
     try {
       const provider = await detectProviderForModelId(ctx, modelId);
       const extraProviderOptions = providerOptions(provider);
+      const webSearchBackend = resolveWebSearchExecutionBackend(ctx.backend, provider);
       const model = await createZediChatModel({
         modelId,
         userId: ctx.userId,
         tier: ctx.tier,
         db: ctx.db,
         feature: `${ctx.feature}:web_search`,
-        backend: "zedi_managed",
+        backend: webSearchBackend,
         temperature: 0.2,
         maxTokens: 1024,
         extraProviderOptions,

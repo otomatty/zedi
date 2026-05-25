@@ -15,17 +15,17 @@ import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
+import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
 import { getGraphContext } from "./shared/getGraphContext.js";
 import { dispatchResearchIteration } from "./shared/dispatchSseCustom.js";
 import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { PlannedQuery, Source } from "../types.js";
 
-/** Default LLM model id for plan/evaluate/refine nodes; overridable by env. */
-const ORCHESTRATOR_MODEL_ENV = "WIKI_COMPOSE_ORCHESTRATOR_MODEL_ID";
-const ORCHESTRATOR_MODEL_FALLBACK = "claude-3-5-haiku";
-
+/**
+ * @deprecated Use {@link resolveComposeModelId} with graph context. Kept for tests importing the symbol.
+ */
 export function getOrchestratorModelId(): string {
-  return process.env[ORCHESTRATOR_MODEL_ENV]?.trim() || ORCHESTRATOR_MODEL_FALLBACK;
+  return process.env.WIKI_COMPOSE_ORCHESTRATOR_MODEL_ID?.trim() || "claude-3-5-haiku";
 }
 
 /** Schema for the LLM's structured output. */
@@ -99,8 +99,9 @@ export async function planQueries(
   // maxIterations は既存 state を優先しつつ 1..5 にクランプ。
   const maxIterations = clampMaxIterations(state.maxIterations ?? 3);
 
+  const modelId = await resolveComposeModelId("orchestrator", ctx.backend, ctx.tier, ctx.db);
   const model = await createZediChatModel({
-    modelId: getOrchestratorModelId(),
+    modelId,
     userId: ctx.userId,
     tier: ctx.tier,
     db: ctx.db,

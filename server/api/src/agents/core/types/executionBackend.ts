@@ -95,3 +95,24 @@ export function credentialProviderToBackend(
       return "user_google";
   }
 }
+
+/**
+ * Execution backend for `web_search` given the session backend and resolved model provider.
+ *
+ * - `zedi_managed` sessions always bill web search to Zedi (system keys).
+ * - BYOK sessions use the user's key when the web-search model provider matches, or when
+ *   the user has a stored credential for that provider (cross-provider research).
+ */
+export function resolveWebSearchExecutionBackend(
+  sessionBackend: ExecutionBackend,
+  modelProvider: UserAiCredentialProvider,
+): ExecutionBackend {
+  if (!isUserByokBackend(sessionBackend)) {
+    return "zedi_managed";
+  }
+  const sessionProvider = backendToCredentialProvider(sessionBackend);
+  if (sessionProvider === modelProvider) {
+    return sessionBackend;
+  }
+  return credentialProviderToBackend(modelProvider);
+}

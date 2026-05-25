@@ -14,17 +14,11 @@
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
+import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
 import { dispatchComposePhase, dispatchComposeSection } from "./shared/dispatch.js";
 import type { WikiComposeStateType, WikiComposeStateUpdate } from "../state.js";
 import type { DraftedSection, OutlineSection, Source } from "../types.js";
-
-const DRAFT_MODEL_ENV = "WIKI_COMPOSE_DRAFT_MODEL_ID";
-const DRAFT_MODEL_FALLBACK = "claude-3-5-sonnet";
-
-function getDraftModelId(): string {
-  return process.env[DRAFT_MODEL_ENV]?.trim() || DRAFT_MODEL_FALLBACK;
-}
 
 const SECTION_SYSTEM_PROMPT =
   "You are a co-author writing one section of a wiki article. Constraints:\n" +
@@ -132,8 +126,9 @@ export async function draftSections(
     return { draftedSections: [], phase: "draft:completed" };
   }
 
+  const modelId = await resolveComposeModelId("draft", ctx.backend, ctx.tier, ctx.db);
   const model = await createZediChatModel({
-    modelId: getDraftModelId(),
+    modelId,
     userId: ctx.userId,
     tier: ctx.tier,
     db: ctx.db,
