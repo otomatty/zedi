@@ -148,6 +148,43 @@ export interface UseWikiComposeSessionReturn extends WikiComposeSessionState {
  * available (modern browsers); falls back to a coarse fallback for old
  * environments and SSR.
  */
+/**
+ * `session.metadata.composeSeed` を型検証して graph input 用 seed にする。
+ * Validate persisted `metadata.composeSeed` before sending `/run` input.
+ */
+function parseComposeSeedFromMetadata(metadata: Record<string, unknown> | null | undefined):
+  | {
+      outline: string;
+      conversationText: string;
+      userSchema?: string;
+      conversationId?: string;
+    }
+  | undefined {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const raw = metadata.composeSeed;
+  if (!raw || typeof raw !== "object") return undefined;
+  const seed = raw as Record<string, unknown>;
+  if (typeof seed.outline !== "string" || typeof seed.conversationText !== "string") {
+    return undefined;
+  }
+  const out: {
+    outline: string;
+    conversationText: string;
+    userSchema?: string;
+    conversationId?: string;
+  } = {
+    outline: seed.outline,
+    conversationText: seed.conversationText,
+  };
+  if (typeof seed.userSchema === "string" && seed.userSchema.trim()) {
+    out.userSchema = seed.userSchema;
+  }
+  if (typeof seed.conversationId === "string" && seed.conversationId.trim()) {
+    out.conversationId = seed.conversationId;
+  }
+  return out;
+}
+
 function activityId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -510,24 +547,12 @@ export function useWikiComposeSession(
       sessionRef.current = session;
       update({ session, status: session.status, error: null, ...projectionHydration });
 
-      const metadataSeed = session.metadata?.composeSeed as
-        | {
-            outline?: string;
-            conversationText?: string;
-            userSchema?: string;
-            conversationId?: string;
-          }
-        | undefined;
+      const metadataSeed = parseComposeSeedFromMetadata(session.metadata);
       const runInput =
         initialInput ??
-        (metadataSeed?.outline && metadataSeed.conversationText
+        (metadataSeed
           ? {
-              chatSeed: {
-                outline: metadataSeed.outline,
-                conversationText: metadataSeed.conversationText,
-                userSchema: metadataSeed.userSchema,
-                conversationId: metadataSeed.conversationId,
-              },
+              chatSeed: metadataSeed,
             }
           : undefined);
 

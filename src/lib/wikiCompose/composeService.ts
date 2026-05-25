@@ -75,13 +75,19 @@ export async function createSession(input: CreateSessionInput): Promise<ComposeS
   return data.session;
 }
 
-/** Response of `GET /compose-sessions/:id` (session row + optional checkpoint projection). */
+/**
+ * `GET /compose-sessions/:id` の応答（行 + 任意の checkpoint projection）。
+ * Response of `GET /compose-sessions/:id` (session row + optional checkpoint projection).
+ */
 export interface GetComposeSessionResult {
   session: ComposeSession;
   projection: ComposeSessionUiProjection | null;
 }
 
-/** Fetch a compose session row and optional UI projection for reload (#950). */
+/**
+ * Compose セッション行と、再開用 projection を取得する (#950)。
+ * Fetch a compose session row and optional UI projection for reload.
+ */
 export async function getSession(
   pageId: string,
   sessionId: string,

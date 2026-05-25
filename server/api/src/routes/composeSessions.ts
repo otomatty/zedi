@@ -212,25 +212,37 @@ app.get("/:pageId/compose-sessions/:id", authRequired, async (c) => {
   if (!row) throw new HTTPException(404, { message: "Session not found" });
 
   const tier = await getUserTier(userId, db);
-  const projection = await loadComposeSessionProjection({
-    sessionId: row.id,
-    pageId: row.pageId,
-    graphId: row.graphId,
-    status: row.status,
-    phase: row.phase,
-    context: {
-      threadId: row.id,
+
+  // Stale / unsupported backend rows must still be readable; skip projection
+  // instead of turning GET into a 500 (CodeRabbit P1 on reload path).
+  // 古い backend 行でもセッション行は返し、projection だけ省略する。
+  let projection = null;
+  try {
+    const backend = assertSupportedBackendP0(row.backend);
+    projection = await loadComposeSessionProjection({
       sessionId: row.id,
-      userId,
-      userEmail: c.get("userEmail") ?? null,
       pageId: row.pageId,
       graphId: row.graphId,
-      backend: assertSupportedBackendP0(row.backend),
-      tier,
-      db,
-      feature: `wiki_compose:${row.graphId}`,
-    },
-  });
+      status: row.status,
+      phase: row.phase,
+      context: {
+        threadId: row.id,
+        sessionId: row.id,
+        userId,
+        userEmail: c.get("userEmail") ?? null,
+        pageId: row.pageId,
+        graphId: row.graphId,
+        backend,
+        tier,
+        db,
+        feature: `wiki_compose:${row.graphId}`,
+      },
+    });
+  } catch (err) {
+    if (!(err instanceof UnsupportedBackendError)) {
+      throw err;
+    }
+  }
 
   return c.json({ session: row, projection });
 });

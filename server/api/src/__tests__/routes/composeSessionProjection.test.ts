@@ -1,5 +1,6 @@
 /**
- * `composeSessionProjection` unit tests (#950).
+ * `composeSessionProjection` のユニットテスト (#950)。
+ * Unit tests for `composeSessionProjection`.
  */
 import { describe, expect, it } from "vitest";
 import { projectComposeStateValues } from "../../routes/composeSessionProjection.js";
@@ -20,6 +21,22 @@ describe("projectComposeStateValues", () => {
     expect(projection.phase).toBe("brief");
     expect(projection.briefQuestions).toHaveLength(1);
     expect(projection.pageSnapshot).toMatchObject({ title: "T" });
+  });
+
+  it("keeps interrupt-derived phase when row phase is also present", () => {
+    const projection = projectComposeStateValues({
+      phase: "brief:await_user",
+      __interrupt__: [
+        {
+          value: {
+            kind: "human_review_research",
+            batch: null,
+            pendingSources: [],
+          },
+        },
+      ],
+    });
+    expect(projection.phase).toBe("research");
   });
 
   it("projects completion markdown from checkpoint values", () => {

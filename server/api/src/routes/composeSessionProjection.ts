@@ -13,7 +13,10 @@ import { resolveCheckpointerForRun } from "../agents/core/checkpoint/index.js";
 import { getRegisteredGraph } from "../agents/registry/graphRegistry.js";
 import type { WikiComposeSessionStatus } from "../schema/wikiComposeSessions.js";
 
-/** Wire projection returned by `GET /compose-sessions/:id`. */
+/**
+ * `GET /compose-sessions/:id` が返す UI projection。
+ * Wire projection returned by `GET /compose-sessions/:id`.
+ */
 export interface ComposeSessionUiProjection {
   phase?: string;
   briefQuestions?: unknown[];
@@ -119,7 +122,9 @@ export function projectComposeStateValues(
     }
   }
 
-  if (typeof state.phase === "string") {
+  // Interrupt-derived phase wins; row `phase` is only a fallback.
+  // interrupt 由来の phase を優先し、行の phase はフォールバックのみ。
+  if (typeof state.phase === "string" && projection.phase === undefined) {
     projection.phase = phaseFromSessionRow(state.phase, "interrupted");
   }
 
@@ -127,6 +132,7 @@ export function projectComposeStateValues(
 }
 
 /**
+ * チェックポイントから UI projection を読み込む。利用不可時は `null`。
  * Load checkpoint projection for a compose session row, or `null` when unavailable.
  */
 export async function loadComposeSessionProjection(input: {

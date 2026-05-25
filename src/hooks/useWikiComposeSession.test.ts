@@ -238,6 +238,25 @@ describe("useWikiComposeSession", () => {
     expect(result.current.phase).toBe("research");
   });
 
+  it("ignores malformed metadata.composeSeed when building run input", async () => {
+    mocks.createSession.mockResolvedValue({
+      ...SESSION,
+      metadata: { composeSeed: { outline: 1, conversationText: true } },
+    });
+    arrangeRun([{ type: "done", status: "completed" }]);
+
+    const { result } = renderHook(() =>
+      useWikiComposeSession({ pageId: "page-1", sessionId: null }),
+    );
+    await waitFor(() => expect(result.current.session).not.toBeNull());
+
+    expect(mocks.runSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: undefined,
+      }),
+    );
+  });
+
   it("hydrates interrupted session from GET projection without POST /run", async () => {
     mocks.createSession.mockReset();
     mocks.getSession.mockResolvedValue({
