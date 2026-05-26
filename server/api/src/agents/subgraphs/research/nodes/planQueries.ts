@@ -16,14 +16,15 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { composeContentLocaleInstruction } from "../../../core/composeLocale.js";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
-import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
+import { resolveWikiComposeModelId } from "../../../core/llm/wikiComposeModelId.js";
 import { getGraphContext } from "./shared/getGraphContext.js";
 import { dispatchResearchIteration } from "./shared/dispatchSseCustom.js";
 import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { PlannedQuery, Source } from "../types.js";
 
 /**
- * @deprecated Use {@link resolveComposeModelId} with graph context. Kept for tests importing the symbol.
+ * @deprecated Use {@link resolveWikiComposeModelId} for Wiki Compose graphs.
+ * Kept for ingest planner BYOK preflight ({@link getComposeModelIdsForGraph}).
  */
 export function getOrchestratorModelId(): string {
   return process.env.WIKI_COMPOSE_ORCHESTRATOR_MODEL_ID?.trim() || "claude-3-5-haiku";
@@ -100,7 +101,7 @@ export async function planQueries(
   // maxIterations は既存 state を優先しつつ 1..5 にクランプ。
   const maxIterations = clampMaxIterations(state.maxIterations ?? 3);
 
-  const modelId = await resolveComposeModelId("orchestrator", ctx.backend, ctx.tier, ctx.db);
+  const modelId = await resolveWikiComposeModelId("orchestrator", ctx.tier, ctx.db);
   const model = await createZediChatModel({
     modelId,
     userId: ctx.userId,

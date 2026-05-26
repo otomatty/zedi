@@ -2,13 +2,12 @@
  * Pre-flight BYOK checks for Wiki Compose session creation (#951).
  * Wiki Compose セッション作成前の BYOK 事前チェック（#951）。
  *
- * Static env model ids are not validated here — provider matching is enforced at
- * runtime via {@link resolveComposeModelId}. This function only verifies that
- * the user has a stored credential when the graph will call an LLM.
+ * Wiki Compose uses a fixed Google model at runtime ({@link WIKI_COMPOSE_MODEL_ID}).
+ * BYOK sessions still need a stored credential when the graph calls an LLM; provider
+ * alignment with the fixed model is the caller's responsibility for now.
  *
- * 静的 env モデル id との provider 照合は行わない。実行時の
- * `resolveComposeModelId` が provider 整合を担保する。本関数は LLM を呼ぶ
- * グラフで credential が存在するかだけを確認する。
+ * Wiki Compose は実行時に Google 固定モデルを使う。BYOK 時は LLM 呼び出し前に
+ * credential の有無だけをここで確認する。
  */
 import { HTTPException } from "hono/http-exception";
 import type { Database, UserTier } from "../../types/index.js";

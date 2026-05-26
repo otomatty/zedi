@@ -8,6 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { createZediChatModel } = vi.hoisted(() => ({ createZediChatModel: vi.fn() }));
 
+vi.mock("../../../../../agents/core/llm/wikiComposeModelId.js", () => ({
+  WIKI_COMPOSE_MODEL_ID: "google:gemini-3.5-flash",
+  resolveWikiComposeModelId: vi.fn(async () => "google:gemini-3.5-flash"),
+}));
+
 vi.mock("../../../../../agents/core/llm/modelFactory.js", async () => {
   const actual = await vi.importActual<
     typeof import("../../../../../agents/core/llm/modelFactory.js")
