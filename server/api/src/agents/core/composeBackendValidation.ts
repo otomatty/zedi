@@ -12,12 +12,17 @@
 import { HTTPException } from "hono/http-exception";
 import type { Database, UserTier } from "../../types/index.js";
 import { getComposeModelIdsForGraph } from "./composeModelConfig.js";
+import { WIKI_COMPOSE_GRAPH_ID } from "../graphs/wikiCompose/index.js";
+import { RESEARCH_GRAPH_ID } from "../subgraphs/research/index.js";
 import {
   backendToCredentialProvider,
   isUserByokBackend,
   type ExecutionBackend,
 } from "./types/executionBackend.js";
 import { getUserAiCredentialPlaintext } from "../../services/userAiCredentialService.js";
+
+/** Graphs that always call the pinned Google Wiki Compose model. */
+const WIKI_COMPOSE_GOOGLE_MODEL_GRAPHS = new Set([WIKI_COMPOSE_GRAPH_ID, RESEARCH_GRAPH_ID]);
 
 /**
  * Ensure a BYOK backend has stored credentials when the target graph uses LLMs.
@@ -31,6 +36,13 @@ export async function assertComposeBackendReady(input: {
   db: Database;
 }): Promise<void> {
   if (!isUserByokBackend(input.backend)) return;
+
+  if (WIKI_COMPOSE_GOOGLE_MODEL_GRAPHS.has(input.graphId) && input.backend !== "user_google") {
+    throw new HTTPException(400, {
+      message:
+        'Wiki Compose uses a fixed Google model; use backend "user_google" or "zedi_managed".',
+    });
+  }
 
   const modelIds = getComposeModelIdsForGraph(input.graphId);
   // Model-less graphs (e.g. wiki-maintenance) never call `createZediChatModel`.

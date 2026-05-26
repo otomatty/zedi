@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { loadAISettings, AI_SETTINGS_CHANGED_EVENT } from "@/lib/aiSettings";
 import { fetchUserAiCredentialsStatus } from "@/lib/userAiCredentials";
-import { resolveComposeBackendFromAiSettings } from "@/lib/wikiCompose/resolveComposeBackend";
+import { resolveWikiComposeBackendFromAiSettings } from "@/lib/wikiCompose/resolveComposeBackend";
 import type { ComposeExecutionBackend } from "@/lib/wikiCompose/backends";
 import { DEFAULT_AI_SETTINGS } from "@/types/ai";
 
@@ -25,7 +25,7 @@ const EMPTY_CREDENTIALS = {
 async function loadComposeBackendFromSettings(): Promise<ComposeExecutionBackend> {
   const settings = (await loadAISettings()) ?? DEFAULT_AI_SETTINGS;
   const credentials = await fetchUserAiCredentialsStatus().catch(() => EMPTY_CREDENTIALS);
-  return resolveComposeBackendFromAiSettings(settings, credentials);
+  return resolveWikiComposeBackendFromAiSettings(settings, credentials);
 }
 
 export interface UseInitialComposeBackendOptions {

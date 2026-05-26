@@ -27,10 +27,34 @@ describe("assertComposeBackendReady", () => {
     expect(mockGetUserAiCredentialPlaintext).not.toHaveBeenCalled();
   });
 
-  it("allows BYOK backend without static env model provider mismatch (#972)", async () => {
+  it("rejects non-Google BYOK for wiki-compose-research (pinned Google model)", async () => {
+    await expect(
+      assertComposeBackendReady({
+        backend: "user_openai",
+        graphId: "wiki-compose-research",
+        userId: "u1",
+        tier: "free",
+        db,
+      }),
+    ).rejects.toBeInstanceOf(HTTPException);
+    expect(mockGetUserAiCredentialPlaintext).not.toHaveBeenCalled();
+  });
+
+  it("allows user_google BYOK for wiki-compose-research", async () => {
+    await assertComposeBackendReady({
+      backend: "user_google",
+      graphId: "wiki-compose-research",
+      userId: "u1",
+      tier: "free",
+      db,
+    });
+    expect(mockGetUserAiCredentialPlaintext).toHaveBeenCalledWith("u1", "google", db);
+  });
+
+  it("allows non-Google BYOK for ingest planner (provider-specific models)", async () => {
     await assertComposeBackendReady({
       backend: "user_openai",
-      graphId: "wiki-compose-research",
+      graphId: "ingest-planner",
       userId: "u1",
       tier: "free",
       db,

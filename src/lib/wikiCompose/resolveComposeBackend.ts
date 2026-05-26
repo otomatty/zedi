@@ -58,3 +58,20 @@ export function resolveComposeBackendFromAiSettings(
   }
   return "zedi_managed";
 }
+
+/**
+ * Wiki Compose backend: only `user_google` BYOK or `zedi_managed` match the pinned
+ * Google compose model (`google:gemini-3.5-flash`). Other BYOK providers fall back.
+ *
+ * Wiki Compose は Google 固定モデルのため、Google BYOK か zedi_managed のみ使う。
+ */
+export function resolveWikiComposeBackendFromAiSettings(
+  settings: AISettings,
+  credentials: UserAiCredentialsStatus,
+): ComposeExecutionBackend {
+  const preferred = resolvePreferredComposeBackend(settings);
+  if (preferred === "user_google" && isComposeBackendAvailable("user_google", credentials)) {
+    return "user_google";
+  }
+  return "zedi_managed";
+}

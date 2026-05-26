@@ -4,6 +4,7 @@ import {
   isComposeBackendAvailable,
   resolveComposeBackendFromAiSettings,
   resolvePreferredComposeBackend,
+  resolveWikiComposeBackendFromAiSettings,
 } from "./resolveComposeBackend";
 import type { UserAiCredentialsStatus } from "@/lib/userAiCredentials";
 
@@ -93,5 +94,33 @@ describe("resolveComposeBackendFromAiSettings", () => {
         credentialsOpenAi,
       ),
     ).toBe("user_openai");
+  });
+});
+
+describe("resolveWikiComposeBackendFromAiSettings", () => {
+  it("falls back to zedi_managed when preferred BYOK is not Google", () => {
+    expect(
+      resolveWikiComposeBackendFromAiSettings(
+        baseSettings({ apiMode: "user_api_key", provider: "openai", isConfigured: true }),
+        credentialsOpenAi,
+      ),
+    ).toBe("zedi_managed");
+  });
+
+  it("uses user_google when settings and credentials are Google BYOK", () => {
+    const credentialsGoogle: UserAiCredentialsStatus = {
+      storageEnabled: true,
+      providers: [
+        { provider: "anthropic", configured: false },
+        { provider: "openai", configured: false },
+        { provider: "google", configured: true },
+      ],
+    };
+    expect(
+      resolveWikiComposeBackendFromAiSettings(
+        baseSettings({ apiMode: "user_api_key", provider: "google", isConfigured: true }),
+        credentialsGoogle,
+      ),
+    ).toBe("user_google");
   });
 });
