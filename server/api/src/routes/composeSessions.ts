@@ -343,11 +343,35 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
     throw err;
   }
 
-  // Atomically claim the session so concurrent POST /run cannot both pass a
-  // read-then-write race and double-bill LLM usage.
+  const acceptLanguage = c.req.header("accept-language");
+  const contentLocale = resolveSessionContentLocale(
+    session.metadata,
+    body.input,
+    acceptLanguage,
+    "ja",
+  );
+  const shouldPersistLocale = !readContentLocaleFromSessionMetadata(session.metadata);
+  const metadataWithLocale = shouldPersistLocale
+    ? {
+        ...(session.metadata &&
+        typeof session.metadata === "object" &&
+        !Array.isArray(session.metadata)
+          ? { ...(session.metadata as Record<string, unknown>) }
+          : {}),
+        contentLocale,
+      }
+    : undefined;
+
+  // Atomically claim the session (and persist `contentLocale` when needed) so
+  // concurrent POST /run cannot double-bill and a failed follow-up write cannot
+  // leave the row stuck in `running` without metadata.
   const [claimed] = await db
     .update(wikiComposeSessions)
-    .set({ status: "running" satisfies WikiComposeSessionStatus, updatedAt: new Date() })
+    .set({
+      status: "running" satisfies WikiComposeSessionStatus,
+      updatedAt: new Date(),
+      ...(metadataWithLocale ? { metadata: metadataWithLocale } : {}),
+    })
     .where(
       and(
         eq(wikiComposeSessions.id, id),
@@ -363,27 +387,6 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
           ? "Session is already running"
           : `Session is ${session.status}`,
     });
-  }
-
-  const acceptLanguage = c.req.header("accept-language");
-  const contentLocale = resolveSessionContentLocale(
-    claimed.metadata,
-    body.input,
-    acceptLanguage,
-    "ja",
-  );
-  if (!readContentLocaleFromSessionMetadata(claimed.metadata)) {
-    const baseMeta =
-      claimed.metadata && typeof claimed.metadata === "object" && !Array.isArray(claimed.metadata)
-        ? { ...(claimed.metadata as Record<string, unknown>) }
-        : {};
-    await db
-      .update(wikiComposeSessions)
-      .set({
-        metadata: { ...baseMeta, contentLocale },
-        updatedAt: new Date(),
-      })
-      .where(and(eq(wikiComposeSessions.id, id), eq(wikiComposeSessions.pageId, pageId)));
   }
 
   return streamSSE(c, async (stream) => {
