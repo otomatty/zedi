@@ -59,20 +59,20 @@ export function useInitialComposeBackend(
     let cancelled = false;
     let loadGeneration = 0;
 
-    const applyFromSettings = (markResolved: boolean) => {
+    const applyFromSettings = () => {
       const generation = ++loadGeneration;
       void loadComposeBackendFromSettings().then((resolved) => {
         if (cancelled || generation !== loadGeneration) return;
         setBackend(resolved);
-        if (markResolved) setIsResolved(true);
+        setIsResolved(true);
       });
     };
 
     setIsResolved(false);
-    applyFromSettings(true);
+    applyFromSettings();
 
     const onSettingsChanged = () => {
-      applyFromSettings(false);
+      applyFromSettings();
     };
 
     window.addEventListener(AI_SETTINGS_CHANGED_EVENT, onSettingsChanged);

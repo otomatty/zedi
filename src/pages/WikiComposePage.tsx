@@ -94,13 +94,29 @@ const WikiComposePage: React.FC = () => {
     !sessionId && session.status === "idle" && !session.session && !session.isStreaming;
   const autoStartRequestedRef = useRef(false);
 
+  const startComposeSession = session.start;
+
   // Fresh compose: start automatically once AI settings yield a backend (#951).
   useEffect(() => {
     if (sessionId || !isComposeBackendResolved || !awaitingComposeStart) return;
     if (autoStartRequestedRef.current) return;
     autoStartRequestedRef.current = true;
-    void session.start();
-  }, [sessionId, isComposeBackendResolved, awaitingComposeStart, session.start]);
+    void startComposeSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot auto-start when backend resolves
+  }, [sessionId, isComposeBackendResolved, awaitingComposeStart]);
+
+  // Allow manual retry after a failed auto-start (ref would otherwise block re-entry).
+  useEffect(() => {
+    if (sessionId || session.session || !session.error) return;
+    autoStartRequestedRef.current = false;
+  }, [sessionId, session.session, session.error]);
+
+  const canRetryComposeStart =
+    !sessionId &&
+    Boolean(session.error) &&
+    !session.session &&
+    !session.isStreaming &&
+    (session.status === "idle" || session.status === "failed");
 
   // Clear history seed only after the session row left `pending` (first run claimed).
   // `pending` のまま state を消すと失敗時リロードで chatSeed が届かなくなる (#950)。
@@ -252,7 +268,21 @@ const WikiComposePage: React.FC = () => {
     <div className="flex h-[100dvh] w-full flex-col">
       {header}
       {session.error ? (
-        <div className="bg-destructive/10 text-destructive px-4 py-2 text-xs">{session.error}</div>
+        <div className="bg-destructive/10 text-destructive flex items-center justify-between gap-2 px-4 py-2 text-xs">
+          <span className="min-w-0 flex-1">{session.error}</span>
+          {canRetryComposeStart ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 shrink-0 px-2"
+              data-testid="compose-retry"
+              onClick={() => void startComposeSession()}
+            >
+              {t("common:retry")}
+            </Button>
+          ) : null}
+        </div>
       ) : null}
       <div className="min-h-0 flex-1">
         <ResizablePanelGroup direction={isMobile ? "vertical" : "horizontal"} className="h-full">
