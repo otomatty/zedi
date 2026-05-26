@@ -58,23 +58,28 @@ export function useInitialComposeBackend(
     if (!enabled || userOverrode) return;
 
     let cancelled = false;
-    void loadComposeBackendFromSettings().then((resolved) => {
-      if (!cancelled) {
+    let loadGeneration = 0;
+
+    const applyFromSettings = (markSynced: boolean) => {
+      const generation = ++loadGeneration;
+      void loadComposeBackendFromSettings().then((resolved) => {
+        if (cancelled || generation !== loadGeneration) return;
         setBackend(resolved);
-        setSettingsSynced(true);
-      }
-    });
+        if (markSynced) setSettingsSynced(true);
+      });
+    };
+
+    applyFromSettings(true);
 
     const onSettingsChanged = () => {
       if (userOverrode) return;
-      void loadComposeBackendFromSettings().then((resolved) => {
-        if (!cancelled) setBackend(resolved);
-      });
+      applyFromSettings(false);
     };
 
     window.addEventListener(AI_SETTINGS_CHANGED_EVENT, onSettingsChanged);
     return () => {
       cancelled = true;
+      loadGeneration += 1;
       window.removeEventListener(AI_SETTINGS_CHANGED_EVENT, onSettingsChanged);
     };
   }, [enabled, userOverrode]);
