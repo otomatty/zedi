@@ -1,13 +1,13 @@
 /**
  * BottomNav: 4 tabs (My Note / Notes / AI / Me), aria-current on active tab,
- * safe-area padding, and Me tab opens a Sheet with the account menu content.
+ * safe-area padding, and Me tab links to `/account`.
  *
  * ボトムナビ: 4 タブ（マイノート / ノート / AI / Me）、アクティブタブの aria-current、
- * safe-area padding、Me タブの Sheet 表示を検証する。
+ * safe-area padding、Me タブの `/account` リンクを検証する。
  */
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { BottomNav } from "./index";
 
@@ -78,7 +78,7 @@ describe("BottomNav", () => {
     // Use exact match for "Notes" since "My Note" also contains "Note".
     expect(screen.getByRole("link", { name: /^notes$/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /^ai$/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /account/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /account/i })).toBeInTheDocument();
   });
 
   it("marks the My Note tab as aria-current when on /notes/me", () => {
@@ -124,10 +124,19 @@ describe("BottomNav", () => {
     expect(nav?.getAttribute("style") ?? "").toContain("env(safe-area-inset-bottom)");
   });
 
-  it("opens the Me sheet when the Me tab is clicked", async () => {
+  it("links the Me tab to /account", () => {
     renderAt("/notes/me");
-    const meButton = screen.getByRole("button", { name: /account/i });
-    fireEvent.click(meButton);
-    expect(await screen.findByTestId("bottom-nav-me-content")).toBeInTheDocument();
+    const meLink = screen.getByRole("link", { name: /account/i });
+    expect(meLink).toHaveAttribute("href", "/account");
+  });
+
+  it("marks the Me tab as aria-current when on /account", () => {
+    renderAt("/account");
+    const meLink = screen.getByRole("link", { name: /account/i });
+    expect(meLink).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: /my note/i })).not.toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
 });

@@ -24,6 +24,7 @@ import ExtensionAuthCallback from "./pages/ExtensionAuthCallback";
 import McpAuthorize from "./pages/McpAuthorize";
 import PdfReaderPage from "./pages/pdfKnowledge/PdfReaderPage";
 import Settings from "./pages/Settings";
+import Account from "./pages/Account";
 import WikiSchemaPage from "./pages/WikiSchemaPage";
 import IndexPage from "./pages/IndexPage";
 import Pricing from "./pages/Pricing";
@@ -255,6 +256,7 @@ const App = () => (
                           desktop-only placeholder. */}
                       <Route path="/sources/:sourceId/pdf" element={<PdfReaderPage />} />
                       <Route path="/settings" element={<Settings />} />
+                      <Route path="/account" element={<Account />} />
                       <Route path="/wiki-schema" element={<WikiSchemaPage />} />
                       <Route path="/index" element={<IndexPage />} />
                       <Route path="/pricing" element={<Pricing />} />

@@ -1,34 +1,25 @@
-import React, { useCallback, useState } from "react";
+import React from "react";
 import { useLocation } from "react-router-dom";
-import { Sheet, SheetContent, SheetDescription, SheetTitle, cn } from "@zedi/ui";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { Avatar, AvatarFallback, AvatarImage } from "@zedi/ui";
+import { cn } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
-import { SignedIn, SignedOut, useAuth, useUser } from "@/hooks/useAuth";
-import { useProfile } from "@/hooks/useProfile";
-import { useSyncStatusDotColor } from "../Header/UnifiedMenuSyncStatus";
 import { PRIMARY_NAV_ITEMS, isPrimaryNavActive } from "../navigationItems";
-import { SignedInMenuContent, SignedOutMenuContent } from "./BottomNavMeContent";
+import { BottomNavAccountTab } from "./BottomNavAccountTab";
 import { BottomNavTab } from "./BottomNavTab";
 
 /**
  * Mobile bottom navigation. Renders the shared {@link PRIMARY_NAV_ITEMS} as
- * tabs followed by a Me tab. The Me tab opens a sheet that reuses the
- * signed-in / signed-out menu content from {@link UnifiedMenu}, so the
- * account surfaces stay in sync; the primary tabs stay in sync with the
+ * tabs followed by a Me tab that links to `/account`. The account page reuses
+ * menu content from {@link UnifiedMenu}; primary tabs stay in sync with the
  * header dropdown because both read from the same config.
  *
  * モバイル用のボトムナビゲーション。共通の {@link PRIMARY_NAV_ITEMS} をタブとして描画し、
- * 末尾に Me タブを追加する。Me タブは {@link UnifiedMenu} と同じメニュー内容を Sheet で
- * 表示しアカウント UI の二重実装を避ける。プライマリタブはヘッダーのドロップダウンと
- * 同じ配列を参照するので表示項目が常に一致する。
+ * 末尾の Me タブは `/account` へ遷移する。アカウント画面は {@link UnifiedMenu} と同じ
+ * メニュー内容を表示する。プライマリタブはヘッダーのドロップダウンと同じ配列を参照する。
  */
 export const BottomNav: React.FC = () => {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const [meOpen, setMeOpen] = useState(false);
-  const closeMe = useCallback(() => setMeOpen(false), []);
-  const sheetTitle = t("nav.account", "Account");
+  const accountActive = pathname === "/account";
 
   return (
     <nav
@@ -49,83 +40,9 @@ export const BottomNav: React.FC = () => {
             active={isPrimaryNavActive(item, pathname)}
           />
         ))}
-        <li className="flex-1">
-          <MeTab open={meOpen} onOpenChange={setMeOpen} />
-        </li>
+        <BottomNavAccountTab active={accountActive} />
       </ul>
-
-      <Sheet open={meOpen} onOpenChange={setMeOpen}>
-        <SheetContent side="right" className="w-3/4 max-w-sm p-4">
-          <VisuallyHidden>
-            <SheetTitle>{sheetTitle}</SheetTitle>
-            <SheetDescription>{t("nav.account", "Account")}</SheetDescription>
-          </VisuallyHidden>
-          <div data-testid="bottom-nav-me-content">
-            <SignedIn>
-              <SignedInMenuContent onClose={closeMe} />
-            </SignedIn>
-            <SignedOut>
-              <SignedOutMenuContent onClose={closeMe} />
-            </SignedOut>
-          </div>
-        </SheetContent>
-      </Sheet>
     </nav>
-  );
-};
-
-interface MeTabProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-const MeTab: React.FC<MeTabProps> = ({ open, onOpenChange }) => {
-  const { t } = useTranslation();
-  const { isSignedIn } = useAuth();
-  const { user } = useUser();
-  const { displayName, avatarUrl } = useProfile();
-  const dotColor = useSyncStatusDotColor();
-
-  return (
-    <button
-      type="button"
-      aria-label={t("nav.account", "Account")}
-      aria-haspopup="dialog"
-      aria-expanded={open}
-      onClick={() => onOpenChange(true)}
-      className={cn(
-        "text-muted-foreground hover:text-foreground flex h-full w-full flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors",
-      )}
-    >
-      <span className="relative">
-        {isSignedIn ? (
-          <Avatar className="h-6 w-6">
-            <AvatarImage
-              src={avatarUrl || user?.imageUrl}
-              alt={displayName || user?.fullName || "User"}
-            />
-            <AvatarFallback className="text-[10px]">
-              {(displayName || user?.firstName)?.charAt(0) ?? "U"}
-            </AvatarFallback>
-          </Avatar>
-        ) : (
-          <Avatar className="h-6 w-6">
-            <AvatarFallback className="text-[10px]">
-              {t("nav.account", "Account").charAt(0)}
-            </AvatarFallback>
-          </Avatar>
-        )}
-        {dotColor && (
-          <span
-            className={cn(
-              "border-background absolute right-0 bottom-0 h-2 w-2 rounded-full border",
-              dotColor,
-            )}
-          />
-        )}
-      </span>
-      <span>{t("nav.account", "Account")}</span>
-    </button>
   );
 };
 

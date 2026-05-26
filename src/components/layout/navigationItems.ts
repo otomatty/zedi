@@ -6,11 +6,11 @@ import type React from "react";
  * One entry in the primary navigation. The header dropdown and the mobile
  * bottom navigation both render the same list so the two surfaces stay in
  * sync. User-menu / account entries are intentionally excluded; they live on
- * the header avatar and the bottom nav "Me" tab respectively.
+ * the header avatar and the bottom nav `/account` tab respectively.
  *
  * プライマリナビゲーションの 1 項目。ヘッダーのドロップダウンとモバイルのボトムナビが
  * 同じリストを参照するため、表示項目が常に一致する。ユーザーメニュー・アカウント関連は
- * ここには含めず、引き続きヘッダーのアバターとボトムナビの Me タブに分離する。
+ * ここには含めず、引き続きヘッダーのアバターとボトムナビの `/account` タブに分離する。
  */
 export interface PrimaryNavItem {
   /** Link target. 遷移先パス。*/
