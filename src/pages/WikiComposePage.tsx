@@ -10,7 +10,7 @@
  * Compose UI shell. The page reads the `useWikiComposeSession` hook for state
  * and routes user submissions back through the hook's mutator methods.
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, X } from "lucide-react";
@@ -29,7 +29,6 @@ import { COMPOSE_SEED_STATE_KEY, type ComposeNavigationSeed } from "@/lib/wikiCo
 import type { DraftedSection } from "@/lib/wikiCompose/types";
 import { EditorPane } from "@/components/wikiCompose/EditorPane";
 import { ComposePanel } from "@/components/wikiCompose/ComposePanel";
-import { ComposeBackendSelector } from "@/components/wikiCompose/ComposeBackendSelector";
 import { useInitialComposeBackend } from "@/hooks/useInitialComposeBackend";
 
 /** Map drafted section list to a quick lookup. */
@@ -61,13 +60,10 @@ const WikiComposePage: React.FC = () => {
     return s;
   });
 
-  const {
-    backend: composeBackend,
-    setBackend: setComposeBackend,
-    isResolved: isComposeBackendResolved,
-  } = useInitialComposeBackend({
-    enabled: !sessionId,
-  });
+  const { backend: composeBackend, isResolved: isComposeBackendResolved } =
+    useInitialComposeBackend({
+      enabled: !sessionId,
+    });
 
   const initialInput = useMemo(
     () =>
@@ -87,7 +83,7 @@ const WikiComposePage: React.FC = () => {
   const session = useWikiComposeSession({
     pageId,
     sessionId,
-    // Fresh compose: user picks backend then clicks Start (#951).
+    // Resume existing session on mount; fresh compose starts after backend resolves.
     autoStart: Boolean(sessionId && pageId),
     composeSeed,
     initialInput,
@@ -96,7 +92,15 @@ const WikiComposePage: React.FC = () => {
 
   const awaitingComposeStart =
     !sessionId && session.status === "idle" && !session.session && !session.isStreaming;
-  const showBackendSelector = awaitingComposeStart;
+  const autoStartRequestedRef = useRef(false);
+
+  // Fresh compose: start automatically once AI settings yield a backend (#951).
+  useEffect(() => {
+    if (sessionId || !isComposeBackendResolved || !awaitingComposeStart) return;
+    if (autoStartRequestedRef.current) return;
+    autoStartRequestedRef.current = true;
+    void session.start();
+  }, [sessionId, isComposeBackendResolved, awaitingComposeStart, session.start]);
 
   // Clear history seed only after the session row left `pending` (first run claimed).
   // `pending` のまま state を消すと失敗時リロードで chatSeed が届かなくなる (#950)。
@@ -249,24 +253,6 @@ const WikiComposePage: React.FC = () => {
       {header}
       {session.error ? (
         <div className="bg-destructive/10 text-destructive px-4 py-2 text-xs">{session.error}</div>
-      ) : null}
-      {showBackendSelector ? (
-        <div className="border-border space-y-3 border-b px-4 py-3">
-          <ComposeBackendSelector
-            value={composeBackend}
-            onChange={setComposeBackend}
-            disabled={session.isStreaming}
-          />
-          <Button
-            type="button"
-            size="sm"
-            data-testid="compose-start"
-            onClick={() => void session.start()}
-            disabled={session.isStreaming || !isComposeBackendResolved}
-          >
-            {t("wikiCompose.page.startCompose")}
-          </Button>
-        </div>
       ) : null}
       <div className="min-h-0 flex-1">
         <ResizablePanelGroup direction={isMobile ? "vertical" : "horizontal"} className="h-full">

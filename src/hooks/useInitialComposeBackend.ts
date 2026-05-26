@@ -2,7 +2,7 @@
  * Initializes Wiki Compose backend from AI settings (#951).
  * Wiki Compose の backend を設定画面の AI 設定から初期化する。
  */
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useState } from "react";
 import { loadAISettings, AI_SETTINGS_CHANGED_EVENT } from "@/lib/aiSettings";
 import { fetchUserAiCredentialsStatus } from "@/lib/userAiCredentials";
 import { resolveComposeBackendFromAiSettings } from "@/lib/wikiCompose/resolveComposeBackend";
@@ -35,44 +35,43 @@ export interface UseInitialComposeBackendOptions {
 
 export interface UseInitialComposeBackendResult {
   backend: ComposeExecutionBackend;
-  setBackend: Dispatch<SetStateAction<ComposeExecutionBackend>>;
   /** False until the first settings-based resolution finishes (when `enabled`). */
   isResolved: boolean;
 }
 
 /**
- * Returns backend state synced from AI settings until the user changes it or `enabled` is false.
- * AI 設定と同期した backend。ユーザーが変更するか `enabled` が false になるまで追従する。
+ * Returns backend state synced from AI settings while `enabled` is true.
+ * `enabled` が true の間、AI 設定と同期した backend を返す。
  */
 export function useInitialComposeBackend(
   options: UseInitialComposeBackendOptions = {},
 ): UseInitialComposeBackendResult {
   const { enabled = true } = options;
   const [backend, setBackend] = useState<ComposeExecutionBackend>("zedi_managed");
-  const [userOverrode, setUserOverrode] = useState(false);
-  const [settingsSynced, setSettingsSynced] = useState(!enabled);
-
-  const isResolved = !enabled || userOverrode || settingsSynced;
+  const [isResolved, setIsResolved] = useState(!enabled);
 
   useEffect(() => {
-    if (!enabled || userOverrode) return;
+    if (!enabled) {
+      setIsResolved(true);
+      return;
+    }
 
     let cancelled = false;
     let loadGeneration = 0;
 
-    const applyFromSettings = (markSynced: boolean) => {
+    const applyFromSettings = (markResolved: boolean) => {
       const generation = ++loadGeneration;
       void loadComposeBackendFromSettings().then((resolved) => {
         if (cancelled || generation !== loadGeneration) return;
         setBackend(resolved);
-        if (markSynced) setSettingsSynced(true);
+        if (markResolved) setIsResolved(true);
       });
     };
 
+    setIsResolved(false);
     applyFromSettings(true);
 
     const onSettingsChanged = () => {
-      if (userOverrode) return;
       applyFromSettings(false);
     };
 
@@ -82,13 +81,7 @@ export function useInitialComposeBackend(
       loadGeneration += 1;
       window.removeEventListener(AI_SETTINGS_CHANGED_EVENT, onSettingsChanged);
     };
-  }, [enabled, userOverrode]);
+  }, [enabled]);
 
-  const setBackendWithOverride: Dispatch<SetStateAction<ComposeExecutionBackend>> = (value) => {
-    setUserOverrode(true);
-    setSettingsSynced(true);
-    setBackend(value);
-  };
-
-  return { backend, setBackend: setBackendWithOverride, isResolved };
+  return { backend, isResolved };
 }
