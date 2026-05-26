@@ -10,7 +10,7 @@
  * Compose UI shell. The page reads the `useWikiComposeSession` hook for state
  * and routes user submissions back through the hook's mutator methods.
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, X } from "lucide-react";
@@ -29,7 +29,6 @@ import { COMPOSE_SEED_STATE_KEY, type ComposeNavigationSeed } from "@/lib/wikiCo
 import type { DraftedSection } from "@/lib/wikiCompose/types";
 import { EditorPane } from "@/components/wikiCompose/EditorPane";
 import { ComposePanel } from "@/components/wikiCompose/ComposePanel";
-import { ComposeBackendSelector } from "@/components/wikiCompose/ComposeBackendSelector";
 import { useInitialComposeBackend } from "@/hooks/useInitialComposeBackend";
 
 /** Map drafted section list to a quick lookup. */
@@ -61,13 +60,10 @@ const WikiComposePage: React.FC = () => {
     return s;
   });
 
-  const {
-    backend: composeBackend,
-    setBackend: setComposeBackend,
-    isResolved: isComposeBackendResolved,
-  } = useInitialComposeBackend({
-    enabled: !sessionId,
-  });
+  const { backend: composeBackend, isResolved: isComposeBackendResolved } =
+    useInitialComposeBackend({
+      enabled: !sessionId,
+    });
 
   const initialInput = useMemo(
     () =>
@@ -87,7 +83,7 @@ const WikiComposePage: React.FC = () => {
   const session = useWikiComposeSession({
     pageId,
     sessionId,
-    // Fresh compose: user picks backend then clicks Start (#951).
+    // Resume existing session on mount; fresh compose starts after backend resolves.
     autoStart: Boolean(sessionId && pageId),
     composeSeed,
     initialInput,
@@ -96,7 +92,31 @@ const WikiComposePage: React.FC = () => {
 
   const awaitingComposeStart =
     !sessionId && session.status === "idle" && !session.session && !session.isStreaming;
-  const showBackendSelector = awaitingComposeStart;
+  const autoStartRequestedRef = useRef(false);
+
+  const startComposeSession = session.start;
+
+  // Fresh compose: start automatically once AI settings yield a backend (#951).
+  useEffect(() => {
+    if (sessionId || !isComposeBackendResolved || !awaitingComposeStart) return;
+    if (autoStartRequestedRef.current) return;
+    autoStartRequestedRef.current = true;
+    void startComposeSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot auto-start when backend resolves
+  }, [sessionId, isComposeBackendResolved, awaitingComposeStart]);
+
+  // Allow manual retry after a failed auto-start (ref would otherwise block re-entry).
+  useEffect(() => {
+    if (sessionId || session.session || !session.error) return;
+    autoStartRequestedRef.current = false;
+  }, [sessionId, session.session, session.error]);
+
+  const canRetryComposeStart =
+    !sessionId &&
+    Boolean(session.error) &&
+    !session.session &&
+    !session.isStreaming &&
+    (session.status === "idle" || session.status === "failed");
 
   // Clear history seed only after the session row left `pending` (first run claimed).
   // `pending` のまま state を消すと失敗時リロードで chatSeed が届かなくなる (#950)。
@@ -248,24 +268,20 @@ const WikiComposePage: React.FC = () => {
     <div className="flex h-[100dvh] w-full flex-col">
       {header}
       {session.error ? (
-        <div className="bg-destructive/10 text-destructive px-4 py-2 text-xs">{session.error}</div>
-      ) : null}
-      {showBackendSelector ? (
-        <div className="border-border space-y-3 border-b px-4 py-3">
-          <ComposeBackendSelector
-            value={composeBackend}
-            onChange={setComposeBackend}
-            disabled={session.isStreaming}
-          />
-          <Button
-            type="button"
-            size="sm"
-            data-testid="compose-start"
-            onClick={() => void session.start()}
-            disabled={session.isStreaming || !isComposeBackendResolved}
-          >
-            {t("wikiCompose.page.startCompose")}
-          </Button>
+        <div className="bg-destructive/10 text-destructive flex items-center justify-between gap-2 px-4 py-2 text-xs">
+          <span className="min-w-0 flex-1">{session.error}</span>
+          {canRetryComposeStart ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 shrink-0 px-2"
+              data-testid="compose-retry"
+              onClick={() => void startComposeSession()}
+            >
+              {t("common:retry")}
+            </Button>
+          ) : null}
         </div>
       ) : null}
       <div className="min-h-0 flex-1">

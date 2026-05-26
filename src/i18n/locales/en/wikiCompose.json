@@ -6,8 +6,7 @@
     "back": "Back",
     "sessionPrefix": "session:",
     "close": "Close",
-    "cancel": "Cancel",
-    "startCompose": "Start compose"
+    "cancel": "Cancel"
   },
   "phase": {
     "brief": "Brief",

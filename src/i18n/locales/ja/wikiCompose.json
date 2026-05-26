@@ -6,8 +6,7 @@
     "back": "戻る",
     "sessionPrefix": "セッション:",
     "close": "閉じる",
-    "cancel": "キャンセル",
-    "startCompose": "Compose を開始"
+    "cancel": "キャンセル"
   },
   "phase": {
     "brief": "ブリーフ",
