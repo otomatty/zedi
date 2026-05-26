@@ -24,6 +24,7 @@ import ExtensionAuthCallback from "./pages/ExtensionAuthCallback";
 import McpAuthorize from "./pages/McpAuthorize";
 import PdfReaderPage from "./pages/pdfKnowledge/PdfReaderPage";
 import Settings from "./pages/Settings";
+import Account from "./pages/Account";
 import WikiSchemaPage from "./pages/WikiSchemaPage";
 import IndexPage from "./pages/IndexPage";
 import Pricing from "./pages/Pricing";
@@ -255,6 +256,18 @@ const App = () => (
                           desktop-only placeholder. */}
                       <Route path="/sources/:sourceId/pdf" element={<PdfReaderPage />} />
                       <Route path="/settings" element={<Settings />} />
+                      {/* `/account` — mobile-friendly account hub. The
+                          bottom-nav Account tab links here instead of
+                          opening a Sheet so the entry behaves like the
+                          other primary tabs (history, back button,
+                          deep-linking). Reuses the avatar menu content so
+                          there is no duplicated account UI.
+                          モバイル向けアカウントハブ。ボトムナビの
+                          「アカウント」タブからリンクし、Sheet ではなく
+                          ページ遷移として動かす。アバターメニューと同じ
+                          コンポーネントを再利用してアカウント UI の二重
+                          実装を避ける。 */}
+                      <Route path="/account" element={<Account />} />
                       <Route path="/wiki-schema" element={<WikiSchemaPage />} />
                       <Route path="/index" element={<IndexPage />} />
                       <Route path="/pricing" element={<Pricing />} />

@@ -1,34 +1,34 @@
-import React, { useCallback, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { Sheet, SheetContent, SheetDescription, SheetTitle, cn } from "@zedi/ui";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import React from "react";
+import { Link, useLocation, matchPath } from "react-router-dom";
+import { cn } from "@zedi/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
-import { SignedIn, SignedOut, useAuth, useUser } from "@/hooks/useAuth";
+import { useAuth, useUser } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useSyncStatusDotColor } from "../Header/UnifiedMenuSyncStatus";
 import { PRIMARY_NAV_ITEMS, isPrimaryNavActive } from "../navigationItems";
-import { SignedInMenuContent, SignedOutMenuContent } from "./BottomNavMeContent";
 import { BottomNavTab } from "./BottomNavTab";
+
+/** Pathname patterns that mark the Account tab as active. /
+ *  アカウントタブをアクティブ扱いするパスパターン。 */
+const ACCOUNT_TAB_MATCH_PATHS = ["/account"] as const;
 
 /**
  * Mobile bottom navigation. Renders the shared {@link PRIMARY_NAV_ITEMS} as
- * tabs followed by a Me tab. The Me tab opens a sheet that reuses the
- * signed-in / signed-out menu content from {@link UnifiedMenu}, so the
- * account surfaces stay in sync; the primary tabs stay in sync with the
- * header dropdown because both read from the same config.
+ * tabs followed by an Account tab. The Account tab navigates to
+ * `/account` so the bottom nav stays consistent with the other tabs
+ * (history, back button, deep-linking) instead of opening a side Sheet.
  *
  * モバイル用のボトムナビゲーション。共通の {@link PRIMARY_NAV_ITEMS} をタブとして描画し、
- * 末尾に Me タブを追加する。Me タブは {@link UnifiedMenu} と同じメニュー内容を Sheet で
- * 表示しアカウント UI の二重実装を避ける。プライマリタブはヘッダーのドロップダウンと
- * 同じ配列を参照するので表示項目が常に一致する。
+ * 末尾にアカウントタブを追加する。アカウントタブは Sheet を開かず `/account` に遷移する
+ * ため、他のタブと同じくページ遷移として履歴・戻る・ディープリンクが効く。
  */
 export const BottomNav: React.FC = () => {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const [meOpen, setMeOpen] = useState(false);
-  const closeMe = useCallback(() => setMeOpen(false), []);
-  const sheetTitle = t("nav.account", "Account");
+  const accountActive = ACCOUNT_TAB_MATCH_PATHS.some(
+    (pattern) => matchPath({ path: pattern, end: true }, pathname) != null,
+  );
 
   return (
     <nav
@@ -50,51 +50,43 @@ export const BottomNav: React.FC = () => {
           />
         ))}
         <li className="flex-1">
-          <MeTab open={meOpen} onOpenChange={setMeOpen} />
+          <AccountTab active={accountActive} />
         </li>
       </ul>
-
-      <Sheet open={meOpen} onOpenChange={setMeOpen}>
-        <SheetContent side="right" className="w-3/4 max-w-sm p-4">
-          <VisuallyHidden>
-            <SheetTitle>{sheetTitle}</SheetTitle>
-            <SheetDescription>{t("nav.account", "Account")}</SheetDescription>
-          </VisuallyHidden>
-          <div data-testid="bottom-nav-me-content">
-            <SignedIn>
-              <SignedInMenuContent onClose={closeMe} />
-            </SignedIn>
-            <SignedOut>
-              <SignedOutMenuContent onClose={closeMe} />
-            </SignedOut>
-          </div>
-        </SheetContent>
-      </Sheet>
     </nav>
   );
 };
 
-interface MeTabProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface AccountTabProps {
+  active: boolean;
 }
 
-const MeTab: React.FC<MeTabProps> = ({ open, onOpenChange }) => {
+/**
+ * Account tab in the mobile bottom nav. Renders the user's avatar (or a
+ * generic fallback for guests) inside a `<Link>` to `/account` so the tab
+ * behaves like the other primary tabs — pressing it navigates with full
+ * history support, instead of opening a Sheet that bypasses the back stack.
+ *
+ * モバイルボトムナビのアカウントタブ。ユーザーのアバター（未ログインは汎用
+ * フォールバック）を `<Link>` で包み `/account` に遷移する。他のプライマリ
+ * タブと同様にページ遷移として履歴に積まれるため、戻るボタンが効く。
+ */
+const AccountTab: React.FC<AccountTabProps> = ({ active }) => {
   const { t } = useTranslation();
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const { displayName, avatarUrl } = useProfile();
   const dotColor = useSyncStatusDotColor();
+  const label = t("nav.account", "Account");
 
   return (
-    <button
-      type="button"
-      aria-label={t("nav.account", "Account")}
-      aria-haspopup="dialog"
-      aria-expanded={open}
-      onClick={() => onOpenChange(true)}
+    <Link
+      to="/account"
+      aria-label={label}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "text-muted-foreground hover:text-foreground flex h-full w-full flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors",
+        "flex h-full w-full flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors",
+        active ? "text-primary" : "text-muted-foreground hover:text-foreground",
       )}
     >
       <span className="relative">
@@ -110,9 +102,7 @@ const MeTab: React.FC<MeTabProps> = ({ open, onOpenChange }) => {
           </Avatar>
         ) : (
           <Avatar className="h-6 w-6">
-            <AvatarFallback className="text-[10px]">
-              {t("nav.account", "Account").charAt(0)}
-            </AvatarFallback>
+            <AvatarFallback className="text-[10px]">{label.charAt(0)}</AvatarFallback>
           </Avatar>
         )}
         {dotColor && (
@@ -124,8 +114,8 @@ const MeTab: React.FC<MeTabProps> = ({ open, onOpenChange }) => {
           />
         )}
       </span>
-      <span>{t("nav.account", "Account")}</span>
-    </button>
+      <span>{label}</span>
+    </Link>
   );
 };
 
