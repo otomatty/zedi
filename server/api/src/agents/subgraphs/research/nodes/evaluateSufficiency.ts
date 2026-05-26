@@ -10,6 +10,7 @@
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { z } from "zod";
+import { composeContentLocaleInstruction } from "../../../core/composeLocale.js";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
 import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
 import { getGraphContext } from "./shared/getGraphContext.js";
@@ -88,7 +89,10 @@ export async function evaluateSufficiency(
     name: "research_evaluation",
   });
   const parsed = await structured.invoke([
-    { role: "system", content: SYSTEM_PROMPT },
+    {
+      role: "system",
+      content: SYSTEM_PROMPT + composeContentLocaleInstruction(ctx.contentLocale),
+    },
     { role: "user", content: buildUserPrompt(state) },
   ]);
   const evaluation: Evaluation = {

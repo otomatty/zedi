@@ -11,6 +11,7 @@
  * and routes user submissions back through the hook's mutator methods.
  */
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, X } from "lucide-react";
 import {
@@ -40,6 +41,7 @@ function indexById(items: DraftedSection[]): Record<string, DraftedSection> {
 
 /** Root page for `/notes/:noteId/:pageId/compose[/:sessionId]`. */
 const WikiComposePage: React.FC = () => {
+  const { t } = useTranslation();
   const params = useParams<{ noteId: string; pageId: string; sessionId?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -148,14 +150,18 @@ const WikiComposePage: React.FC = () => {
     handleBack();
   };
 
+  const phaseLabel = (() => {
+    const key = `wikiCompose.phaseDisplay.${session.phase}` as const;
+    const translated = t(key);
+    return translated === key ? session.phase : translated;
+  })();
+
   if (!pageId) {
     return (
       <div className="p-6">
         <Alert variant="destructive">
-          <AlertTitle>Missing page id</AlertTitle>
-          <AlertDescription>
-            This URL is missing a page id. Use the Compose button on a wiki page to start.
-          </AlertDescription>
+          <AlertTitle>{t("wikiCompose.page.missingPageIdTitle")}</AlertTitle>
+          <AlertDescription>{t("wikiCompose.page.missingPageIdDescription")}</AlertDescription>
         </Alert>
       </div>
     );
@@ -175,19 +181,19 @@ const WikiComposePage: React.FC = () => {
           data-testid="compose-back"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Back
+          {t("wikiCompose.page.back")}
         </Button>
         <span className="truncate text-sm font-medium">
-          {session.pageSnapshot?.title || "Wiki Compose"}
+          {session.pageSnapshot?.title || t("wikiCompose.page.titleFallback")}
         </span>
         <span className="text-muted-foreground text-[11px] tracking-wide uppercase">
-          {session.phase}
+          {phaseLabel}
         </span>
       </div>
       <div className="flex items-center gap-2">
         {session.session ? (
           <span className="text-muted-foreground hidden text-[11px] sm:inline">
-            session: {session.session.id.slice(0, 8)}…
+            {t("wikiCompose.page.sessionPrefix")} {session.session.id.slice(0, 8)}…
           </span>
         ) : null}
         <Button
@@ -199,7 +205,9 @@ const WikiComposePage: React.FC = () => {
           disabled={session.status === "completed" || session.status === "cancelled"}
         >
           <X className="mr-1 h-4 w-4" />
-          {session.status === "completed" ? "Close" : "Cancel"}
+          {session.status === "completed"
+            ? t("wikiCompose.page.close")
+            : t("wikiCompose.page.cancel")}
         </Button>
       </div>
     </header>
@@ -256,7 +264,7 @@ const WikiComposePage: React.FC = () => {
             onClick={() => void session.start()}
             disabled={session.isStreaming || !isComposeBackendResolved}
           >
-            Start compose
+            {t("wikiCompose.page.startCompose")}
           </Button>
         </div>
       ) : null}

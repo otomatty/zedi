@@ -11,6 +11,7 @@
  * id sets to `submitResearchApproval`.
  */
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ExternalLink, Check } from "lucide-react";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@zedi/ui";
 import { cn } from "@zedi/ui";
@@ -31,18 +32,6 @@ export interface ResearchSectionProps {
   }) => Promise<void>;
 }
 
-/** Maps source kind to a short label. */
-function kindLabel(kind: ResearchSource["kind"]): string {
-  switch (kind) {
-    case "web":
-      return "Web";
-    case "wiki":
-      return "Wiki";
-    case "fetched":
-      return "Article";
-  }
-}
-
 /** Render the research review panel. */
 export const ResearchSection: React.FC<ResearchSectionProps> = ({
   batch,
@@ -52,8 +41,20 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
   isStreaming,
   onSubmit,
 }) => {
+  const { t } = useTranslation();
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  const kindLabel = (kind: ResearchSource["kind"]): string => {
+    switch (kind) {
+      case "web":
+        return t("wikiCompose.research.web");
+      case "wiki":
+        return t("wikiCompose.research.wiki");
+      case "fetched":
+        return t("wikiCompose.research.article");
+    }
+  };
 
   // Seed decisions to "approved" by default when sources change so the user
   // can review and reject rather than starting from scratch.
@@ -92,14 +93,17 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
     if (approvedSources.length === 0) {
       return (
         <section data-testid="research-section-readonly" className="text-muted-foreground text-xs">
-          No research sources were approved.
+          {t("wikiCompose.research.noneApproved")}
         </section>
       );
     }
     return (
       <section data-testid="research-section-readonly" className="space-y-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
-          Research <Badge variant="secondary">{approvedSources.length} approved</Badge>
+          {t("wikiCompose.phase.research")}{" "}
+          <Badge variant="secondary">
+            {t("wikiCompose.research.approvedBadge", { count: approvedSources.length })}
+          </Badge>
         </h2>
         <ul className="space-y-1.5">
           {approvedSources.map((s) => (
@@ -132,9 +136,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
   if (pendingSources.length === 0) {
     return (
       <section data-testid="research-section-empty" className="text-muted-foreground text-xs">
-        {isStreaming
-          ? "Research in progress — sources will appear when ready."
-          : "No research sources to review."}
+        {isStreaming ? t("wikiCompose.research.inProgress") : t("wikiCompose.research.empty")}
       </section>
     );
   }
@@ -147,11 +149,18 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
     <section data-testid="research-section-review" className="space-y-3">
       <header className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
-          Research review
-          {batch ? <Badge variant="outline">iter {batch.iteration + 1}</Badge> : null}
+          {t("wikiCompose.research.reviewTitle")}
+          {batch ? (
+            <Badge variant="outline">
+              {t("wikiCompose.research.iterationBadge", { count: batch.iteration + 1 })}
+            </Badge>
+          ) : null}
         </h2>
         <span className="text-muted-foreground text-xs">
-          {approvedCount} / {pendingSources.length} approved
+          {t("wikiCompose.research.approvedOf", {
+            approved: approvedCount,
+            total: pendingSources.length,
+          })}
         </span>
       </header>
 
@@ -201,7 +210,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
                     data-testid={`source-approve-${s.id}`}
                     onClick={() => setDecision(s.id, "approved")}
                   >
-                    Approve
+                    {t("wikiCompose.research.approve")}
                   </Button>
                   <Button
                     type="button"
@@ -210,7 +219,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
                     data-testid={`source-reject-${s.id}`}
                     onClick={() => setDecision(s.id, "rejected")}
                   >
-                    Reject
+                    {t("wikiCompose.research.reject")}
                   </Button>
                 </div>
               </CardContent>
@@ -226,7 +235,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({
           disabled={submitting || isStreaming}
           onClick={handleSubmit}
         >
-          <Check className="mr-1 h-4 w-4" /> Continue with selection
+          <Check className="mr-1 h-4 w-4" /> {t("wikiCompose.research.continue")}
         </Button>
       </div>
     </section>

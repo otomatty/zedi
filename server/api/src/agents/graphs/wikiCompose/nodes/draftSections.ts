@@ -13,6 +13,7 @@
  * paint into the EditorPane.
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
+import { composeContentLocaleInstruction } from "../../../core/composeLocale.js";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
 import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
@@ -158,7 +159,10 @@ export async function draftSections(
     let body = "";
     try {
       const stream = await model.stream([
-        { role: "system", content: SECTION_SYSTEM_PROMPT },
+        {
+          role: "system",
+          content: SECTION_SYSTEM_PROMPT + composeContentLocaleInstruction(ctx.contentLocale),
+        },
         {
           role: "user",
           content: buildSectionPrompt({

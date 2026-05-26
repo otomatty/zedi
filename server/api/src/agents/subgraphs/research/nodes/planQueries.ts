@@ -14,6 +14,7 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { composeContentLocaleInstruction } from "../../../core/composeLocale.js";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
 import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
 import { getGraphContext } from "./shared/getGraphContext.js";
@@ -112,7 +113,10 @@ export async function planQueries(
   });
   const structured = model.withStructuredOutput(planQueriesSchema, { name: "plan_queries" });
   const planned = await structured.invoke([
-    { role: "system", content: SYSTEM_PROMPT },
+    {
+      role: "system",
+      content: SYSTEM_PROMPT + composeContentLocaleInstruction(ctx.contentLocale),
+    },
     { role: "user", content: brief || "(no brief provided; produce 2 broad coverage queries)" },
   ]);
 

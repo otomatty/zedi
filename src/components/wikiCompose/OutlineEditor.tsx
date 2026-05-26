@@ -10,6 +10,7 @@
  * button. The user submits via the dedicated button at the bottom.
  */
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ArrowDown, ArrowUp, Trash2, Plus, Check } from "lucide-react";
 import { Button, Card, CardContent, Input, Textarea } from "@zedi/ui";
 import { cn } from "@zedi/ui";
@@ -33,6 +34,7 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
   disabled = false,
   onSubmit,
 }) => {
+  const { t } = useTranslation();
   const [sections, setSections] = useState<OutlineSection[]>(initialSections);
   const [submitting, setSubmitting] = useState(false);
 
@@ -59,7 +61,7 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
   const add = () =>
     setSections((prev) => [
       ...prev,
-      { id: makeLocalId(), heading: "New section", depth: 1, intent: "" },
+      { id: makeLocalId(), heading: t("wikiCompose.structure.newSection"), depth: 1, intent: "" },
     ]);
 
   const update = (id: string, patch: Partial<OutlineSection>) =>
@@ -81,14 +83,14 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
                 value={section.heading}
                 data-testid={`outline-heading-${section.id}`}
                 onChange={(e) => update(section.id, { heading: e.target.value })}
-                placeholder="Section heading"
+                placeholder={t("wikiCompose.structure.headingPlaceholder")}
                 disabled={disabled}
               />
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
-                title="Toggle depth"
+                title={t("wikiCompose.structure.toggleDepth")}
                 onClick={() => update(section.id, { depth: section.depth === 1 ? 2 : 1 })}
                 disabled={disabled}
               >
@@ -98,7 +100,7 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
                 type="button"
                 size="sm"
                 variant="ghost"
-                title="Move up"
+                title={t("wikiCompose.structure.moveUp")}
                 onClick={() => move(i, -1)}
                 disabled={disabled || i === 0}
               >
@@ -108,7 +110,7 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
                 type="button"
                 size="sm"
                 variant="ghost"
-                title="Move down"
+                title={t("wikiCompose.structure.moveDown")}
                 onClick={() => move(i, +1)}
                 disabled={disabled || i === sections.length - 1}
               >
@@ -118,7 +120,7 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
                 type="button"
                 size="sm"
                 variant="ghost"
-                title="Remove section"
+                title={t("wikiCompose.structure.removeSection")}
                 onClick={() => remove(section.id)}
                 disabled={disabled}
               >
@@ -129,7 +131,7 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
               value={section.intent}
               data-testid={`outline-intent-${section.id}`}
               onChange={(e) => update(section.id, { intent: e.target.value })}
-              placeholder="What should this section cover?"
+              placeholder={t("wikiCompose.structure.intentPlaceholder")}
               rows={2}
               disabled={disabled}
               className="text-xs"
@@ -147,7 +149,7 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
           disabled={disabled}
           data-testid="outline-add"
         >
-          <Plus className="mr-1 h-4 w-4" /> Add section
+          <Plus className="mr-1 h-4 w-4" /> {t("wikiCompose.structure.addSection")}
         </Button>
         <Button
           type="button"
@@ -162,7 +164,7 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
             }
           }}
         >
-          <Check className="mr-1 h-4 w-4" /> Approve outline
+          <Check className="mr-1 h-4 w-4" /> {t("wikiCompose.structure.approveOutline")}
         </Button>
       </div>
     </div>

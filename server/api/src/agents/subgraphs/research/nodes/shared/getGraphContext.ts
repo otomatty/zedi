@@ -8,6 +8,7 @@
  * で誤って忘れたケースを早期に検出するため throw する。
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
+import { normalizeComposeContentLocale } from "../../../../core/composeLocale.js";
 import {
   GRAPH_CONTEXT_CONFIG_KEY,
   type GraphContext,
@@ -44,5 +45,9 @@ export function getGraphContext(config: LangGraphRunnableConfig | undefined): Gr
         "Check GraphRunner.buildConfig.",
     );
   }
-  return ctx as GraphContext;
+  const contentLocale =
+    normalizeComposeContentLocale(ctx.contentLocale) ??
+    normalizeComposeContentLocale((ctx as { locale?: unknown }).locale) ??
+    "en";
+  return { ...(ctx as GraphContext), contentLocale };
 }

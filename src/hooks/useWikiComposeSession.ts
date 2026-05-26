@@ -19,7 +19,9 @@ import {
   resumeSession,
   runSession,
 } from "@/lib/wikiCompose/composeService";
+import i18n from "@/i18n";
 import type { ComposeExecutionBackend } from "@/lib/wikiCompose/backends";
+import { resolveComposeContentLocale } from "@/lib/wikiCompose/resolveComposeContentLocale";
 import type { ComposeNavigationSeed } from "@/lib/wikiCompose/navigation";
 import type {
   BriefAnswer,
@@ -224,6 +226,18 @@ function activityId(): string {
   return `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Merge graph run input with the active UI content locale. */
+function withContentLocale(input?: Record<string, unknown>): Record<string, unknown> {
+  return { ...(input ?? {}), contentLocale: resolveComposeContentLocale() };
+}
+
+/** Human-readable phase label for activity log entries. */
+function phaseDisplayLabel(phase: string): string {
+  const key = `wikiCompose.phaseDisplay.${phase}` as const;
+  const translated = i18n.t(key);
+  return translated === key ? phase : translated;
+}
+
 /**
  * Map an SSE event into a state update. Returns a partial state to merge.
  */
@@ -235,7 +249,7 @@ function reduceEvent(
     case "started":
       return {
         activity: appendActivity(prev.activity, {
-          label: "Run started",
+          label: i18n.t("wikiCompose.activity.runStarted"),
           detail: event.graphId,
           status: "info",
         }),
@@ -244,7 +258,7 @@ function reduceEvent(
       return {
         phase: event.phase,
         activity: appendActivity(prev.activity, {
-          label: `Phase: ${event.phase}`,
+          label: i18n.t("wikiCompose.activity.phase", { phase: phaseDisplayLabel(event.phase) }),
           detail: event.status,
           status: event.status === "entered" ? "started" : "completed",
         }),
@@ -263,7 +277,7 @@ function reduceEvent(
     case "tool_start":
       return {
         activity: appendActivity(prev.activity, {
-          label: `Tool: ${event.tool}`,
+          label: i18n.t("wikiCompose.activity.toolStarted", { tool: event.tool }),
           detail: event.input ? "running" : undefined,
           status: "started",
         }),
@@ -271,7 +285,7 @@ function reduceEvent(
     case "tool_end":
       return {
         activity: appendActivity(prev.activity, {
-          label: `Tool: ${event.tool}`,
+          label: i18n.t("wikiCompose.activity.toolDone", { tool: event.tool }),
           detail: event.error ?? (event.outputLength ? `${event.outputLength} chars` : "ok"),
           status: event.error ? "error" : "completed",
         }),
@@ -279,7 +293,9 @@ function reduceEvent(
     case "research_iteration":
       return {
         activity: appendActivity(prev.activity, {
-          label: `Research iteration ${event.iteration + 1}`,
+          label: i18n.t("wikiCompose.activity.researchIteration", {
+            count: event.iteration + 1,
+          }),
           detail: `${event.status} · ${event.queryCount} queries`,
           status: "info",
         }),
@@ -287,7 +303,9 @@ function reduceEvent(
     case "research_evaluation":
       return {
         activity: appendActivity(prev.activity, {
-          label: `Sufficiency: ${event.score.toFixed(2)}`,
+          label: i18n.t("wikiCompose.activity.sufficiency", {
+            score: event.score.toFixed(2),
+          }),
           detail: event.rationale,
           status: "info",
         }),
@@ -295,7 +313,9 @@ function reduceEvent(
     case "research_batch":
       return {
         activity: appendActivity(prev.activity, {
-          label: `Research batch (#${event.iteration})`,
+          label: i18n.t("wikiCompose.activity.researchBatch", {
+            iteration: event.iteration,
+          }),
           detail: `${event.sourceCount} sources · ${event.exitReason}`,
           status: "completed",
         }),
@@ -306,7 +326,7 @@ function reduceEvent(
           streamingSectionId: event.sectionId,
           sectionBuffers: { ...prev.sectionBuffers, [event.sectionId]: "" },
           activity: appendActivity(prev.activity, {
-            label: `Drafting: ${event.heading}`,
+            label: i18n.t("wikiCompose.activity.drafting", { heading: event.heading }),
             detail: `${event.index} / ${event.total}`,
             status: "started",
           }),
@@ -316,7 +336,7 @@ function reduceEvent(
         streamingSectionId:
           prev.streamingSectionId === event.sectionId ? null : prev.streamingSectionId,
         activity: appendActivity(prev.activity, {
-          label: `Drafted: ${event.heading}`,
+          label: i18n.t("wikiCompose.activity.drafted", { heading: event.heading }),
           detail: `${event.index} / ${event.total}`,
           status: "completed",
         }),
@@ -336,7 +356,7 @@ function reduceEvent(
         isStreaming: false,
         status: event.status,
         activity: appendActivity(prev.activity, {
-          label: `Run ${event.status}`,
+          label: i18n.t("wikiCompose.activity.runStatus", { status: event.status }),
           status: event.status === "completed" ? "completed" : "info",
         }),
       };
@@ -344,7 +364,7 @@ function reduceEvent(
       return {
         error: event.message,
         activity: appendActivity(prev.activity, {
-          label: "Error",
+          label: i18n.t("wikiCompose.activity.error"),
           detail: event.message,
           status: "error",
         }),
@@ -353,7 +373,7 @@ function reduceEvent(
       // Usage doesn't change UI state directly, but log it for debug.
       return {
         activity: appendActivity(prev.activity, {
-          label: "Usage",
+          label: i18n.t("wikiCompose.activity.usage"),
           detail: `in=${event.inputTokens} out=${event.outputTokens} cu=${event.costUnits}`,
           status: "info",
         }),
@@ -628,7 +648,7 @@ export function useWikiComposeSession(
       // Interrupted checkpoints require `Command({ resume })`; replaying input
       // would restart or error, and resume payloads are not stored on the row.
       if (session.status === "pending" || session.status === "failed") {
-        await streamRun(session, runInput);
+        await streamRun(session, withContentLocale(runInput));
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

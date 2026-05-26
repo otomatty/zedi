@@ -1,4 +1,115 @@
 {
+  "page": {
+    "titleFallback": "Wiki Compose",
+    "missingPageIdTitle": "Missing page id",
+    "missingPageIdDescription": "This URL is missing a page id. Use the Compose button on a wiki page to start.",
+    "back": "Back",
+    "sessionPrefix": "session:",
+    "close": "Close",
+    "cancel": "Cancel",
+    "startCompose": "Start compose"
+  },
+  "phase": {
+    "brief": "Brief",
+    "research": "Research",
+    "structure": "Structure",
+    "draft": "Draft",
+    "completed": "Done",
+    "progressAria": "Compose phase progress"
+  },
+  "phaseDisplay": {
+    "brief": "Brief",
+    "research": "Research",
+    "structure": "Structure",
+    "draft": "Draft",
+    "conflict": "Conflict",
+    "completed": "Completed"
+  },
+  "brief": {
+    "title": "Brief",
+    "noQuestions": "No questions — proceed to research",
+    "questionCount_one": "{{count}} question",
+    "questionCount_other": "{{count}} questions",
+    "preparing": "Preparing Brief questions…",
+    "existingContentTitle": "Page already has content",
+    "append": "Append to existing content",
+    "replace": "Replace existing content",
+    "researchDepthTitle": "Research depth",
+    "researchQuick": "1 (quick)",
+    "researchDeep": "5 (deep)",
+    "iterationCount_one": "{{count}} iteration",
+    "iterationCount_other": "{{count}} iterations",
+    "startResearch": "Start research",
+    "required": "required",
+    "answerOptionsAria": "Answer options",
+    "freeTextWithOptions": "Add a note (optional)…",
+    "freeTextOnly": "Type your answer…"
+  },
+  "structure": {
+    "title": "Outline",
+    "sectionCount_one": "{{count}} section",
+    "sectionCount_other": "{{count}} sections",
+    "headingPlaceholder": "Section heading",
+    "intentPlaceholder": "What should this section cover?",
+    "toggleDepth": "Toggle depth",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "removeSection": "Remove section",
+    "newSection": "New section",
+    "addSection": "Add section",
+    "approveOutline": "Approve outline"
+  },
+  "draft": {
+    "drafting": "Drafting",
+    "completed": "Completed",
+    "draftingHint": "Sections are being drafted. Watch the editor on the left for live updates.",
+    "completedHint": "Article ready. Return to the page to review and save."
+  },
+  "research": {
+    "web": "Web",
+    "wiki": "Wiki",
+    "article": "Article",
+    "noneApproved": "No research sources were approved.",
+    "approvedBadge": "{{count}} approved",
+    "inProgress": "Research in progress — sources will appear when ready.",
+    "empty": "No research sources to review.",
+    "reviewTitle": "Research review",
+    "iterationBadge": "iter {{count}}",
+    "approvedOf": "{{approved}} / {{total}} approved",
+    "approve": "Approve",
+    "reject": "Reject",
+    "continue": "Continue with selection"
+  },
+  "conflict": {
+    "title": "Resolve conflicts",
+    "cardTitle": "Research conflicts",
+    "approved": "Approved ({{count}})",
+    "rejected": "Rejected ({{count}})",
+    "continue": "Continue with approved sources"
+  },
+  "editor": {
+    "untitled": "Untitled page",
+    "emptyHint": "The article will appear here once the agent starts drafting.",
+    "streaming": "Streaming…",
+    "finalMarkdown": "Final Markdown"
+  },
+  "activity": {
+    "title": "Activity",
+    "live": "live",
+    "empty": "No activity yet.",
+    "runStarted": "Run started",
+    "phase": "Phase: {{phase}}",
+    "toolStarted": "Tool: {{tool}}",
+    "toolDone": "Tool: {{tool}}",
+    "researchIteration": "Research iteration {{count}}",
+    "sufficiency": "Sufficiency: {{score}}",
+    "researchBatch": "Research batch (#{{iteration}})",
+    "drafting": "Drafting: {{heading}}",
+    "drafted": "Drafted: {{heading}}",
+    "runStatus": "Run {{status}}",
+    "error": "Error",
+    "usage": "Usage"
+  },
   "backend": {
     "label": "Execution backend",
     "zediManaged": "Zedi managed",
