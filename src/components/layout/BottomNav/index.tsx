@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useLocation, matchPath } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { cn } from "@zedi/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
@@ -9,9 +9,12 @@ import { useSyncStatusDotColor } from "../Header/UnifiedMenuSyncStatus";
 import { PRIMARY_NAV_ITEMS, isPrimaryNavActive } from "../navigationItems";
 import { BottomNavTab } from "./BottomNavTab";
 
-/** Pathname patterns that mark the Account tab as active. /
- *  アカウントタブをアクティブ扱いするパスパターン。 */
-const ACCOUNT_TAB_MATCH_PATHS = ["/account"] as const;
+/** Exact pathname for the Account tab. The tab has no nested routes, so a
+ *  direct equality check is enough — matchPath would just compile a regex
+ *  to validate the same single literal.
+ *  アカウントタブのパス。サブルートを持たないので完全一致で判定する
+ *  （matchPath だと同一リテラルの正規表現コンパイルが走るだけになる）。 */
+const ACCOUNT_TAB_PATH = "/account";
 
 /**
  * Mobile bottom navigation. Renders the shared {@link PRIMARY_NAV_ITEMS} as
@@ -26,9 +29,7 @@ const ACCOUNT_TAB_MATCH_PATHS = ["/account"] as const;
 export const BottomNav: React.FC = () => {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const accountActive = ACCOUNT_TAB_MATCH_PATHS.some(
-    (pattern) => matchPath({ path: pattern, end: true }, pathname) != null,
-  );
+  const accountActive = pathname === ACCOUNT_TAB_PATH;
 
   return (
     <nav
