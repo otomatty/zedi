@@ -29,7 +29,7 @@ import type { DraftedSection } from "@/lib/wikiCompose/types";
 import { EditorPane } from "@/components/wikiCompose/EditorPane";
 import { ComposePanel } from "@/components/wikiCompose/ComposePanel";
 import { ComposeBackendSelector } from "@/components/wikiCompose/ComposeBackendSelector";
-import type { ComposeExecutionBackend } from "@/lib/wikiCompose/backends";
+import { useInitialComposeBackend } from "@/hooks/useInitialComposeBackend";
 
 /** Map drafted section list to a quick lookup. */
 function indexById(items: DraftedSection[]): Record<string, DraftedSection> {
@@ -48,7 +48,6 @@ const WikiComposePage: React.FC = () => {
   const noteId = params.noteId ?? "";
   const pageId = params.pageId ?? "";
   const sessionId = params.sessionId ?? null;
-  const [composeBackend, setComposeBackend] = useState<ComposeExecutionBackend>("zedi_managed");
 
   // チャット seed は mount 時に 1 回だけ保持。`location.state` を消しても hook 側に残す。
   // Capture chat seed once on mount; survives clearing `location.state` for the hook.
@@ -58,6 +57,14 @@ const WikiComposePage: React.FC = () => {
     const s = raw as ComposeNavigationSeed;
     if (typeof s.outline !== "string" || typeof s.conversationText !== "string") return undefined;
     return s;
+  });
+
+  const {
+    backend: composeBackend,
+    setBackend: setComposeBackend,
+    isResolved: isComposeBackendResolved,
+  } = useInitialComposeBackend({
+    enabled: !sessionId,
   });
 
   const initialInput = useMemo(
@@ -247,7 +254,7 @@ const WikiComposePage: React.FC = () => {
             size="sm"
             data-testid="compose-start"
             onClick={() => void session.start()}
-            disabled={session.isStreaming}
+            disabled={session.isStreaming || !isComposeBackendResolved}
           >
             Start compose
           </Button>
