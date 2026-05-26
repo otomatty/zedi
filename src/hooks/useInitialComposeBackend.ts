@@ -59,20 +59,22 @@ export function useInitialComposeBackend(
     let cancelled = false;
     let loadGeneration = 0;
 
-    const applyFromSettings = (markResolved: boolean) => {
+    const applyFromSettings = () => {
       const generation = ++loadGeneration;
       void loadComposeBackendFromSettings().then((resolved) => {
         if (cancelled || generation !== loadGeneration) return;
         setBackend(resolved);
-        if (markResolved) setIsResolved(true);
+        // Always unblock compose auto-start on the latest successful load.
+        // 最新の読み込みが成功したら常に resolved にする（設定変更イベントとの競合対策）。
+        setIsResolved(true);
       });
     };
 
     setIsResolved(false);
-    applyFromSettings(true);
+    applyFromSettings();
 
     const onSettingsChanged = () => {
-      applyFromSettings(false);
+      applyFromSettings();
     };
 
     window.addEventListener(AI_SETTINGS_CHANGED_EVENT, onSettingsChanged);

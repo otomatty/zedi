@@ -99,7 +99,10 @@ const WikiComposePage: React.FC = () => {
     if (sessionId || !isComposeBackendResolved || !awaitingComposeStart) return;
     if (autoStartRequestedRef.current) return;
     autoStartRequestedRef.current = true;
-    void session.start();
+    void session.start().catch(() => {
+      // Allow retry after transient create/run failures (manual Start button removed).
+      autoStartRequestedRef.current = false;
+    });
   }, [sessionId, isComposeBackendResolved, awaitingComposeStart, session.start]);
 
   // Clear history seed only after the session row left `pending` (first run claimed).
