@@ -2,6 +2,8 @@
  * Content locale for Wiki Compose LLM outputs (#950).
  * Wiki Compose の生成言語（ユーザー向けテキスト）を表す。
  */
+import { resolveLocaleFromAcceptLanguage } from "../../services/invitationService.js";
+
 export type ComposeContentLocale = "ja" | "en";
 
 /**
@@ -28,12 +30,35 @@ export function resolveComposeContentLocale(
     );
     if (fromInput) return fromInput;
   }
-  if (acceptLanguage) {
-    const primary = acceptLanguage.split(",")[0]?.trim().toLowerCase() ?? "";
-    if (primary.startsWith("ja")) return "ja";
-    if (primary.startsWith("en")) return "en";
-  }
+  const fromHeader = resolveLocaleFromAcceptLanguage(acceptLanguage);
+  if (fromHeader) return fromHeader;
   return fallback;
+}
+
+/**
+ * Read persisted `contentLocale` from a compose session metadata blob.
+ * compose セッション metadata に保存された `contentLocale` を読む。
+ */
+export function readContentLocaleFromSessionMetadata(
+  metadata: unknown,
+): ComposeContentLocale | null {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  return normalizeComposeContentLocale((metadata as Record<string, unknown>).contentLocale);
+}
+
+/**
+ * Resolve locale for a session: metadata (first run) → input → Accept-Language → fallback.
+ * セッション用ロケール解決: metadata（初回 run で固定）→ input → Accept-Language。
+ */
+export function resolveSessionContentLocale(
+  metadata: unknown,
+  input: unknown,
+  acceptLanguage: string | undefined | null,
+  fallback: ComposeContentLocale = "ja",
+): ComposeContentLocale {
+  const persisted = readContentLocaleFromSessionMetadata(metadata);
+  if (persisted) return persisted;
+  return resolveComposeContentLocale(input, acceptLanguage, fallback);
 }
 
 /**
@@ -41,7 +66,8 @@ export function resolveComposeContentLocale(
  * LangGraph に渡す前に `contentLocale` を除去する（state チャネルではない）。
  */
 export function stripContentLocaleFromGraphInput(raw: unknown): unknown {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw ?? {};
+  if (raw === null || raw === undefined) return raw;
+  if (typeof raw !== "object" || Array.isArray(raw)) return raw;
   const { contentLocale: _removed, ...rest } = raw as Record<string, unknown>;
   return rest;
 }

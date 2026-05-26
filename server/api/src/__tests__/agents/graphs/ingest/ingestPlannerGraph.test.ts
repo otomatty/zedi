@@ -71,6 +71,7 @@ function fakeContext(threadId: string): GraphContext {
     db: {} as Database,
     feature: "ingest_graph:test",
     userEmail: null,
+    contentLocale: "ja",
   };
 }
 

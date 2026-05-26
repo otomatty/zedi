@@ -3,7 +3,9 @@ import {
   composeConflictRationale,
   composeContentLocaleInstruction,
   normalizeComposeContentLocale,
+  readContentLocaleFromSessionMetadata,
   resolveComposeContentLocale,
+  resolveSessionContentLocale,
   stripContentLocaleFromGraphInput,
   structureDialogueFallbackOutline,
 } from "../../../agents/core/composeLocale.js";
@@ -19,6 +21,7 @@ describe("composeLocale", () => {
     expect(resolveComposeContentLocale({ contentLocale: "en" }, "ja-JP")).toBe("en");
     expect(resolveComposeContentLocale({}, "ja-JP,en;q=0.8")).toBe("ja");
     expect(resolveComposeContentLocale({}, "en-US,en;q=0.9")).toBe("en");
+    expect(resolveComposeContentLocale({}, "zh-CN,en-US;q=0.9")).toBe("en");
     expect(resolveComposeContentLocale({}, null, "ja")).toBe("ja");
   });
 
@@ -26,6 +29,16 @@ describe("composeLocale", () => {
     expect(stripContentLocaleFromGraphInput({ contentLocale: "ja", chatSeed: { x: 1 } })).toEqual({
       chatSeed: { x: 1 },
     });
+    expect(stripContentLocaleFromGraphInput(null)).toBeNull();
+    expect(stripContentLocaleFromGraphInput(undefined)).toBeUndefined();
+  });
+
+  it("persists locale via session metadata resolution", () => {
+    expect(readContentLocaleFromSessionMetadata({ contentLocale: "en" })).toBe("en");
+    expect(
+      resolveSessionContentLocale({ contentLocale: "en" }, { contentLocale: "ja" }, "ja-JP"),
+    ).toBe("en");
+    expect(resolveSessionContentLocale(null, { contentLocale: "ja" }, "en-US")).toBe("ja");
   });
 
   it("includes Japanese in locale instruction when ja", () => {

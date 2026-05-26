@@ -41,6 +41,7 @@ function ctxConfig(): { configurable: Record<string, unknown> } {
         db: {} as Database,
         feature: "wiki_compose:research",
         userEmail: null,
+        contentLocale: "ja",
       } satisfies GraphContext,
     },
   };

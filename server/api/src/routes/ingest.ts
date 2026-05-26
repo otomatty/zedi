@@ -37,6 +37,7 @@ import {
   IngestPlanParseError,
   type CandidatePage,
 } from "../services/ingestPlanner.js";
+import { resolveComposeContentLocale } from "../agents/core/composeLocale.js";
 import { pages } from "../schema/pages.js";
 import { pageContents } from "../schema/pageContents.js";
 import { recordActivity } from "../services/activityLogService.js";
@@ -519,6 +520,7 @@ app.post("/graph/run", authRequired, rateLimit(), async (c) => {
         tier,
         db,
         feature: "ingest_graph:run",
+        contentLocale: resolveComposeContentLocale(null, c.req.header("accept-language"), "ja"),
       },
     },
     {
@@ -619,6 +621,7 @@ app.post("/graph/resume", authRequired, rateLimit(), async (c) => {
         tier,
         db,
         feature: "ingest_graph:resume",
+        contentLocale: resolveComposeContentLocale(null, c.req.header("accept-language"), "ja"),
       },
     },
     body.resume,

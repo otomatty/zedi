@@ -48,6 +48,6 @@ export function getGraphContext(config: LangGraphRunnableConfig | undefined): Gr
   const contentLocale =
     normalizeComposeContentLocale(ctx.contentLocale) ??
     normalizeComposeContentLocale((ctx as { locale?: unknown }).locale) ??
-    "en";
+    "ja";
   return { ...(ctx as GraphContext), contentLocale };
 }
