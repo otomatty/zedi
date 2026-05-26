@@ -27,6 +27,10 @@ vi.mock("@/lib/wikiCompose/composeService", () => ({
   cancelSession: mocks.cancelSession,
 }));
 
+vi.mock("@/lib/wikiCompose/resolveComposeContentLocale", () => ({
+  resolveComposeContentLocale: () => "ja" as const,
+}));
+
 import { useWikiComposeSession } from "./useWikiComposeSession";
 import type { ComposeSseEvent } from "@/lib/wikiCompose/types";
 
@@ -295,7 +299,7 @@ describe("useWikiComposeSession", () => {
 
     expect(mocks.runSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: undefined,
+        body: { contentLocale: "ja" },
       }),
     );
   });
@@ -376,6 +380,7 @@ describe("useWikiComposeSession", () => {
     expect(mocks.runSession).toHaveBeenCalledWith(
       expect.objectContaining({
         body: {
+          contentLocale: "ja",
           chatSeed: {
             outline: "- topic",
             conversationText: "User: seed me",

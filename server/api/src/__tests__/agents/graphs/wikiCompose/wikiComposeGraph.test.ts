@@ -89,6 +89,7 @@ function fakeContext(threadId: string): GraphContext {
     db: {} as Database,
     feature: "wiki_compose:test",
     userEmail: null,
+    contentLocale: "ja",
   };
 }
 

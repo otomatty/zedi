@@ -11,6 +11,7 @@
  * highlighted with a pulsing border so the user sees where to look.
  */
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@zedi/ui";
 import type { DraftedSection, OutlineSection } from "@/lib/wikiCompose/types";
 
@@ -33,17 +34,16 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   streamingSectionId,
   completedMarkdown,
 }) => {
+  const { t } = useTranslation();
   return (
     <div
       data-testid="compose-editor-pane"
       className="bg-background prose prose-sm dark:prose-invert h-full max-w-none overflow-auto px-6 py-6"
     >
-      <h1 className="!mb-2">{title || "Untitled page"}</h1>
+      <h1 className="!mb-2">{title || t("wikiCompose.editor.untitled")}</h1>
 
       {outline.length === 0 && !completedMarkdown ? (
-        <p className="text-muted-foreground text-sm italic">
-          The article will appear here once the agent starts drafting.
-        </p>
+        <p className="text-muted-foreground text-sm italic">{t("wikiCompose.editor.emptyHint")}</p>
       ) : null}
 
       {outline.length > 0 ? (
@@ -70,7 +70,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                 )}
                 {body.trim().length === 0 ? (
                   <p className="text-muted-foreground !my-1 text-xs italic">
-                    {isStreaming ? "Streaming…" : section.intent}
+                    {isStreaming ? t("wikiCompose.editor.streaming") : section.intent}
                   </p>
                 ) : (
                   // Plain-text rendering of the running buffer. Once the
@@ -89,7 +89,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
       {completedMarkdown ? (
         <section data-testid="editor-completed-markdown" className="mt-6 border-t pt-4">
-          <h3 className="text-muted-foreground text-xs tracking-wide uppercase">Final Markdown</h3>
+          <h3 className="text-muted-foreground text-xs tracking-wide uppercase">
+            {t("wikiCompose.editor.finalMarkdown")}
+          </h3>
           <pre className="!bg-muted/40 rounded-md p-3 font-mono text-xs whitespace-pre-wrap">
             {completedMarkdown}
           </pre>

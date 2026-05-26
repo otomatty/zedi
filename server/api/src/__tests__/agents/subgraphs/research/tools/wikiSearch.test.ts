@@ -38,6 +38,7 @@ function ctxConfig(overrides: Partial<GraphContext> = {}): {
         db: {} as Database,
         feature: "wiki_compose:research",
         userEmail: "alice@example.com",
+        contentLocale: "ja",
         ...overrides,
       } satisfies GraphContext,
     },

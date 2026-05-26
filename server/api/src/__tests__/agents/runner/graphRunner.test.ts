@@ -31,6 +31,7 @@ function fakeContext(): GraphContext {
     db: {} as Database,
     feature: "test",
     userEmail: null,
+    contentLocale: "ja",
   };
 }
 

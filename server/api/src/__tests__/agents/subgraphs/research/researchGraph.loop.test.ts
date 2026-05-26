@@ -81,6 +81,7 @@ function fakeContext(graphId: string): GraphContext {
     db: {} as Database,
     feature: "wiki_compose:research",
     userEmail: null,
+    contentLocale: "ja",
   };
 }
 

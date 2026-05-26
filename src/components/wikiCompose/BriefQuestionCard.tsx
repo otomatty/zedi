@@ -9,6 +9,7 @@
  * box. Multi-select is supported; the parent owns the answer state.
  */
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@zedi/ui";
 import { Badge, Card, CardContent, CardHeader, CardTitle, Input } from "@zedi/ui";
 import type { BriefAnswer, BriefQuestion } from "@/lib/wikiCompose/types";
@@ -32,6 +33,7 @@ export const BriefQuestionCard: React.FC<BriefQuestionCardProps> = ({
   answer,
   onChange,
 }) => {
+  const { t } = useTranslation();
   const selected = answer?.selectedOptionIds ?? [];
   const freeText = answer?.freeText ?? "";
 
@@ -42,7 +44,7 @@ export const BriefQuestionCard: React.FC<BriefQuestionCardProps> = ({
           <span className="flex-1">{question.question}</span>
           {question.required ? (
             <Badge variant="outline" className="shrink-0 text-[10px] uppercase">
-              required
+              {t("wikiCompose.brief.required")}
             </Badge>
           ) : null}
         </CardTitle>
@@ -52,7 +54,11 @@ export const BriefQuestionCard: React.FC<BriefQuestionCardProps> = ({
       </CardHeader>
       <CardContent className="space-y-3">
         {question.options.length > 0 ? (
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Answer options">
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-label={t("wikiCompose.brief.answerOptionsAria")}
+          >
             {question.options.map((option) => {
               const active = selected.includes(option.id);
               return (
@@ -85,7 +91,11 @@ export const BriefQuestionCard: React.FC<BriefQuestionCardProps> = ({
 
         <Input
           type="text"
-          placeholder={question.options.length > 0 ? "Add a note (optional)…" : "Type your answer…"}
+          placeholder={
+            question.options.length > 0
+              ? t("wikiCompose.brief.freeTextWithOptions")
+              : t("wikiCompose.brief.freeTextOnly")
+          }
           data-testid={`brief-freetext-${question.id}`}
           value={freeText}
           onChange={(e) =>
