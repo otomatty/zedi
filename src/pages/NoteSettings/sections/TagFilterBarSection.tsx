@@ -89,7 +89,7 @@ const TagFilterBarSection: React.FC = () => {
       </p>
 
       {canManage ? (
-        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="mt-4 flex sm:justify-end">
           <Button
             className="w-full sm:w-auto"
             onClick={handleSave}

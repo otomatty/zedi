@@ -253,7 +253,7 @@ const VisibilitySection: React.FC = () => {
       </section>
 
       {canEdit ? (
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="flex sm:justify-end">
           <Button
             className="w-full sm:w-auto"
             onClick={handleSaveNote}

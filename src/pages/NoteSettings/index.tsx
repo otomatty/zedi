@@ -99,7 +99,7 @@ const NoteSettings: React.FC = () => {
           </header>
 
           <div className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 md:grid-cols-[minmax(0,12rem)_1fr] md:gap-8 lg:grid-cols-[minmax(0,13.5rem)_1fr]">
-            <aside className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-10 -mx-4 border-b px-4 pb-2 backdrop-blur-sm sm:-mx-6 sm:px-6 md:static md:top-24 md:z-auto md:mx-0 md:self-start md:border-b-0 md:bg-transparent md:px-0 md:pb-0 md:backdrop-blur-none">
+            <aside className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-10 -mx-4 border-b px-4 pb-2 backdrop-blur-sm sm:-mx-6 sm:px-6 md:top-24 md:z-auto md:mx-0 md:self-start md:border-b-0 md:bg-transparent md:px-0 md:pb-0 md:backdrop-blur-none">
               <NoteSettingsSidebar noteId={note.id} sidebarRole={sidebarRole} />
             </aside>
             <main className="min-w-0">
