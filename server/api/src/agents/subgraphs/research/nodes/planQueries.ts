@@ -23,8 +23,8 @@ import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js
 import type { PlannedQuery, Source } from "../types.js";
 
 /**
- * @deprecated Use {@link resolveWikiComposeModelId} for Wiki Compose graphs.
- * Kept for ingest planner BYOK preflight ({@link getComposeModelIdsForGraph}).
+ * @deprecated Use {@link resolveWikiComposeModelId} for Wiki Compose graphs; kept for ingest planner BYOK preflight ({@link getComposeModelIdsForGraph}).
+ * Wiki Compose では {@link resolveWikiComposeModelId} を使う。ingest BYOK 事前検証用。
  */
 export function getOrchestratorModelId(): string {
   return process.env.WIKI_COMPOSE_ORCHESTRATOR_MODEL_ID?.trim() || "claude-3-5-haiku";

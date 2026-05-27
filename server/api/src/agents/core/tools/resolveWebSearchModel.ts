@@ -26,7 +26,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { aiModels } from "../../../schema/index.js";
 import type { Database, UserTier } from "../../../types/index.js";
-import { WIKI_COMPOSE_MODEL_ID } from "../llm/wikiComposeModelId.js";
+import { resolveActiveWikiComposeModelId } from "../llm/wikiComposeModelId.js";
 
 const ENV_OVERRIDE = "WIKI_COMPOSE_WEB_SEARCH_MODEL_ID";
 
@@ -50,19 +50,8 @@ export async function resolveWebSearchModelId(
   db: Database,
   tier: UserTier,
 ): Promise<string | null> {
-  const tierClause = tierFilter(tier);
-  const [fixedRow] = await db
-    .select({ id: aiModels.id })
-    .from(aiModels)
-    .where(
-      and(
-        eq(aiModels.id, WIKI_COMPOSE_MODEL_ID),
-        eq(aiModels.isActive, true),
-        ...(tierClause ? [tierClause] : []),
-      ),
-    )
-    .limit(1);
-  if (fixedRow) return fixedRow.id;
+  const fixedId = await resolveActiveWikiComposeModelId(db, tier);
+  if (fixedId) return fixedId;
 
   const override = process.env[ENV_OVERRIDE]?.trim();
   if (override) {

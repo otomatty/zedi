@@ -5,6 +5,8 @@
 import { and, eq } from "drizzle-orm";
 import { aiModels } from "../../../schema/index.js";
 import type { Database, UserTier } from "../../../types/index.js";
+import { WIKI_COMPOSE_GRAPH_ID } from "../../graphs/wikiCompose/index.js";
+import { RESEARCH_GRAPH_ID } from "../../subgraphs/research/index.js";
 import type { ComposeModelRole } from "./resolveComposeModelId.js";
 
 /**
@@ -13,17 +15,24 @@ import type { ComposeModelRole } from "./resolveComposeModelId.js";
  */
 export const WIKI_COMPOSE_MODEL_ID = "google:gemini-3.5-flash" as const;
 
+/** Graph ids that pin LLM calls to {@link WIKI_COMPOSE_MODEL_ID}. */
+export function isFixedWikiComposeModelGraph(graphId: string): boolean {
+  return graphId === WIKI_COMPOSE_GRAPH_ID || graphId === RESEARCH_GRAPH_ID;
+}
+
 function tierFilter(tier: UserTier) {
   if (tier === "pro") return undefined;
   return eq(aiModels.tierRequired, "free");
 }
 
 /**
- * When the fixed row exists and is accessible, return it; otherwise still return
- * {@link WIKI_COMPOSE_MODEL_ID} so callers fail consistently in `validateModelAccess`.
- * 行が active かつ tier 的に使えるときだけ DB 上の id を返し、それ以外は固定 id を返す。
+ * Returns the fixed model row id when active and tier-accessible; otherwise `null`.
+ * `null` のとき呼び出し側はフォールバック（web_search の cheapest 探索など）へ進める。
  */
-async function fixedModelIdIfAccessible(db: Database, tier: UserTier): Promise<string> {
+export async function resolveActiveWikiComposeModelId(
+  db: Database,
+  tier: UserTier,
+): Promise<string | null> {
   const tierClause = tierFilter(tier);
   const [row] = await db
     .select({ id: aiModels.id })
@@ -36,7 +45,7 @@ async function fixedModelIdIfAccessible(db: Database, tier: UserTier): Promise<s
       ),
     )
     .limit(1);
-  return row?.id ?? WIKI_COMPOSE_MODEL_ID;
+  return row?.id ?? null;
 }
 
 /**
@@ -50,5 +59,5 @@ export async function resolveWikiComposeModelId(
   _tier: UserTier,
   db: Database,
 ): Promise<string> {
-  return fixedModelIdIfAccessible(db, _tier);
+  return (await resolveActiveWikiComposeModelId(db, _tier)) ?? WIKI_COMPOSE_MODEL_ID;
 }

@@ -27,15 +27,31 @@ describe("assertComposeBackendReady", () => {
     expect(mockGetUserAiCredentialPlaintext).not.toHaveBeenCalled();
   });
 
-  it("allows BYOK backend without static env model provider mismatch (#972)", async () => {
+  it("rejects non-Google BYOK for wiki-compose-research (fixed Gemini model)", async () => {
+    await expect(
+      assertComposeBackendReady({
+        backend: "user_openai",
+        graphId: "wiki-compose-research",
+        userId: "u1",
+        tier: "free",
+        db,
+      }),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringContaining("user_google"),
+    });
+    expect(mockGetUserAiCredentialPlaintext).not.toHaveBeenCalled();
+  });
+
+  it("allows user_google BYOK for wiki-compose when credential exists", async () => {
     await assertComposeBackendReady({
-      backend: "user_openai",
-      graphId: "wiki-compose-research",
+      backend: "user_google",
+      graphId: "wiki-compose",
       userId: "u1",
       tier: "free",
       db,
     });
-    expect(mockGetUserAiCredentialPlaintext).toHaveBeenCalledWith("u1", "openai", db);
+    expect(mockGetUserAiCredentialPlaintext).toHaveBeenCalledWith("u1", "google", db);
   });
 
   it("skips credential check for model-less graphs (wiki-maintenance)", async () => {
@@ -53,7 +69,7 @@ describe("assertComposeBackendReady", () => {
     mockGetUserAiCredentialPlaintext.mockResolvedValue(null);
     await expect(
       assertComposeBackendReady({
-        backend: "user_anthropic",
+        backend: "user_google",
         graphId: "wiki-compose-research",
         userId: "u1",
         tier: "free",

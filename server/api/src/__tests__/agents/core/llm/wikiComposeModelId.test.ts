@@ -1,5 +1,6 @@
 /**
  * Tests for fixed Wiki Compose model id resolution.
+ * 固定 Wiki Compose モデル id 解決のテスト。
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
