@@ -78,6 +78,7 @@ export async function resolveWebSearchModelId(
     // override が使えない場合は通常検索にフォールバックする。
   }
 
+  const tierClause = tierFilter(tier);
   const rows = await db
     .select({
       id: aiModels.id,
