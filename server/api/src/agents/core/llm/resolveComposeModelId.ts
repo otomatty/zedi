@@ -1,8 +1,8 @@
 /**
- * Resolve `ai_models.id` for Wiki Compose nodes so BYOK backends use a matching provider.
+ * Resolve `ai_models.id` for non–Wiki Compose graphs (e.g. ingest planner).
+ * Wiki Compose uses {@link resolveWikiComposeModelId} instead.
  *
- * Wiki Compose の LLM ノード用 model id 解決。BYOK backend では provider が一致する
- * active モデルを選び、`BackendProviderMismatchError` でセッション全体が落ちるのを防ぐ。
+ * Wiki Compose 以外（ingest planner 等）向けの model id 解決。
  */
 import { and, asc, eq } from "drizzle-orm";
 import { aiModels } from "../../../schema/index.js";
