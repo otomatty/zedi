@@ -9,11 +9,17 @@ import {
   type ComposeContentLocale,
 } from "../agents/core/composeLocale.js";
 
-/** Result of preparing a `POST /run` request for LangGraph execution. */
+/**
+ * Result of preparing a `POST /run` request for LangGraph execution.
+ * LangGraph 実行向け `POST /run` リクエスト前処理の結果。
+ */
 export type ComposeRunLocalePrep = {
   contentLocale: ComposeContentLocale;
   graphInput: unknown;
-  /** Metadata blob to persist on claim when locale is not yet stored. */
+  /**
+   * Metadata blob to persist on claim when locale is not yet stored.
+   * ロケール未保存時に claim 更新で永続化するメタデータ。
+   */
   metadataUpdate: Record<string, unknown> | undefined;
 };
 

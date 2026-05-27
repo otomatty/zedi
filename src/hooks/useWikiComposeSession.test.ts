@@ -76,6 +76,19 @@ describe("useWikiComposeSession", () => {
     mocks.createSession.mockResolvedValue(SESSION);
   });
 
+  it("exposes canRetryStart after auto-start fails for fresh compose / 新規 Compose の自動開始失敗後に canRetryStart になる", async () => {
+    mocks.createSession.mockRejectedValue(new Error("network"));
+    const { result } = renderHook(() =>
+      useWikiComposeSession({
+        pageId: "page-1",
+        sessionId: null,
+        startPolicy: "when-backend-ready",
+      }),
+    );
+    await waitFor(() => expect(result.current.canRetryStart).toBe(true));
+    expect(result.current.error).toBe("network");
+  });
+
   it("reduces a Brief interrupt into briefQuestions + pageSnapshot", async () => {
     arrangeRun([
       { type: "started", sessionId: SESSION.id, graphId: SESSION.graphId },

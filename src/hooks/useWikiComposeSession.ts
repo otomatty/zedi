@@ -243,21 +243,25 @@ export function useWikiComposeSession(
     update({ status: "cancelled" });
   }, [pageId, update]);
 
-  const awaitingFreshStart =
-    !initialSessionId && state.status === "idle" && !state.session && !state.isStreaming;
-
   const canRetryStart =
-    startPolicy === "when-backend-ready" &&
     !initialSessionId &&
     Boolean(state.error) &&
     !state.session &&
     !state.isStreaming &&
     (state.status === "idle" || state.status === "failed");
 
+  // Abort in-flight SSE only on unmount — not when `start()` sets `session` and
+  // re-renders (Codex P1: dependency churn must not cancel a fresh compose run).
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
   useEffect(() => {
     if (startPolicy === "never") return;
     if (startPolicy === "when-backend-ready") {
-      if (!isBackendResolved || !awaitingFreshStart) return;
+      if (!isBackendResolved || initialSessionId) return;
     }
     if (autoStartRequestedRef.current) return;
     autoStartRequestedRef.current = true;
@@ -270,9 +274,8 @@ export function useWikiComposeSession(
     });
     return () => {
       cancelled = true;
-      abortRef.current?.abort();
     };
-  }, [startPolicy, isBackendResolved, awaitingFreshStart, start, update]);
+  }, [startPolicy, isBackendResolved, initialSessionId, start, update]);
 
   useEffect(() => {
     if (startPolicy !== "when-backend-ready") return;

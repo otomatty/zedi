@@ -406,12 +406,18 @@ export function reduceComposeResumeOutput(
       if (approvedOutline?.sections?.length) {
         partial.outlineProposal = approvedOutline.sections;
       } else if (c.sections.length > 0) {
-        partial.outlineProposal = c.sections.map((s) => ({
-          id: s.sectionId,
-          heading: s.heading,
-          depth: 1,
-          intent: "",
-        }));
+        partial.outlineProposal = c.sections
+          .filter((s): s is DraftedSection =>
+            Boolean(
+              s && typeof s === "object" && typeof (s as DraftedSection).sectionId === "string",
+            ),
+          )
+          .map((s) => ({
+            id: s.sectionId,
+            heading: s.heading ?? "",
+            depth: 1 as const,
+            intent: "",
+          }));
       }
     }
   }
