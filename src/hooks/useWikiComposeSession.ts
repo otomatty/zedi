@@ -181,6 +181,9 @@ export function useWikiComposeSession(
     }
   }, [pageId, initialSessionId, initialInput, composeSeed, backend, streamRun, update]);
 
+  const startRef = useRef(start);
+  startRef.current = start;
+
   const submitBrief = useCallback<UseWikiComposeSessionReturn["submitBrief"]>(
     async (input) => {
       const session = sessionRef.current;
@@ -254,6 +257,8 @@ export function useWikiComposeSession(
     !state.isStreaming &&
     (state.status === "idle" || state.status === "failed");
 
+  // Auto-start once when policy allows. Do not abort SSE in this effect's cleanup
+  // when `awaitingFreshStart` flips after createSession — that races with streamRun.
   useEffect(() => {
     if (startPolicy === "never") return;
     if (startPolicy === "when-backend-ready") {
@@ -263,16 +268,21 @@ export function useWikiComposeSession(
     autoStartRequestedRef.current = true;
 
     let cancelled = false;
-    void start().catch((err) => {
+    void startRef.current().catch((err) => {
       if (cancelled) return;
       const message = err instanceof Error ? err.message : String(err);
       update({ error: message });
     });
     return () => {
       cancelled = true;
+    };
+  }, [startPolicy, isBackendResolved, awaitingFreshStart, update]);
+
+  useEffect(() => {
+    return () => {
       abortRef.current?.abort();
     };
-  }, [startPolicy, isBackendResolved, awaitingFreshStart, start, update]);
+  }, []);
 
   useEffect(() => {
     if (startPolicy !== "when-backend-ready") return;

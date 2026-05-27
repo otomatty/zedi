@@ -31,10 +31,15 @@ vi.mock("@/lib/wikiCompose/resolveComposeContentLocale", () => ({
   resolveComposeContentLocale: () => "ja" as const,
 }));
 
+const backendMock = vi.hoisted(() => ({
+  backend: "zedi_managed" as const,
+  isResolved: true,
+}));
+
 vi.mock("@/hooks/useInitialComposeBackend", () => ({
   useInitialComposeBackend: () => ({
-    backend: "zedi_managed" as const,
-    isResolved: true,
+    backend: backendMock.backend,
+    isResolved: backendMock.isResolved,
   }),
 }));
 
@@ -68,6 +73,7 @@ function arrangeRun(events: ComposeSseEvent[]): void {
 
 describe("useWikiComposeSession", () => {
   beforeEach(() => {
+    backendMock.isResolved = true;
     mocks.createSession.mockReset();
     mocks.getSession.mockReset();
     mocks.runSession.mockReset();
@@ -362,6 +368,50 @@ describe("useWikiComposeSession", () => {
         resume: { answers: [], appendToExisting: false },
       }),
     );
+  });
+
+  it("does not abort POST /run when session is created before the stream opens", async () => {
+    let releaseCreate!: () => void;
+    const createGate = new Promise<void>((resolve) => {
+      releaseCreate = resolve;
+    });
+    mocks.createSession.mockImplementation(async () => {
+      await createGate;
+      return SESSION;
+    });
+
+    let abortedBeforeEvents = false;
+    mocks.runSession.mockImplementation(async ({ signal, onEvent }) => {
+      // Yield so React can run auto-start effect cleanup after session state commits.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (signal?.aborted) {
+        abortedBeforeEvents = true;
+        return;
+      }
+      await onEvent({ type: "done", status: "completed" });
+    });
+
+    backendMock.isResolved = false;
+    const { result, rerender } = renderHook(() =>
+      useWikiComposeSession({
+        pageId: "page-1",
+        sessionId: null,
+        startPolicy: "when-backend-ready",
+      }),
+    );
+
+    await act(async () => {
+      backendMock.isResolved = true;
+      rerender();
+      releaseCreate();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await waitFor(() => expect(result.current.session).not.toBeNull());
+    await waitFor(() => expect(mocks.runSession).toHaveBeenCalled());
+    await waitFor(() => expect(result.current.status).toBe("completed"));
+    expect(abortedBeforeEvents).toBe(false);
   });
 
   it("retries a failed session with chatSeed from row metadata when initialInput is absent", async () => {
