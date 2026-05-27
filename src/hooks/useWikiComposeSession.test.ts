@@ -31,6 +31,13 @@ vi.mock("@/lib/wikiCompose/resolveComposeContentLocale", () => ({
   resolveComposeContentLocale: () => "ja" as const,
 }));
 
+vi.mock("@/hooks/useInitialComposeBackend", () => ({
+  useInitialComposeBackend: () => ({
+    backend: "zedi_managed" as const,
+    isResolved: true,
+  }),
+}));
+
 import { useWikiComposeSession } from "./useWikiComposeSession";
 import type { ComposeSseEvent } from "@/lib/wikiCompose/types";
 

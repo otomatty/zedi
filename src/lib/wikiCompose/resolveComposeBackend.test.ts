@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import type { AISettings } from "@/types/ai";
 import {
+  coerceWikiComposeBackend,
   isComposeBackendAvailable,
+  isWikiComposeAllowedBackend,
   resolveComposeBackendFromAiSettings,
   resolvePreferredComposeBackend,
 } from "./resolveComposeBackend";
@@ -32,6 +34,15 @@ const credentialsOpenAi: UserAiCredentialsStatus = {
     { provider: "anthropic", configured: false },
     { provider: "openai", configured: true },
     { provider: "google", configured: false },
+  ],
+};
+
+const credentialsGoogle: UserAiCredentialsStatus = {
+  storageEnabled: true,
+  providers: [
+    { provider: "anthropic", configured: false },
+    { provider: "openai", configured: false },
+    { provider: "google", configured: true },
   ],
 };
 
@@ -76,6 +87,28 @@ describe("isComposeBackendAvailable", () => {
   });
 });
 
+describe("isWikiComposeAllowedBackend", () => {
+  it("allows zedi_managed and user_google only", () => {
+    expect(isWikiComposeAllowedBackend("zedi_managed")).toBe(true);
+    expect(isWikiComposeAllowedBackend("user_google")).toBe(true);
+    expect(isWikiComposeAllowedBackend("user_openai")).toBe(false);
+    expect(isWikiComposeAllowedBackend("user_anthropic")).toBe(false);
+  });
+});
+
+describe("coerceWikiComposeBackend", () => {
+  it("falls back to user_google when preferred non-Google BYOK but Google credential exists", () => {
+    expect(coerceWikiComposeBackend("user_openai", credentialsGoogle)).toBe("user_google");
+    expect(coerceWikiComposeBackend("user_anthropic", credentialsGoogle)).toBe("user_google");
+  });
+
+  it("falls back to zedi_managed when only non-Google BYOK credentials exist", () => {
+    expect(coerceWikiComposeBackend("user_openai", credentialsOpenAi)).toBe("zedi_managed");
+    expect(coerceWikiComposeBackend("user_anthropic", credentialsOpenAi)).toBe("zedi_managed");
+    expect(coerceWikiComposeBackend("user_openai", credentialsNone)).toBe("zedi_managed");
+  });
+});
+
 describe("resolveComposeBackendFromAiSettings", () => {
   it("falls back to zedi_managed when preferred BYOK is unavailable", () => {
     expect(
@@ -86,12 +119,21 @@ describe("resolveComposeBackendFromAiSettings", () => {
     ).toBe("zedi_managed");
   });
 
-  it("keeps user_* when credential exists", () => {
+  it("maps non-Google BYOK to user_google when Google credential exists (#990)", () => {
     expect(
       resolveComposeBackendFromAiSettings(
         baseSettings({ apiMode: "user_api_key", provider: "openai", isConfigured: true }),
-        credentialsOpenAi,
+        credentialsGoogle,
       ),
-    ).toBe("user_openai");
+    ).toBe("user_google");
+  });
+
+  it("keeps user_google when preferred and credential exists", () => {
+    expect(
+      resolveComposeBackendFromAiSettings(
+        baseSettings({ apiMode: "user_api_key", provider: "google", isConfigured: true }),
+        credentialsGoogle,
+      ),
+    ).toBe("user_google");
   });
 });

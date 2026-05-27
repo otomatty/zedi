@@ -45,16 +45,39 @@ export function isComposeBackendAvailable(
 }
 
 /**
- * Resolve compose backend from AI settings, falling back when BYOK is unavailable.
- * AI 設定から backend を決め、BYOK が使えない場合は zedi_managed にフォールバックする。
+ * Backends accepted by Wiki Compose while the graph pins LLM calls to a Google model (#990).
+ * Wiki Compose が Google 固定モデル運用中に受け付ける backend。
+ */
+export function isWikiComposeAllowedBackend(backend: ComposeExecutionBackend): boolean {
+  return backend === "zedi_managed" || backend === "user_google";
+}
+
+/**
+ * Map a settings-derived backend to one the Wiki Compose API accepts.
+ * 設定由来の backend を Wiki Compose API が受け付ける値に矯正する。
+ */
+export function coerceWikiComposeBackend(
+  preferred: ComposeExecutionBackend,
+  credentials: UserAiCredentialsStatus,
+): ComposeExecutionBackend {
+  if (isWikiComposeAllowedBackend(preferred) && isComposeBackendAvailable(preferred, credentials)) {
+    return preferred;
+  }
+  if (isComposeBackendAvailable("user_google", credentials)) {
+    return "user_google";
+  }
+  return "zedi_managed";
+}
+
+/**
+ * Resolve compose backend from AI settings, falling back when BYOK is unavailable
+ * or incompatible with the fixed Google Wiki Compose model (#990).
+ * AI 設定から backend を決め、BYOK 不可・非 Google BYOK は zedi_managed / user_google に落とす。
  */
 export function resolveComposeBackendFromAiSettings(
   settings: AISettings,
   credentials: UserAiCredentialsStatus,
 ): ComposeExecutionBackend {
   const preferred = resolvePreferredComposeBackend(settings);
-  if (isComposeBackendAvailable(preferred, credentials)) {
-    return preferred;
-  }
-  return "zedi_managed";
+  return coerceWikiComposeBackend(preferred, credentials);
 }
