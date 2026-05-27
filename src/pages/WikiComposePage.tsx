@@ -1,16 +1,7 @@
 /**
  * `WikiComposePage` — Wiki Compose split-screen UI (#950).
- *
- * `/notes/:noteId/:pageId/compose` (および `compose/:sessionId`) のルート要素。
- * 左ペイン = `EditorPane` (タイトル + 進捗中の本文プレビュー)、右ペイン =
- * `ComposePanel` (PhaseStepper + Dialogue + Research + Activity)。
- * モバイルでは縦分割、デスクトップでは横分割で表示する。Compose 完了 / 中断
- * 時はノートページに戻れる。
- *
- * Compose UI shell. The page reads the `useWikiComposeSession` hook for state
- * and routes user submissions back through the hook's mutator methods.
  */
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, X } from "lucide-react";
@@ -29,7 +20,6 @@ import { COMPOSE_SEED_STATE_KEY, type ComposeNavigationSeed } from "@/lib/wikiCo
 import type { DraftedSection } from "@/lib/wikiCompose/types";
 import { EditorPane } from "@/components/wikiCompose/EditorPane";
 import { ComposePanel } from "@/components/wikiCompose/ComposePanel";
-import { useInitialComposeBackend } from "@/hooks/useInitialComposeBackend";
 
 /** Map drafted section list to a quick lookup. */
 function indexById(items: DraftedSection[]): Record<string, DraftedSection> {
@@ -50,8 +40,6 @@ const WikiComposePage: React.FC = () => {
   const pageId = params.pageId ?? "";
   const sessionId = params.sessionId ?? null;
 
-  // チャット seed は mount 時に 1 回だけ保持。`location.state` を消しても hook 側に残す。
-  // Capture chat seed once on mount; survives clearing `location.state` for the hook.
   const [composeSeed] = useState((): ComposeNavigationSeed | undefined => {
     const raw = (location.state as Record<string, unknown> | null)?.[COMPOSE_SEED_STATE_KEY];
     if (!raw || typeof raw !== "object") return undefined;
@@ -59,11 +47,6 @@ const WikiComposePage: React.FC = () => {
     if (typeof s.outline !== "string" || typeof s.conversationText !== "string") return undefined;
     return s;
   });
-
-  const { backend: composeBackend, isResolved: isComposeBackendResolved } =
-    useInitialComposeBackend({
-      enabled: !sessionId,
-    });
 
   const initialInput = useMemo(
     () =>
@@ -83,43 +66,11 @@ const WikiComposePage: React.FC = () => {
   const session = useWikiComposeSession({
     pageId,
     sessionId,
-    // Resume existing session on mount; fresh compose starts after backend resolves.
-    autoStart: Boolean(sessionId && pageId),
+    startPolicy: sessionId ? "on-mount" : "when-backend-ready",
     composeSeed,
     initialInput,
-    backend: composeBackend,
   });
 
-  const awaitingComposeStart =
-    !sessionId && session.status === "idle" && !session.session && !session.isStreaming;
-  const autoStartRequestedRef = useRef(false);
-
-  const startComposeSession = session.start;
-
-  // Fresh compose: start automatically once AI settings yield a backend (#951).
-  useEffect(() => {
-    if (sessionId || !isComposeBackendResolved || !awaitingComposeStart) return;
-    if (autoStartRequestedRef.current) return;
-    autoStartRequestedRef.current = true;
-    void startComposeSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot auto-start when backend resolves
-  }, [sessionId, isComposeBackendResolved, awaitingComposeStart]);
-
-  // Allow manual retry after a failed auto-start (ref would otherwise block re-entry).
-  useEffect(() => {
-    if (sessionId || session.session || !session.error) return;
-    autoStartRequestedRef.current = false;
-  }, [sessionId, session.session, session.error]);
-
-  const canRetryComposeStart =
-    !sessionId &&
-    Boolean(session.error) &&
-    !session.session &&
-    !session.isStreaming &&
-    (session.status === "idle" || session.status === "failed");
-
-  // Clear history seed only after the session row left `pending` (first run claimed).
-  // `pending` のまま state を消すと失敗時リロードで chatSeed が届かなくなる (#950)。
   useEffect(() => {
     if (!composeSeed || !location.state) return;
     if (session.status === "idle" || session.status === "pending") return;
@@ -137,7 +88,6 @@ const WikiComposePage: React.FC = () => {
     session.status,
   ]);
 
-  // Persist the session id in the URL so refresh re-opens the same row.
   useEffect(() => {
     const id = session.session?.id;
     if (!id || sessionId || !noteId || !pageId) return;
@@ -148,14 +98,6 @@ const WikiComposePage: React.FC = () => {
     () => indexById(Object.values(session.draftedSections)),
     [session.draftedSections],
   );
-
-  // The displayed outline switches sources as the user progresses through
-  // phases: proposal during structure → final approved outline once approved.
-  // (For the editor pane preview, both are acceptable since they share `id`.)
-  const outlineForPreview =
-    session.phase === "completed" || session.phase === "draft"
-      ? session.outlineProposal
-      : session.outlineProposal;
 
   const handleBack = () => {
     if (noteId && pageId) {
@@ -236,7 +178,7 @@ const WikiComposePage: React.FC = () => {
   const left = (
     <EditorPane
       title={session.pageSnapshot?.title ?? ""}
-      outline={outlineForPreview}
+      outline={session.outlineProposal}
       draftedSections={draftedSectionsById}
       sectionBuffers={session.sectionBuffers}
       streamingSectionId={session.streamingSectionId}
@@ -260,7 +202,6 @@ const WikiComposePage: React.FC = () => {
       onSubmitResearchApproval={session.submitResearchApproval}
       onSubmitConflictAck={session.submitConflictAck}
       onSubmitOutline={session.submitOutline}
-      onSubmitConflictAck={session.submitConflictAck}
     />
   );
 
@@ -270,14 +211,14 @@ const WikiComposePage: React.FC = () => {
       {session.error ? (
         <div className="bg-destructive/10 text-destructive flex items-center justify-between gap-2 px-4 py-2 text-xs">
           <span className="min-w-0 flex-1">{session.error}</span>
-          {canRetryComposeStart ? (
+          {session.canRetryStart ? (
             <Button
               type="button"
               size="sm"
               variant="outline"
               className="h-7 shrink-0 px-2"
               data-testid="compose-retry"
-              onClick={() => void startComposeSession()}
+              onClick={() => void session.start()}
             >
               {t("common:retry")}
             </Button>

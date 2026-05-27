@@ -61,15 +61,14 @@ import { resolveCheckpointerForRun } from "../agents/core/checkpoint/index.js";
 import { RESEARCH_GRAPH_ID } from "../agents/subgraphs/research/index.js";
 import { WIKI_COMPOSE_GRAPH_ID } from "../agents/graphs/wikiCompose/index.js";
 import { WIKI_MAINTENANCE_GRAPH_ID } from "../agents/graphs/wikiMaintenance/index.js";
-import {
-  readContentLocaleFromSessionMetadata,
-  resolveSessionContentLocale,
-  stripContentLocaleFromGraphInput,
-  type ComposeContentLocale,
-} from "../agents/core/composeLocale.js";
+import type { ComposeContentLocale } from "../agents/core/composeLocale.js";
 import type { AppEnv } from "../types/index.js";
 import { persistOutcomeIfStillRunning } from "./composeSessionPersistence.js";
 import { loadComposeSessionProjection } from "./composeSessionProjection.js";
+import {
+  prepareComposeRunFromRequest,
+  resolveComposeSessionContentLocale,
+} from "./composeSessionRunLocale.js";
 
 /**
  * Translate the documented `body.input.kind === "additional_research"` shape
@@ -251,7 +250,7 @@ app.get("/:pageId/compose-sessions/:id", authRequired, async (c) => {
   if (!row) throw new HTTPException(404, { message: "Session not found" });
 
   const tier = await getUserTier(userId, db);
-  const contentLocale = resolveSessionContentLocale(
+  const contentLocale = resolveComposeSessionContentLocale(
     row.metadata,
     null,
     c.req.header("accept-language"),
@@ -343,24 +342,16 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
     throw err;
   }
 
-  const acceptLanguage = c.req.header("accept-language");
-  const contentLocale = resolveSessionContentLocale(
+  const {
+    contentLocale,
+    graphInput,
+    metadataUpdate: metadataWithLocale,
+  } = prepareComposeRunFromRequest(
     session.metadata,
     body.input,
-    acceptLanguage,
+    c.req.header("accept-language"),
     "ja",
   );
-  const shouldPersistLocale = !readContentLocaleFromSessionMetadata(session.metadata);
-  const metadataWithLocale = shouldPersistLocale
-    ? {
-        ...(session.metadata &&
-        typeof session.metadata === "object" &&
-        !Array.isArray(session.metadata)
-          ? { ...(session.metadata as Record<string, unknown>) }
-          : {}),
-        contentLocale,
-      }
-    : undefined;
 
   // Atomically claim the session (and persist `contentLocale` when needed) so
   // concurrent POST /run cannot double-bill and a failed follow-up write cannot
@@ -421,7 +412,6 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
     // checkpoint 保存・再開を有効化する。テスト / CI では未設定なので `false`
     // を返し、LangGraph の checkpoint 機構を無効化したまま smoke-test で走る。
     const checkpointer = await resolveCheckpointerForRun();
-    const graphInput = stripContentLocaleFromGraphInput(body.input ?? {});
 
     try {
       await send(startedEvent(id, session.graphId, session.phase));
@@ -556,7 +546,7 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
   // Resume relies on the checkpointer to fetch the suspended thread; production
   // routes load `PostgresSaver` here, tests/smoke runs get `false`.
   const checkpointer = await resolveCheckpointerForRun();
-  const contentLocale = resolveSessionContentLocale(
+  const contentLocale = resolveComposeSessionContentLocale(
     session.metadata,
     null,
     c.req.header("accept-language"),

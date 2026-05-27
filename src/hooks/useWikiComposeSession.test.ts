@@ -31,6 +31,13 @@ vi.mock("@/lib/wikiCompose/resolveComposeContentLocale", () => ({
   resolveComposeContentLocale: () => "ja" as const,
 }));
 
+vi.mock("@/hooks/useInitialComposeBackend", () => ({
+  useInitialComposeBackend: () => ({
+    backend: "zedi_managed" as const,
+    isResolved: true,
+  }),
+}));
+
 import { useWikiComposeSession } from "./useWikiComposeSession";
 import type { ComposeSseEvent } from "@/lib/wikiCompose/types";
 
@@ -67,6 +74,19 @@ describe("useWikiComposeSession", () => {
     mocks.resumeSession.mockReset();
     mocks.cancelSession.mockReset();
     mocks.createSession.mockResolvedValue(SESSION);
+  });
+
+  it("exposes canRetryStart after auto-start fails for fresh compose / 新規 Compose の自動開始失敗後に canRetryStart になる", async () => {
+    mocks.createSession.mockRejectedValue(new Error("network"));
+    const { result } = renderHook(() =>
+      useWikiComposeSession({
+        pageId: "page-1",
+        sessionId: null,
+        startPolicy: "when-backend-ready",
+      }),
+    );
+    await waitFor(() => expect(result.current.canRetryStart).toBe(true));
+    expect(result.current.error).toBe("network");
   });
 
   it("reduces a Brief interrupt into briefQuestions + pageSnapshot", async () => {
