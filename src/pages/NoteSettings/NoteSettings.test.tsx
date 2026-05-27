@@ -201,6 +201,13 @@ describe("NoteSettings layout", () => {
     expect(screen.getByRole("link", { name: /settingsNav\.members/i })).toBeInTheDocument();
   });
 
+  it("renders the settings nav as a horizontal scroll strip below md breakpoint", () => {
+    renderSettings("/notes/note-1/settings/general");
+    const nav = screen.getByRole("navigation", { name: /settingsNav\.ariaLabel/i });
+    expect(nav).toHaveClass("overflow-x-auto");
+    expect(nav).toHaveClass("md:flex-col");
+  });
+
   it("shows only the Visibility entry for viewers", () => {
     vi.mocked(useNote).mockReturnValue({
       note: baseNote,

@@ -52,7 +52,7 @@ const GeneralSection: React.FC = () => {
   };
 
   return (
-    <section className="border-border/60 rounded-lg border p-4">
+    <section className="border-border/60 rounded-lg border p-3 sm:p-4">
       <header className="mb-4 space-y-1">
         <h2 className="text-base font-semibold">{t("notes.settingsNav.general")}</h2>
         <p className="text-muted-foreground text-xs">{t("notes.generalSectionDescription")}</p>
@@ -71,8 +71,12 @@ const GeneralSection: React.FC = () => {
       </div>
 
       {canManage ? (
-        <div className="mt-4 flex justify-end">
-          <Button onClick={handleSave} disabled={updateNoteMutation.isPending || !isDirty}>
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            className="w-full sm:w-auto"
+            onClick={handleSave}
+            disabled={updateNoteMutation.isPending || !isDirty}
+          >
             {updateNoteMutation.isPending ? t("common.saving") : t("common.save")}
           </Button>
         </div>

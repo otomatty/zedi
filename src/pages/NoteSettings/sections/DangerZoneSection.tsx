@@ -58,13 +58,17 @@ const DangerZoneSection: React.FC = () => {
 
   return (
     <>
-      <section className="border-destructive/40 space-y-3 rounded-lg border p-4">
+      <section className="border-destructive/40 space-y-3 rounded-lg border p-3 sm:p-4">
         <header className="space-y-1">
           <h2 className="text-destructive text-base font-semibold">{t("notes.deleteSection")}</h2>
           <p className="text-muted-foreground text-sm">{t("notes.deleteSectionDescription")}</p>
         </header>
-        <div className="flex justify-end">
-          <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            className="w-full sm:w-auto"
+            variant="destructive"
+            onClick={() => setIsDeleteDialogOpen(true)}
+          >
             {t("notes.deleteNote")}
           </Button>
         </div>

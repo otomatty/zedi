@@ -79,28 +79,27 @@ const NoteSettings: React.FC = () => {
 
   return (
     <NoteSettingsContext.Provider value={contextValue}>
-      <div className="min-h-0 flex-1 py-8">
+      <div className="min-h-0 flex-1 py-4 sm:py-6 md:py-8">
         <Container>
-          <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            {/* タイトル → ノート切替 → 公開バッジ を 1 行に並べる。長いノート名は
-                NoteTitleSwitcher 側で whitespace-nowrap、外側は flex-wrap で
-                次の行に逃がす。
-                Lay out "Settings → [Note switcher] → [Visibility badge]" on a
-                single row. Long note titles stay on one line inside the
-                switcher; the wrapper flex-wraps to keep things readable on
-                narrow viewports. */}
+          <header className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-4 sm:gap-y-2">
+            {/* タイトル → ノート切替 → 公開バッジ。狭い画面では折り返し、
+                「ノートへ戻る」は全幅ボタンにしてタップしやすくする。
+                Title row wraps on narrow viewports; the back link becomes a
+                full-width button on mobile for a larger tap target. */}
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-              <h1 className="text-xl font-semibold whitespace-nowrap">{t("notes.noteSettings")}</h1>
+              <h1 className="text-lg font-semibold whitespace-nowrap sm:text-xl">
+                {t("notes.noteSettings")}
+              </h1>
               <NoteTitleSwitcher noteId={note.id} noteTitle={note.title} variant="subtitle" />
               <NoteVisibilityBadge visibility={note.visibility} />
             </div>
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="outline" size="sm" className="w-full shrink-0 sm:w-auto">
               <Link to={`/notes/${note.id}`}>{t("notes.backToNote")}</Link>
             </Button>
           </header>
 
-          <div className="mt-6 grid gap-6 md:grid-cols-[200px_1fr] md:gap-8">
-            <aside className="md:sticky md:top-24 md:self-start">
+          <div className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 md:grid-cols-[minmax(0,12rem)_1fr] md:gap-8 lg:grid-cols-[minmax(0,13.5rem)_1fr]">
+            <aside className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-10 -mx-4 border-b px-4 pb-2 backdrop-blur-sm sm:-mx-6 sm:px-6 md:static md:top-24 md:z-auto md:mx-0 md:self-start md:border-b-0 md:bg-transparent md:px-0 md:pb-0 md:backdrop-blur-none">
               <NoteSettingsSidebar noteId={note.id} sidebarRole={sidebarRole} />
             </aside>
             <main className="min-w-0">

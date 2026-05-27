@@ -61,9 +61,9 @@ function VisibilityOptionRow({
   const { t } = useTranslation();
   const inputId = `visibility-section-${value}`;
   return (
-    <div className="border-border/60 flex gap-3 rounded-md border p-3">
-      <RadioGroupItem value={value} id={inputId} disabled={!canEdit} className="mt-1" />
-      <div className="flex-1 space-y-1">
+    <div className="border-border/60 flex min-w-0 gap-3 rounded-md border p-3 sm:p-4">
+      <RadioGroupItem value={value} id={inputId} disabled={!canEdit} className="mt-1 shrink-0" />
+      <div className="min-w-0 flex-1 space-y-1">
         <Label htmlFor={inputId} className="text-sm font-medium">
           {t(visibilityKeys[value])}
         </Label>
@@ -78,7 +78,13 @@ function VisibilityOptionRow({
                 readOnly
                 className="text-xs"
               />
-              <Button type="button" variant="outline" size="sm" onClick={onCopyNoteUrl}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full shrink-0 sm:w-auto"
+                onClick={onCopyNoteUrl}
+              >
                 <Copy className="mr-2 h-4 w-4" />
                 {t("notes.copy")}
               </Button>
@@ -106,11 +112,16 @@ function EditPermissionOptionRow({
   const enabled = allowedEditOptions.includes(value);
   return (
     <div
-      className="border-border/60 flex gap-3 rounded-md border p-3 data-[disabled=true]:opacity-60"
+      className="border-border/60 flex min-w-0 gap-3 rounded-md border p-3 data-[disabled=true]:opacity-60 sm:p-4"
       data-disabled={!enabled || !canEdit}
     >
-      <RadioGroupItem value={value} id={inputId} disabled={!enabled || !canEdit} className="mt-1" />
-      <div className="flex-1 space-y-1">
+      <RadioGroupItem
+        value={value}
+        id={inputId}
+        disabled={!enabled || !canEdit}
+        className="mt-1 shrink-0"
+      />
+      <div className="min-w-0 flex-1 space-y-1">
         <Label htmlFor={inputId} className="text-sm font-medium">
           {t(editPermissionLabelKeys[value])}
         </Label>
@@ -185,7 +196,7 @@ const VisibilitySection: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <section className="border-border/60 space-y-3 rounded-lg border p-4">
+      <section className="border-border/60 space-y-3 rounded-lg border p-3 sm:p-4">
         <header className="space-y-1">
           <h2 className="text-base font-semibold">{t("notes.shareVisibilityHeading")}</h2>
           <p className="text-muted-foreground text-xs">{t("notes.visibilitySectionDescription")}</p>
@@ -217,7 +228,7 @@ const VisibilitySection: React.FC = () => {
         </RadioGroup>
       </section>
 
-      <section className="border-border/60 space-y-3 rounded-lg border p-4">
+      <section className="border-border/60 space-y-3 rounded-lg border p-3 sm:p-4">
         <header className="space-y-1">
           <h2 className="text-base font-semibold">{t("notes.shareEditPermissionHeading")}</h2>
         </header>
@@ -242,8 +253,12 @@ const VisibilitySection: React.FC = () => {
       </section>
 
       {canEdit ? (
-        <div className="flex justify-end">
-          <Button onClick={handleSaveNote} disabled={isSaving || !isDirty}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            className="w-full sm:w-auto"
+            onClick={handleSaveNote}
+            disabled={isSaving || !isDirty}
+          >
             {isSaving ? t("common.saving") : t("notes.shareSaveChanges")}
           </Button>
         </div>

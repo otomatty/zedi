@@ -347,13 +347,13 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({
   const nowMs = (now ?? Date.now)();
 
   return (
-    <section className="border-border/60 mt-6 rounded-lg border p-4">
+    <section className="border-border/60 mt-6 rounded-lg border p-3 sm:p-4">
       <h2 className="mb-1 text-sm font-semibold">{t("notes.inviteLinksTitle")}</h2>
       <p className="text-muted-foreground mb-4 text-xs">{t("notes.inviteLinksPhase5Hint")}</p>
 
       {!readOnly ? (
         <>
-          <div className="grid gap-3 md:grid-cols-[1fr_140px_160px_160px_auto]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_140px_160px_160px_auto]">
             <Input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
@@ -402,7 +402,7 @@ export const NoteInviteLinksSection: React.FC<NoteInviteLinksSectionProps> = ({
             <Button
               onClick={handleCreate}
               disabled={createMutation.isPending || needsEditorAck}
-              className="gap-1"
+              className="w-full gap-1 sm:col-span-2 lg:col-span-1 lg:w-auto"
             >
               {createMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -550,7 +550,7 @@ const InviteLinkRowView: React.FC<InviteLinkRowViewProps> = ({
     );
 
   return (
-    <div className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-b pb-2">
+    <div className="border-border/60 flex flex-col gap-3 border-b pb-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium">{link.label ?? t("notes.inviteLinksUnnamed")}</span>
@@ -561,7 +561,7 @@ const InviteLinkRowView: React.FC<InviteLinkRowViewProps> = ({
           {usageLabel} · {expiresLabel}
         </p>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-end gap-2 sm:shrink-0">
         <Button
           variant="ghost"
           size="icon"

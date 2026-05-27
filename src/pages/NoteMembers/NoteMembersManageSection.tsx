@@ -8,6 +8,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  cn,
 } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 import type { NoteMemberInvitation, NoteMemberRole, NoteMemberStatus } from "@/types/note";
@@ -153,13 +154,13 @@ export function NoteMembersManageSection({
   const { t } = useTranslation();
   const nowMs = (now ?? Date.now)();
   return (
-    <section className="border-border/60 mt-6 rounded-lg border p-4">
+    <section className="border-border/60 mt-6 rounded-lg border p-3 sm:p-4">
       {readOnly ? (
         <h2 className="mb-4 text-sm font-semibold">{t("notes.members")}</h2>
       ) : (
         <>
           <h2 className="mb-4 text-sm font-semibold">{t("notes.inviteMember")}</h2>
-          <div className="grid gap-3 md:grid-cols-[1fr_200px_auto]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_200px] md:grid-cols-[1fr_200px_auto]">
             <Input
               value={memberEmail}
               onChange={(event) => setMemberEmail(event.target.value)}
@@ -180,7 +181,9 @@ export function NoteMembersManageSection({
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={onAddMember}>{t("notes.add")}</Button>
+            <Button className="w-full sm:col-span-2 md:col-span-1 md:w-auto" onClick={onAddMember}>
+              {t("notes.add")}
+            </Button>
           </div>
         </>
       )}
@@ -213,13 +216,15 @@ export function NoteMembersManageSection({
             return (
               <div
                 key={member.memberEmail}
-                className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-b pb-2"
+                className="border-border/60 flex flex-col gap-3 border-b pb-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">{member.memberEmail}</span>
-                  <Badge className={badgeStyles[variant]}>{badgeText}</Badge>
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                  <span className="truncate text-sm">{member.memberEmail}</span>
+                  <Badge className={cn(badgeStyles[variant], "w-fit max-w-full shrink-0")}>
+                    {badgeText}
+                  </Badge>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-end gap-2 sm:shrink-0">
                   <Select
                     value={member.role}
                     onValueChange={(value) =>
