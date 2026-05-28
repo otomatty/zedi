@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { NoteSummary } from "@/types/note";
 import {
   buildNoteListSections,
+  resolveNoteDisplayTitle,
   buildSwitcherNotes,
   filterNotesByTitle,
   sortNotes,
@@ -74,6 +75,13 @@ describe("buildSwitcherNotes", () => {
     const rows = buildSwitcherNotes(notes, [], "default", { recentCount: 5 });
     expect(rows.map((n) => n.id)).toEqual(["default", "a", "b", "c", "d", "e"]);
     expect(rows).toHaveLength(6);
+  });
+});
+
+describe("resolveNoteDisplayTitle", () => {
+  it("returns untitled label for null or blank titles", () => {
+    expect(resolveNoteDisplayTitle(null, "Untitled")).toBe("Untitled");
+    expect(resolveNoteDisplayTitle("  ", "Untitled")).toBe("Untitled");
   });
 });
 

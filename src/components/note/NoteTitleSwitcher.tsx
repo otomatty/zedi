@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Link, matchPath, useLocation, useNavigate } from "react-router-dom";
+import { Link, matchPath, useLocation } from "react-router-dom";
 import { ChevronsUpDown, ListTree, Plus } from "lucide-react";
 import {
   cn,
@@ -85,7 +85,6 @@ export const NoteTitleSwitcher: React.FC<NoteTitleSwitcherProps> = ({
   const { isSignedIn } = useAuth();
   const isAuthed = isSignedIn === true;
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
   const close = useCallback(() => setOpen(false), []);
 
   const notesQuery = useNotes();
@@ -165,18 +164,16 @@ export const NoteTitleSwitcher: React.FC<NoteTitleSwitcherProps> = ({
               {switcherNotes.map((note) => (
                 <DropdownMenuItem
                   key={note.id}
+                  asChild
+                  onSelect={close}
                   className="cursor-pointer p-0 focus:bg-transparent"
-                  onSelect={(event) => {
-                    event.preventDefault();
-                    close();
-                    navigate(`/notes/${note.id}`);
-                  }}
                 >
                   <NoteSwitcherRow
                     note={note}
                     isDefault={note.id === defaultNoteId}
                     isActive={note.id === activeNoteId}
                     isPinned={isNotePinned(note.id, pinnedIds) || note.id === defaultNoteId}
+                    onSelect={close}
                   />
                 </DropdownMenuItem>
               ))}

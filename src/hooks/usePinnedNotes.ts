@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   isNotePinned,
+  NOTE_PINNED_CHANGED_EVENT,
   NOTE_PINNED_STORAGE_KEY,
   readPinnedNoteIds,
   togglePinnedNoteId,
@@ -19,19 +20,25 @@ export function usePinnedNotes(): {
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => readPinnedNoteIds());
 
   useEffect(() => {
+    const sync = () => setPinnedIds(readPinnedNoteIds());
     const onStorage = (event: StorageEvent) => {
       if (event.key === null || event.key === NOTE_PINNED_STORAGE_KEY) {
-        setPinnedIds(readPinnedNoteIds());
+        sync();
       }
     };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener(NOTE_PINNED_CHANGED_EVENT, sync);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(NOTE_PINNED_CHANGED_EVENT, sync);
+    };
   }, []);
 
   const togglePin = useCallback((noteId: string) => {
     setPinnedIds((current) => {
       const next = togglePinnedNoteId(noteId, current);
       writePinnedNoteIds(next);
+      window.dispatchEvent(new Event(NOTE_PINNED_CHANGED_EVENT));
       return next;
     });
   }, []);

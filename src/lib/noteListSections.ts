@@ -7,6 +7,18 @@ export const RECENT_SECTION_COUNT = 3;
 /** Recent rows in the title switcher (excluding pinned). / スイッチャーの「最近」行数 */
 export const SWITCHER_RECENT_COUNT = 5;
 
+/**
+ * Safe note title for UI (API may return null at runtime).
+ * UI 向けタイトル（実行時に null があり得る）。
+ */
+export function resolveNoteDisplayTitle(
+  title: string | null | undefined,
+  untitledLabel: string,
+): string {
+  const trimmed = (title ?? "").trim();
+  return trimmed.length > 0 ? trimmed : untitledLabel;
+}
+
 export type NoteListSort = "updated" | "title";
 
 export interface NoteListSections {

@@ -1,6 +1,9 @@
 /** localStorage key for user-pinned note ids. / ピン留めノート ID の保存キー */
 export const NOTE_PINNED_STORAGE_KEY = "zedi-note-pinned-ids";
 
+/** Fired in-tab when pin list changes (storage event is cross-tab only). */
+export const NOTE_PINNED_CHANGED_EVENT = "zedi-note-pinned-changed";
+
 /** Max user-pinned notes (default note is always shown separately). / ユーザーがピンできる上限 */
 export const MAX_PINNED_NOTES = 5;
 

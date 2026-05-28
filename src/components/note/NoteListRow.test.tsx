@@ -59,7 +59,7 @@ describe("NoteListRow", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await user.click(screen.getByRole("button", { name: /Team wiki/i }));
+    await user.click(screen.getByRole("link", { name: "Team wiki" }));
     expect(screen.getByTestId("location")).toHaveTextContent("/notes/note-1");
   });
 
@@ -84,5 +84,18 @@ describe("NoteListRow", () => {
     await user.click(screen.getByRole("button", { name: "notes.list.pin" }));
     expect(onTogglePin).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("location")).toHaveTextContent("/notes");
+  });
+
+  it("handles null title without crashing", () => {
+    render(
+      <MemoryRouter>
+        <NoteListRow
+          note={{ ...note, title: null as unknown as string }}
+          showPinAction
+          onTogglePin={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "notes.untitledNote" })).toBeInTheDocument();
   });
 });

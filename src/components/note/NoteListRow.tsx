@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { FileText, NotebookText, Pin, PinOff, Users } from "lucide-react";
 import type { NoteSummary } from "@/types/note";
 import type { NoteAccessRole } from "@/types/note";
@@ -9,6 +9,7 @@ import { Badge } from "@zedi/ui";
 import { Button } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 import { formatTimeAgo } from "@/lib/dateUtils";
+import { resolveNoteDisplayTitle } from "@/lib/noteListSections";
 
 const ROLE_I18N_KEYS: Record<NoteAccessRole, string> = {
   owner: "common.note.owner",
@@ -48,7 +49,7 @@ export const NoteListRowContent: React.FC<NoteListRowContentProps> = ({
   isPinned,
 }) => {
   const { t } = useTranslation();
-  const title = note.title.trim().length > 0 ? note.title : t("notes.untitledNote");
+  const title = resolveNoteDisplayTitle(note.title, t("notes.untitledNote"));
   const updatedLabel = formatTimeAgo(note.updatedAt);
 
   return (
@@ -139,13 +140,8 @@ export const NoteListRow: React.FC<NoteListRowProps> = ({
   showPinAction = false,
   onTogglePin,
 }) => {
-  const navigate = useNavigate();
   const { t } = useTranslation();
-
-  const handleNavigate = () => {
-    navigate(`/notes/${note.id}`);
-  };
-
+  const displayTitle = resolveNoteDisplayTitle(note.title, t("notes.untitledNote"));
   const pinLabel = isPinned ? t("notes.list.unpin") : t("notes.list.pin");
 
   return (
@@ -162,9 +158,9 @@ export const NoteListRow: React.FC<NoteListRowProps> = ({
           : undefined
       }
     >
-      <button
-        type="button"
-        onClick={handleNavigate}
+      <Link
+        to={`/notes/${note.id}`}
+        aria-label={displayTitle}
         className={cn(
           "border-border/50 bg-card hover:border-border hover:bg-muted/30 flex w-full items-center gap-3 rounded-lg border text-left transition-colors",
           variant === "card" ? "h-full p-4" : "p-3",
@@ -178,7 +174,7 @@ export const NoteListRow: React.FC<NoteListRowProps> = ({
           isActive={isActive}
           isPinned={isPinned}
         />
-      </button>
+      </Link>
       {showPinAction && onTogglePin && (
         <Button
           type="button"
@@ -190,6 +186,7 @@ export const NoteListRow: React.FC<NoteListRowProps> = ({
           )}
           aria-label={pinLabel}
           onClick={(e) => {
+            e.preventDefault();
             e.stopPropagation();
             onTogglePin();
           }}
@@ -206,47 +203,49 @@ interface NoteSwitcherRowProps {
   isDefault: boolean;
   isActive: boolean;
   isPinned: boolean;
+  onSelect: () => void;
 }
 
 /**
  * Dropdown row for {@link NoteTitleSwitcher} (link + compact metadata).
  * {@link NoteTitleSwitcher} 用のドロップダウン行。
  */
-export const NoteSwitcherRow: React.FC<NoteSwitcherRowProps> = ({
-  note,
-  isDefault,
-  isActive,
-  isPinned,
-}) => {
-  const { t } = useTranslation();
-  const title = note.title.trim().length > 0 ? note.title : t("notes.untitledNote");
-  const updatedLabel = formatTimeAgo(note.updatedAt);
+export const NoteSwitcherRow = React.forwardRef<HTMLAnchorElement, NoteSwitcherRowProps>(
+  function NoteSwitcherRow({ note, isDefault, isActive, isPinned, onSelect }, ref) {
+    const { t } = useTranslation();
+    const title = resolveNoteDisplayTitle(note.title, t("notes.untitledNote"));
+    const updatedLabel = formatTimeAgo(note.updatedAt);
 
-  return (
-    <div
-      className={cn(
-        "flex w-full items-center gap-3 rounded-md px-2.5 py-2",
-        isActive && "bg-accent/60",
-      )}
-    >
-      <span
-        className={cn("w-1 shrink-0 self-stretch rounded-full", ROLE_ACCENT_CLASS[note.role])}
-        aria-hidden
-      />
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-2">
-          <span className={cn("truncate text-sm", isActive && "font-medium")}>{title}</span>
-          {isPinned && <Pin className="text-muted-foreground h-3 w-3 shrink-0" aria-hidden />}
-          {isDefault && (
-            <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">
-              {t("notes.switcher.defaultBadge")}
-            </Badge>
-          )}
+    return (
+      <Link
+        ref={ref}
+        to={`/notes/${note.id}`}
+        aria-current={isActive ? "true" : undefined}
+        onClick={onSelect}
+        className={cn(
+          "hover:bg-accent flex w-full items-center gap-3 rounded-md px-2.5 py-2",
+          isActive && "bg-accent/60",
+        )}
+      >
+        <span
+          className={cn("w-1 shrink-0 self-stretch rounded-full", ROLE_ACCENT_CLASS[note.role])}
+          aria-hidden
+        />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span className={cn("truncate text-sm", isActive && "font-medium")}>{title}</span>
+            {isPinned && <Pin className="text-muted-foreground h-3 w-3 shrink-0" aria-hidden />}
+            {isDefault && (
+              <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">
+                {t("notes.switcher.defaultBadge")}
+              </Badge>
+            )}
+          </span>
+          <span className="text-muted-foreground mt-0.5 text-xs">
+            {updatedLabel} · {note.pageCount} {t("notes.list.pagesShort")}
+          </span>
         </span>
-        <span className="text-muted-foreground mt-0.5 text-xs">
-          {updatedLabel} · {note.pageCount} {t("notes.list.pagesShort")}
-        </span>
-      </span>
-    </div>
-  );
-};
+      </Link>
+    );
+  },
+);

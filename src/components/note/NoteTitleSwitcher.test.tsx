@@ -145,6 +145,11 @@ const noteBeta = makeNote({ id: "note-beta", title: "Beta note", updatedAt: 300 
 const noteGamma = makeNote({ id: "note-gamma", title: "Gamma note", updatedAt: 200 });
 const defaultNote = makeNote({ id: "note-default", title: "My default", updatedAt: 50 });
 
+async function noteSwitcherLinks() {
+  const links = await screen.findAllByRole("link");
+  return links.filter((el) => /^\/notes\/[^/?]+$/.test(el.getAttribute("href") ?? ""));
+}
+
 describe("NoteTitleSwitcher", () => {
   beforeEach(() => {
     useAuthMock.mockReturnValue({ isSignedIn: true, isLoaded: true, userId: "user-1" });
@@ -192,10 +197,8 @@ describe("NoteTitleSwitcher", () => {
 
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
-    const items = await screen.findAllByRole("menuitem");
-    const noteRowNames = items
-      .map((el) => el.textContent ?? "")
-      .filter((text) => /My default|Alpha note|Beta note|Gamma note/.test(text));
+    const links = await noteSwitcherLinks();
+    const noteRowNames = links.map((el) => el.textContent ?? "");
 
     expect(noteRowNames[0]).toMatch(/My default/);
     expect(noteRowNames[0]).toMatch(/既定/);
@@ -212,11 +215,11 @@ describe("NoteTitleSwitcher", () => {
     renderAt("/notes/note-beta/settings", { noteId: "note-beta", noteTitle: "Beta note" });
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
-    const betaItem = await screen.findByRole("menuitem", { name: /Beta note/ });
-    expect(betaItem.querySelector(".font-medium")).toBeTruthy();
+    const betaItem = await screen.findByRole("link", { name: /Beta note/ });
+    expect(betaItem).toHaveAttribute("aria-current", "true");
 
-    const alphaItem = await screen.findByRole("menuitem", { name: /Alpha note/ });
-    expect(alphaItem.querySelector(".font-medium")).toBeFalsy();
+    const alphaItem = await screen.findByRole("link", { name: /Alpha note/ });
+    expect(alphaItem).not.toHaveAttribute("aria-current", "true");
   });
 
   it("navigates to /notes/:noteId when a row is selected", async () => {
@@ -224,7 +227,8 @@ describe("NoteTitleSwitcher", () => {
     renderAt("/notes/note-alpha");
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
-    const betaItem = await screen.findByRole("menuitem", { name: /Beta note/ });
+    const betaItem = await screen.findByRole("link", { name: /Beta note/ });
+    expect(betaItem).toHaveAttribute("href", "/notes/note-beta");
     await user.click(betaItem);
     expect(screen.getByTestId("location")).toHaveTextContent("/notes/note-beta");
   });
@@ -279,12 +283,12 @@ describe("NoteTitleSwitcher", () => {
     renderAt("/notes/note-0", { noteId: "note-0", noteTitle: "Note 0" });
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
-    const rows = (await screen.findAllByRole("menuitem")).filter((el) =>
-      /Note \d+/.test(el.textContent ?? ""),
-    );
+    const rows = (await noteSwitcherLinks()).filter((el) => /Note \d+/.test(el.textContent ?? ""));
     expect(rows.length).toBe(5);
     expect(rows[0].textContent).toMatch(/Note 19/);
-    expect(screen.queryByRole("menuitem", { name: /^Note 0$/ })).not.toBeInTheDocument();
+    expect(
+      (await noteSwitcherLinks()).find((el) => el.getAttribute("href") === "/notes/note-0"),
+    ).toBeUndefined();
   });
 
   it("does not list soft-deleted notes", async () => {
@@ -300,8 +304,9 @@ describe("NoteTitleSwitcher", () => {
     renderAt("/notes/note-live", { noteId: "note-live", noteTitle: "Live note" });
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
-    expect(screen.queryByRole("menuitem", { name: /Dead note/ })).not.toBeInTheDocument();
-    expect(await screen.findByRole("menuitem", { name: /Live note/ })).toBeInTheDocument();
+    const links = await noteSwitcherLinks();
+    expect(links.some((el) => /Dead note/.test(el.textContent ?? ""))).toBe(false);
+    expect(links.some((el) => /Live note/.test(el.textContent ?? ""))).toBe(true);
   });
 
   it("applies subtitle text styling when variant=subtitle", () => {

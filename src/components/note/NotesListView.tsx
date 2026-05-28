@@ -111,6 +111,7 @@ export const NotesListView: React.FC<NotesListViewProps> = ({ notes, isLoading }
           <button
             type="button"
             onClick={() => setSort("updated")}
+            aria-pressed={sort === "updated"}
             className={cn(
               "rounded-md px-3 py-1.5 text-sm transition-colors",
               sort === "updated"
@@ -123,6 +124,7 @@ export const NotesListView: React.FC<NotesListViewProps> = ({ notes, isLoading }
           <button
             type="button"
             onClick={() => setSort("title")}
+            aria-pressed={sort === "title"}
             className={cn(
               "rounded-md px-3 py-1.5 text-sm transition-colors",
               sort === "title"
