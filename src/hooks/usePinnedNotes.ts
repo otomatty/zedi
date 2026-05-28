@@ -62,12 +62,11 @@ export function usePinnedNotes(options: UsePinnedNotesOptions = {}): {
   const togglePin = useCallback(
     (noteId: string) => {
       if (defaultNoteId && noteId === defaultNoteId) return;
-      setStoredPinnedIds((current) => {
-        const next = togglePinnedNoteId(noteId, current);
-        writePinnedNoteIds(next);
-        window.dispatchEvent(new Event(NOTE_PINNED_CHANGED_EVENT));
-        return next;
-      });
+      const current = stripDefaultNoteFromPinnedIds(readPinnedNoteIds(), defaultNoteId);
+      const next = togglePinnedNoteId(noteId, current);
+      setStoredPinnedIds(next);
+      writePinnedNoteIds(next);
+      window.dispatchEvent(new Event(NOTE_PINNED_CHANGED_EVENT));
     },
     [defaultNoteId],
   );
