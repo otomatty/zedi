@@ -77,9 +77,9 @@ export const NotesListView: React.FC<NotesListViewProps> = ({ notes, isLoading }
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<NoteListSort>("updated");
-  const { pinnedIds, togglePin } = usePinnedNotes();
   const { data: myNote } = useMyNote();
   const defaultNoteId = myNote?.id ?? null;
+  const { pinnedIds, togglePin } = usePinnedNotes({ defaultNoteId });
 
   const filtered = useMemo(() => filterNotesByTitle(notes, search), [notes, search]);
 

@@ -1,7 +1,10 @@
 /** localStorage key for user-pinned note ids. / ピン留めノート ID の保存キー */
 export const NOTE_PINNED_STORAGE_KEY = "zedi-note-pinned-ids";
 
-/** Fired in-tab when pin list changes (storage event is cross-tab only). */
+/**
+ * Fired in-tab when pin list changes (`storage` is cross-tab only).
+ * ピン一覧が変わったときに同一タブへ通知する（`storage` は別タブ専用）。
+ */
 export const NOTE_PINNED_CHANGED_EVENT = "zedi-note-pinned-changed";
 
 /** Max user-pinned notes (default note is always shown separately). / ユーザーがピンできる上限 */
@@ -33,6 +36,18 @@ export function writePinnedNoteIds(ids: string[]): void {
   } catch {
     // ignore
   }
+}
+
+/**
+ * Remove the default note id from user pins (shown separately in the pinned section).
+ * 既定ノート ID をユーザーピンから除去する（ピンセクションでは別枠表示）。
+ */
+export function stripDefaultNoteFromPinnedIds(
+  pinnedIds: string[],
+  defaultNoteId: string | null,
+): string[] {
+  if (!defaultNoteId) return pinnedIds;
+  return pinnedIds.filter((id) => id !== defaultNoteId);
 }
 
 /**

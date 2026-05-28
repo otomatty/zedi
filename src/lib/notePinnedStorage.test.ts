@@ -1,11 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   MAX_PINNED_NOTES,
+  stripDefaultNoteFromPinnedIds,
   readPinnedNoteIds,
   togglePinnedNoteId,
   writePinnedNoteIds,
   NOTE_PINNED_STORAGE_KEY,
 } from "./notePinnedStorage";
+
+describe("stripDefaultNoteFromPinnedIds", () => {
+  it("removes the default note id from user pins", () => {
+    expect(stripDefaultNoteFromPinnedIds(["a", "default", "b"], "default")).toEqual(["a", "b"]);
+    expect(stripDefaultNoteFromPinnedIds(["a"], null)).toEqual(["a"]);
+  });
+});
 
 describe("notePinnedStorage", () => {
   beforeEach(() => {

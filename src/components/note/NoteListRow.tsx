@@ -27,6 +27,10 @@ const ROLE_ACCENT_CLASS: Record<NoteAccessRole, string> = {
   none: "bg-border",
 };
 
+/**
+ * Visual density for note list rows (`compact` = mobile list, `card` = desktop grid).
+ * ノート行の表示密度（`compact` = モバイルリスト、`card` = デスクトップグリッド）。
+ */
 export type NoteListRowVariant = "compact" | "card";
 
 interface NoteListRowContentProps {
@@ -115,6 +119,7 @@ export const NoteListRowContent: React.FC<NoteListRowContentProps> = ({
   );
 };
 
+/** Props for {@link NoteListRow}. / {@link NoteListRow} の props。 */
 export interface NoteListRowProps {
   note: NoteSummary;
   variant?: NoteListRowVariant;
@@ -181,7 +186,8 @@ export const NoteListRow: React.FC<NoteListRowProps> = ({
           variant="ghost"
           size="icon"
           className={cn(
-            "absolute top-2 right-2 h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100",
+            "absolute top-2 right-2 h-8 w-8 transition-opacity focus-visible:opacity-100",
+            variant === "compact" ? "opacity-100" : "opacity-0 group-hover:opacity-100",
             isPinned && "opacity-100",
           )}
           aria-label={pinLabel}

@@ -90,7 +90,7 @@ export const NoteTitleSwitcher: React.FC<NoteTitleSwitcherProps> = ({
   const notesQuery = useNotes();
   const myNoteQuery = useMyNote({ enabled: isAuthed });
   const defaultNoteId = myNoteQuery.data?.id ?? null;
-  const { pinnedIds } = usePinnedNotes();
+  const { pinnedIds } = usePinnedNotes({ defaultNoteId });
 
   const location = useLocation();
   const activeNoteId = useMemo(

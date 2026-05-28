@@ -19,8 +19,16 @@ export function resolveNoteDisplayTitle(
   return trimmed.length > 0 ? trimmed : untitledLabel;
 }
 
+/**
+ * Sort key for the "all notes" section on `/notes`.
+ * `/notes` の「すべて」セクションの並び順。
+ */
 export type NoteListSort = "updated" | "title";
 
+/**
+ * Grouped note rows for `/notes` (pinned / recent / all).
+ * `/notes` 向けのノート行グループ（よく使う / 最近 / すべて）。
+ */
 export interface NoteListSections {
   /** Default note + user pins. / 既定ノートとユーザーピン */
   pinned: NoteSummary[];
