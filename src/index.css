@@ -218,6 +218,14 @@
    * Tiptap エディタ: 日本語主体の洗練タイポグラフィ
    * Spec: design_handoff_editor_typography/README.md
    * ============================================================ */
+  /* モバイル: 固定 Wiki Link 入力バー（およびキーボード持ち上げ分）の下に
+   * 本文末尾が隠れないよう padding-bottom を確保する。
+   * Mobile: reserve space below the document so the fixed Wiki Link bar
+   * (and lifted keyboard offset) do not cover the last editable line. */
+  .tiptap-editor-host[data-floating-bar-inset] .tiptap-editor {
+    padding-bottom: var(--editor-bottom-inset, 0px);
+  }
+
   .tiptap-editor {
     min-height: 200px;
     outline: none;
