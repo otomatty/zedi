@@ -24,6 +24,18 @@
   "creating": "Creating...",
   "createFailed": "Failed to create note",
   "sectionParticipating": "Notes you've joined",
+  "list": {
+    "sectionPinned": "Frequently used",
+    "sectionRecent": "Recent",
+    "sectionAll": "All notes",
+    "searchPlaceholder": "Search notes",
+    "sortTitle": "Title",
+    "noSearchResults": "No notes match your search.",
+    "pin": "Pin note",
+    "unpin": "Unpin note",
+    "pinned": "Pinned",
+    "pagesShort": "pages"
+  },
   "noNotesYet": "You haven't joined any notes yet.",
   "sectionPublic": "Public notes",
   "publicNotesPlaceholder": "A list of notes anyone can join and related UI will be implemented after spec is finalized.",
