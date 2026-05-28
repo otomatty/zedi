@@ -20,7 +20,7 @@ import { useTiptapEditorController } from "./TiptapEditor/useTiptapEditorControl
 import { useBubbleMenuWikiLink } from "./TiptapEditor/useBubbleMenuWikiLink";
 import { useEditorWikiLinkShortcuts } from "@/hooks/useEditorWikiLinkShortcuts";
 import { SlashAgentLoadingOverlay } from "./TiptapEditor/SlashAgentLoadingOverlay";
-import { useEditorFloatingBarBottomInset } from "./useEditorFloatingBarBottomInset";
+import { useVirtualKeyboardOffset } from "@/hooks/useVirtualKeyboardOffset";
 
 // Re-export types for consumers
 export type { ContentError } from "./TiptapEditor/useContentSanitizer";
@@ -57,7 +57,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const hasFloatingBar = !isReadOnly;
-  const editorBottomInsetPx = useEditorFloatingBarBottomInset(hasFloatingBar);
+  const keyboardOffset = useVirtualKeyboardOffset(isMobile && hasFloatingBar);
   const resolvedPlaceholder = placeholder ?? t("editor.startWritingPlaceholder");
   const {
     editor,
@@ -153,13 +153,12 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
         className,
         isDraggingOver && "ring-dashed ring-primary ring-2",
       )}
-      data-floating-bar-inset={hasFloatingBar && editorBottomInsetPx > 0 ? "" : undefined}
+      data-floating-bar-inset={isMobile && hasFloatingBar ? "" : undefined}
+      data-keyboard-open={isMobile && hasFloatingBar && keyboardOffset > 0 ? "" : undefined}
       style={
         {
           "--editor-font-size": `${editorFontSizePx}px`,
-          ...(editorBottomInsetPx > 0
-            ? { "--editor-bottom-inset": `${editorBottomInsetPx}px` }
-            : {}),
+          ...(isMobile && hasFloatingBar ? { "--keyboard-offset": `${keyboardOffset}px` } : {}),
         } as React.CSSProperties
       }
       onDragOver={handleDragOver}
