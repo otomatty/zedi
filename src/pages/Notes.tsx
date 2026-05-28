@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { NotesLayout } from "@/components/note/NotesLayout";
 import { useNotes, useCreateNote } from "@/hooks/useNoteQueries";
 import { useAuth } from "@/hooks/useAuth";
 import type { NoteEditPermission, NoteVisibility } from "@/types/note";
-import { NoteCard } from "@/components/note/NoteCard";
+import { NotesListView } from "@/components/note/NotesListView";
 import { NoteEditPermissionControls } from "@/components/note/NoteEditPermissionControls";
 import { allowedEditPermissions, visibilityKeys } from "@/lib/noteSettingsConfig";
 import { shouldConfirmPublicAnyLoggedInSave } from "@/lib/noteSharingRisk";
@@ -175,8 +175,6 @@ const Notes: React.FC = () => {
   const [visibility, setVisibility] = useState<NoteVisibility>("private");
   const [editPermission, setEditPermission] = useState<NoteEditPermission>("owner_only");
 
-  const sortedNotes = useMemo(() => [...notes].sort((a, b) => b.updatedAt - a.updatedAt), [notes]);
-
   const executeCreate = async () => {
     reopenCreateAfterPublicConfirmRef.current = false;
     try {
@@ -302,22 +300,7 @@ const Notes: React.FC = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <section className="mb-10">
-        <h2 className="text-foreground mb-4 text-lg font-medium">
-          {t("notes.sectionParticipating")}
-        </h2>
-        {isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
-        ) : sortedNotes.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("notes.noNotesYet")}</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {sortedNotes.map((note, index) => (
-              <NoteCard key={note.id} note={note} index={index} />
-            ))}
-          </div>
-        )}
-      </section>
+      <NotesListView notes={notes} isLoading={isLoading} />
     </NotesLayout>
   );
 };

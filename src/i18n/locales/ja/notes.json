@@ -24,6 +24,18 @@
   "creating": "作成中...",
   "createFailed": "ノートの作成に失敗しました",
   "sectionParticipating": "参加しているノート",
+  "list": {
+    "sectionPinned": "よく使う",
+    "sectionRecent": "最近",
+    "sectionAll": "すべて",
+    "searchPlaceholder": "ノートを検索",
+    "sortTitle": "タイトル順",
+    "noSearchResults": "該当するノートがありません。",
+    "pin": "ピン留め",
+    "unpin": "ピン留めを解除",
+    "pinned": "ピン留め済み",
+    "pagesShort": "ページ"
+  },
   "noNotesYet": "参加しているノートはまだありません。",
   "sectionPublic": "みんなのノート",
   "publicNotesPlaceholder": "誰でも参加できるノートの一覧や、様々な情報に触れられるUIは仕様検討後に実装予定です。",

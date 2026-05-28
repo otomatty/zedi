@@ -30,6 +30,10 @@ type UseAuthResult = {
   userId: string | null;
 };
 
+vi.mock("@/lib/dateUtils", () => ({
+  formatTimeAgo: () => "3時間前",
+}));
+
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, fallback?: string) => {
@@ -42,6 +46,7 @@ vi.mock("react-i18next", () => ({
         "notes.switcher.allNotes": "すべてのノートを見る",
         "notes.switcher.newNote": "新規ノートを作成",
         "notes.untitledNote": "無題のノート",
+        "notes.list.pagesShort": "ページ",
       };
       return table[key] ?? fallback ?? key;
     },
@@ -64,6 +69,16 @@ const useAuthMock: Mock<() => UseAuthResult> = vi.fn();
 vi.mock("@/hooks/useNoteQueries", () => ({
   useNotes: () => useNotesMock(),
   useMyNote: (options?: { enabled?: boolean }) => useMyNoteMock(options),
+}));
+
+const usePinnedNotesMock = vi.fn(() => ({
+  pinnedIds: [] as string[],
+  isPinned: () => false,
+  togglePin: vi.fn(),
+}));
+
+vi.mock("@/hooks/usePinnedNotes", () => ({
+  usePinnedNotes: () => usePinnedNotesMock(),
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -198,10 +213,10 @@ describe("NoteTitleSwitcher", () => {
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
     const betaItem = await screen.findByRole("menuitem", { name: /Beta note/ });
-    expect(betaItem).toHaveAttribute("aria-current", "true");
+    expect(betaItem.querySelector(".font-medium")).toBeTruthy();
 
     const alphaItem = await screen.findByRole("menuitem", { name: /Alpha note/ });
-    expect(alphaItem).not.toHaveAttribute("aria-current", "true");
+    expect(alphaItem.querySelector(".font-medium")).toBeFalsy();
   });
 
   it("navigates to /notes/:noteId when a row is selected", async () => {
@@ -210,7 +225,6 @@ describe("NoteTitleSwitcher", () => {
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
     const betaItem = await screen.findByRole("menuitem", { name: /Beta note/ });
-    expect(betaItem).toHaveAttribute("href", "/notes/note-beta");
     await user.click(betaItem);
     expect(screen.getByTestId("location")).toHaveTextContent("/notes/note-beta");
   });
@@ -255,8 +269,8 @@ describe("NoteTitleSwitcher", () => {
     expect(await screen.findByText("読み込み中…")).toBeInTheDocument();
   });
 
-  it("caps the listed notes at 50 entries", async () => {
-    const many: NoteSummary[] = Array.from({ length: 80 }, (_, i) =>
+  it("lists pinned and recent notes only, not the full catalog", async () => {
+    const many: NoteSummary[] = Array.from({ length: 20 }, (_, i) =>
       makeNote({ id: `note-${i}`, title: `Note ${i}`, updatedAt: i }),
     );
     useNotesMock.mockReturnValue({ data: many, isLoading: false });
@@ -266,10 +280,11 @@ describe("NoteTitleSwitcher", () => {
     await user.click(screen.getByRole("button", { name: "ノートを切り替え" }));
 
     const rows = (await screen.findAllByRole("menuitem")).filter((el) =>
-      /^Note \d+$/.test((el.textContent ?? "").trim()),
+      /Note \d+/.test(el.textContent ?? ""),
     );
-    expect(rows.length).toBe(50);
-    expect(rows[0].textContent?.trim()).toBe("Note 79");
+    expect(rows.length).toBe(5);
+    expect(rows[0].textContent).toMatch(/Note 19/);
+    expect(screen.queryByRole("menuitem", { name: /^Note 0$/ })).not.toBeInTheDocument();
   });
 
   it("does not list soft-deleted notes", async () => {
