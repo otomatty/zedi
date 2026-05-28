@@ -60,14 +60,14 @@ const TagFilterBarSection: React.FC = () => {
   };
 
   return (
-    <section className="border-border/60 rounded-lg border p-4">
+    <section className="border-border/60 rounded-lg border p-3 sm:p-4">
       <header className="mb-4 space-y-1">
         <h2 className="text-base font-semibold">{t("notes.filterBarSettings.title")}</h2>
         <p className="text-muted-foreground text-xs">{t("notes.filterBarSettings.description")}</p>
       </header>
 
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1 space-y-1">
           <Label htmlFor="tag-filter-bar-show-default" className="text-sm font-medium">
             {t("notes.filterBarSettings.showByDefault")}
           </Label>
@@ -80,6 +80,7 @@ const TagFilterBarSection: React.FC = () => {
           checked={showByDefault}
           onCheckedChange={setShowByDefault}
           disabled={!canManage}
+          className="shrink-0 self-start sm:self-center"
         />
       </div>
 
@@ -88,8 +89,12 @@ const TagFilterBarSection: React.FC = () => {
       </p>
 
       {canManage ? (
-        <div className="mt-4 flex justify-end">
-          <Button onClick={handleSave} disabled={updateNoteMutation.isPending || !isDirty}>
+        <div className="mt-4 flex sm:justify-end">
+          <Button
+            className="w-full sm:w-auto"
+            onClick={handleSave}
+            disabled={updateNoteMutation.isPending || !isDirty}
+          >
             {updateNoteMutation.isPending ? t("common.saving") : t("common.save")}
           </Button>
         </div>

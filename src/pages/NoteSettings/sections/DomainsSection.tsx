@@ -76,9 +76,9 @@ function DomainAccessAddForm({
     return t("notes.domainTabCreateFailedFreeEmail", { domain: inputError.domain });
   })();
   return (
-    <section className="border-border/60 space-y-3 rounded-lg border p-4">
+    <section className="border-border/60 space-y-3 rounded-lg border p-3 sm:p-4">
       <h3 className="text-sm font-semibold">{t("notes.domainTabAddHeading")}</h3>
-      <div className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_180px] md:grid-cols-[1fr_180px_auto]">
         <div className="flex flex-col gap-1">
           <Input
             value={domainInput}
@@ -102,7 +102,11 @@ function DomainAccessAddForm({
             <SelectItem value="editor">{t("notes.domainTabRoleEditor")}</SelectItem>
           </SelectContent>
         </Select>
-        <Button onClick={onAdd} disabled={isPending || !isValid}>
+        <Button
+          className="w-full sm:col-span-2 md:col-span-1 md:w-auto"
+          onClick={onAdd}
+          disabled={isPending || !isValid}
+        >
           {t("notes.domainTabAdd")}
         </Button>
       </div>
