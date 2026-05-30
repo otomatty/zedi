@@ -13,6 +13,17 @@ import { runStaleRule } from "./rules/stale.js";
 export type { LintFindingCandidate, LintRuleResult } from "./types.js";
 
 /**
+ * 未解決 findings 取得時の防御的上限。バックログが膨大なユーザーでも、無制限の
+ * 結果セットをメモリに読み込まないようにするための安全弁（ページネーションでは
+ * なくハードキャップ）。通常の利用では到達しない十分大きな値を設定する。
+ *
+ * Defensive cap for unresolved-finding queries — a hard safety bound (not
+ * pagination) so a user with a large backlog cannot pull an unbounded result
+ * set into memory. Set high enough that normal usage never hits it.
+ */
+export const DEFAULT_LINT_FINDINGS_LIMIT = 500;
+
+/**
  * 全 Lint ルールを実行し、結果を lint_findings テーブルに保存する。
  * 実行前に未解決の findings をクリアし、最新の結果のみを保持する。
  *
@@ -86,7 +97,8 @@ export async function getUnresolvedFindings(ownerId: string, db: Database) {
     .select()
     .from(lintFindings)
     .where(and(eq(lintFindings.ownerId, ownerId), isNull(lintFindings.resolvedAt)))
-    .orderBy(lintFindings.createdAt);
+    .orderBy(lintFindings.createdAt)
+    .limit(DEFAULT_LINT_FINDINGS_LIMIT);
 }
 
 /**
@@ -109,7 +121,8 @@ export async function getFindingsForPage(ownerId: string, pageId: string, db: Da
         sql`${pageId} = ANY(${lintFindings.pageIds})`,
       ),
     )
-    .orderBy(lintFindings.createdAt);
+    .orderBy(lintFindings.createdAt)
+    .limit(DEFAULT_LINT_FINDINGS_LIMIT);
 }
 
 /**
