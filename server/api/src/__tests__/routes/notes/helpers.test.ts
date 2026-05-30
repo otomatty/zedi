@@ -2,11 +2,13 @@
  * `routes/notes/helpers.ts` の `getNoteRole` ロジックテスト。
  *
  * Unit tests for the role-resolution order implemented in `helpers.ts`
- * (issue #663). The mock DB from `setup.ts` returns results by call order,
- * so each query consumes one slot:
- *   1. findActiveNoteById
- *   2. noteMembers lookup (when email present)
- *   3. noteDomainAccess lookup (when no member match)
+ * (issue #663). `getNoteRole` は note 行・メンバーロール・ドメインロールを
+ * 1 クエリ（相関サブクエリ）で取得するため、モック DB は 1 スロットだけを
+ * 消費する: `[{ note, memberRole, domainRole }]`。
+ *
+ * `getNoteRole` resolves the note row plus the caller's member/domain roles in
+ * a single query (correlated subqueries), so the mock DB consumes exactly one
+ * slot: `[{ note, memberRole, domainRole }]`.
  *
  * 解決順: owner > member > domain access > visibility > none.
  */
@@ -60,7 +62,33 @@ function mockNoteRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * `getNoteRole` が消費する combined 行を組み立てる。note 列はフラットに展開し、
+ * memberRole / domainRole を併せ持つ（本番クエリの select 形に合わせる）。
+ * Builds the combined row consumed by `getNoteRole`: note columns are flattened
+ * with memberRole / domainRole alongside them, matching the production select.
+ */
+function mockRoleRow(
+  overrides: {
+    note?: Record<string, unknown>;
+    memberRole?: "viewer" | "editor" | null;
+    domainRole?: "viewer" | "editor" | null;
+  } = {},
+) {
+  return {
+    ...mockNoteRow(overrides.note ?? {}),
+    memberRole: overrides.memberRole ?? null,
+    domainRole: overrides.domainRole ?? null,
+  };
+}
+
 describe("getNoteRole — resolution order (issue #663)", () => {
+  it("issues a single DB round trip", async () => {
+    const { db, chains } = createMockDb([[mockRoleRow()]]);
+    await getNoteRole(NOTE_ID, VISITOR_ID, VISITOR_EMAIL, db as unknown as Database);
+    expect(chains.length).toBe(1);
+  });
+
   it("returns null role when the note does not exist", async () => {
     const { db } = createMockDb([[]]);
     const result = await getNoteRole(NOTE_ID, VISITOR_ID, VISITOR_EMAIL, db as unknown as Database);
@@ -68,8 +96,10 @@ describe("getNoteRole — resolution order (issue #663)", () => {
     expect(result.role).toBeNull();
   });
 
-  it("returns 'owner' when caller owns the note (short-circuits later checks)", async () => {
-    const { db } = createMockDb([[mockNoteRow()]]);
+  it("returns 'owner' when caller owns the note (outranks member/domain)", async () => {
+    // owner はメンバー / ドメインのロールが乗っていても最優先で勝つ。
+    // Owner wins even if member/domain roles are also present on the row.
+    const { db } = createMockDb([[mockRoleRow({ memberRole: "editor", domainRole: "editor" })]]);
     const result = await getNoteRole(
       NOTE_ID,
       OWNER_ID,
@@ -80,79 +110,49 @@ describe("getNoteRole — resolution order (issue #663)", () => {
   });
 
   it("returns member role when the caller is an accepted member (wins over domain rule)", async () => {
-    // owner > member の後、member にヒットしたら domain のチェックはしない。
-    // After the member hit, the domain query must not fire (member > domain).
+    // member にヒットしたら domain より優先される（明示的に昇格済み）。
+    // A member match outranks any domain rule.
     const { db } = createMockDb([
-      [mockNoteRow()],
-      [{ role: "editor" }], // noteMembers → accepted editor
+      [mockRoleRow({ note: { ownerId: OWNER_ID }, memberRole: "editor", domainRole: "viewer" })],
     ]);
     const result = await getNoteRole(NOTE_ID, VISITOR_ID, VISITOR_EMAIL, db as unknown as Database);
     expect(result.role).toBe("editor");
   });
 
-  it("returns domain role when member check is empty and a rule matches", async () => {
-    // member 無し → domain ルールでヒット。editor として返る。
-    // No member, but a domain rule matches — returns editor.
-    const { db } = createMockDb([
-      [mockNoteRow()],
-      [], // noteMembers → empty
-      [{ role: "editor" }], // noteDomainAccess → editor rule
-    ]);
+  it("returns domain role when there is no member match", async () => {
+    // member 無し → domain ロール（SQL 側で最強ロールを集約済み）を返す。
+    // No member; returns the domain role (strongest role aggregated in SQL).
+    const { db } = createMockDb([[mockRoleRow({ memberRole: null, domainRole: "editor" })]]);
     const result = await getNoteRole(NOTE_ID, VISITOR_ID, VISITOR_EMAIL, db as unknown as Database);
     expect(result.role).toBe("editor");
   });
 
-  it("picks the strongest domain role when multiple rules match (editor > viewer)", async () => {
-    const { db } = createMockDb([
-      [mockNoteRow()],
-      [], // noteMembers → empty
-      [{ role: "viewer" }, { role: "editor" }], // multiple rules
-    ]);
+  it("returns the viewer domain role when that is the strongest match", async () => {
+    const { db } = createMockDb([[mockRoleRow({ memberRole: null, domainRole: "viewer" })]]);
     const result = await getNoteRole(NOTE_ID, VISITOR_ID, VISITOR_EMAIL, db as unknown as Database);
-    expect(result.role).toBe("editor");
-  });
-
-  it("matches the domain case-insensitively via the normalized email", async () => {
-    // `visitor@EXAMPLE.COM` でもルールに一致する。
-    // Upper-cased email domains must still resolve.
-    const { db } = createMockDb([
-      [mockNoteRow()],
-      [], // noteMembers → empty
-      [{ role: "viewer" }],
-    ]);
-    const result = await getNoteRole(
-      NOTE_ID,
-      VISITOR_ID,
-      "visitor@EXAMPLE.COM",
-      db as unknown as Database,
-    );
     expect(result.role).toBe("viewer");
   });
 
   it("falls through to 'guest' for public notes when no member or domain match", async () => {
-    const { db } = createMockDb([
-      [mockNoteRow({ visibility: "public" })],
-      [], // noteMembers → empty
-      [], // noteDomainAccess → empty
-    ]);
+    const { db } = createMockDb([[mockRoleRow({ note: { visibility: "public" } })]]);
+    const result = await getNoteRole(NOTE_ID, VISITOR_ID, VISITOR_EMAIL, db as unknown as Database);
+    expect(result.role).toBe("guest");
+  });
+
+  it("falls through to 'guest' for unlisted notes", async () => {
+    const { db } = createMockDb([[mockRoleRow({ note: { visibility: "unlisted" } })]]);
     const result = await getNoteRole(NOTE_ID, VISITOR_ID, VISITOR_EMAIL, db as unknown as Database);
     expect(result.role).toBe("guest");
   });
 
   it("returns null for private notes when nothing matches", async () => {
-    const { db } = createMockDb([
-      [mockNoteRow()],
-      [], // noteMembers → empty
-      [], // noteDomainAccess → empty
-    ]);
+    const { db } = createMockDb([[mockRoleRow()]]);
     const result = await getNoteRole(NOTE_ID, VISITOR_ID, VISITOR_EMAIL, db as unknown as Database);
     expect(result.role).toBeNull();
   });
 
-  it("skips member/domain checks when email is missing (still returns guest for public)", async () => {
-    // email 無しだと member / domain の問い合わせを発行しない。
-    // Without an email, skip member and domain queries entirely.
-    const { db } = createMockDb([[mockNoteRow({ visibility: "public" })]]);
+  it("returns guest for public notes even when the email is missing", async () => {
+    const { db } = createMockDb([[mockRoleRow({ note: { visibility: "public" } })]]);
     const result = await getNoteRole(NOTE_ID, VISITOR_ID, undefined, db as unknown as Database);
     expect(result.role).toBe("guest");
   });
