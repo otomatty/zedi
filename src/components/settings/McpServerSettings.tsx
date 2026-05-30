@@ -22,8 +22,14 @@ import { isValidMcpServerConfig, normalizeImportedConfig } from "@/lib/mcpServer
 export const McpServerSettings: React.FC = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const { servers, addServer, removeServer, updateServer, toggleServer, importServers } =
-    useMcpConfigStore();
+  // 個別セレクタで購読し、servers 変更時のみ再レンダリングする（アクションは安定参照）。
+  // Subscribe via individual selectors so only `servers` changes trigger a re-render.
+  const servers = useMcpConfigStore((s) => s.servers);
+  const addServer = useMcpConfigStore((s) => s.addServer);
+  const removeServer = useMcpConfigStore((s) => s.removeServer);
+  const updateServer = useMcpConfigStore((s) => s.updateServer);
+  const toggleServer = useMcpConfigStore((s) => s.toggleServer);
+  const importServers = useMcpConfigStore((s) => s.importServers);
 
   const [formOpen, setFormOpen] = useState(false);
   const [formSessionKey, setFormSessionKey] = useState(0);
