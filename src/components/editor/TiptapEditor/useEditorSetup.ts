@@ -18,7 +18,21 @@ import type { TagSuggestionHandle } from "../extensions/TagSuggestion";
 import type { SlashSuggestionHandle } from "./SlashSuggestionLayer";
 import { createEditorExtensions, defaultEditorProps } from "./editorConfig";
 import type { TiptapEditorProps } from "./types";
+import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import i18n from "@/i18n";
+
+/**
+ * `onChange` を発火するまでの待機時間（ms）。連続入力中の document 全体の
+ * `JSON.stringify` と親コンポーネントの再レンダリングを 1 タイプごとから
+ * 入力が落ち着いたタイミングへ間引く。本文の永続化は協調編集 (Yjs) 経由で
+ * 別途行われるため、この遅延は派生用途（AI 文脈・エクスポート）にのみ影響する。
+ *
+ * Debounce window (ms) before emitting `onChange`. Collapses the per-keystroke
+ * full-document `JSON.stringify` + parent re-render into one fire after typing
+ * settles. Content persistence happens separately via Yjs collaboration, so
+ * this delay only affects derived consumers (AI context, export).
+ */
+const CONTENT_CHANGE_DEBOUNCE_MS = 300;
 
 /**
  * Keeps latest `workspaceRoot` in a ref without re-running `useEditor` (Issue #461).
@@ -164,6 +178,15 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
   const workspaceRootRef = useWorkspaceRootRef(workspaceRoot);
   const noteIdRef = useNoteIdRef(noteId);
 
+  // 入力が落ち着いてから最新の document を一度だけシリアライズして通知する。
+  // editorRef は常に最新エディタを指すため、debounce 発火時点の内容を読む。
+  // Serialize the latest document once after typing settles. `editorRef`
+  // always points at the current editor, so we read its content at fire time.
+  const emitContentChange = useDebouncedCallback(() => {
+    const ed = editorRef.current;
+    if (ed) onChange(JSON.stringify(ed.getJSON()));
+  }, CONTENT_CHANGE_DEBOUNCE_MS);
+
   const editor = useEditor(
     {
       /* eslint-disable react-hooks/refs -- createEditorExtensions runs at render but refs are only read in ProseMirror/Tiptap handlers (not during render) */
@@ -237,7 +260,7 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
           if (JSON.stringify(editor.getJSON()).length <= 50) return;
           isEditorInitializedRef.current = true;
         }
-        onChange(JSON.stringify(editor.getJSON()));
+        emitContentChange();
       },
       onCreate: () => {
         if (initialParsedContent) isEditorInitializedRef.current = true;

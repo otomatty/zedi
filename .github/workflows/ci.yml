@@ -192,6 +192,11 @@ jobs:
     # for a follow-up PR rather than risking a noisy first integration.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
+    # ブラウザ DL / apt が CI ネットワークの不調で停滞しても既定の 6h 待たずに
+    # 失敗させ、install ステップのリトライへ倒すためジョブ全体に上限を設ける。
+    # Cap the whole job so a stalled browser/apt download fails fast (letting the
+    # install step's retry kick in) instead of hanging for the default 6h.
+    timeout-minutes: 20
     steps:
       - name: Checkout (with retry)
         uses: Wandalen/wretry.action@v3
@@ -203,9 +208,19 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
 
       # Playwright のブラウザバイナリ + 必要な OS 依存を入れる。
-      # Install Playwright's browser binaries plus the matching OS deps.
-      - name: Install Playwright browsers
-        run: bunx playwright install --with-deps chromium
+      # ネットワーク起因の停滞に備え、各試行を `timeout` で打ち切りつつ最大 3 回
+      # リトライする（既存の checkout と同じ wretry.action を使用）。停滞した試行
+      # はハングのまま終わらないため、`timeout` で非ゼロ終了させてリトライを促す。
+      # Install Playwright's browser binaries plus the matching OS deps. Guard
+      # against network stalls: bound each attempt with `timeout` (so a hung
+      # download exits non-zero and triggers a retry) and retry up to 3 times
+      # via the same wretry.action used for checkout above.
+      - name: Install Playwright browsers (with retry)
+        uses: Wandalen/wretry.action@v3
+        with:
+          command: timeout 300 bunx playwright install --with-deps chromium
+          attempt_limit: 3
+          attempt_delay: 10000
 
       - name: Run PDF knowledge E2E
         run: bunx playwright test e2e/pdf-knowledge.spec.ts

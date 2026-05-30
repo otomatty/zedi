@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 /**
  * 共通ヘッダーの中央スロットに、ページ固有のアクションをポータル風に
@@ -42,12 +42,18 @@ export function HeaderActionsProvider({ children }: { children: ReactNode }) {
   const setLeftSlot = useCallback((el: HTMLElement | null) => setLeftSlotState(el), []);
   const setRightSlot = useCallback((el: HTMLElement | null) => setRightSlotState(el), []);
 
-  const value: HeaderActionsContextValue = {
-    leftSlot,
-    rightSlot,
-    setLeftSlot,
-    setRightSlot,
-  };
+  // value をメモ化し、スロット要素が変わったときだけ参照を更新する。
+  // Memoize so consumers only re-render when a slot element actually changes
+  // (the setters are stable via useCallback).
+  const value = useMemo<HeaderActionsContextValue>(
+    () => ({
+      leftSlot,
+      rightSlot,
+      setLeftSlot,
+      setRightSlot,
+    }),
+    [leftSlot, rightSlot, setLeftSlot, setRightSlot],
+  );
 
   return <HeaderActionsContext.Provider value={value}>{children}</HeaderActionsContext.Provider>;
 }

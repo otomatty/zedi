@@ -1,4 +1,4 @@
-import { createContext, useRef, useContext, useState, type ReactNode } from "react";
+import { createContext, useRef, useContext, useState, useMemo, type ReactNode } from "react";
 import { PageContext } from "../types/aiChat";
 
 interface AIChatContextValue {
@@ -24,18 +24,20 @@ export function AIChatProvider({ children }: { children: ReactNode }) {
   const contentAppendHandlerRef = useRef<((nextContent: string) => void) | null>(null);
   const insertAtCursorRef = useRef<((markdown: string) => boolean) | null>(null);
 
-  return (
-    <AIChatContext.Provider
-      value={{
-        pageContext,
-        setPageContext,
-        contentAppendHandlerRef,
-        insertAtCursorRef,
-      }}
-    >
-      {children}
-    </AIChatContext.Provider>
+  // value をメモ化し、pageContext が変わったときだけ参照を更新する。
+  // Memoize the context value so descendants only re-render when pageContext
+  // actually changes (refs and setPageContext are stable across renders).
+  const value = useMemo<AIChatContextValue>(
+    () => ({
+      pageContext,
+      setPageContext,
+      contentAppendHandlerRef,
+      insertAtCursorRef,
+    }),
+    [pageContext],
   );
+
+  return <AIChatContext.Provider value={value}>{children}</AIChatContext.Provider>;
 }
 
 /**

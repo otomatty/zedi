@@ -148,8 +148,9 @@ describe("GET /api/notes/:noteId/search", () => {
     // Any resolved member role allows searching, even on a private note.
     const privateNote = createMockNote({ ownerId: OTHER_USER_ID, visibility: "private" });
     const { app, chains } = createTestApp([
-      [privateNote], // findActiveNoteById
-      [{ role: "viewer" }], // member check matches
+      // getNoteRole: 1 クエリで note 列 + memberRole/domainRole を返す。
+      // getNoteRole resolves the note row + member/domain roles in one query.
+      [{ ...privateNote, memberRole: "viewer", domainRole: null }],
       { rows: [] }, // execute search
     ]);
 
@@ -171,9 +172,9 @@ describe("GET /api/notes/:noteId/search", () => {
     // they are allowed to search. Mirrors `GET /:noteId/pages` semantics.
     const publicNote = createMockNote({ ownerId: OTHER_USER_ID, visibility: "public" });
     const { app } = createTestApp([
-      [publicNote], // findActiveNoteById
-      [], // member check
-      [], // domain access → empty, falls through to visibility=public → guest
+      // getNoteRole: member/domain なし → visibility=public で guest に解決。
+      // No member/domain → falls through to visibility=public → guest.
+      [{ ...publicNote, memberRole: null, domainRole: null }],
       { rows: [] }, // execute search
     ]);
 
