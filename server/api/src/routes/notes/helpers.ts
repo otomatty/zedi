@@ -182,21 +182,32 @@ export async function getNoteRole(
   // (editor > viewer) in SQL. Resolution order (#663) is applied in JS below.
   //
   // メンバーは大文字小文字を区別せず突合する（古い行や手動挿入を取りこぼさない）。
-  // email / domain が空ならサブクエリは何にも一致せず null を返す。
-  // Members match case-insensitively (covers legacy/manual rows). When the
-  // email/domain is empty the subqueries match nothing and yield null.
-  const rows = await db
-    .select({
-      ...getTableColumns(notes),
-      memberRole: sql<NoteMemberRole | null>`(
+  // email が無い場合は member サブクエリを実行せず NULL を返す。これにより
+  // `member_email = ''` の空メール行への偶発的一致で匿名アクセスが付与される
+  // のを防ぎ（旧実装は email 無し時に member/domain チェックを丸ごとスキップ
+  // していた）、不要なサブクエリ実行も避ける。domain も同様に抽出できなければ
+  // 実行しない。
+  //
+  // Members match case-insensitively (covers legacy/manual rows). When there is
+  // no email we emit a literal NULL instead of running the member subquery: this
+  // prevents an empty-string match against a blank `member_email` row from
+  // granting anonymous access (the previous implementation skipped member/domain
+  // checks entirely when the email was empty) and avoids a needless subquery.
+  // The domain subquery is likewise skipped when no domain can be extracted.
+  const memberRoleExpr =
+    normalizedEmail.length > 0
+      ? sql<NoteMemberRole | null>`(
         SELECT ${noteMembers.role} FROM ${noteMembers}
         WHERE ${noteMembers.noteId} = ${noteId}
           AND LOWER(${noteMembers.memberEmail}) = ${normalizedEmail}
           AND ${noteMembers.isDeleted} = false
           AND ${noteMembers.status} = 'accepted'
         LIMIT 1
-      )`,
-      domainRole: sql<NoteMemberRole | null>`(
+      )`
+      : sql<NoteMemberRole | null>`NULL`;
+
+  const domainRoleExpr = domain
+    ? sql<NoteMemberRole | null>`(
         SELECT CASE
           WHEN bool_or(${noteDomainAccess.role} = 'editor') THEN 'editor'
           WHEN count(*) > 0 THEN 'viewer'
@@ -206,7 +217,14 @@ export async function getNoteRole(
         WHERE ${noteDomainAccess.noteId} = ${noteId}
           AND ${noteDomainAccess.domain} = ${domain}
           AND ${noteDomainAccess.isDeleted} = false
-      )`,
+      )`
+    : sql<NoteMemberRole | null>`NULL`;
+
+  const rows = await db
+    .select({
+      ...getTableColumns(notes),
+      memberRole: memberRoleExpr,
+      domainRole: domainRoleExpr,
     })
     .from(notes)
     .where(and(eq(notes.id, noteId), eq(notes.isDeleted, false)))
@@ -220,9 +238,13 @@ export async function getNoteRole(
   // 1. owner
   if (userId && note.ownerId === userId) return { role: "owner", note };
   // 2. member（domain より強い: 明示的に昇格済み）/ member outranks domain
-  if (memberRole) return { role: memberRole, note };
+  //    email が無い呼び出しでは member ロールを採用しない（多層防御。SQL 側でも
+  //    サブクエリを実行しないが、空メール行による偶発的な権限付与を二重に防ぐ）。
+  //    Never honor a member role for an email-less caller (defense in depth: the
+  //    SQL also skips the subquery, but this double-guards against blank rows).
+  if (normalizedEmail.length > 0 && memberRole) return { role: memberRole, note };
   // 3. domain access（editor > viewer は SQL 側で集約済み）/ domain rule
-  if (domainRole) return { role: domainRole, note };
+  if (domain && domainRole) return { role: domainRole, note };
   // 4. visibility
   if (note.visibility === "public" || note.visibility === "unlisted") {
     return { role: "guest", note };

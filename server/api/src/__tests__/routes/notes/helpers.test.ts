@@ -156,4 +156,14 @@ describe("getNoteRole — resolution order (issue #663)", () => {
     const result = await getNoteRole(NOTE_ID, VISITOR_ID, undefined, db as unknown as Database);
     expect(result.role).toBe("guest");
   });
+
+  it("never grants a member role to an email-less caller on a private note", async () => {
+    // 多層防御: email 無しの呼び出しでは、たとえ行に member ロールが乗っていても
+    // （空メール行への偶発一致など）採用せず private は null のままにする。
+    // Defense in depth: an email-less caller must not be granted access via a
+    // member role on the row (e.g. an accidental blank-email match).
+    const { db } = createMockDb([[mockRoleRow({ memberRole: "editor", domainRole: "editor" })]]);
+    const result = await getNoteRole(NOTE_ID, VISITOR_ID, undefined, db as unknown as Database);
+    expect(result.role).toBeNull();
+  });
 });
