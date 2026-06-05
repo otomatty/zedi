@@ -10,6 +10,7 @@ import * as Y from "yjs";
 
 import { createMockDb } from "../createMockDb.js";
 import { propagateTitleRename } from "../../services/titleRenamePropagationService.js";
+import { links, ghostLinks, pageContents, pages } from "../../schema/index.js";
 
 /**
  * page_contents 行に入っているようなバイナリ Y.Doc を生成するヘルパー。
@@ -111,6 +112,73 @@ const OWNER_ID = "owner-user-1";
 
 /** Default scope result: personal page owned by OWNER_ID. 個人ページ既定スコープ。 */
 const PERSONAL_SCOPE_ROW = [{ noteId: null, ownerId: OWNER_ID }];
+
+/**
+ * 並列バッチ検証用の意味ベース DB モック。`createMockDb` は呼び出し順に結果を
+ * 返すため、複数ソースを並列処理するとクエリがインターリーブして対応が崩れる。
+ * このモックは `.from(table)` で結果を決めるため順序非依存で、`execute`
+ * （FOR UPDATE）はソース順の呼び出し index で制御できる。
+ *
+ * Order-independent DB mock for the parallel batch path. Results are keyed by
+ * the queried table (not call order), so concurrent interleaving is fine. The
+ * `execute` (FOR UPDATE) call is delegated to `onExecute(callIndex)` — call
+ * order equals source order, which lets tests fail or gate a specific source.
+ */
+function createParallelRenameDb(config: {
+  sourceIds: string[];
+  makePageContentsRow: () => Array<Record<string, unknown>>;
+  scopeRow: Array<Record<string, unknown>>;
+  ghostCandidates: Array<Record<string, unknown>>;
+  onExecute: (callIndex: number) => Promise<unknown>;
+}) {
+  let executeCalls = 0;
+
+  function resolveByTable(table: unknown): unknown {
+    if (table === links) return config.sourceIds.map((id) => ({ sourceId: id }));
+    if (table === pageContents) return config.makePageContentsRow();
+    if (table === pages) return config.scopeRow;
+    if (table === ghostLinks) return config.ghostCandidates;
+    return [];
+  }
+
+  function makeSelectChain() {
+    let table: unknown = null;
+    const chain: Record<string, unknown> = {};
+    for (const m of ["where", "limit", "innerJoin", "leftJoin", "orderBy", "groupBy", "offset"]) {
+      chain[m] = () => chain;
+    }
+    chain.from = (t: unknown) => {
+      table = t;
+      return chain;
+    };
+    chain.then = (resolve?: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve(resolveByTable(table)).then(resolve, reject);
+    return chain;
+  }
+
+  function makeWriteChain() {
+    const chain: Record<string, unknown> = {};
+    for (const m of ["set", "where", "values", "onConflictDoNothing", "returning"]) {
+      chain[m] = () => chain;
+    }
+    chain.then = (resolve?: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve([]).then(resolve, reject);
+    return chain;
+  }
+
+  const db: Record<string, unknown> = {
+    select: () => makeSelectChain(),
+    update: () => makeWriteChain(),
+    insert: () => makeWriteChain(),
+    delete: () => makeWriteChain(),
+    execute: () => config.onExecute(executeCalls++),
+    transaction: (fn: (tx: unknown) => Promise<unknown>) => fn(db),
+  };
+  return db;
+}
+
+/** マクロタスク境界まで進めて保留中の microtask を全て流す。 / Flush microtasks. */
+const flushTasks = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("propagateTitleRename", () => {
   it("returns a zero result and skips all DB work when oldTitle or newTitle is missing", async () => {
@@ -452,5 +520,80 @@ describe("propagateTitleRename", () => {
       expect(titles[PAGE_ID]).toBe("Bar");
       expect(titles[OTHER_TARGET_ID]).toBe("Foo");
     }
+  });
+
+  it("rewrites multiple source pages in parallel and stays best-effort on failure", async () => {
+    // 3 ソースを並列処理。FOR UPDATE の 2 回目（= 2 番目のソース）だけ失敗させ、
+    // 残り 2 件は成功し、集計とゴースト昇格が回帰なく動くことを検証する。
+    // Three sources processed in parallel; only the 2nd FOR UPDATE (2nd source)
+    // fails. The other two succeed, counts aggregate, and ghost promotion runs.
+    const invalidate = vi.fn().mockResolvedValue(undefined);
+    const db = createParallelRenameDb({
+      sourceIds: ["src-a", "src-b", "src-c"],
+      makePageContentsRow: () => [
+        { pageId: "src-x", ydocState: makeYdocWithWikiLink("Foo"), version: 1 },
+      ],
+      scopeRow: PERSONAL_SCOPE_ROW,
+      ghostCandidates: [],
+      // execute 呼び出しはソース順。index 1（2 番目）だけロック失敗させる。
+      onExecute: (i) => (i === 1 ? Promise.reject(new Error("lock failed")) : Promise.resolve([])),
+    });
+
+    const result = await propagateTitleRename(db as never, PAGE_ID, "Foo", "Bar", {
+      invalidateDocument: invalidate,
+    });
+
+    expect(result.sourcePagesAttempted).toBe(3);
+    expect(result.sourcePagesSucceeded).toBe(2);
+    expect(result.sourcePagesFailed).toBe(1);
+    // 各成功ソースが 1 マークを書き換え、合算される。 / counts aggregate across sources.
+    expect(result.wikiLinkMarksUpdated).toBe(2);
+    expect(result.wikiLinkTextUpdated).toBe(2);
+    // 成功した 2 ソース分だけ invalidate される。 / only successful sources invalidate.
+    expect(invalidate).toHaveBeenCalledTimes(2);
+    // ゴースト昇格は失敗に関係なく実行される（候補ゼロなので 0）。
+    expect(result.ghostPromotionsCount).toBe(0);
+  });
+
+  it("bounds concurrency to SOURCE_REWRITE_CONCURRENCY (8) across source pages", async () => {
+    // 10 ソースを投入。FOR UPDATE を手動ゲートで保留させ、最初のチャンクで
+    // 同時に走るのが最大 8 件であること（= 8 件だけ execute が発火）を検証する。
+    // 10 sources with manually-gated FOR UPDATE: assert at most 8 run before the
+    // first batch resolves, proving the bound, then drain and assert all succeed.
+    const invalidate = vi.fn().mockResolvedValue(undefined);
+    const gates: Array<() => void> = [];
+    const db = createParallelRenameDb({
+      sourceIds: Array.from({ length: 10 }, (_, i) => `src-${i}`),
+      makePageContentsRow: () => [
+        { pageId: "src-x", ydocState: makeYdocWithWikiLink("Foo"), version: 1 },
+      ],
+      scopeRow: PERSONAL_SCOPE_ROW,
+      ghostCandidates: [],
+      onExecute: () =>
+        new Promise((resolve) => {
+          gates.push(() => resolve([]));
+        }),
+    });
+
+    const pending = propagateTitleRename(db as never, PAGE_ID, "Foo", "Bar", {
+      invalidateDocument: invalidate,
+    });
+
+    // 最初のチャンク (8 件) のみが in-flight。 / Only the first chunk of 8 has started.
+    await flushTasks();
+    expect(gates.length).toBe(8);
+
+    // 1 チャンク目を解放すると 2 チャンク目 (残り 2 件) が走る。
+    gates.splice(0, 8).forEach((open) => open());
+    await flushTasks();
+    expect(gates.length).toBe(2);
+
+    gates.splice(0, 2).forEach((open) => open());
+    const result = await pending;
+
+    expect(result.sourcePagesAttempted).toBe(10);
+    expect(result.sourcePagesSucceeded).toBe(10);
+    expect(result.sourcePagesFailed).toBe(0);
+    expect(invalidate).toHaveBeenCalledTimes(10);
   });
 });

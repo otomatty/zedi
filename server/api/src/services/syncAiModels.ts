@@ -189,33 +189,38 @@ async function syncOneProvider(
   const [maxRow] = await db
     .select({ maxOrder: sql<number>`coalesce(max(${aiModels.sortOrder}), -1)` })
     .from(aiModels);
-  let nextSortOrder = Number(maxRow?.maxOrder ?? -1) + 1;
+  const nextSortOrder = Number(maxRow?.maxOrder ?? -1) + 1;
 
+  // 既存 ID を除いた新規行を 1 回のマルチバリュー INSERT でまとめて投入する。
+  // sortOrder は max+1 から index で事前採番する。`existingIds` で除外済みのため
+  // onConflict はほぼ発生せず、仮にスキップで連番にギャップが生じても sortOrder
+  // は表示順（orderBy）にしか使われないため無害。
+  //
+  // Insert all new rows (those not already present) in a single multi-value
+  // INSERT, pre-assigning sortOrder by index from max+1. Conflicts are
+  // unlikely since existing IDs are filtered out, and any gap from a skipped
+  // conflict is harmless because sortOrder only feeds display ordering.
+  const newRows = rows.filter((row) => !existingIds.has(row.id));
   let upserted = 0;
-  for (const row of rows) {
-    if (existingIds.has(row.id)) continue;
-
-    const isActive = isSonnetModel(row.provider, row.modelId) ? false : row.isActive;
+  if (newRows.length > 0) {
+    const values = newRows.map((row, idx) => ({
+      id: row.id,
+      provider: row.provider,
+      modelId: row.modelId,
+      displayName: row.displayName,
+      tierRequired: row.tierRequired,
+      inputCostUnits: row.inputCostUnits,
+      outputCostUnits: row.outputCostUnits,
+      isActive: isSonnetModel(row.provider, row.modelId) ? false : row.isActive,
+      sortOrder: nextSortOrder + idx,
+    }));
 
     const inserted = await db
       .insert(aiModels)
-      .values({
-        id: row.id,
-        provider: row.provider,
-        modelId: row.modelId,
-        displayName: row.displayName,
-        tierRequired: row.tierRequired,
-        inputCostUnits: row.inputCostUnits,
-        outputCostUnits: row.outputCostUnits,
-        isActive,
-        sortOrder: nextSortOrder,
-      })
+      .values(values)
       .onConflictDoNothing({ target: aiModels.id })
       .returning({ id: aiModels.id });
-    if (inserted.length > 0) {
-      upserted += 1;
-      nextSortOrder += 1;
-    }
+    upserted = inserted.length;
   }
 
   const fetchedIds = rows.map((row) => row.id);
