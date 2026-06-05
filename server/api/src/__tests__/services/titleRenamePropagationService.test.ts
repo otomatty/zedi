@@ -555,10 +555,10 @@ describe("propagateTitleRename", () => {
     expect(result.ghostPromotionsCount).toBe(0);
   });
 
-  it("bounds concurrency to SOURCE_REWRITE_CONCURRENCY (8) across source pages", async () => {
+  it("bounds concurrency to SOURCE_REWRITE_CONCURRENCY (4) across source pages", async () => {
     // 10 ソースを投入。FOR UPDATE を手動ゲートで保留させ、最初のチャンクで
-    // 同時に走るのが最大 8 件であること（= 8 件だけ execute が発火）を検証する。
-    // 10 sources with manually-gated FOR UPDATE: assert at most 8 run before the
+    // 同時に走るのが最大 4 件であること（= 4 件だけ execute が発火）を検証する。
+    // 10 sources with manually-gated FOR UPDATE: assert at most 4 run before the
     // first batch resolves, proving the bound, then drain and assert all succeed.
     const invalidate = vi.fn().mockResolvedValue(undefined);
     const gates: Array<() => void> = [];
@@ -579,12 +579,17 @@ describe("propagateTitleRename", () => {
       invalidateDocument: invalidate,
     });
 
-    // 最初のチャンク (8 件) のみが in-flight。 / Only the first chunk of 8 has started.
+    // 最初のチャンク (4 件) のみが in-flight。 / Only the first chunk of 4 has started.
     await flushTasks();
-    expect(gates.length).toBe(8);
+    expect(gates.length).toBe(4);
 
-    // 1 チャンク目を解放すると 2 チャンク目 (残り 2 件) が走る。
-    gates.splice(0, 8).forEach((open) => open());
+    // 1 チャンク目を解放すると 2 チャンク目 (4 件) が走る。
+    gates.splice(0, 4).forEach((open) => open());
+    await flushTasks();
+    expect(gates.length).toBe(4);
+
+    // 2 チャンク目を解放すると 3 チャンク目 (残り 2 件) が走る。
+    gates.splice(0, 4).forEach((open) => open());
     await flushTasks();
     expect(gates.length).toBe(2);
 

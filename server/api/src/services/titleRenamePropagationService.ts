@@ -81,14 +81,18 @@ export interface PropagateTitleRenameOptions {
 
 /**
  * 参照元ページの書き換えを並列実行する際の最大同時実行数。各 source page は
- * 個別の `db.transaction`（接続を 1 本消費）を張るため、DB プール上限
- * （`db/client.ts` の `max: 20`）に対し余裕を残す値に固定する。
+ * 個別の `db.transaction`（接続を 1 本消費）を張る。さらに本伝播は呼び出し元で
+ * fire-and-forget されるため、複数ユーザーの同時リネームで使用接続数が重畳する
+ * （N 件同時 → 最大 4N 接続）。DB プール上限（`db/client.ts` の `max: 20`）を
+ * 枯渇させて無関係な API を巻き込まないよう、保守的に 4 に固定する。
  *
  * Maximum number of source-page rewrites run concurrently. Each rewrite opens
- * its own transaction (one pooled connection), so this stays well under the
- * pool's `max: 20` to leave headroom for other in-flight requests.
+ * its own transaction (one pooled connection), and propagation is fire-and-
+ * forget, so concurrent renames stack (N at once → up to 4N connections). Kept
+ * conservatively at 4 so it never exhausts the pool (`max: 20`) and starves
+ * unrelated requests.
  */
-const SOURCE_REWRITE_CONCURRENCY = 8;
+const SOURCE_REWRITE_CONCURRENCY = 4;
 
 function normalizeTitle(value: string): string {
   return value.toLowerCase().trim();
