@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback, useMemo, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { FileText } from "lucide-react";
 import type { ReferencedPage } from "../../types/aiChat";
@@ -16,23 +16,43 @@ export interface UserMessageBubbleProps {
   isStreaming: boolean;
 }
 
-/** Render user message content with inline @PageTitle styled as badges */
-export function renderUserContent(content: string, referencedPages?: ReferencedPage[]) {
-  if (!referencedPages || referencedPages.length === 0) {
+/**
+ * Render user message content with inline @PageTitle styled as badges.
+ *
+ * `referencedPages` をキーに sort/map/RegExp/split の構築を `useMemo` 化し、
+ * `memo` で props 不変時の再 render を抑える。会話が長くなるほど毎 render の
+ * 正規表現再構築が累積していたのを避ける（issue #1000 Item 2）。
+ *
+ * Memoizes the sort/map/RegExp/split work on `referencedPages` and wraps the
+ * component in `memo`, avoiding the per-render regex rebuild that accumulated
+ * as conversations grew (issue #1000 Item 2).
+ */
+export const UserMessageContent = memo(function UserMessageContent({
+  content,
+  referencedPages,
+}: {
+  content: string;
+  referencedPages?: ReferencedPage[];
+}) {
+  const parsed = useMemo(() => {
+    if (!referencedPages || referencedPages.length === 0) return null;
+
+    const sortedPages = [...referencedPages].sort((a, b) => b.title.length - a.title.length);
+    const titleToPage = new Map(sortedPages.map((p) => [`@${p.title}`, p]));
+    const escapedTitles = sortedPages.map((p) => p.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    // Allow boundary after @Title: whitespace, end, or punctuation (e.g. @AI Chat, @ページ。)
+    const pattern = new RegExp(`(@(?:${escapedTitles.join("|")}))(?=[\\s\\p{P}\\p{S}]|$)`, "gu");
+    return { titleToPage, parts: content.split(pattern) };
+  }, [content, referencedPages]);
+
+  if (!parsed) {
     return <div className="break-words whitespace-pre-wrap">{content}</div>;
   }
 
-  const sortedPages = [...referencedPages].sort((a, b) => b.title.length - a.title.length);
-  const titleToPage = new Map(sortedPages.map((p) => [`@${p.title}`, p]));
-  const escapedTitles = sortedPages.map((p) => p.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  // Allow boundary after @Title: whitespace, end, or punctuation (e.g. @AI Chat, @ページ。)
-  const pattern = new RegExp(`(@(?:${escapedTitles.join("|")}))(?=[\\s\\p{P}\\p{S}]|$)`, "gu");
-  const parts = content.split(pattern);
-
   return (
     <div className="break-words whitespace-pre-wrap">
-      {parts.map((part, i) => {
-        const matchedRef = titleToPage.get(part);
+      {parsed.parts.map((part, i) => {
+        const matchedRef = parsed.titleToPage.get(part);
         if (matchedRef) {
           return (
             <span
@@ -48,7 +68,7 @@ export function renderUserContent(content: string, referencedPages?: ReferencedP
       })}
     </div>
   );
-}
+});
 
 /**
  *
@@ -251,7 +271,7 @@ export function UserMessageBubble({
       onPointerLeave={canEdit ? handlePointerUp : undefined}
       onPointerCancel={canEdit ? handlePointerCancel : undefined}
     >
-      {renderUserContent(content, referencedPages)}
+      <UserMessageContent content={content} referencedPages={referencedPages} />
     </div>
   );
 }
