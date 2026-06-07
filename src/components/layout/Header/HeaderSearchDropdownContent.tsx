@@ -75,6 +75,14 @@ export function HeaderSearchDropdownContent({
   // Scroll container referenced by the virtualizer's `getScrollElement`.
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // 直近の activeIndex 変更がマウスホバー由来かを記録する。ホバー由来の追従は
+  // ホイールスクロール中にポインタ下の行へスナップバックして操作を阻害するため、
+  // キーボード操作時のみスクロール追従する（下の effect で参照）。
+  // Tracks whether the latest activeIndex change came from mouse hover. Hover
+  // -driven follow would snap back to the row under the pointer mid-wheel-scroll
+  // and fight the user, so we only follow on keyboard navigation.
+  const wasMouseChangeRef = useRef(false);
+
   const rowVirtualizer = useVirtualizer({
     count: searchResults.length,
     getScrollElement: () => scrollRef.current,
@@ -85,14 +93,18 @@ export function HeaderSearchDropdownContent({
   // キーボードナビの active 行を描画ウィンドウ内に入れる。仮想化で off-screen の
   // option は DOM から外れるため、`aria-activedescendant` が解決できるよう、また
   // 視認できるよう `scrollToIndex` でウィンドウ内へ寄せる（footer 行は対象外）。
+  // ただしマウスホバー由来の変更時はスクロール追従をスキップし、ホイール
+  // スクロール中のスナップ競合を防ぐ。
   // Keep the keyboard-active row inside the virtual window: virtualization
   // drops off-screen options from the DOM, so scroll the active index into
   // view so `aria-activedescendant` resolves and the row is visible (the
-  // footer row is handled by the parent and is never virtualized).
+  // footer row is handled by the parent and is never virtualized). Skip the
+  // follow for hover-driven changes to avoid snapping against wheel scroll.
   useEffect(() => {
-    if (activeIndex >= 0 && activeIndex < searchResults.length) {
+    if (activeIndex >= 0 && activeIndex < searchResults.length && !wasMouseChangeRef.current) {
       rowVirtualizer.scrollToIndex(activeIndex, { align: "auto" });
     }
+    wasMouseChangeRef.current = false;
   }, [activeIndex, searchResults.length, rowVirtualizer]);
 
   return (
@@ -153,7 +165,10 @@ export function HeaderSearchDropdownContent({
                       activeIndex === index ? "bg-accent text-accent-foreground" : "hover:bg-muted",
                     )}
                     onClick={() => onSelectItem(item)}
-                    onMouseEnter={() => setActiveIndex(index)}
+                    onMouseEnter={() => {
+                      wasMouseChangeRef.current = true;
+                      setActiveIndex(index);
+                    }}
                   >
                     {isPdf ? (
                       <BookOpen className="text-muted-foreground h-4 w-4 shrink-0" />

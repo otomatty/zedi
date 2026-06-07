@@ -31,6 +31,30 @@ describe("UserMessageContent", () => {
     expect(screen.getByText(/and/)).toBeInTheDocument();
   });
 
+  it("ignores empty-title referenced pages without breaking on bare @", () => {
+    const { container } = render(
+      <UserMessageContent
+        content="ping @bob @Alpha"
+        referencedPages={[
+          { id: "empty", title: "" },
+          { id: "a", title: "Alpha" },
+        ]}
+      />,
+    );
+
+    // 空タイトルは除外され、@ 単体や @bob は誤ってバッジ化されない。
+    expect(screen.getByText("Alpha").tagName).toBe("SPAN");
+    expect(container.textContent).toContain("ping @bob ");
+  });
+
+  it("renders plain text when every referenced page has an empty title", () => {
+    const { container } = render(
+      <UserMessageContent content="hi @x" referencedPages={[{ id: "1", title: "" }]} />,
+    );
+    expect(container.textContent).toBe("hi @x");
+    expect(container.querySelector("span")).toBeNull();
+  });
+
   it("prefers the longest matching title for overlapping prefixes", () => {
     render(
       <UserMessageContent

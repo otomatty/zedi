@@ -37,7 +37,15 @@ export const UserMessageContent = memo(function UserMessageContent({
   const parsed = useMemo(() => {
     if (!referencedPages || referencedPages.length === 0) return null;
 
-    const sortedPages = [...referencedPages].sort((a, b) => b.title.length - a.title.length);
+    // 空タイトルは除外する。残すと `escapedTitles.join("|")` に空の選択肢が入り、
+    // `@(?:Alpha|)` のように `@` 単体へ無条件マッチして表示が崩れるため。
+    // Drop empty titles: otherwise `escapedTitles.join("|")` yields an empty
+    // alternative (e.g. `@(?:Alpha|)`) that matches a bare `@` and breaks rendering.
+    const sortedPages = [...referencedPages]
+      .filter((p) => p.title.trim() !== "")
+      .sort((a, b) => b.title.length - a.title.length);
+    if (sortedPages.length === 0) return null;
+
     const titleToPage = new Map(sortedPages.map((p) => [`@${p.title}`, p]));
     const escapedTitles = sortedPages.map((p) => p.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
     // Allow boundary after @Title: whitespace, end, or punctuation (e.g. @AI Chat, @ページ。)

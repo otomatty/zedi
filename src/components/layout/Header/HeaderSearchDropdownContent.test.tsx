@@ -11,6 +11,12 @@ import type { GlobalSearchResultItem } from "@/hooks/useGlobalSearch";
 // (mirroring PageGrid.test.tsx) and stub `scrollToIndex`.
 const VIRTUAL_ROW_HEIGHT = 40;
 
+// scrollToIndex はレンダーをまたいで参照を保つよう module スコープに置き、
+// マウスホバー時に呼ばれない／キーボード追従時に呼ばれることを検証する。
+// Hoisted so the same spy persists across renders, to assert hover does not
+// scroll while keyboard navigation does.
+const scrollToIndexMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: ({ count }: { count: number }) => ({
     getVirtualItems: () =>
@@ -23,7 +29,7 @@ vi.mock("@tanstack/react-virtual", () => ({
         lane: 0,
       })),
     getTotalSize: () => count * VIRTUAL_ROW_HEIGHT,
-    scrollToIndex: vi.fn(),
+    scrollToIndex: scrollToIndexMock,
     measure: vi.fn(),
     measureElement: vi.fn(),
   }),
@@ -68,13 +74,19 @@ function renderDropdown(
   };
   // PopoverContent は Radix の Popover コンテキストを要求するため、open な
   // Popover でラップする。
-  render(
+  const ui = (p: Parameters<typeof HeaderSearchDropdownContent>[0]) => (
     <Popover open>
       <PopoverAnchor />
-      <HeaderSearchDropdownContent {...props} />
-    </Popover>,
+      <HeaderSearchDropdownContent {...p} />
+    </Popover>
   );
-  return { onSelectItem, setActiveIndex, props };
+  const { rerender } = render(ui(props));
+  return {
+    onSelectItem,
+    setActiveIndex,
+    props,
+    rerenderWith: (next: Partial<typeof props>) => rerender(ui({ ...props, ...next })),
+  };
 }
 
 beforeEach(() => {
@@ -115,5 +127,22 @@ describe("HeaderSearchDropdownContent", () => {
   it("renders the show-all footer when there is a query", () => {
     renderDropdown();
     expect(screen.getByText(/の検索結果をすべて表示/)).toBeInTheDocument();
+  });
+
+  it("follows the active row with scrollToIndex on keyboard navigation", () => {
+    const { rerenderWith } = renderDropdown({ activeIndex: -1 });
+    scrollToIndexMock.mockClear();
+    // キーボード操作相当: activeIndex prop が外部から変わる。
+    rerenderWith({ activeIndex: 2 });
+    expect(scrollToIndexMock).toHaveBeenCalledWith(2, { align: "auto" });
+  });
+
+  it("does not scroll-snap when the active row changes via mouse hover", () => {
+    const { rerenderWith } = renderDropdown({ activeIndex: -1 });
+    scrollToIndexMock.mockClear();
+    // ホバーで activeIndex が変わったことを記録してから prop 変更を反映する。
+    fireEvent.mouseEnter(screen.getByText("Result 1"));
+    rerenderWith({ activeIndex: 1 });
+    expect(scrollToIndexMock).not.toHaveBeenCalled();
   });
 });
