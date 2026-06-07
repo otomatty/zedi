@@ -79,6 +79,21 @@ export interface PropagateTitleRenameOptions {
   invalidateDocument?: (pageId: string) => Promise<void>;
 }
 
+/**
+ * 参照元ページの書き換えを並列実行する際の最大同時実行数。各 source page は
+ * 個別の `db.transaction`（接続を 1 本消費）を張る。さらに本伝播は呼び出し元で
+ * fire-and-forget されるため、複数ユーザーの同時リネームで使用接続数が重畳する
+ * （N 件同時 → 最大 4N 接続）。DB プール上限（`db/client.ts` の `max: 20`）を
+ * 枯渇させて無関係な API を巻き込まないよう、保守的に 4 に固定する。
+ *
+ * Maximum number of source-page rewrites run concurrently. Each rewrite opens
+ * its own transaction (one pooled connection), and propagation is fire-and-
+ * forget, so concurrent renames stack (N at once → up to 4N connections). Kept
+ * conservatively at 4 so it never exhausts the pool (`max: 20`) and starves
+ * unrelated requests.
+ */
+const SOURCE_REWRITE_CONCURRENCY = 4;
+
 function normalizeTitle(value: string): string {
   return value.toLowerCase().trim();
 }
@@ -193,6 +208,44 @@ async function rewriteSourcePage(
 
     return { changed: true, rewrite };
   });
+}
+
+/**
+ * 1 つのソースページを書き換え、変更があれば Hocuspocus キャッシュを破棄する。
+ * 並列バッチの 1 ユニットとして使う。invalidate の失敗はベストエフォートで
+ * warn して握りつぶし、rewrite の失敗はそのまま throw して呼び出し側の
+ * `Promise.allSettled` に `sourcePagesFailed` として集計させる。
+ *
+ * Rewrite one source page and, if it changed, drop its Hocuspocus cache.
+ * Used as a single unit inside the bounded parallel batch. Invalidation
+ * failures are swallowed (best-effort warn); rewrite failures propagate so
+ * the caller's `Promise.allSettled` counts them as `sourcePagesFailed`.
+ */
+async function rewriteAndInvalidateSourcePage(
+  db: Database,
+  sourceId: string,
+  renamedPageId: string,
+  oldTitle: string,
+  newTitle: string,
+  invalidate: (pageId: string) => Promise<void>,
+): Promise<RewriteResult> {
+  const { changed, rewrite } = await rewriteSourcePage(
+    db,
+    sourceId,
+    renamedPageId,
+    oldTitle,
+    newTitle,
+  );
+
+  if (changed) {
+    try {
+      await invalidate(sourceId);
+    } catch (error) {
+      console.warn(`[RenamePropagation] Invalidation failed for source page ${sourceId}:`, error);
+    }
+  }
+
+  return rewrite;
 }
 
 /**
@@ -312,40 +365,47 @@ export async function propagateTitleRename(
 
   const uniqueSourceIds = Array.from(new Set(sourceRows.map((r) => r.sourceId)));
 
-  for (const sourceId of uniqueSourceIds) {
-    result.sourcePagesAttempted += 1;
-    try {
-      const { changed, rewrite } = await rewriteSourcePage(
-        db,
-        sourceId,
-        renamedPageId,
-        trimmedOld,
-        trimmedNew,
-      );
-      result.sourcePagesSucceeded += 1;
-      result.wikiLinkMarksUpdated += rewrite.wikiLinkMarksUpdated;
-      result.wikiLinkTextUpdated += rewrite.wikiLinkTextUpdated;
-      result.tagMarksUpdated += rewrite.tagMarksUpdated;
-      result.tagTextUpdated += rewrite.tagTextUpdated;
+  // 各 source page は独立した `page_contents` 行をロックするため順序非依存。
+  // 多数リンク時のレイテンシを抑えるため、最大 SOURCE_REWRITE_CONCURRENCY 件
+  // ずつチャンクに分けて並列実行する。失敗は従来どおりベストエフォートで握り、
+  // 後続の source / ghost 昇格を止めない。
+  //
+  // Source pages are order-independent (each locks a distinct page_contents
+  // row), so rewrite them in bounded `Promise.allSettled` batches to keep
+  // latency flat as the link count grows. Per-page failures stay best-effort.
+  for (let i = 0; i < uniqueSourceIds.length; i += SOURCE_REWRITE_CONCURRENCY) {
+    const batch = uniqueSourceIds.slice(i, i + SOURCE_REWRITE_CONCURRENCY);
+    const settled = await Promise.allSettled(
+      batch.map((sourceId) =>
+        rewriteAndInvalidateSourcePage(
+          db,
+          sourceId,
+          renamedPageId,
+          trimmedOld,
+          trimmedNew,
+          invalidate,
+        ),
+      ),
+    );
 
-      if (changed) {
-        try {
-          await invalidate(sourceId);
-        } catch (error) {
-          console.warn(
-            `[RenamePropagation] Invalidation failed for source page ${sourceId}:`,
-            error,
-          );
-        }
+    settled.forEach((outcome, idx) => {
+      const sourceId = batch[idx];
+      result.sourcePagesAttempted += 1;
+      if (outcome.status === "fulfilled") {
+        result.sourcePagesSucceeded += 1;
+        result.wikiLinkMarksUpdated += outcome.value.wikiLinkMarksUpdated;
+        result.wikiLinkTextUpdated += outcome.value.wikiLinkTextUpdated;
+        result.tagMarksUpdated += outcome.value.tagMarksUpdated;
+        result.tagTextUpdated += outcome.value.tagTextUpdated;
+      } else {
+        result.sourcePagesFailed += 1;
+        console.error(
+          `[RenamePropagation] Failed to rewrite source page ${sourceId} ` +
+            `for rename ${renamedPageId} (${trimmedOld} → ${trimmedNew}):`,
+          outcome.reason,
+        );
       }
-    } catch (error) {
-      result.sourcePagesFailed += 1;
-      console.error(
-        `[RenamePropagation] Failed to rewrite source page ${sourceId} ` +
-          `for rename ${renamedPageId} (${trimmedOld} → ${trimmedNew}):`,
-        error,
-      );
-    }
+    });
   }
 
   // 2. Promote matching ghost links. ベストエフォートで昇格させる。
