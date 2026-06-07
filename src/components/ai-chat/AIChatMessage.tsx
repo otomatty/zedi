@@ -6,7 +6,7 @@ import { ChatMessage, ChatAction } from "../../types/aiChat";
 import { getDisplayContent } from "../../lib/aiChatActions";
 import { AIChatActionCard } from "./AIChatActionCard";
 import { AIChatWikiLink } from "./AIChatWikiLink";
-import { UserMessageBubble, renderUserContent } from "./AIChatUserMessageBubble";
+import { UserMessageBubble, UserMessageContent } from "./AIChatUserMessageBubble";
 import { CodeBlockWithCopy } from "./AIChatCodeBlock";
 import { replaceWikiLinksInMarkdown } from "./aiChatMarkdownHelpers";
 import ReactMarkdown from "react-markdown";
@@ -101,7 +101,10 @@ export function AIChatMessage({
               isStreaming={isStreaming}
             />
           ) : isUser ? (
-            renderUserContent(displayContent, message.referencedPages)
+            <UserMessageContent
+              content={displayContent}
+              referencedPages={message.referencedPages}
+            />
           ) : message.isStreaming && displayContent === "" ? (
             <AIChatMessageSkeleton />
           ) : (

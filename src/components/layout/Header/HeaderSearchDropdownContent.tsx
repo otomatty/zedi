@@ -1,9 +1,20 @@
+import { useEffect, useRef } from "react";
 import { FileText, Link as LinkIcon, ArrowRight, BookOpen } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { PopoverContent } from "@zedi/ui";
 import { cn } from "@zedi/ui";
 import type { GlobalSearchResultItem } from "@/hooks/useGlobalSearch";
 
 const EMPTY_MESSAGE = "ページが見つかりません";
+
+/**
+ * 1 行分の推定高さ（px）。検索結果の各行は `truncate` で単一行に固定されるため、
+ * 列によらず一定。`useVirtualizer` の `estimateSize` に使う。
+ *
+ * Estimated height (px) of a single result row. Rows are single-line
+ * (`truncate`), so the height is uniform and a fixed estimate is exact.
+ */
+const SEARCH_ROW_HEIGHT = 40;
 
 /**
  *
@@ -17,7 +28,6 @@ export interface HeaderSearchDropdownContentProps {
   activeIndex: number;
   query: string;
   hasQuery: boolean;
-  listRef: React.RefObject<HTMLUListElement | null>;
   footerRef: React.RefObject<HTMLButtonElement | null>;
   getOptionId: (index: number) => string;
   onSelectItem: (item: GlobalSearchResultItem) => void;
@@ -54,7 +64,6 @@ export function HeaderSearchDropdownContent({
   activeIndex,
   query,
   hasQuery,
-  listRef,
   footerRef,
   getOptionId,
   onSelectItem,
@@ -62,6 +71,42 @@ export function HeaderSearchDropdownContent({
   closeDropdown,
   handleSearchSubmit,
 }: HeaderSearchDropdownContentProps) {
+  // スクロールコンテナ。`useVirtualizer` の `getScrollElement` から参照する。
+  // Scroll container referenced by the virtualizer's `getScrollElement`.
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // 直近の activeIndex 変更がマウスホバー由来かを記録する。ホバー由来の追従は
+  // ホイールスクロール中にポインタ下の行へスナップバックして操作を阻害するため、
+  // キーボード操作時のみスクロール追従する（下の effect で参照）。
+  // Tracks whether the latest activeIndex change came from mouse hover. Hover
+  // -driven follow would snap back to the row under the pointer mid-wheel-scroll
+  // and fight the user, so we only follow on keyboard navigation.
+  const wasMouseChangeRef = useRef(false);
+
+  const rowVirtualizer = useVirtualizer({
+    count: searchResults.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => SEARCH_ROW_HEIGHT,
+    overscan: 10,
+  });
+
+  // キーボードナビの active 行を描画ウィンドウ内に入れる。仮想化で off-screen の
+  // option は DOM から外れるため、`aria-activedescendant` が解決できるよう、また
+  // 視認できるよう `scrollToIndex` でウィンドウ内へ寄せる（footer 行は対象外）。
+  // ただしマウスホバー由来の変更時はスクロール追従をスキップし、ホイール
+  // スクロール中のスナップ競合を防ぐ。
+  // Keep the keyboard-active row inside the virtual window: virtualization
+  // drops off-screen options from the DOM, so scroll the active index into
+  // view so `aria-activedescendant` resolves and the row is visible (the
+  // footer row is handled by the parent and is never virtualized). Skip the
+  // follow for hover-driven changes to avoid snapping against wheel scroll.
+  useEffect(() => {
+    if (activeIndex >= 0 && activeIndex < searchResults.length && !wasMouseChangeRef.current) {
+      rowVirtualizer.scrollToIndex(activeIndex, { align: "auto" });
+    }
+    wasMouseChangeRef.current = false;
+  }, [activeIndex, searchResults.length, rowVirtualizer]);
+
   return (
     <PopoverContent
       id="header-search-list"
@@ -85,26 +130,45 @@ export function HeaderSearchDropdownContent({
       )}
 
       {showResults && (
-        <div className="overflow-y-auto py-2">
+        <div ref={scrollRef} className="overflow-y-auto py-2">
           <p className="text-muted-foreground px-3 py-1.5 text-xs font-medium">
             候補 ({searchResults.length}件)
           </p>
-          <ul ref={listRef} className="list-none" role="group" aria-label="検索候補">
-            {searchResults.map((item, index) => {
+          <ul
+            className="relative list-none"
+            role="group"
+            aria-label="検索候補"
+            style={{ height: rowVirtualizer.getTotalSize() }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const index = virtualRow.index;
+              const item = searchResults[index];
+              if (!item) return null;
               const isPdf = item.kind === "pdf_highlight";
               return (
-                <li key={getResultKey(item)} role="none">
+                <li
+                  key={getResultKey(item)}
+                  role="none"
+                  className="absolute top-0 left-0 w-full"
+                  style={{
+                    height: virtualRow.size,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
                   <button
                     id={getOptionId(index)}
                     type="button"
                     role="option"
                     aria-selected={activeIndex === index}
                     className={cn(
-                      "flex w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none",
+                      "flex h-full w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none",
                       activeIndex === index ? "bg-accent text-accent-foreground" : "hover:bg-muted",
                     )}
                     onClick={() => onSelectItem(item)}
-                    onMouseEnter={() => setActiveIndex(index)}
+                    onMouseEnter={() => {
+                      wasMouseChangeRef.current = true;
+                      setActiveIndex(index);
+                    }}
                   >
                     {isPdf ? (
                       <BookOpen className="text-muted-foreground h-4 w-4 shrink-0" />

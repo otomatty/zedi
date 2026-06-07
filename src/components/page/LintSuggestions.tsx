@@ -11,7 +11,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Badge, Button, Skeleton } from "@zedi/ui";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -202,6 +202,17 @@ export function LintSuggestions({ pageId }: LintSuggestionsProps) {
     },
   });
 
+  // detail の整形（fallback で `JSON.stringify`）を毎 render ではなく findings /
+  // 言語の変化時のみ実行する。`findings` は React Query の参照が安定しているため、
+  // 同一データなら再計算をスキップできる（issue #1000 Item 4）。
+  // Precompute the formatted detail strings (the fallback runs `JSON.stringify`)
+  // so they recompute only when findings or the language change, instead of on
+  // every render. `findings` keeps a stable reference from React Query.
+  const formattedDetails = useMemo(
+    () => (findings ?? []).map((f) => formatDetail(f.detail, t)),
+    [findings, t],
+  );
+
   // 未認証 (ゲスト) では LintSuggestions 自体を描画しない。
   // 公開ノートの閲覧経路 `NotePagePublicView` でも `currentPageId` を渡すように
   // なったため、ここでゲストを除外しないと毎回 401 を返すリクエストが走る。
@@ -251,7 +262,7 @@ export function LintSuggestions({ pageId }: LintSuggestionsProps) {
         <span>{t("common.page.lintTitle", { count: findings.length })}</span>
       </div>
       <div className="space-y-2">
-        {findings.map((f) => (
+        {findings.map((f, i) => (
           <div key={f.id} className="bg-muted/50 flex items-start gap-3 rounded-lg border p-3">
             <div className="mt-0.5 shrink-0">{severityIcon(f.severity)}</div>
             <div className="min-w-0 flex-1">
@@ -261,7 +272,7 @@ export function LintSuggestions({ pageId }: LintSuggestionsProps) {
                   {ruleLabel(f.rule)}
                 </Badge>
               </div>
-              <p className="text-muted-foreground mt-1 text-sm">{formatDetail(f.detail, t)}</p>
+              <p className="text-muted-foreground mt-1 text-sm">{formattedDetails[i]}</p>
             </div>
             <Button
               type="button"
