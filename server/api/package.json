@@ -27,7 +27,7 @@
     "@langchain/langgraph-checkpoint-postgres": "^1.0.1",
     "@langchain/openai": "^1.4.7",
     "@mozilla/readability": "^0.6.0",
-    "@polar-sh/sdk": "^0.47.0",
+    "@polar-sh/sdk": "^0.48.0",
     "@react-email/components": "^1.0.11",
     "@sentry/node": "^10.51.0",
     "@tiptap/core": "^3.20.1",
