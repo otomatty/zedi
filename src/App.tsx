@@ -22,7 +22,7 @@ import AuthCallback from "./pages/AuthCallback";
 import ExtensionAuth from "./pages/ExtensionAuth";
 import ExtensionAuthCallback from "./pages/ExtensionAuthCallback";
 import McpAuthorize from "./pages/McpAuthorize";
-import PdfReaderPage from "./pages/pdfKnowledge/PdfReaderPage";
+import PdfReaderPage from "./pages/PdfKnowledge/PdfReaderPage";
 import Settings from "./pages/Settings";
 import Account from "./pages/Account";
 import WikiSchemaPage from "./pages/WikiSchemaPage";

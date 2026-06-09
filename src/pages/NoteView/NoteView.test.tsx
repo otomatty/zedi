@@ -78,7 +78,7 @@ vi.mock("@/components/layout/AppLayout", () => ({
     <div data-testid="app-layout">{children}</div>
   ),
 }));
-vi.mock("@/components/ai-chat/ContentWithAIChat", () => ({
+vi.mock("@/components/aiChat/ContentWithAIChat", () => ({
   ContentWithAIChat: ({
     children,
     floatingAction,

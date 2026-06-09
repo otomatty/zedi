@@ -1,14 +1,14 @@
 import { Suspense, lazy, useCallback, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import Container from "@/components/layout/Container";
-import { AIChatMessages } from "@/components/ai-chat/AIChatMessages";
-import { AIChatInput } from "@/components/ai-chat/AIChatInput";
-import { AIChatViewTabs, type AIChatViewTab } from "@/components/ai-chat/AIChatViewTabs";
-import { PromoteToWikiDialog } from "@/components/ai-chat/PromoteToWikiDialog";
+import { AIChatMessages } from "@/components/aiChat/AIChatMessages";
+import { AIChatInput } from "@/components/aiChat/AIChatInput";
+import { AIChatViewTabs, type AIChatViewTab } from "@/components/aiChat/AIChatViewTabs";
+import { PromoteToWikiDialog } from "@/components/aiChat/PromoteToWikiDialog";
 import { usePromoteToWiki } from "@/hooks/usePromoteToWiki";
 
 const AIChatBranchTree = lazy(() =>
-  import("@/components/ai-chat/AIChatBranchTree").then((m) => ({ default: m.AIChatBranchTree })),
+  import("@/components/aiChat/AIChatBranchTree").then((m) => ({ default: m.AIChatBranchTree })),
 );
 import { useAIChatConversations } from "@/hooks/useAIChatConversations";
 import { useAIChatStore } from "@/stores/aiChatStore";

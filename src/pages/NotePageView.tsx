@@ -32,7 +32,7 @@ import {
 } from "@/hooks/useNoteQueries";
 import { useAuth } from "@/hooks/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";
-import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
+import { ContentWithAIChat } from "@/components/aiChat/ContentWithAIChat";
 import { NoteWorkspaceProvider, useNoteWorkspaceOptional } from "@/contexts/NoteWorkspaceContext";
 import { useAIChatContext } from "@/contexts/AIChatContext";
 import { NoteWorkspaceToolbar } from "@/components/note/NoteWorkspaceToolbar";

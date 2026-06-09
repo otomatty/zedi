@@ -215,7 +215,7 @@ vi.mock("@/components/note/NotePagePublicView", () => ({
   ),
 }));
 
-vi.mock("@/components/ai-chat/ContentWithAIChat", () => ({
+vi.mock("@/components/aiChat/ContentWithAIChat", () => ({
   ContentWithAIChat: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="content-with-ai-chat">{children}</div>
   ),

@@ -4,7 +4,7 @@ import { HoverCard, HoverCardTrigger, HoverCardContent } from "@zedi/ui";
 import { useWikiLinkNavigation } from "@/components/editor/TiptapEditor/useWikiLinkNavigation";
 import { CreatePageDialog } from "@/components/editor/TiptapEditor/CreatePageDialog";
 import { usePageStore } from "../../stores/pageStore";
-import { WikiLinkPreviewContent } from "../wiki-link/WikiLinkPreviewContent";
+import { WikiLinkPreviewContent } from "../wikiLink/WikiLinkPreviewContent";
 
 interface AIChatWikiLinkProps {
   /** WikiLink title (e.g. from [[Title]]) */

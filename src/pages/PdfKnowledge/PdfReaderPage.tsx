@@ -4,7 +4,7 @@
  * Route entry point for `/sources/:sourceId/pdf` — defers to the reader
  * component, which handles platform gating + missing-file UX.
  */
-import { PdfReader } from "@/components/pdf-reader/PdfReader";
+import { PdfReader } from "@/components/pdfReader/PdfReader";
 
 /**
  * Route element for `/sources/:sourceId/pdf` — thin wrapper around the
