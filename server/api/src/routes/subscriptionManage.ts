@@ -18,10 +18,13 @@ function createPolar(): Polar {
 // At runtime the property is always present. We access it through a helper to keep the
 // rest of the code type-safe while silencing the false-positive.
 function polarSubscriptions(polar: Polar) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (polar as any).subscriptions as {
-    update(req: { id: string; subscriptionUpdate: Record<string, unknown> }): Promise<unknown>;
-  };
+  return (
+    polar as unknown as {
+      subscriptions: {
+        update(req: { id: string; subscriptionUpdate: Record<string, unknown> }): Promise<unknown>;
+      };
+    }
+  ).subscriptions;
 }
 
 const app = new Hono<AppEnv>();
