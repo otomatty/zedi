@@ -9,7 +9,7 @@ import { NotesListView } from "@/components/note/NotesListView";
 import { NoteEditPermissionControls } from "@/components/note/NoteEditPermissionControls";
 import { allowedEditPermissions, visibilityKeys } from "@/lib/noteSettingsConfig";
 import { shouldConfirmPublicAnyLoggedInSave } from "@/lib/noteSharingRisk";
-import { OpenPdfButton } from "@/components/pdf-reader/OpenPdfButton";
+import { OpenPdfButton } from "@/components/pdfReader/OpenPdfButton";
 import { Button } from "@zedi/ui";
 import {
   AlertDialog,

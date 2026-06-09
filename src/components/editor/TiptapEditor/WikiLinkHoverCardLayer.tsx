@@ -2,7 +2,7 @@ import React, { useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/core";
 import { usePageStore } from "@/stores/pageStore";
-import { WikiLinkPreviewContent } from "@/components/wiki-link/WikiLinkPreviewContent";
+import { WikiLinkPreviewContent } from "@/components/wikiLink/WikiLinkPreviewContent";
 import { useWikiLinkHover } from "./useWikiLinkHover";
 
 /**

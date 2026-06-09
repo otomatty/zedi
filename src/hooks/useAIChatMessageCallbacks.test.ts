@@ -8,7 +8,7 @@ vi.mock("./useAIChatExecute", () => ({
   executeRegenerateAssistant: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("@/lib/aiChatActionHelpers", () => ({
+vi.mock("@/lib/aiChat/aiChatActionHelpers", () => ({
   resolveReferencedPagesFromContent: vi.fn(() => []),
 }));
 

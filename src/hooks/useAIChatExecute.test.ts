@@ -6,7 +6,7 @@ import { loadAISettings } from "../lib/aiSettings";
 import { streamAssistantCompletion } from "./useAIChatExecuteHelpers";
 import { executeSendMessage, executeRegenerateAssistant } from "./useAIChatExecute";
 
-vi.mock("../lib/aiChatPrompt", () => ({
+vi.mock("@/lib/aiChat/aiChatPrompt", () => ({
   buildSystemPrompt: vi.fn(() => "SYS"),
 }));
 

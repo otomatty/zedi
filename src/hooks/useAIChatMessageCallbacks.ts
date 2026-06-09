@@ -1,7 +1,7 @@
 import { useCallback, type Dispatch, type RefObject, type SetStateAction } from "react";
 import type { ChatTreeState, PageContext, ReferencedPage } from "../types/aiChat";
 import type { PageSummary } from "@/types/page";
-import { resolveReferencedPagesFromContent } from "@/lib/aiChatActionHelpers";
+import { resolveReferencedPagesFromContent } from "@/lib/aiChat/aiChatActionHelpers";
 import { getActivePath, patchMessageInTree } from "@/lib/messageTree";
 import { executeRegenerateAssistant, executeSendMessage } from "./useAIChatExecute";
 

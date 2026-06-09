@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { AIChatViewTab } from "@/components/ai-chat/AIChatViewTabs";
+import type { AIChatViewTab } from "@/components/aiChat/AIChatViewTabs";
 import type {
   Conversation,
   MessageMap,

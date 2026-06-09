@@ -2,7 +2,7 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import type { ChatTreeState, PageContext } from "../types/aiChat";
 import type { PageSummary } from "@/types/page";
 import { useAIChatStore } from "../stores/aiChatStore";
-import { emptyTree } from "./aiChatEmptyTree";
+import { emptyTree } from "@/lib/aiChat/aiChatEmptyTree";
 import { useAIChatMessageCallbacks } from "./useAIChatMessageCallbacks";
 import { useAIChatTreeLoaders } from "./useAIChatTreeLoaders";
 import { useAIChatBranchControls } from "./useAIChatBranchControls";

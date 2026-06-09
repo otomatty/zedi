@@ -1,7 +1,7 @@
 /**
  * Unit tests for compose session locale preparation helper.
  */
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it } from "vitest";
 import {
   prepareComposeRunFromRequest,
   resolveComposeSessionContentLocale,

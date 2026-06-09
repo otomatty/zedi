@@ -2,7 +2,7 @@ import React, { useCallback } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Container from "@/components/layout/Container";
 import FloatingActionButton from "@/components/layout/FloatingActionButton";
-import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
+import { ContentWithAIChat } from "@/components/aiChat/ContentWithAIChat";
 import { NoteShareUrlCopyButton } from "@/components/note/NoteShareUrlCopyButton";
 import { NoteTitleSwitcher } from "@/components/note/NoteTitleSwitcher";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";

@@ -4,7 +4,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useAIChatActions } from "./useAIChatActions";
 import { AIChatProvider, useAIChatContext } from "@/contexts/AIChatContext";
 import { createHookWrapper } from "@/test/testWrapper";
-import { appendMarkdownToTiptapContent } from "@/lib/aiChatActionHelpers";
+import { appendMarkdownToTiptapContent } from "@/lib/aiChat/aiChatActionHelpers";
 
 const mockToast = vi.fn();
 const mockNavigate = vi.fn();

@@ -18,7 +18,7 @@ import {
   buildSuggestedWikiLinksMarkdown,
   getMissingSuggestedWikiLinkTitles,
   normalizePageTitle,
-} from "@/lib/aiChatActionHelpers";
+} from "@/lib/aiChat/aiChatActionHelpers";
 import { extractWikiLinksFromContent } from "@/lib/wikiLinkUtils";
 
 /**

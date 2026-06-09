@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, createContext, useContext, type ReactNode } from "react";
 import type { Conversation, PageContextSnapshot } from "../types/aiChat";
 import { migrateConversation } from "../lib/conversationMigration";
-import { generateConversationTitleFromTree } from "../lib/aiChatConversationTitle";
+import { generateConversationTitleFromTree } from "@/lib/aiChat/aiChatConversationTitle";
 
 const LOCAL_STORAGE_KEY = "zedi-ai-conversations";
 const MAX_CONVERSATIONS = 50;

@@ -3,7 +3,7 @@ import i18n from "@/i18n";
 import type { ChatTreeState, PageContext, TreeChatMessage } from "../types/aiChat";
 import type { AIServiceRequest } from "../lib/aiService";
 import { loadAISettings } from "../lib/aiSettings";
-import { buildSystemPrompt } from "../lib/aiChatPrompt";
+import { buildSystemPrompt } from "@/lib/aiChat/aiChatPrompt";
 import { addMessageToTree, getActivePath, stripToChatMessage } from "../lib/messageTree";
 import {
   buildApiPayload,
