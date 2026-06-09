@@ -107,6 +107,37 @@ server/mcp/       # MCP サーバー (stdio / HTTP) — Claude Code 連携
 terraform/        # インフラ定義
 ```
 
+### 命名規則 / Naming conventions
+
+- **機能・ドメインのディレクトリは camelCase**（例: `src/lib/aiChat/`, `src/components/tagFilterBar/`）。kebab-case は使わない。  
+  _Feature/domain directories use camelCase. Do not use kebab-case._
+- **単一コンポーネント（とその付属ファイル群）をまとめるディレクトリは PascalCase**（例: `src/components/editor/PageEditor/`, `src/components/layout/Header/`）。  
+  _Directories wrapping a single component (and its satellites) use PascalCase._
+- **`src/pages/` 直下のページディレクトリは PascalCase**（例: `src/pages/NoteSettings/`）。  
+  _Page directories under `src/pages/` use PascalCase._
+- **例外**: `packages/ui/src/components/` は shadcn/ui 由来の kebab-case を維持する。  
+  _Exception: `packages/ui/src/components/` keeps shadcn/ui's kebab-case._
+- ファイル名: React コンポーネントは PascalCase `.tsx`、フックは `use` プレフィックス + camelCase、それ以外のユーティリティは camelCase `.ts`。  
+  _Files: components = PascalCase `.tsx`; hooks = `use*` camelCase; utilities = camelCase `.ts`._
+
+### 配置規則 / Placement rules
+
+- `src/hooks/` には **React フック（`use*`）のみ**を置く。フックでないヘルパーは `src/lib/` へ。  
+  _`src/hooks/` is for React hooks only; non-hook helpers belong in `src/lib/`._
+- `src/pages/` にフックを置かない。ページ専用フックも `src/hooks/` へ。  
+  _Do not place hooks under `src/pages/`; page-specific hooks also go to `src/hooks/`._
+- `src/lib/` 直下に同一ドメインのファイルが **2 つ以上**になったらサブディレクトリへまとめる（例: `aiChat*` 系は `src/lib/aiChat/`）。  
+  _Group two or more same-domain files under a `src/lib/<domain>/` subdirectory._
+- `server/api` では再利用ロジックの置き場を区別する: ドメインロジックは `src/services/`、汎用ヘルパー（HTTP/環境変数/外部 API ラッパー等）は `src/lib/`。`*Service.ts` は `services/` に置く。  
+  _In `server/api`, domain logic lives in `src/services/`; generic helpers in `src/lib/`. `*Service.ts` files belong in `services/`._
+
+### テスト配置 / Test placement
+
+- **クライアント側**（`src/`, `admin/`, `packages/*`）と `server/hocuspocus`: テストは対象ファイルと**同じディレクトリに同居**させる（`foo.ts` → `foo.test.ts`）。  
+  _Client-side workspaces and `server/hocuspocus` colocate tests next to sources._
+- **`server/api` と `server/mcp`**: `src/__tests__/` 配下にソースツリーをミラーして集約する。新規テストを同居型で追加しない。  
+  _`server/api` and `server/mcp` centralize tests under `src/__tests__/`, mirroring the source tree. Do not add colocated tests there._
+
 ## ワークスペース構成とデプロイ / Workspaces layout and deploy
 
 - ルート `package.json` の `workspaces` は `packages/*` と `admin` のみを含む。`server/api`, `server/hocuspocus`, `server/mcp` は **意図的にルートの Bun workspace から外して**、個別の Bun プロジェクトとして管理する。  
