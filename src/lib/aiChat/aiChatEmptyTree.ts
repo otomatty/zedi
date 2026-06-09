@@ -1,4 +1,4 @@
-import type { ChatTreeState } from "../types/aiChat";
+import type { ChatTreeState } from "@/types/aiChat";
 
 /**
  * Initial empty chat tree (no messages, no active leaf).

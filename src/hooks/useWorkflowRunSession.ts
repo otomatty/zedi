@@ -14,7 +14,7 @@ import type {
   WorkflowRunProgress,
   WorkflowStepDefinition,
 } from "@/lib/workflow/types";
-import { applyWorkflowRunOutcome } from "./workflowRunOutcomeHandlers";
+import { applyWorkflowRunOutcome } from "@/lib/workflow/workflowRunOutcomeHandlers";
 
 /** Snapshot while paused (step id + outputs by id). / 一時停止中のスナップショット */
 type PausedSnapshot = {

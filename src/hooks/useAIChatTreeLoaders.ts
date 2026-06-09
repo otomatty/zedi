@@ -1,7 +1,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import type { ChatMessage, ChatTreeState, Conversation } from "../types/aiChat";
 import { migrateConversation, flatMessagesToTree } from "@/lib/conversationMigration";
-import { emptyTree } from "./aiChatEmptyTree";
+import { emptyTree } from "@/lib/aiChat/aiChatEmptyTree";
 
 /**
  * Parameters for {@link useAIChatTreeLoaders}.

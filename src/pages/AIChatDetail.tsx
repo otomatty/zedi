@@ -16,7 +16,7 @@ import { useAIChat } from "@/hooks/useAIChat";
 import { useAIChatActions } from "@/hooks/useAIChatActions";
 import { usePagesSummary } from "@/hooks/usePageQueries";
 import type { ReferencedPage } from "@/types/aiChat";
-import { useAIChatDetailLifecycle } from "./useAIChatDetailLifecycle";
+import { useAIChatDetailLifecycle } from "@/hooks/useAIChatDetailLifecycle";
 
 /**
  * Full-page AI chat for a single conversation (`/ai/:conversationId`).
