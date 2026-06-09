@@ -207,68 +207,37 @@ jobs:
 
       - uses: ./.github/actions/setup-toolchain
 
-      # Playwright のブラウザバイナリ取得を「キャッシュ + OS 依存と分離」で安定化する
-      # （Issue #1017）。従来の `playwright install --with-deps chromium` は
-      # ダウンロード 100% 完了「後」の展開フェーズで 5 分間無出力のまま停滞し、
-      # `timeout 300` の打ち切り（exit 124）× 3 試行で恒常的に失敗していた。
-      # 各リトライ冒頭で前回の中途半端な chromium build を「unused」として削除 →
-      # 再ダウンロードするため、リトライが状況を改善しない構造だった。
+      # === Issue #1017 診断ステップ（原因の切り分け。恒久対応ではない）=========
+      # これまでの run で判明していること:
+      #   * apt OS 依存のインストールは正常（直近 run で ~18s で完了）。
+      #   * chromium zip (164.7 MiB) のダウンロードは毎回 100% まで到達する。
+      #   * その「直後」から Playwright が一切のログを出さずに停止し、`timeout`
+      #     で打ち切られる（展開フェーズ or 次アセット取得で停滞している疑い）。
+      # → apt と browser DL を別ステップに分離し、apt 側は無実と確定済み。
+      #   残る不明点「100% 到達後のどのフェーズで止まるのか」を `DEBUG=pw:install`
+      #   で可視化する。展開（extract）/ headless-shell / ffmpeg 取得のどれで
+      #   停滞するかがログに出るので、それを見て恒久対応を決める。
       #
-      # 対策: ブラウザバイナリ（~/.cache/ms-playwright）を Playwright バージョンを
-      # キーにキャッシュし、ヒット時はダウンロード自体を回避する。OS 依存 (apt) は
-      # キャッシュ対象外なので別ステップで毎回入れる。restore / save を分離し、
-      # ブラウザ取得が成功したとき（= save ステップに到達できたとき）だけ保存する
-      # ことで、停滞して打ち切られた中途半端な build がキャッシュに焼き付くのを防ぐ。
-      #
-      # Stabilize Playwright browser provisioning via cache + split OS deps
-      # (Issue #1017). The old `playwright install --with-deps chromium` stalled
-      # for 5 minutes in the post-download extraction phase, getting killed by
-      # `timeout 300` (exit 124) on all 3 attempts. Each retry first removed the
-      # half-extracted chromium build as "unused" and re-downloaded it, so
-      # retrying never converged. Fix: cache the browser binaries keyed on the
-      # Playwright version so cache hits skip the download entirely. apt OS deps
-      # are not cacheable, so install them every run in a separate step. Restore
-      # and save are split so the cache is only written when the browser install
-      # actually succeeded (i.e. we reach the save step), preventing a stalled,
-      # half-extracted build from being baked into the cache.
-      - name: Resolve Playwright version
-        id: pw-version
-        run: echo "version=$(bunx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
-
-      - name: Restore Playwright browsers cache
-        id: pw-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.pw-version.outputs.version }}
-
+      # Diagnostic step for Issue #1017 (NOT a permanent fix). Established so far:
+      # apt deps succeed (~18s in the latest run); the chromium zip reliably
+      # reaches 100%, then Playwright goes completely silent until `timeout`
+      # kills it. apt is split out and already cleared as the culprit. This run
+      # turns on `DEBUG=pw:install` to reveal which post-download phase actually
+      # stalls (zip extraction vs. headless-shell / ffmpeg fetch) so we can pick
+      # the right permanent fix from real evidence rather than guessing.
       - name: Install Playwright system dependencies
         run: bunx playwright install-deps chromium
 
-      # キャッシュミス時のみブラウザバイナリを取得する。download 後の展開や
-      # 後続アセット（headless-shell / ffmpeg）取得の停滞に備え、1 試行あたりの
-      # 予算を 600s に広げ、最大 2 回リトライする（ジョブ全体 20 分に収める）。
-      # Only fetch browser binaries on a cache miss. Widen the per-attempt budget
-      # to 600s to absorb extraction / headless-shell / ffmpeg stalls, retrying
-      # up to 2 times (kept within the job's 20-minute cap).
-      - name: Install Playwright browsers (cache miss, with retry)
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        uses: Wandalen/wretry.action@v3
-        with:
-          command: timeout 600 bunx playwright install chromium
-          attempt_limit: 2
-          attempt_delay: 10000
-
-      # ブラウザ取得が成功した（このステップに到達できた）ときだけキャッシュを保存する。
-      # 上の install が失敗するとジョブはここに来ないため、壊れた状態は保存されない。
-      # Save the cache only after a successful install (we only reach this step if
-      # the install above did not fail), so corrupt state is never persisted.
-      - name: Save Playwright browsers cache
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.pw-version.outputs.version }}
+      # 単発・無リトライで実行する。停滞は 100% 到達の直後に起きるため timeout 300
+      # でも停滞箇所の DEBUG ログは十分取得できる。リトライはジョブ 20 分の予算を
+      # 浪費して診断ログを埋もれさせるだけなので、この診断 run では付けない。
+      # Single attempt, no retry: the stall happens right after 100%, so a 300s
+      # bound is plenty to capture the DEBUG trace at the hang point. Retrying
+      # would only burn the 20-minute job budget and bury the diagnostic output.
+      - name: Install Playwright browsers (diagnostic, DEBUG=pw:install)
+        env:
+          DEBUG: pw:install
+        run: timeout 300 bunx playwright install chromium
 
       - name: Run PDF knowledge E2E
         run: bunx playwright test e2e/pdf-knowledge.spec.ts
