@@ -7,8 +7,8 @@ import {
   findPricing,
   findReferencePricePerToken,
   calculateCostUnits,
-} from "./syncAiModelsPricing.js";
-import type { OpenRouterPricing } from "./syncAiModelsTypes.js";
+} from "../../services/syncAiModelsPricing.js";
+import type { OpenRouterPricing } from "../../services/syncAiModelsTypes.js";
 
 function pricing(prompt: string, completion: string): OpenRouterPricing {
   return { prompt, completion };

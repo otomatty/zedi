@@ -8,7 +8,7 @@ import {
   isSonnetModel,
   assignTier,
   parseAllowlist,
-} from "./syncAiModelsFilters.js";
+} from "../../services/syncAiModelsFilters.js";
 
 describe("isTextChatModel", () => {
   it("openai: gpt-4 は true", () => {

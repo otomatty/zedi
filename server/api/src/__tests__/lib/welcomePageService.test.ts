@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveWelcomePageLocale } from "../content/welcomePage/index.js";
+import { resolveWelcomePageLocale } from "../../content/welcomePage/index.js";
 
 describe("resolveWelcomePageLocale", () => {
   it("returns 'ja' when the input is null or undefined", () => {

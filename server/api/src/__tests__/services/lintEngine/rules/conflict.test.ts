@@ -3,7 +3,7 @@
  * Unit tests for the conflict rule (pure function extractFacts).
  */
 import { describe, it, expect } from "vitest";
-import { extractFacts } from "./conflict.js";
+import { extractFacts } from "../../../../services/lintEngine/rules/conflict.js";
 
 describe("extractFacts", () => {
   it("空文字列からは何も抽出しない / extracts nothing from empty string", () => {

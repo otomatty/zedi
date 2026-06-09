@@ -19,7 +19,7 @@ import {
   fetchYouTubeContent,
   __resetInnertubeForTesting,
   type TranscriptSegment,
-} from "./youtubeService.js";
+} from "../../services/youtubeService.js";
 
 /**
  * basic_info / page / getTranscript を持つ最小限の VideoInfo モックを生成する。

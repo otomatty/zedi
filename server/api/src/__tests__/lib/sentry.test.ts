@@ -22,7 +22,7 @@ const sentrySdkMock = vi.hoisted(() => ({
 
 vi.mock("@sentry/node", () => sentrySdkMock);
 
-import { captureApiException, initSentry, scrubSentryEvent } from "./sentry.js";
+import { captureApiException, initSentry, scrubSentryEvent } from "../../lib/sentry.js";
 
 function makeEvent(overrides: Partial<ErrorEvent> = {}): ErrorEvent {
   return { type: undefined, ...overrides } as ErrorEvent;

@@ -3,9 +3,9 @@
  * Tests for the ghost-many rule's row → finding mapping.
  */
 import { describe, it, expect } from "vitest";
-import { runGhostManyRule } from "./ghostMany.js";
-import { createMockDb } from "../../../__tests__/createMockDb.js";
-import type { Database } from "../../../types/index.js";
+import { runGhostManyRule } from "../../../../services/lintEngine/rules/ghostMany.js";
+import { createMockDb } from "../../../createMockDb.js";
+import type { Database } from "../../../../types/index.js";
 
 function asDb(results: unknown[]) {
   const { db, chains } = createMockDb(results);

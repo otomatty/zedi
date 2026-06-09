@@ -6,19 +6,20 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // sendEmail のモック / Mock sendEmail
 const mockSendEmail = vi.fn();
-vi.mock("./emailService.js", () => ({
+vi.mock("../../services/emailService.js", () => ({
   sendEmail: (...args: unknown[]) => mockSendEmail(...args),
 }));
 
 // renderInviteNoteEmail & getInviteNoteSubject のモック / Mock email template
 const mockRender = vi.fn();
 const mockGetSubject = vi.fn();
-vi.mock("../emails/invite-note.js", () => ({
+vi.mock("../../emails/invite-note.js", () => ({
   renderInviteNoteEmail: (...args: unknown[]) => mockRender(...args),
   getInviteNoteSubject: (...args: unknown[]) => mockGetSubject(...args),
 }));
 
-const { sendInvitation, resolveLocaleFromAcceptLanguage } = await import("./invitationService.js");
+const { sendInvitation, resolveLocaleFromAcceptLanguage } =
+  await import("../../services/invitationService.js");
 
 // ── Mock DB helper ──────────────────────────────────────────────────────────
 

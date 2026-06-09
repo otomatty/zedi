@@ -3,7 +3,7 @@
  * Unit tests for token utility
  */
 import { describe, it, expect } from "vitest";
-import { generateToken, getTokenExpiresAt, isTokenExpired } from "./token.js";
+import { generateToken, getTokenExpiresAt, isTokenExpired } from "../../utils/token.js";
 
 describe("generateToken", () => {
   it("URL セーフな Base64 文字列を返す", () => {

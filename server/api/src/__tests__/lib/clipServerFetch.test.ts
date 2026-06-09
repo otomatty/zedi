@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { lookup } from "node:dns/promises";
-import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "./clipServerFetch.js";
+import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "../../lib/clipServerFetch.js";
 
 vi.mock("node:dns/promises", () => ({
   lookup: vi.fn(),

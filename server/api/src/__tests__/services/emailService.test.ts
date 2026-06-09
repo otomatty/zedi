@@ -15,7 +15,7 @@ vi.mock("resend", () => {
 });
 
 // モック設定後にインポート / Import after mock setup
-const { sendEmail, _resetClient } = await import("./emailService.js");
+const { sendEmail, _resetClient } = await import("../../services/emailService.js");
 
 describe("sendEmail", () => {
   const originalEnv = process.env;

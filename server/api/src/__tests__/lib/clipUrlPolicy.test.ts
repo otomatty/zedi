@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { LookupAddress } from "node:dns";
 import { lookup } from "node:dns/promises";
-import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "./clipUrlPolicy.js";
+import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "../../lib/clipUrlPolicy.js";
 
 vi.mock("node:dns/promises", () => ({
   lookup: vi.fn(),

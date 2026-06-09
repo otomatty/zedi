@@ -3,7 +3,7 @@
  * Unit tests for the titleSimilar rule (pure function levenshtein).
  */
 import { describe, it, expect } from "vitest";
-import { levenshtein } from "./titleSimilar.js";
+import { levenshtein } from "../../../../services/lintEngine/rules/titleSimilar.js";
 
 describe("levenshtein", () => {
   it("同一文字列の距離は 0 / identical strings have distance 0", () => {

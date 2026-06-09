@@ -61,7 +61,7 @@ import {
   readDispatchRepository,
   triggerRepositoryDispatch,
   verifyInstallationToken,
-} from "./githubAppAuth.js";
+} from "../../lib/githubAppAuth.js";
 
 describe("readDispatchRepository", () => {
   const ORIGINAL = process.env.GITHUB_DISPATCH_REPOSITORY;

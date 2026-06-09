@@ -3,9 +3,9 @@
  * Tests for the broken-link rule's row → finding mapping using a mocked db.
  */
 import { describe, it, expect } from "vitest";
-import { runBrokenLinkRule } from "./brokenLink.js";
-import { createMockDb } from "../../../__tests__/createMockDb.js";
-import type { Database } from "../../../types/index.js";
+import { runBrokenLinkRule } from "../../../../services/lintEngine/rules/brokenLink.js";
+import { createMockDb } from "../../../createMockDb.js";
+import type { Database } from "../../../../types/index.js";
 
 function asDb(results: unknown[]) {
   const { db, chains } = createMockDb(results);

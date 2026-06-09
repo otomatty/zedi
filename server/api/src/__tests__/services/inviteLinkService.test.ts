@@ -22,9 +22,9 @@ import {
   generateInviteLinkToken,
   normalizeCreateInviteLinkInput,
   redeemInviteLink,
-} from "./inviteLinkService.js";
-import { noteInviteLinkRedemptions, noteInviteLinks, noteMembers } from "../schema/index.js";
-import type { Database } from "../types/index.js";
+} from "../../services/inviteLinkService.js";
+import { noteInviteLinkRedemptions, noteInviteLinks, noteMembers } from "../../schema/index.js";
+import type { Database } from "../../types/index.js";
 
 // ── generateInviteLinkToken ────────────────────────────────────────────────
 

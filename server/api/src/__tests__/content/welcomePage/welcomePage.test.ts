@@ -4,8 +4,12 @@ import { getSchema } from "@tiptap/core";
 import { prosemirrorJSONToYDoc } from "@tiptap/y-tiptap";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
-import { welcomePageContent, WELCOME_PAGE_TITLE, type WelcomePageLocale } from "./index.js";
-import { VideoServer } from "../../lib/videoServerExtension.js";
+import {
+  welcomePageContent,
+  WELCOME_PAGE_TITLE,
+  type WelcomePageLocale,
+} from "../../../content/welcomePage/index.js";
+import { VideoServer } from "../../../lib/videoServerExtension.js";
 
 const extensions = [
   StarterKit.configure({ heading: { levels: [1, 2, 3] }, codeBlock: false, link: false }),

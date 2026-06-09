@@ -7,7 +7,7 @@ import {
   ensureDefaultNote,
   formatDefaultNoteTitle,
   getDefaultNoteOrNull,
-} from "./defaultNoteService.js";
+} from "../../services/defaultNoteService.js";
 
 // ── Mock DB helper (shared with other service tests) ───────────────────────
 

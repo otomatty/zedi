@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock the dependencies
-vi.mock("../services/youtubeService.js", () => ({
+vi.mock("../../services/youtubeService.js", () => ({
   fetchYouTubeContent: vi.fn(),
   formatDuration: vi.fn((iso: string) => {
     const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -18,13 +18,13 @@ vi.mock("../services/youtubeService.js", () => ({
   }),
 }));
 
-vi.mock("../services/aiProviders.js", () => ({
+vi.mock("../../services/aiProviders.js", () => ({
   callProvider: vi.fn(),
 }));
 
-import { extractYouTubeContent } from "./youtubeExtractor.js";
-import { fetchYouTubeContent } from "../services/youtubeService.js";
-import { callProvider } from "../services/aiProviders.js";
+import { extractYouTubeContent } from "../../lib/youtubeExtractor.js";
+import { fetchYouTubeContent } from "../../services/youtubeService.js";
+import { callProvider } from "../../services/aiProviders.js";
 
 const mockFetchYouTubeContent = vi.mocked(fetchYouTubeContent);
 const mockCallProvider = vi.mocked(callProvider);

@@ -28,8 +28,8 @@ import {
   updateApiErrorStatus,
   API_ERROR_LIST_DEFAULT_LIMIT,
   API_ERROR_LIST_MAX_LIMIT,
-} from "./apiErrorService.js";
-import type { ApiError, ApiErrorStatus } from "../schema/apiErrors.js";
+} from "../../services/apiErrorService.js";
+import type { ApiError, ApiErrorStatus } from "../../schema/apiErrors.js";
 
 // ── Mock DB helpers ─────────────────────────────────────────────────────────
 

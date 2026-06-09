@@ -10,7 +10,7 @@ import {
   FREE_EMAIL_DOMAINS,
   extractEmailDomain,
   normalizeDomainInput,
-} from "./freeEmailDomains.js";
+} from "../../lib/freeEmailDomains.js";
 
 describe("normalizeDomainInput", () => {
   it("lower-cases and returns a valid domain", () => {

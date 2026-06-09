@@ -3,8 +3,11 @@
  * Unit tests for the pure stale-fold helper.
  */
 import { describe, it, expect } from "vitest";
-import { foldStaleRowsIntoFindings, type StaleRow } from "./stale.js";
-import type { LintFindingCandidate } from "../types.js";
+import {
+  foldStaleRowsIntoFindings,
+  type StaleRow,
+} from "../../../../services/lintEngine/rules/stale.js";
+import type { LintFindingCandidate } from "../../../../services/lintEngine/types.js";
 
 const makeRow = (overrides: Partial<StaleRow> = {}): StaleRow => ({
   page_id: "p1",
