@@ -11,8 +11,7 @@ import {
   type ConvertMarkdownToTiptapOptions,
 } from "@/lib/markdownToTiptap";
 
-export { convertMarkdownToTiptapContent } from "@/lib/markdownToTiptap";
-export type { ConvertMarkdownToTiptapOptions } from "@/lib/markdownToTiptap";
+export { convertMarkdownToTiptapContent, type ConvertMarkdownToTiptapOptions };
 
 type TiptapDoc = {
   type: "doc";
