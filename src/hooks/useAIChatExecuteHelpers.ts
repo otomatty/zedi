@@ -2,7 +2,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { ChatMessage, ChatTreeState, ReferencedPage, ToolExecution } from "../types/aiChat";
 import type { AISettings } from "../types/ai";
 import { callAIService, type AIServiceRequest } from "../lib/aiService";
-import { parseActions } from "../lib/aiChatActions";
+import { parseActions } from "@/lib/aiChat/aiChatActions";
 import { useAIChatStore } from "../stores/aiChatStore";
 import { patchMessageInTree } from "../lib/messageTree";
 

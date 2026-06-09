@@ -3,7 +3,7 @@ import { BookOpen, ClipboardPaste, Copy, Sparkles, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@zedi/ui";
 import { ChatMessage, ChatAction } from "../../types/aiChat";
-import { getDisplayContent } from "../../lib/aiChatActions";
+import { getDisplayContent } from "@/lib/aiChat/aiChatActions";
 import { AIChatActionCard } from "./AIChatActionCard";
 import { AIChatWikiLink } from "./AIChatWikiLink";
 import { UserMessageBubble, UserMessageContent } from "./AIChatUserMessageBubble";

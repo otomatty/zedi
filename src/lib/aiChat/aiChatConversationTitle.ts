@@ -1,5 +1,5 @@
-import type { MessageMap } from "../types/aiChat";
-import { getActivePath } from "./messageTree";
+import type { MessageMap } from "@/types/aiChat";
+import { getActivePath } from "@/lib/messageTree";
 
 /**
  * Builds a short title from the first user message on the active path.

@@ -1,6 +1,6 @@
 import i18n from "@/i18n";
-import { PageContext, ReferencedPage } from "../types/aiChat";
-import type { McpServerEntry } from "../types/mcp";
+import { PageContext, ReferencedPage } from "@/types/aiChat";
+import type { McpServerEntry } from "@/types/mcp";
 import { getAiChatActionFormatBlock } from "./aiChatPromptActionFormat";
 
 /**

@@ -1,4 +1,4 @@
-import type { AIChatDetailLocationState } from "../types/aiChat";
+import type { AIChatDetailLocationState } from "@/types/aiChat";
 import { aiChatInitialPayloadStorageKey } from "@/constants/aiChatSidebar";
 
 /**

@@ -1,4 +1,4 @@
-import { ChatAction } from "../types/aiChat";
+import { ChatAction } from "@/types/aiChat";
 
 /** アクションブロック検出用正規表現（複数行・空白のゆらぎに対応） */
 const ACTION_BLOCK_REGEX =

@@ -3,7 +3,7 @@
  * 「Wiki に残す」ダイアログ状態管理フック。
  */
 import { useState, useCallback } from "react";
-import { serializeChatMessagesForPageGeneration } from "@/lib/aiChatActionHelpers";
+import { serializeChatMessagesForPageGeneration } from "@/lib/aiChat/aiChatActionHelpers";
 import type { ChatMessage } from "@/types/aiChat";
 
 /**

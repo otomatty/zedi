@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { buildSystemPrompt } from "./aiChatPrompt";
-import type { PageContext, ReferencedPage } from "../types/aiChat";
+import type { PageContext, ReferencedPage } from "@/types/aiChat";
 import i18n from "@/i18n";
 
 describe("buildSystemPrompt", () => {

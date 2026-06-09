@@ -17,7 +17,7 @@ import {
   getMissingSuggestedWikiLinkTitles,
   normalizePageTitle,
   serializeChatMessagesForPageGeneration,
-} from "@/lib/aiChatActionHelpers";
+} from "@/lib/aiChat/aiChatActionHelpers";
 
 type ToastFn = (opts: { title: string; variant?: "destructive" }) => void;
 

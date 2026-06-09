@@ -5,14 +5,14 @@ import {
   type CreatePageAction,
   type ReferencedPage,
 } from "@/types/aiChat";
-import { extractWikiLinksFromContent } from "./wikiLinkUtils";
+import { extractWikiLinksFromContent } from "@/lib/wikiLinkUtils";
 import {
   convertMarkdownToTiptapContent,
   type ConvertMarkdownToTiptapOptions,
-} from "./markdownToTiptap";
+} from "@/lib/markdownToTiptap";
 
-export { convertMarkdownToTiptapContent } from "./markdownToTiptap";
-export type { ConvertMarkdownToTiptapOptions } from "./markdownToTiptap";
+export { convertMarkdownToTiptapContent } from "@/lib/markdownToTiptap";
+export type { ConvertMarkdownToTiptapOptions } from "@/lib/markdownToTiptap";
 
 type TiptapDoc = {
   type: "doc";

@@ -9,7 +9,7 @@ import type {
 } from "../types/aiChat";
 import type { AIServiceRequest } from "../lib/aiService";
 import { loadAISettings } from "../lib/aiSettings";
-import { buildSystemPrompt } from "../lib/aiChatPrompt";
+import { buildSystemPrompt } from "@/lib/aiChat/aiChatPrompt";
 import { useMcpConfigStore } from "../stores/mcpConfigStore";
 import { addMessageToTree, getActivePath, stripToChatMessage } from "../lib/messageTree";
 import {

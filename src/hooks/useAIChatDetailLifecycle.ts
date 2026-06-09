@@ -7,7 +7,7 @@ import {
   clearPendingInitialPayload,
   hasPendingLandingPayload,
   readPendingInitialPayload,
-} from "@/lib/aiChatDetailLandingPayload";
+} from "@/lib/aiChat/aiChatDetailLandingPayload";
 
 type UseAIChatDetailLifecycleParams = {
   conversationId: string | undefined;

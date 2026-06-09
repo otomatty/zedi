@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { generateConversationTitleFromTree } from "./aiChatConversationTitle";
-import type { TreeChatMessage } from "../types/aiChat";
+import type { TreeChatMessage } from "@/types/aiChat";
 
 /**
  * Build a small message-map with the given ordered chain (root → ... → leaf).
