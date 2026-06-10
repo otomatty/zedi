@@ -17,7 +17,7 @@ import {
   issueExtensionToken,
   storeExtensionCode,
 } from "../lib/extAuth.js";
-import { extractYouTubeVideoId } from "../lib/articleExtractor.js";
+import { extractYouTubeVideoId } from "../services/articleExtractor.js";
 import { clipAndCreate } from "../lib/clipAndCreate.js";
 import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "../lib/clipUrlPolicy.js";
 import { resolveAiConfigForRequest } from "../lib/aiAccessHelpers.js";

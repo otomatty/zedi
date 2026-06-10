@@ -22,7 +22,7 @@ vi.mock("../../services/aiProviders.js", () => ({
   callProvider: vi.fn(),
 }));
 
-import { extractYouTubeContent } from "../../lib/youtubeExtractor.js";
+import { extractYouTubeContent } from "../../services/youtubeExtractor.js";
 import { fetchYouTubeContent } from "../../services/youtubeService.js";
 import { callProvider } from "../../services/aiProviders.js";
 

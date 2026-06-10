@@ -2,7 +2,7 @@
  * 日本語版ウェルカムページの Tiptap ドキュメント。
  * Japanese welcome page Tiptap document.
  */
-import type { TiptapNode } from "../../lib/articleExtractor.js";
+import type { TiptapNode } from "../../services/articleExtractor.js";
 
 /**
  * `/pages/:welcomeId` に表示される日本語版ウェルカムページの Tiptap ドキュメント。

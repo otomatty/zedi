@@ -13,8 +13,8 @@ import {
   fetchYouTubeContent,
   formatDuration,
   type YouTubeContent,
-} from "../services/youtubeService.js";
-import { callProvider } from "../services/aiProviders.js";
+} from "./youtubeService.js";
+import { callProvider } from "./aiProviders.js";
 import type { TiptapNode } from "./articleExtractor.js";
 import type { AIProviderType, AIMessage, TokenUsage } from "../types/index.js";
 
