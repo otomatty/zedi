@@ -17,7 +17,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { pages, users, userOnboardingStatus } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
 import type { AppEnv } from "../types/index.js";
-import { insertWelcomePage, retryWelcomePageIfNeeded } from "../lib/welcomePageService.js";
+import { insertWelcomePage, retryWelcomePageIfNeeded } from "../services/welcomePageService.js";
 
 const app = new Hono<AppEnv>();
 

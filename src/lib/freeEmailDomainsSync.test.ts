@@ -1,6 +1,6 @@
 /**
  * `@zedi/shared/freeEmailDomains` と、`server/api` 側で同じ値を二重定義している
- * `server/api/src/lib/freeEmailDomains.ts` がドリフトしていないことを CI で
+ * `server/api/src/services/freeEmailDomains.ts` がドリフトしていないことを CI で
  * 保証するテスト。`server/api` はルートの Bun workspace から意図的に外れて
  * いるため `@zedi/shared` を直接 import できないので、本テストがサーバ側の
  * ファイルを `fs.readFileSync` で読み、`FREE_EMAIL_DOMAINS` セットと
@@ -8,7 +8,7 @@
  *
  * Drift detector that fails CI when `@zedi/shared`'s `FREE_EMAIL_DOMAINS` /
  * `DOMAIN_REGEX` and the server-side duplicates in
- * `server/api/src/lib/freeEmailDomains.ts` disagree. `server/api` lives
+ * `server/api/src/services/freeEmailDomains.ts` disagree. `server/api` lives
  * outside the Bun workspace (Railway uses `server/api/` as the build
  * context), so it cannot import `@zedi/shared`. This test reads the server
  * file from disk and compares the canonical values byte-for-byte.
@@ -38,7 +38,7 @@ function parseServerDomainSet(source: string): string[] {
   );
   expect(
     arrayMatch,
-    "FREE_EMAIL_DOMAINS export not found in server/api/src/lib/freeEmailDomains.ts",
+    "FREE_EMAIL_DOMAINS export not found in server/api/src/services/freeEmailDomains.ts",
   ).not.toBeNull();
   if (!arrayMatch) return [];
   const body = arrayMatch[1];
@@ -64,17 +64,17 @@ function parseServerDomainRegex(source: string): string | null {
 }
 
 describe("FREE_EMAIL_DOMAINS / DOMAIN_REGEX sync between @zedi/shared and server/api", () => {
-  const serverFilePath = resolve(__dirname, "../../server/api/src/lib/freeEmailDomains.ts");
+  const serverFilePath = resolve(__dirname, "../../server/api/src/services/freeEmailDomains.ts");
   const source = readFileSync(serverFilePath, "utf8");
 
-  it("server/api/src/lib/freeEmailDomains.ts mirrors the shared FREE_EMAIL_DOMAINS set", () => {
+  it("server/api/src/services/freeEmailDomains.ts mirrors the shared FREE_EMAIL_DOMAINS set", () => {
     const serverEntries = parseServerDomainSet(source);
     expect(new Set(serverEntries)).toEqual(FREE_EMAIL_DOMAINS);
     // 二重登録が無いこと（パース上のドリフトを防ぐ）/ guard against duplicates.
     expect(serverEntries).toHaveLength(new Set(serverEntries).size);
   });
 
-  it("server/api/src/lib/freeEmailDomains.ts mirrors the shared DOMAIN_REGEX pattern", () => {
+  it("server/api/src/services/freeEmailDomains.ts mirrors the shared DOMAIN_REGEX pattern", () => {
     const serverPattern = parseServerDomainRegex(source);
     expect(serverPattern, "DOMAIN_REGEX literal not found in server file").not.toBeNull();
     expect(serverPattern).toBe(DOMAIN_REGEX.source);

@@ -8,8 +8,8 @@ import { HTTPException } from "hono/http-exception";
 import { authRequired } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "../lib/clipServerFetch.js";
-import { extractYouTubeContent } from "../lib/youtubeExtractor.js";
-import { resolveAiConfigForRequest } from "../lib/aiAccessHelpers.js";
+import { extractYouTubeContent } from "../services/youtubeExtractor.js";
+import { resolveAiConfigForRequest } from "../services/aiAccessHelpers.js";
 import { calculateCost, recordUsage } from "../services/usageService.js";
 import type { AppEnv, AIProviderType } from "../types/index.js";
 

@@ -11,7 +11,7 @@ import {
   issueExtensionToken,
   verifyExtensionToken,
   type ExtensionTokenPayload,
-} from "../../lib/extAuth.js";
+} from "../../services/extAuth.js";
 
 /** base64url encode (no padding) - mirrors extAuth internal logic for test */
 function sha256Base64url(str: string): string {

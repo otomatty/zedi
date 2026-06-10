@@ -10,7 +10,7 @@
 import { createHash } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import type { Redis } from "ioredis";
-import { getEnv, getOptionalEnv } from "./env.js";
+import { getEnv, getOptionalEnv } from "../lib/env.js";
 
 const CODE_TTL_SEC = 300; // 5 minutes
 const JWT_EXP_DAYS = 7;

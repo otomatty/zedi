@@ -12,7 +12,7 @@
  * page_contents. Content is frozen at creation time; later locale changes do
  * not regenerate (the user may have edited the page).
  */
-import type { TiptapNode } from "../../lib/articleExtractor.js";
+import type { TiptapNode } from "../../services/articleExtractor.js";
 import { welcomePageJa } from "./ja.js";
 import { welcomePageEn } from "./en.js";
 

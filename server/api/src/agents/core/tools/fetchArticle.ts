@@ -16,7 +16,10 @@
  */
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { extractArticleFromUrl, ClipFetchBlockedError } from "../../../lib/articleExtractor.js";
+import {
+  extractArticleFromUrl,
+  ClipFetchBlockedError,
+} from "../../../services/articleExtractor.js";
 import { isClipUrlAllowedAfterDns } from "../../../lib/clipUrlPolicy.js";
 
 /** Tool name. */

@@ -30,7 +30,7 @@ import { authRequired, authOptional } from "../middleware/auth.js";
 import type { AppEnv, Database } from "../types/index.js";
 import { ensureDefaultNote, getDefaultNoteOrNull } from "../services/defaultNoteService.js";
 import { getNoteRole, canEdit } from "./notes/helpers.js";
-import { extractEmailDomain } from "../lib/freeEmailDomains.js";
+import { extractEmailDomain } from "../services/freeEmailDomains.js";
 import { assertPageEditAccess } from "../services/pageAccessService.js";
 import { propagateTitleRename } from "../services/titleRenamePropagationService.js";
 import { deleteThumbnailObject } from "../services/thumbnailGcService.js";

@@ -19,8 +19,8 @@ import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
 import Image from "@tiptap/extension-image";
 import { common, createLowlight } from "lowlight";
 import { createHash } from "node:crypto";
-import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "./clipServerFetch.js";
-import { YouTubeEmbedServer } from "./youtubeEmbedServerExtension.js";
+import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "../lib/clipServerFetch.js";
+import { YouTubeEmbedServer } from "../lib/youtubeEmbedServerExtension.js";
 import { extractYouTubeContent } from "./youtubeExtractor.js";
 import type { AIProviderType, TokenUsage } from "../types/index.js";
 

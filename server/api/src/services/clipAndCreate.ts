@@ -15,7 +15,7 @@ import { pages, pageContents } from "../schema/index.js";
 import type * as schema from "../schema/index.js";
 import { buildArticleSchema, extractArticleFromUrl } from "./articleExtractor.js";
 import type { AIProviderType, TokenUsage } from "../types/index.js";
-import { ensureDefaultNote } from "../services/defaultNoteService.js";
+import { ensureDefaultNote } from "./defaultNoteService.js";
 
 const YDOC_FRAGMENT = "default";
 
