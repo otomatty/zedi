@@ -3,7 +3,6 @@
  * HTTP/SSE fields for the MCP server form (Issue #463).
  */
 
-import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { Input } from "@zedi/ui";

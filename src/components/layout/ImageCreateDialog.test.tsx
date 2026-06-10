@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { AIProviderType, APIMode } from "@/types/ai";
 
 // --- Mocks ---
 // vi.mock() は hoist されるので、共有する値は vi.hoisted() で作る。
@@ -13,9 +14,9 @@ const mocks = vi.hoisted(() => ({
   },
   useAISettingsMock: {
     settings: {
-      provider: "openai" as const,
+      provider: "openai" as AIProviderType,
       apiKey: "sk-test",
-      apiMode: "user_api_key" as const,
+      apiMode: "user_api_key" as APIMode,
       model: "gpt-5-mini",
       modelId: "openai:gpt-5-mini",
       isConfigured: true,
@@ -78,8 +79,10 @@ async function advanceToPreview(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("ImageCreateDialog", () => {
-  let onOpenChange: ReturnType<typeof vi.fn>;
-  let onCreated: ReturnType<typeof vi.fn>;
+  let onOpenChange: ReturnType<typeof vi.fn<(open: boolean) => void>>;
+  let onCreated: ReturnType<
+    typeof vi.fn<(imageUrl: string, extractedText?: string, description?: string) => void>
+  >;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -91,8 +94,8 @@ describe("ImageCreateDialog", () => {
     useAISettingsMock.settings.model = "gpt-5-mini";
     useAISettingsMock.settings.modelId = "openai:gpt-5-mini";
     useAISettingsMock.settings.isConfigured = true;
-    onOpenChange = vi.fn();
-    onCreated = vi.fn();
+    onOpenChange = vi.fn<(open: boolean) => void>();
+    onCreated = vi.fn<(imageUrl: string, extractedText?: string, description?: string) => void>();
   });
 
   afterEach(() => {

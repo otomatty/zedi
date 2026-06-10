@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription, AlertTitle } from "@zedi/ui";
 import { CollapsibleHelp } from "./CollapsibleHelp";
 import { ApiKeySourcesHelp } from "./ApiKeySourcesHelp";
-import type { AIProvider } from "@/types/ai";
+import type { AIProvider, AISettings } from "@/types/ai";
 import { useTranslation } from "react-i18next";
 
 interface AISettingsFormUserKeySectionProps {
@@ -18,7 +18,7 @@ interface AISettingsFormUserKeySectionProps {
   currentProvider: AIProvider | undefined;
   showApiKey: boolean;
   onToggleShowApiKey: () => void;
-  onUpdateSettings: (updates: { provider?: string; apiKey?: string; model?: string }) => void;
+  onUpdateSettings: (updates: Partial<AISettings>) => void;
   isSaving: boolean;
   isTesting: boolean;
   testResult: { success: boolean; message: string } | null;

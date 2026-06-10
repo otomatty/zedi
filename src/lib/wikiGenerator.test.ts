@@ -188,8 +188,8 @@ describe("generateWikiContentStream", () => {
     });
 
     vi.mocked(callAIService).mockImplementation((_s, _req, handlers) => {
-      handlers.onChunk("Hello ");
-      handlers.onChunk("[[World]].");
+      handlers.onChunk?.("Hello ");
+      handlers.onChunk?.("[[World]].");
       handlers.onComplete?.({ content: "" });
       return Promise.resolve();
     });
@@ -236,8 +236,8 @@ describe("generateWikiContentStream", () => {
     });
 
     vi.mocked(callAIService).mockImplementation((_s, _req, handlers) => {
-      handlers.onChunk("Streamed ");
-      handlers.onChunk("body");
+      handlers.onChunk?.("Streamed ");
+      handlers.onChunk?.("body");
       handlers.onComplete?.({} as unknown as AIServiceResponse);
       return Promise.resolve();
     });
@@ -257,7 +257,7 @@ describe("generateWikiContentStream", () => {
     vi.mocked(loadAISettings).mockResolvedValue({ ...baseSettings });
     const svcErr = new Error("stream service failed");
     vi.mocked(callAIService).mockImplementation((_s, _req, handlers) => {
-      handlers.onError(svcErr);
+      handlers.onError?.(svcErr);
       return Promise.resolve();
     });
 
@@ -348,8 +348,8 @@ describe("generateWikiContentFromChatOutlineStream — api_server", () => {
     });
 
     vi.mocked(callAIService).mockImplementation((_s, _req, handlers) => {
-      handlers.onChunk("# ");
-      handlers.onChunk("Hello");
+      handlers.onChunk?.("# ");
+      handlers.onChunk?.("Hello");
       handlers.onComplete?.({ content: "# Hello" });
       return Promise.resolve();
     });
@@ -396,8 +396,8 @@ describe("generateWikiContentFromChatOutlineStream — api_server", () => {
   it("uses streamed chunks when onComplete returns undefined content", async () => {
     vi.mocked(loadAISettings).mockResolvedValue({ ...baseSettings, apiMode: "api_server" });
     vi.mocked(callAIService).mockImplementation((_s, _req, handlers) => {
-      handlers.onChunk("Part1");
-      handlers.onChunk("Part2");
+      handlers.onChunk?.("Part1");
+      handlers.onChunk?.("Part2");
       handlers.onComplete?.({ content: undefined } as unknown as AIServiceResponse);
       return Promise.resolve();
     });
@@ -422,7 +422,7 @@ describe("generateWikiContentFromChatOutlineStream — api_server", () => {
     vi.mocked(loadAISettings).mockResolvedValue({ ...baseSettings, apiMode: "api_server" });
     const err = new Error("chat svc");
     vi.mocked(callAIService).mockImplementation((_s, _req, handlers) => {
-      handlers.onError(err);
+      handlers.onError?.(err);
       return Promise.resolve();
     });
 
@@ -496,7 +496,7 @@ describe("generateWikiContentFromChatOutlineStream — user_api_key", () => {
     });
 
     vi.mocked(streamWikiStyleFromFullPrompt).mockImplementation((_s, _req, handlers) => {
-      handlers.onChunk("x");
+      handlers.onChunk?.("x");
       handlers.onComplete({ content: "x", wikiLinks: [] });
       return Promise.resolve();
     });

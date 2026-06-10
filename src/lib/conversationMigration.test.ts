@@ -4,7 +4,8 @@ import { migrateConversation, needsMigration } from "./conversationMigration";
 
 describe("needsMigration", () => {
   it("returns true when legacy messages array is present without messageMap", () => {
-    expect(needsMigration({ messages: [] } as Conversation)).toBe(true);
+    // Partial fixture: needsMigration only inspects messages/messageMap.
+    expect(needsMigration({ messages: [] } as unknown as Conversation)).toBe(true);
     expect(
       needsMigration({
         messages: [{ id: "u1", role: "user", content: "Hi", timestamp: 0 }],

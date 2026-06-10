@@ -395,46 +395,50 @@ describe("convertMarkdownToTiptapContent (URL sanitization)", () => {
 
 describe("getCreatePageOutline", () => {
   it("returns trimmed outline", () => {
-    const action = {
+    const action: CreatePageAction = {
       type: "create-page",
       title: "T",
+      content: "",
       outline: "- A\n- B",
       suggestedLinks: [],
       reason: "r",
-    } as CreatePageAction;
+    };
     expect(getCreatePageOutline(action)).toBe("- A\n- B");
   });
 
   it("returns empty string when outline missing", () => {
-    const action = {
+    const action: CreatePageAction = {
       type: "create-page",
       title: "T",
+      content: "",
       suggestedLinks: [],
       reason: "r",
-    } as CreatePageAction;
+    };
     expect(getCreatePageOutline(action)).toBe("");
   });
 
   it("uses outline field, not title", () => {
-    const action = {
+    const action: CreatePageAction = {
       type: "create-page",
       title: "TitleOnly",
+      content: "",
       outline: "OutlineBody",
       suggestedLinks: [],
       reason: "r",
-    } as CreatePageAction;
+    };
     expect(getCreatePageOutline(action)).toBe("OutlineBody");
     expect(getCreatePageOutline(action)).not.toContain("TitleOnly");
   });
 
   it("trims outline whitespace via optional chain", () => {
-    const action = {
+    const action: CreatePageAction = {
       type: "create-page",
       title: "T",
+      content: "",
       outline: "  padded  ",
       suggestedLinks: [],
       reason: "r",
-    } as CreatePageAction;
+    };
     expect(getCreatePageOutline(action)).toBe("padded");
   });
 });

@@ -154,9 +154,9 @@ describe("PageActionHub", () => {
   });
 
   it("ハンドルの close() で閉じ、再オープン時は list / close() then reopen lands on list", async () => {
-    let handle: PageActionHubHandle | null = null;
+    const handleRef: { current: PageActionHubHandle | null } = { current: null };
     const onMount = (h: PageActionHubHandle) => {
-      handle = h;
+      handleRef.current = h;
     };
     const user = userEvent.setup();
     render(<Harness ctx={makeCtx()} onMount={onMount} />);
@@ -164,11 +164,11 @@ describe("PageActionHub", () => {
     await user.click(screen.getByTestId("open-trigger"));
     await user.click(screen.getByRole("button", { name: /Search image/ }));
 
-    await waitFor(() => expect(handle).not.toBeNull());
+    await waitFor(() => expect(handleRef.current).not.toBeNull());
 
     // close() を呼ぶ
     // Call close() through the imperative handle.
-    handle?.close();
+    handleRef.current?.close();
 
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

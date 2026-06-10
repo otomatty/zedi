@@ -81,7 +81,7 @@ export class CollaborationManager {
       url: wsUrl,
       name: documentName,
       document: this.ydoc,
-      token: () => this.getAuthToken(),
+      token: async () => (await this.getAuthToken()) ?? "",
       onStatus: ({ status }) => {
         this.updateState({
           status: status as ConnectionStatus,

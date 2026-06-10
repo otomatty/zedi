@@ -12,7 +12,7 @@ interface WikiLinkSuggestionLayerProps {
   editor: Editor | null;
   suggestionState: WikiLinkSuggestionState | null;
   position: { top: number; left: number } | null;
-  suggestionRef: React.RefObject<WikiLinkSuggestionHandle>;
+  suggestionRef: React.RefObject<WikiLinkSuggestionHandle | null>;
   onSelect: (item: SuggestionItem) => void;
   onClose: () => void;
   /**

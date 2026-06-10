@@ -18,7 +18,7 @@ function effectiveStorageProviderId(provider: string): StorageProviderType {
  * 各設定セクションカード向けの 1 行サマリーを生成する。
  */
 export function useSettingsSummaries(): Record<SettingsSectionId, string> {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const general = useGeneralSettings();
   const ai = useAISettings();
   const storage = useStorageSettings();

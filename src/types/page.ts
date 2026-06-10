@@ -6,17 +6,25 @@ export interface Page {
   id: string;
   ownerUserId: string;
   /**
-   * 所属ノート ID。Issue #823 でデフォルトノート（マイノート）が導入され、
-   * すべてのページはちょうど 1 つのノートに所属するようになった。旧 `/home`
-   * 表示用の「個人ページ（`note_id IS NULL`）」概念は廃止され、Issue #825 で
-   * フロント型も non-null に揃えた。
+   * 所属ノート ID。`null` は「個人ページ（`note_id IS NULL`）」を表す。
    *
-   * Owning note ID. After issue #823 every page belongs to exactly one note
-   * (the caller's default note replaces the legacy "personal page" concept,
-   * where `note_id` was `null`). Issue #825 tightened the frontend type to
-   * non-null to match the API contract.
+   * Issue #823/#825 はデフォルトノート導入に伴いこの概念を廃止する方針だが、
+   * ストレージ層（`PageMetadata.noteId: string | null`）・ゲストストア
+   * (`pageStore`)・IndexedDB の個人ページ判定 (`noteId === null`) が依然として
+   * `null` を生成・依存しているため、フロントのドメイン型も実態に合わせて
+   * `string | null` とする（`strict: true` 化で型穴を顕在化）。`null` をソース
+   * から完全に除去して non-null へ再 tighten するのは個人ページ概念の根絶
+   * エピックで対応する。
+   *
+   * Owning note ID. `null` denotes a legacy "personal page" (`note_id IS NULL`).
+   * Issues #823/#825 aim to retire this concept, but the storage layer
+   * (`PageMetadata.noteId: string | null`), the guest store (`pageStore`), and
+   * IndexedDB's personal-page filter (`noteId === null`) still produce and rely
+   * on `null`, so the frontend domain type matches reality as `string | null`
+   * (surfaced by enabling `strict: true`). Eliminating `null` at the source and
+   * re-tightening to non-null is tracked by the personal-page removal epic.
    */
-  noteId: string;
+  noteId: string | null;
   title: string;
   content: string; // Tiptap JSON stringified
   contentPreview?: string;
@@ -35,13 +43,13 @@ export interface PageSummary {
   id: string;
   ownerUserId: string;
   /**
-   * 所属ノート ID。`Page.noteId` と同様、Issue #823 / #825 によりフロント型も
-   * non-null になった。
+   * 所属ノート ID。`Page.noteId` と同様、`null` は個人ページを表す暫定形。
+   * 詳細と今後の方針（個人ページ概念の根絶エピック）は `Page.noteId` を参照。
    *
-   * Owning note ID. Mirrors the non-null contract on `Page.noteId` after
-   * issues #823 and #825.
+   * Owning note ID. Like `Page.noteId`, `null` denotes a personal page as an
+   * interim shape; see `Page.noteId` for details and the planned removal epic.
    */
-  noteId: string;
+  noteId: string | null;
   title: string;
   contentPreview?: string;
   thumbnailUrl?: string;

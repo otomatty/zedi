@@ -873,9 +873,11 @@ const NotePageView: React.FC = () => {
     navigate(`/notes/${noteId}`);
   }, [navigate, noteId]);
 
-  const canEdit = canEditPage(access, userId, page);
+  const canEdit = canEditPage(access ?? undefined, userId ?? undefined, page);
   const isTitleEditable =
-    page?.noteId != null ? Boolean(access?.canEdit) : canEdit && canEditTitle(userId, page);
+    page?.noteId != null
+      ? Boolean(access?.canEdit)
+      : canEdit && canEditTitle(userId ?? undefined, page);
   const collaborationPageId = page?.id ?? "";
   const isCollaborationEnabled = Boolean(collaborationPageId && isSignedIn && canEdit);
   const collaboration = useCollaboration({

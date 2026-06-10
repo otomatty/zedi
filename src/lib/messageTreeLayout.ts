@@ -88,6 +88,9 @@ export function buildFlowGraph(
     const pos = dagreGraph.node(m.id);
     const isOnActivePath = activePathIds.has(m.id);
     const isActiveLeaf = activeLeafId === m.id;
+    // collectFromRoot は system を除外済みなので role は user/assistant に限られる。
+    // collectFromRoot already excludes system, so role is narrowed to user/assistant.
+    const role: BranchNodeData["role"] = m.role === "user" ? "user" : "assistant";
 
     return {
       id: m.id,
@@ -97,7 +100,7 @@ export function buildFlowGraph(
         y: pos.y - NODE_HEIGHT / 2,
       },
       data: {
-        role: m.role,
+        role,
         contentPreview: contentPreview(m.content),
         isOnActivePath,
         isActiveLeaf,

@@ -3,7 +3,7 @@
  * ユーザーの Wiki スキーマ（「憲法」）ページの取得・更新フック。
  */
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/auth/useAuth";
+import { useUser } from "@/hooks/auth/useAuth";
 
 /**
  * Response shape from GET /api/wiki-schema.
@@ -67,7 +67,7 @@ async function updateWikiSchema(body: {
  * @returns `{ data, isLoading, error, updateSchema }` — data is null when no schema exists yet.
  */
 export function useWikiSchema() {
-  const { user } = useAuth();
+  const { user } = useUser();
   const queryClient = useQueryClient();
   const queryKey = getWikiSchemaKey(user?.id);
 

@@ -158,7 +158,7 @@ async function runWorkflowStepsLoop(
   };
 
   const emitNote = (
-    currentStepIndex: number,
+    _currentStepIndex: number,
     statuses: WorkflowStepRunStatus[],
     streamingStepIndex: number | null,
     streamingText: string,

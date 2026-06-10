@@ -8,7 +8,6 @@
  * ロゴ・検索 Sheet のトグル・既存のデスクトップウィジェット（NavigationMenu /
  * UnifiedMenu）は描画されない（役割はボトムナビへ移動）。
  */
-import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";

@@ -44,12 +44,12 @@ function dispatchKeyDown(init: KeyboardEventInit & { key: string }): KeyboardEve
 }
 
 describe("useEditorWikiLinkShortcuts - Cmd/Ctrl+K", () => {
-  let focusInputBar: ReturnType<typeof vi.fn>;
-  let convertSelectionToWikiLink: ReturnType<typeof vi.fn>;
+  let focusInputBar: ReturnType<typeof vi.fn<() => void>>;
+  let convertSelectionToWikiLink: ReturnType<typeof vi.fn<() => Promise<void>>>;
 
   beforeEach(() => {
-    focusInputBar = vi.fn();
-    convertSelectionToWikiLink = vi.fn().mockResolvedValue(undefined);
+    focusInputBar = vi.fn<() => void>();
+    convertSelectionToWikiLink = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   });
 
   it("Cmd+K (mac) を捕捉して focusInputBar を呼び preventDefault する / catches Cmd+K on mac and invokes focusInputBar with preventDefault", () => {
@@ -126,12 +126,12 @@ describe("useEditorWikiLinkShortcuts - Cmd/Ctrl+K", () => {
 });
 
 describe("useEditorWikiLinkShortcuts - Cmd/Ctrl+Shift+L", () => {
-  let focusInputBar: ReturnType<typeof vi.fn>;
-  let convertSelectionToWikiLink: ReturnType<typeof vi.fn>;
+  let focusInputBar: ReturnType<typeof vi.fn<() => void>>;
+  let convertSelectionToWikiLink: ReturnType<typeof vi.fn<() => Promise<void>>>;
 
   beforeEach(() => {
-    focusInputBar = vi.fn();
-    convertSelectionToWikiLink = vi.fn().mockResolvedValue(undefined);
+    focusInputBar = vi.fn<() => void>();
+    convertSelectionToWikiLink = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   });
 
   it("非空選択時に convertSelectionToWikiLink を呼ぶ / invokes convertSelectionToWikiLink when selection is non-empty", () => {
@@ -236,12 +236,12 @@ describe("useEditorWikiLinkShortcuts - Cmd/Ctrl+Shift+L", () => {
 });
 
 describe("useEditorWikiLinkShortcuts - 共通ガード / shared guards", () => {
-  let focusInputBar: ReturnType<typeof vi.fn>;
-  let convertSelectionToWikiLink: ReturnType<typeof vi.fn>;
+  let focusInputBar: ReturnType<typeof vi.fn<() => void>>;
+  let convertSelectionToWikiLink: ReturnType<typeof vi.fn<() => Promise<void>>>;
 
   beforeEach(() => {
-    focusInputBar = vi.fn();
-    convertSelectionToWikiLink = vi.fn().mockResolvedValue(undefined);
+    focusInputBar = vi.fn<() => void>();
+    convertSelectionToWikiLink = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   });
 
   it("editor が null のときは何もしない / no-op when editor is null", () => {

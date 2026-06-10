@@ -61,7 +61,7 @@ const CodeBlockWithCopyNodeView: React.FC<NodeViewProps> = ({ node }) => {
   return (
     <NodeViewWrapper as="div" className="group/code relative" spellCheck={false}>
       <pre ref={preRef} className="overflow-x-auto" spellCheck={false}>
-        <NodeViewContent
+        <NodeViewContent<"code">
           as="code"
           className={language ? `language-${language}` : ""}
           spellCheck={false}

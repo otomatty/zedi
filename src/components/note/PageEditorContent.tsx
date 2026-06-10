@@ -31,10 +31,10 @@ function getCollaborationState(collaboration: UseCollaborationReturn | undefined
   isInitialSyncPending: boolean;
   collaborationConfig: CollaborationConfig | undefined;
 } {
-  const ready = Boolean(
-    collaboration?.ydoc && collaboration?.xmlFragment && collaboration?.collaborationUser,
-  );
-  if (!ready || !collaboration) {
+  const ydoc = collaboration?.ydoc;
+  const xmlFragment = collaboration?.xmlFragment;
+  const collaborationUser = collaboration?.collaborationUser;
+  if (!collaboration || !ydoc || !xmlFragment || !collaborationUser) {
     return {
       useCollaborationMode: false,
       isInitialSyncPending: false,
@@ -42,10 +42,10 @@ function getCollaborationState(collaboration: UseCollaborationReturn | undefined
     };
   }
   const config: CollaborationConfig = {
-    ydoc: collaboration.ydoc,
-    xmlFragment: collaboration.xmlFragment,
+    ydoc,
+    xmlFragment,
     awareness: collaboration.awareness,
-    user: collaboration.collaborationUser,
+    user: collaborationUser,
     updateCursor: collaboration.updateCursor,
     updateSelection: collaboration.updateSelection,
     isSynced: collaboration.isSynced,

@@ -38,7 +38,7 @@ function convertNode(node: TiptapNode): string {
   return handler ? handler(node) : convertChildren(node);
 }
 
-Object.assign(nodeHandlers, {
+Object.assign<Record<string, NodeHandler>, Record<string, NodeHandler>>(nodeHandlers, {
   doc: (n) => convertChildren(n),
   paragraph: (n) => convertChildren(n) + "\n\n",
   heading: (n) => {

@@ -10,7 +10,7 @@ export interface ProfileSettingsCardProps {
   avatarUrl: string | undefined;
   displayName: string | undefined;
   updateProfileAndSave: (updates: { displayName?: string; avatarUrl?: string }) => void;
-  fileInputRef: React.RefObject<HTMLInputElement>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   onAvatarFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   /** Called when user removes avatar; parent should revoke blob URL and clear ref before updating. / アバター削除時。親で blob URL を revoke し ref をクリアしてから更新すること。 */
   onAvatarRemove?: () => void;
@@ -43,7 +43,7 @@ export function ProfileSettingsCard({
       <CardContent className="space-y-6">
         <ProfileFormFields
           displayName={profile.displayName ?? ""}
-          avatarDisplayUrl={profile.avatarUrl || avatarUrl}
+          avatarDisplayUrl={profile.avatarUrl || avatarUrl || ""}
           displayNameForAvatar={displayName}
           onDisplayNameChange={(value) => updateProfileAndSave({ displayName: value })}
           onAvatarChange={onAvatarFileChange}

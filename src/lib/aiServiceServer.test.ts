@@ -3,9 +3,9 @@
  * AI サービス（API サーバー経由・SSE）のテスト。
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { callAIWithServer } from "./aiServiceServer";
-import type { AIServiceRequest, AIServiceCallbacks } from "./aiService";
+import type { AIServiceRequest } from "./aiService";
 
 /**
  * Build a mock streaming Response whose body is a `ReadableStream<Uint8Array>`
@@ -38,9 +38,7 @@ function buildRequest(overrides: Partial<AIServiceRequest> = {}): AIServiceReque
   };
 }
 
-function buildCallbacks(): Required<
-  Pick<AIServiceCallbacks, "onChunk" | "onComplete" | "onError" | "onUsageUpdate">
-> {
+function buildCallbacks(): Record<"onChunk" | "onComplete" | "onError" | "onUsageUpdate", Mock> {
   return {
     onChunk: vi.fn(),
     onComplete: vi.fn(),
