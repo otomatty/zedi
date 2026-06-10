@@ -66,7 +66,7 @@ const useNotesMock: Mock<() => UseNotesResult> = vi.fn();
 const useMyNoteMock: Mock<(options?: { enabled?: boolean }) => UseMyNoteResult> = vi.fn();
 const useAuthMock: Mock<() => UseAuthResult> = vi.fn();
 
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   useNotes: () => useNotesMock(),
   useMyNote: (options?: { enabled?: boolean }) => useMyNoteMock(options),
 }));
@@ -77,11 +77,11 @@ const usePinnedNotesMock = vi.fn(() => ({
   togglePin: vi.fn(),
 }));
 
-vi.mock("@/hooks/usePinnedNotes", () => ({
+vi.mock("@/hooks/notes/usePinnedNotes", () => ({
   usePinnedNotes: () => usePinnedNotesMock(),
 }));
 
-vi.mock("@/hooks/useAuth", () => ({
+vi.mock("@/hooks/auth/useAuth", () => ({
   useAuth: () => useAuthMock(),
 }));
 

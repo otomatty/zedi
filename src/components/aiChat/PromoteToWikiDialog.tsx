@@ -20,8 +20,8 @@ import {
 } from "@/lib/aiChat/extractEntitiesPrompt";
 import { callAIService } from "@/lib/aiService";
 import { loadAISettings } from "@/lib/aiSettings";
-import { useCreatePage } from "@/hooks/usePageQueries";
-import { useWikiSchema } from "@/hooks/useWikiSchema";
+import { useCreatePage } from "@/hooks/pages/usePageQueries";
+import { useWikiSchema } from "@/hooks/wiki/useWikiSchema";
 import { navigateToWikiCompose } from "@/lib/wikiCompose/navigation";
 import { EntityRow } from "./EntityRow";
 

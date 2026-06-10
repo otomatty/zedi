@@ -31,7 +31,7 @@ import {
   usePageSnapshots,
   usePageSnapshot,
   useRestorePageSnapshot,
-} from "@/hooks/usePageSnapshotQueries";
+} from "@/hooks/pages/usePageSnapshotQueries";
 import { SnapshotList } from "./SnapshotList";
 import { SnapshotPreview } from "./SnapshotPreview";
 import { SnapshotCompare } from "./SnapshotCompare";

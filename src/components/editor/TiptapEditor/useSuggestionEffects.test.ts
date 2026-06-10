@@ -7,7 +7,7 @@ import { slashSuggestionPluginKey } from "../extensions/slashSuggestionPlugin";
 import { tagSuggestionPluginKey } from "../extensions/tagSuggestionPlugin";
 
 const mockCheckReferenced = vi.fn();
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useCheckGhostLinkReferenced: () => ({ checkReferenced: mockCheckReferenced }),
 }));
 

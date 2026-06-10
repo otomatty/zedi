@@ -24,7 +24,7 @@ import type {
   ResearchConflictSummary,
   ResearchSource,
 } from "@/lib/wikiCompose/types";
-import type { ComposeActivity, ComposePhase } from "@/hooks/useWikiComposeSession";
+import type { ComposeActivity, ComposePhase } from "@/hooks/wiki/useWikiComposeSession";
 
 export interface ComposePanelProps {
   phase: ComposePhase;

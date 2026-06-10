@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { resolveSearchResultUrl } from "./GlobalSearchContext";
-import type { GlobalSearchResultItem } from "@/hooks/useGlobalSearch";
+import type { GlobalSearchResultItem } from "@/hooks/search/useGlobalSearch";
 
 /**
  * Issue #864 / #889 Phase 3 受け入れ基準: 検索結果クリック時の URL 組み立てが

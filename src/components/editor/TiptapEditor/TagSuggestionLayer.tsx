@@ -6,7 +6,7 @@ import {
   type TagSuggestionItem,
   type TagSuggestionHandle,
 } from "../extensions/TagSuggestion";
-import { useTagCandidates } from "@/hooks/useTagCandidates";
+import { useTagCandidates } from "@/hooks/tags/useTagCandidates";
 
 interface TagSuggestionLayerProps {
   editor: Editor | null;

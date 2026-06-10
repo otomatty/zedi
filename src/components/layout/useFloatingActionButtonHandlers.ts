@@ -5,8 +5,8 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useCreatePage } from "@/hooks/usePageQueries";
-import { useAddPageToNote } from "@/hooks/useNoteQueries";
+import { useCreatePage } from "@/hooks/pages/usePageQueries";
+import { useAddPageToNote } from "@/hooks/notes/useNoteQueries";
 import { useToast } from "@zedi/ui";
 import { deleteCommittedThumbnail } from "@/lib/thumbnailCommit";
 import { getThumbnailApiBaseUrl } from "@/components/editor/TiptapEditor/thumbnailApiHelpers";

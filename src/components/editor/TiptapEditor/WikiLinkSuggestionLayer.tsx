@@ -6,7 +6,7 @@ import {
   type SuggestionItem,
   type WikiLinkSuggestionHandle,
 } from "../extensions/WikiLinkSuggestion";
-import { useWikiLinkCandidates } from "@/hooks/useWikiLinkCandidates";
+import { useWikiLinkCandidates } from "@/hooks/wiki/useWikiLinkCandidates";
 
 interface WikiLinkSuggestionLayerProps {
   editor: Editor | null;

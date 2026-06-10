@@ -12,13 +12,13 @@ let mockNotePagesData: MockNotePage[] | undefined;
 // Issue #860 Phase 6: replaced useNotePages mock with useNoteTitleIndex; tag
 // existence resolution only reads `id` / `title`, so the minimal title row
 // is sufficient.
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   useNoteTitleIndex: vi.fn(() => ({
     data: mockNotePagesData,
   })),
 }));
 
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useWikiLinkExistsChecker: vi.fn(
     (options?: { notePages?: MockNotePage[]; pageNoteId?: string | null }) => ({
       checkExistence: vi.fn(async (titles: string[]) => {

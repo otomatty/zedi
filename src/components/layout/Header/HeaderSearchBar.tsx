@@ -3,8 +3,8 @@ import { Search } from "lucide-react";
 import { Popover, PopoverAnchor } from "@zedi/ui";
 import { Input } from "@zedi/ui";
 import { useGlobalSearchContext } from "@/contexts/GlobalSearchContext";
-import type { GlobalSearchResultItem } from "@/hooks/useGlobalSearch";
-import { useGlobalSearchShortcut } from "@/hooks/useGlobalSearchShortcut";
+import type { GlobalSearchResultItem } from "@/hooks/search/useGlobalSearch";
+import { useGlobalSearchShortcut } from "@/hooks/search/useGlobalSearchShortcut";
 import { HeaderSearchDropdownContent } from "./HeaderSearchDropdownContent";
 import { cn } from "@zedi/ui";
 

@@ -1,7 +1,7 @@
 import React from "react";
 import { Sparkles, Plus } from "lucide-react";
 import { Button } from "@zedi/ui";
-import { useCreateNewPage } from "@/hooks/useCreateNewPage";
+import { useCreateNewPage } from "@/hooks/pages/useCreateNewPage";
 import { useTranslation } from "react-i18next";
 
 /**

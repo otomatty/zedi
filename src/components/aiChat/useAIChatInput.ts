@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, useDeferredValue } f
 import { useTranslation } from "react-i18next";
 import { useAIChatStore } from "../../stores/aiChatStore";
 import { useAIChatContext } from "../../contexts/AIChatContext";
-import { usePagesSummary } from "../../hooks/usePageQueries";
+import { usePagesSummary } from "@/hooks/pages/usePageQueries";
 import type { ReferencedPage } from "../../types/aiChat";
 import { ZEDI_PAGE_MIME_TYPE, MAX_REFERENCED_PAGES } from "../../types/aiChat";
 import {

@@ -3,7 +3,7 @@ import { FileText, Link as LinkIcon, ArrowRight, BookOpen } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { PopoverContent } from "@zedi/ui";
 import { cn } from "@zedi/ui";
-import type { GlobalSearchResultItem } from "@/hooks/useGlobalSearch";
+import type { GlobalSearchResultItem } from "@/hooks/search/useGlobalSearch";
 
 const EMPTY_MESSAGE = "ページが見つかりません";
 

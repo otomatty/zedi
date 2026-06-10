@@ -16,7 +16,7 @@ vi.mock("react-i18next", () => ({
 
 const deleteWithStoreSync = vi.fn();
 
-vi.mock("@/hooks/useDeleteAIConversation", () => ({
+vi.mock("@/hooks/aiChat/useDeleteAIConversation", () => ({
   useDeleteAIConversation: () => deleteWithStoreSync,
 }));
 

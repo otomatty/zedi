@@ -28,14 +28,14 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useOnboarding", () => ({
+vi.mock("@/hooks/auth/useOnboarding", () => ({
   useOnboarding: () => ({
     needsSetupWizard: true,
     completeSetupWizard: mockCompleteSetupWizard,
   }),
 }));
 
-vi.mock("@/hooks/useProfile", () => ({
+vi.mock("@/hooks/auth/useProfile", () => ({
   useProfile: () => ({
     profile: mockProfile,
     isLoading: false,
@@ -47,7 +47,7 @@ vi.mock("@/hooks/useProfile", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useGeneralSettings", () => ({
+vi.mock("@/hooks/settings/useGeneralSettings", () => ({
   useGeneralSettings: () => ({
     settings: { locale: "ja" },
     isLoading: false,

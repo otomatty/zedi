@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Input, Label, useToast } from "@zedi/ui";
-import { useUpdateNote } from "@/hooks/useNoteQueries";
+import { useUpdateNote } from "@/hooks/notes/useNoteQueries";
 import { useNoteSettingsContext } from "../NoteSettingsContext";
 
 /**

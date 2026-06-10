@@ -11,7 +11,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import DangerZoneSection from "./DangerZoneSection";
 import { NoteSettingsContext, type NoteSettingsContextValue } from "../NoteSettingsContext";
-import { useDeleteNote } from "@/hooks/useNoteQueries";
+import { useDeleteNote } from "@/hooks/notes/useNoteQueries";
 import type { Note, NoteAccess } from "@/types/note";
 
 vi.mock("react-i18next", () => ({
@@ -35,7 +35,7 @@ vi.mock("@zedi/ui", async (importOriginal) => {
   };
 });
 
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   useDeleteNote: vi.fn(),
 }));
 

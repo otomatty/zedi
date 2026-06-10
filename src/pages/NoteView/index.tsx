@@ -7,16 +7,16 @@ import { NoteShareUrlCopyButton } from "@/components/note/NoteShareUrlCopyButton
 import { NoteTitleSwitcher } from "@/components/note/NoteTitleSwitcher";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Badge } from "@zedi/ui";
-import { useNote } from "@/hooks/useNoteQueries";
+import { useNote } from "@/hooks/notes/useNoteQueries";
 import { useTranslation } from "react-i18next";
 import { getNoteViewPermissions } from "./noteViewHelpers";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteViewHeaderActions } from "./NoteViewHeaderActions";
 import PageGrid from "@/components/page/PageGrid";
 import { TagFilterBar } from "@/components/tagFilterBar";
-import { useNoteTagAggregation } from "@/hooks/useNoteTagAggregation";
-import { useTagFilterBarPreference } from "@/hooks/useTagFilterBarPreference";
-import { useURLTagFilter } from "@/hooks/useURLTagFilter";
+import { useNoteTagAggregation } from "@/hooks/notes/useNoteTagAggregation";
+import { useTagFilterBarPreference } from "@/hooks/tags/useTagFilterBarPreference";
+import { useURLTagFilter } from "@/hooks/tags/useURLTagFilter";
 import type { PageSummary } from "@/types/page";
 import { isClipUrlAllowed } from "@/lib/webClipper";
 

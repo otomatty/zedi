@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Editor } from "@tiptap/react";
 import { extractWikiLinksFromContent, getUniqueWikiLinkTitles } from "@/lib/wikiLinkUtils";
-import { useWikiLinkExistsChecker } from "@/hooks/usePageQueries";
-import { useNoteTitleIndex } from "@/hooks/useNoteQueries";
+import { useWikiLinkExistsChecker } from "@/hooks/pages/usePageQueries";
+import { useNoteTitleIndex } from "@/hooks/notes/useNoteQueries";
 
 interface UseWikiLinkStatusSyncOptions {
   editor: Editor | null;

@@ -52,7 +52,7 @@ import { GlobalSearchProvider } from "./contexts/GlobalSearchContext";
 import { GlobalShortcutsProvider } from "./components/layout/GlobalShortcutsProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AIChatProvider } from "./contexts/AIChatContext";
-import { AIChatConversationsProvider } from "./hooks/useAIChatConversations";
+import { AIChatConversationsProvider } from "./hooks/aiChat/useAIChatConversations";
 import { FilePreviewDialogHost } from "./components/note/FilePreviewDialogHost";
 import { AppLayout } from "./components/layout/AppLayout";
 

@@ -3,7 +3,7 @@ import { HighlightedSnippet } from "@/components/search/HighlightedSnippet";
 import { MatchTypeBadge } from "@/components/search/MatchTypeBadge";
 import type { MatchType } from "@/lib/searchUtils";
 import { cn } from "@zedi/ui";
-import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
+import { useAuthenticatedImageUrl } from "@/hooks/media/useAuthenticatedImageUrl";
 
 /**
  * 検索結果カードの表示用アイテム。判別可能 union で `kind` が `"page"` と

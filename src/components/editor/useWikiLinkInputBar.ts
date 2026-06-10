@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/core";
-import { useWikiLinkCandidates } from "@/hooks/useWikiLinkCandidates";
-import { useCheckGhostLinkReferenced, useWikiLinkExistsChecker } from "@/hooks/usePageQueries";
+import { useWikiLinkCandidates } from "@/hooks/wiki/useWikiLinkCandidates";
+import {
+  useCheckGhostLinkReferenced,
+  useWikiLinkExistsChecker,
+} from "@/hooks/pages/usePageQueries";
 import type {
   SuggestionItem,
   WikiLinkSuggestionHandle,

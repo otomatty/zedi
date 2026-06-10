@@ -31,7 +31,7 @@ vi.mock("@zedi/ui", () => ({
   useToast: () => ({ toast: mockToast }),
 }));
 
-vi.mock("@/hooks/useAISettings", () => ({
+vi.mock("@/hooks/aiChat/useAISettings", () => ({
   useAISettings: () => ({
     settings: mockSettings,
     availableModels: [],

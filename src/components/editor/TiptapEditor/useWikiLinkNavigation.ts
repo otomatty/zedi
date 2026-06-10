@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePageByTitle, usePagesSummary, useCreatePage } from "@/hooks/usePageQueries";
-import { useNoteTitleIndex } from "@/hooks/useNoteQueries";
+import { usePageByTitle, usePagesSummary, useCreatePage } from "@/hooks/pages/usePageQueries";
+import { useNoteTitleIndex } from "@/hooks/notes/useNoteQueries";
 
 interface UseWikiLinkNavigationOptions {
   /**

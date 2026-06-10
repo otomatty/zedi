@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NotePagePublicView } from "./NotePagePublicView";
-import { useNoteApi } from "@/hooks/useNoteQueries";
+import { useNoteApi } from "@/hooks/notes/useNoteQueries";
 import { ApiError } from "@/lib/api";
 import type { Page } from "@/types/page";
 
@@ -28,7 +28,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   useNoteApi: vi.fn(),
 }));
 

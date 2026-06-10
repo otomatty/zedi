@@ -25,7 +25,7 @@ vi.mock("@zedi/ui", () => ({
   useToast: () => ({ toast: toastMock }),
 }));
 
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   useUpdateNote: () => ({ mutateAsync: mutateAsyncMock, isPending: false }),
 }));
 

@@ -6,7 +6,7 @@ import { HeaderSearchBar } from "./HeaderSearchBar";
 import { NavigationMenu } from "./NavigationMenu";
 import { UnifiedMenu } from "./UnifiedMenu";
 import { MobileHeader } from "../MobileHeader";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/auth/useAuth";
 import { useTranslation } from "react-i18next";
 import { useGlobalSearchContextOptional } from "@/contexts/GlobalSearchContext";
 import { useHeaderActions } from "@/contexts/HeaderActionsContext";

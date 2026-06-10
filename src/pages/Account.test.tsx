@@ -36,7 +36,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useAuth", () => ({
+vi.mock("@/hooks/auth/useAuth", () => ({
   useAuth: () => ({
     isLoaded: true,
     isSignedIn: authState.isSignedIn,
@@ -49,11 +49,11 @@ vi.mock("@/hooks/useAuth", () => ({
     authState.isSignedIn ? null : <>{children}</>,
 }));
 
-vi.mock("@/hooks/useProfile", () => ({
+vi.mock("@/hooks/auth/useProfile", () => ({
   useProfile: () => ({ displayName: "Alice", avatarUrl: "" }),
 }));
 
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useSyncStatus: () => "idle",
   useSync: () => ({ sync: () => {}, isSyncing: false }),
 }));

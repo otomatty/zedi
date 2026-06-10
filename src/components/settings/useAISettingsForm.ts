@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, type MutableRefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@zedi/ui";
-import { useAISettings } from "@/hooks/useAISettings";
+import { useAISettings } from "@/hooks/aiChat/useAISettings";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import {
   useSavedIndicator,

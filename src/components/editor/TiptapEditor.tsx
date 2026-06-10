@@ -18,7 +18,7 @@ import { TableBubbleMenu } from "./TiptapEditor/TableBubbleMenu";
 import { PageActionHub } from "@/components/editor/PageActionHub/PageActionHub";
 import { useTiptapEditorController } from "./TiptapEditor/useTiptapEditorController";
 import { useBubbleMenuWikiLink } from "./TiptapEditor/useBubbleMenuWikiLink";
-import { useEditorWikiLinkShortcuts } from "@/hooks/useEditorWikiLinkShortcuts";
+import { useEditorWikiLinkShortcuts } from "@/hooks/wiki/useEditorWikiLinkShortcuts";
 import { SlashAgentLoadingOverlay } from "./TiptapEditor/SlashAgentLoadingOverlay";
 import { useVirtualKeyboardOffset } from "@/hooks/useVirtualKeyboardOffset";
 
