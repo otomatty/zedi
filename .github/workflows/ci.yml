@@ -207,37 +207,45 @@ jobs:
 
       - uses: ./.github/actions/setup-toolchain
 
-      # === Issue #1017 診断ステップ（原因の切り分け。恒久対応ではない）=========
-      # これまでの run で判明していること:
-      #   * apt OS 依存のインストールは正常（直近 run で ~18s で完了）。
-      #   * chromium zip (164.7 MiB) のダウンロードは毎回 100% まで到達する。
-      #   * その「直後」から Playwright が一切のログを出さずに停止し、`timeout`
-      #     で打ち切られる（展開フェーズ or 次アセット取得で停滞している疑い）。
-      # → apt と browser DL を別ステップに分離し、apt 側は無実と確定済み。
-      #   残る不明点「100% 到達後のどのフェーズで止まるのか」を `DEBUG=pw:install`
-      #   で可視化する。展開（extract）/ headless-shell / ffmpeg 取得のどれで
-      #   停滞するかがログに出るので、それを見て恒久対応を決める。
+      # Issue #1017: E2E (web) の Playwright ブラウザインストールが恒常的に
+      # exit 124（timeout）で失敗していた問題の恒久対応。
       #
-      # Diagnostic step for Issue #1017 (NOT a permanent fix). Established so far:
-      # apt deps succeed (~18s in the latest run); the chromium zip reliably
-      # reaches 100%, then Playwright goes completely silent until `timeout`
-      # kills it. apt is split out and already cleared as the culprit. This run
-      # turns on `DEBUG=pw:install` to reveal which post-download phase actually
-      # stalls (zip extraction vs. headless-shell / ffmpeg fetch) so we can pick
-      # the right permanent fix from real evidence rather than guessing.
+      # 切り分けの結果（run 27243476723 の `DEBUG=pw:install` ログ）:
+      #   * chromium zip の DL は ~1.4s で完了（`download complete` までは正常）。
+      #   * 直後の `pw:install extracting archive`（zip 展開）で停止し、5 分後に
+      #     timeout で打ち切られていた。→ ネットワークではなく「展開処理」が原因。
+      #
+      # 展開は extract-zip（yauzl + Node の zlib stream）が担う純粋なローカル処理。
+      # これを `bunx`（= Bun ランタイム）で実行していたため、Bun の zlib/stream
+      # 実装で展開がハングしていた。ワークフロー未変更でも `setup-bun` の
+      # `bun-version: "1.3"` が実行時に最新 1.3.x を引くため、5 月末の Bun 更新で
+      # 静かに退行したと考えられる（5/28 以前は成功、の観測と整合）。
+      #
+      # 対応: 展開を含む `playwright install` を Bun ではなく **Node**（`npx`）で
+      # 実行する。apt 依存は別ステップのまま（Bun でも正常なので据え置き）。
+      # ネットワーク揺らぎに備え timeout + wretry で最大 2 回リトライする。
+      #
+      # Permanent fix for Issue #1017. The `DEBUG=pw:install` trace (run
+      # 27243476723) showed the chromium zip downloads in ~1.4s, then Playwright
+      # hangs in `extracting archive` until `timeout` kills it — so the culprit
+      # is zip extraction, not the network. Extraction is extract-zip (yauzl +
+      # Node zlib streams), a pure local op. We were running it via `bunx` (Bun
+      # runtime), and Bun's zlib/stream implementation hangs on it. The workflow
+      # was unchanged, but `setup-bun`'s `bun-version: "1.3"` resolves the latest
+      # 1.3.x at run time, so a late-May Bun update silently regressed this
+      # (consistent with "passed before 5/28"). Fix: run `playwright install`
+      # (and thus the extraction) under Node via `npx` instead of Bun. apt deps
+      # stay in their own step (they work fine under Bun). Bound each attempt
+      # with `timeout` and retry up to twice for network flake.
       - name: Install Playwright system dependencies
         run: bunx playwright install-deps chromium
 
-      # 単発・無リトライで実行する。停滞は 100% 到達の直後に起きるため timeout 300
-      # でも停滞箇所の DEBUG ログは十分取得できる。リトライはジョブ 20 分の予算を
-      # 浪費して診断ログを埋もれさせるだけなので、この診断 run では付けない。
-      # Single attempt, no retry: the stall happens right after 100%, so a 300s
-      # bound is plenty to capture the DEBUG trace at the hang point. Retrying
-      # would only burn the 20-minute job budget and bury the diagnostic output.
-      - name: Install Playwright browsers (diagnostic, DEBUG=pw:install)
-        env:
-          DEBUG: pw:install
-        run: timeout 300 bunx playwright install chromium
+      - name: Install Playwright browsers (Node runtime, with retry)
+        uses: Wandalen/wretry.action@v3
+        with:
+          command: timeout 300 npx playwright install chromium
+          attempt_limit: 2
+          attempt_delay: 10000
 
       - name: Run PDF knowledge E2E
         run: bunx playwright test e2e/pdf-knowledge.spec.ts
