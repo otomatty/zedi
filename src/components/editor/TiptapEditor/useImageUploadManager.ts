@@ -6,10 +6,12 @@ import type { StorageSettings } from "@/types/storage";
 import {
   runSingleUpload,
   filterImageFiles,
+  filterVideoFiles,
   updateUploadNodeAttributesImpl,
   replaceUploadNodeWithImageImpl,
   removeUploadNodeImpl,
 } from "./useImageUploadManagerHelpers";
+import { uploadVideoFilesAndInsert } from "./uploadVideoFiles";
 
 type ToastFn = ReturnType<typeof useToast>["toast"];
 
@@ -461,6 +463,29 @@ export function useImageUploadManager({
   }, [isStorageConfigured, isStorageLoading, onRequestStorageSetup, toast]);
 
   /**
+   * 動画ファイルを WebM 変換なしで /api/media（S3 デフォルトストレージ）へ
+   * アップロードし、完了後に `video` ノードを挿入する。画像と異なり provider 設定に
+   * 依存しない（動画は常にデフォルトストレージを使う）ため storage 設定チェックは行わない。
+   * 進捗は画像側の imageUpload プレースホルダー機構を複製せず、トーストで通知する。
+   *
+   * Uploads video files to /api/media (default S3 storage) and inserts a
+   * `video` node on success. Unlike images this does not depend on the selected
+   * storage provider; progress is surfaced via a toast rather than the inline
+   * imageUpload placeholder machinery.
+   */
+  const handleVideoUpload = useCallback(
+    async (files: File[]) => {
+      const editor = editorRef.current;
+      if (!editor || isReadOnly || files.length === 0) return;
+      restoreSelectionIfNeeded();
+      await uploadVideoFilesAndInsert(editor, files, (description) => {
+        toast({ title: "動画アップロード", description, variant: "destructive" });
+      });
+    },
+    [editorRef, isReadOnly, restoreSelectionIfNeeded, toast],
+  );
+
+  /**
    *
    */
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -487,11 +512,18 @@ export function useImageUploadManager({
       e.stopPropagation();
       setIsDraggingOver(false);
 
-      if (e.dataTransfer?.files?.length) {
-        handleImageUpload(e.dataTransfer.files);
-      }
+      const files = e.dataTransfer?.files;
+      if (!files?.length) return;
+      const videoFiles = filterVideoFiles(files);
+      const imageFiles = filterImageFiles(files);
+      if (videoFiles.length > 0) void handleVideoUpload(videoFiles);
+      if (imageFiles.length > 0) handleImageUpload(imageFiles);
+      // 画像でも動画でもないファイルは、既存の「画像ファイルのみ対応」トーストで案内する。
+      // Fall back to the existing image-only handler so unsupported drops still
+      // surface a message.
+      if (videoFiles.length === 0 && imageFiles.length === 0) handleImageUpload(files);
     },
-    [handleImageUpload],
+    [handleImageUpload, handleVideoUpload],
   );
 
   useEffect(() => {

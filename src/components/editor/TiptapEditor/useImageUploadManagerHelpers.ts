@@ -177,3 +177,14 @@ export async function runSingleUpload(params: RunUploadParams): Promise<void> {
 export function filterImageFiles(files: FileList | File[]): File[] {
   return Array.from(files).filter((file) => file.type.startsWith("image/"));
 }
+
+/**
+ * ファイルリストから動画ファイル（`video/*`）のみを抽出する。
+ * Extract only video (`video/*`) files from a list.
+ *
+ * @param files - ファイルリストまたはファイル配列 / a FileList or File array
+ * @returns 動画ファイルの配列 / an array of video File objects
+ */
+export function filterVideoFiles(files: FileList | File[]): File[] {
+  return Array.from(files).filter((file) => file.type.startsWith("video/"));
+}
