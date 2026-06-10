@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Container from "@/components/layout/Container";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/auth/useAuth";
 import { useTranslation } from "react-i18next";
 import { cn } from "@zedi/ui";
 

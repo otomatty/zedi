@@ -2,7 +2,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import Container from "@/components/layout/Container";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { SignedIn, SignedOut } from "@/hooks/useAuth";
+import { SignedIn, SignedOut } from "@/hooks/auth/useAuth";
 import { SignedInMenuContent, SignedOutMenuContent } from "@/components/layout/Header/UnifiedMenu";
 
 /**

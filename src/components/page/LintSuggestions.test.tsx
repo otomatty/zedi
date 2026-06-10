@@ -25,7 +25,7 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
-vi.mock("@/hooks/useAuth", () => ({
+vi.mock("@/hooks/auth/useAuth", () => ({
   useAuth: () => ({ isSignedIn: true, isLoaded: true }),
 }));
 

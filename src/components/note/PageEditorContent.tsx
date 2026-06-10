@@ -11,7 +11,7 @@ import { LintSuggestions } from "@/components/page/LintSuggestions";
 import Container from "@/components/layout/Container";
 import { isContentNotEmpty } from "@/lib/contentUtils";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
-import type { WikiGeneratorStatus } from "@/hooks/useWikiGenerator";
+import type { WikiGeneratorStatus } from "@/hooks/wiki/useWikiGenerator";
 import { PageTitleBlock } from "./PageTitleBlock";
 import { EditorSkeleton } from "./EditorSkeleton";
 

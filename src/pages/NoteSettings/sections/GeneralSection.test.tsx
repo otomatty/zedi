@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import GeneralSection from "./GeneralSection";
 import { NoteSettingsContext, type NoteSettingsContextValue } from "../NoteSettingsContext";
-import { useUpdateNote } from "@/hooks/useNoteQueries";
+import { useUpdateNote } from "@/hooks/notes/useNoteQueries";
 import type { Note, NoteAccess } from "@/types/note";
 
 vi.mock("react-i18next", () => ({
@@ -30,7 +30,7 @@ vi.mock("@zedi/ui", async (importOriginal) => {
   };
 });
 
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   useUpdateNote: vi.fn(),
 }));
 

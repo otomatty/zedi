@@ -13,7 +13,7 @@ import {
 import { Badge, Button, Skeleton } from "@zedi/ui";
 import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/auth/useAuth";
 
 /**
  * Lint finding の型（API レスポンス）。

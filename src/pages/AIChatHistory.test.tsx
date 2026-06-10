@@ -20,7 +20,7 @@ const mockConversations = vi.hoisted(() =>
   vi.fn(() => [] as import("@/types/aiChat").Conversation[]),
 );
 
-vi.mock("@/hooks/useAIChatConversations", () => ({
+vi.mock("@/hooks/aiChat/useAIChatConversations", () => ({
   useAIChatConversations: () => ({
     conversations: mockConversations(),
     createConversation: vi.fn(),

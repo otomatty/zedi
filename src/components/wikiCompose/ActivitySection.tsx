@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 import { ScrollArea } from "@zedi/ui";
 import { cn } from "@zedi/ui";
 import { Check, Circle, AlertCircle, Loader2 } from "lucide-react";
-import type { ComposeActivity } from "@/hooks/useWikiComposeSession";
+import type { ComposeActivity } from "@/hooks/wiki/useWikiComposeSession";
 
 export interface ActivitySectionProps {
   activity: ComposeActivity[];

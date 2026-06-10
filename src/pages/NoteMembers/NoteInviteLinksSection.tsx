@@ -37,7 +37,7 @@ import {
   useCreateInviteLink,
   useInviteLinksForNote,
   useRevokeInviteLink,
-} from "@/hooks/useInviteLinks";
+} from "@/hooks/auth/useInviteLinks";
 import type { InviteLinkRow } from "@/lib/api/types";
 import type { NoteEditPermission } from "@/types/note";
 

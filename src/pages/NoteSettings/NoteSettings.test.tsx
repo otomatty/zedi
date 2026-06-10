@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route, Navigate } from "react-router-dom";
 import NoteSettings from "./index";
-import { useNote } from "@/hooks/useNoteQueries";
+import { useNote } from "@/hooks/notes/useNoteQueries";
 import type { Note, NoteAccess, NoteAccessRole } from "@/types/note";
 
 vi.mock("react-i18next", () => ({
@@ -25,7 +25,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   useNote: vi.fn(),
 }));
 

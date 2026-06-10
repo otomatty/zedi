@@ -1,7 +1,7 @@
 import React, { useCallback } from "react";
 import { Cloud, CloudOff, Loader2, Check, DatabaseZap } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { useSyncStatus, useSync } from "@/hooks/usePageQueries";
+import { useAuth } from "@/hooks/auth/useAuth";
+import { useSyncStatus, useSync } from "@/hooks/pages/usePageQueries";
 import { useTranslation } from "react-i18next";
 import { cn, DropdownMenuItem, DropdownMenuSeparator } from "@zedi/ui";
 

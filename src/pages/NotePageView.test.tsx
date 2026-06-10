@@ -3,9 +3,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import NotePageView from "./NotePageView";
-import { useNote, useNotePage, useNoteApi, useRemovePageFromNote } from "@/hooks/useNoteQueries";
-import { useAuth } from "@/hooks/useAuth";
-import { usePagePublicContent } from "@/hooks/usePagePublicContent";
+import {
+  useNote,
+  useNotePage,
+  useNoteApi,
+  useRemovePageFromNote,
+} from "@/hooks/notes/useNoteQueries";
+import { useAuth } from "@/hooks/auth/useAuth";
+import { usePagePublicContent } from "@/hooks/pages/usePagePublicContent";
 import { AIChatProvider } from "@/contexts/AIChatContext";
 
 const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
@@ -86,7 +91,7 @@ vi.mock("react-i18next", () => ({
   // (which uses `initReactI18next`) can load without a real i18n boot.
 }));
 
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   useNote: vi.fn(),
   useNotePage: vi.fn(),
   useNoteApi: vi.fn(() => ({
@@ -106,7 +111,7 @@ vi.mock("@/hooks/useNoteQueries", () => ({
   },
 }));
 
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useUpdatePage: vi.fn(() => ({ mutateAsync: mockUpdatePageMutateAsync })),
 }));
 
@@ -118,7 +123,7 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
   };
 });
 
-vi.mock("@/hooks/useAuth", () => ({
+vi.mock("@/hooks/auth/useAuth", () => ({
   useAuth: vi.fn(),
 }));
 
@@ -158,7 +163,7 @@ vi.mock("@/components/editor/PageEditor/usePdfExport", () => ({
 // (Codex P1 on PR #893). Default mock returns a resolved, non-empty body;
 // individual tests override via `mockReturnValue` when they need a different
 // state (loading / empty content / error).
-vi.mock("@/hooks/usePagePublicContent", () => ({
+vi.mock("@/hooks/pages/usePagePublicContent", () => ({
   usePagePublicContent: vi.fn(),
 }));
 

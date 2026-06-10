@@ -9,7 +9,7 @@ import type {
 } from "@/components/search/SearchResultCard";
 import { SearchResultsLoadingSkeleton } from "@/components/search/SearchResultsLoadingSkeleton";
 import { SearchResultsEmptyState } from "@/components/search/SearchResultsEmptyState";
-import { useSearchPages, useSearchSharedNotes } from "@/hooks/usePageQueries";
+import { useSearchPages, useSearchSharedNotes } from "@/hooks/pages/usePageQueries";
 import { extractPlainText } from "@/lib/contentUtils";
 import {
   type MatchType,
@@ -24,7 +24,7 @@ import {
   PDF_HIGHLIGHT_BASE_SCORE,
   dedupSharedRowsAgainstPersonal,
   formatPdfHighlightDisplay,
-} from "@/hooks/useGlobalSearch";
+} from "@/hooks/search/useGlobalSearch";
 import type { SearchPageResultRow, SearchPdfHighlightResultRow } from "@/lib/api/types";
 
 type PageSearchResultItem = SearchResultCardPageItem & {

@@ -5,7 +5,7 @@ import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteTitleSwitcher } from "@/components/note/NoteTitleSwitcher";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Button } from "@zedi/ui";
-import { useNote } from "@/hooks/useNoteQueries";
+import { useNote } from "@/hooks/notes/useNoteQueries";
 import { useTranslation } from "react-i18next";
 import { NoteSettingsContext, type NoteSettingsContextValue } from "./NoteSettingsContext";
 import { NoteSettingsSidebar } from "./NoteSettingsSidebar";

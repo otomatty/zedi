@@ -11,8 +11,8 @@ import {
   type NoteListSort,
 } from "@/lib/noteListSections";
 import { isNotePinned } from "@/lib/notePinnedStorage";
-import { usePinnedNotes } from "@/hooks/usePinnedNotes";
-import { useMyNote } from "@/hooks/useNoteQueries";
+import { usePinnedNotes } from "@/hooks/notes/usePinnedNotes";
+import { useMyNote } from "@/hooks/notes/useNoteQueries";
 
 interface NotesListViewProps {
   notes: NoteSummary[];

@@ -30,11 +30,11 @@ const mocks = vi.hoisted(() => ({
 // uploadImage は useImageUploadMock にひも付ける / Wire uploadImage through the hook mock.
 mocks.useImageUploadMock.uploadImage = mocks.uploadImage;
 
-vi.mock("@/hooks/useImageUpload", () => ({
+vi.mock("@/hooks/media/useImageUpload", () => ({
   useImageUpload: () => mocks.useImageUploadMock,
 }));
 
-vi.mock("@/hooks/useAISettings", () => ({
+vi.mock("@/hooks/aiChat/useAISettings", () => ({
   useAISettings: () => mocks.useAISettingsMock,
 }));
 

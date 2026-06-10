@@ -2,7 +2,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@zedi/ui";
 import { Link2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { PageLinkCard } from "./PageLinkCard";
-import type { OutgoingLinkWithChildren } from "@/hooks/useLinkedPages";
+import type { OutgoingLinkWithChildren } from "@/hooks/pages/useLinkedPages";
 
 interface LinkGroupRowProps {
   linkGroup: OutgoingLinkWithChildren;

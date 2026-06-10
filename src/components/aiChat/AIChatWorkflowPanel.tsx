@@ -3,7 +3,7 @@
  * Claude Code マルチステップワークフロー UI（Issue #462）。
  */
 
-import { useWorkflowPanelLogic } from "@/hooks/useWorkflowPanelLogic";
+import { useWorkflowPanelLogic } from "@/hooks/workflow/useWorkflowPanelLogic";
 import { WorkflowPanelForm } from "./WorkflowPanelForm";
 
 /**

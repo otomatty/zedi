@@ -3,7 +3,7 @@ import { Link, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "@zedi/ui";
 import { Card, CardContent } from "@zedi/ui";
-import { useAuth, SignedIn, SignedOut } from "@/hooks/useAuth";
+import { useAuth, SignedIn, SignedOut } from "@/hooks/auth/useAuth";
 import { FileText, Link as LinkIcon, Search, Cloud, Sparkles, ArrowRight } from "lucide-react";
 
 interface FeatureCardProps {

@@ -21,11 +21,11 @@ import NoteMeRedirect from "./NoteMeRedirect";
 const useMyNoteMock = vi.fn();
 const useOnboardingMock = vi.fn();
 
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   useMyNote: (...args: unknown[]) => useMyNoteMock(...args),
 }));
 
-vi.mock("@/hooks/useOnboarding", () => ({
+vi.mock("@/hooks/auth/useOnboarding", () => ({
   useOnboarding: () => useOnboardingMock(),
 }));
 

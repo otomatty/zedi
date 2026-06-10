@@ -3,10 +3,10 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
 import { Button } from "@zedi/ui";
-import { useOnboarding } from "@/hooks/useOnboarding";
-import { useOnboardingProfileAvatar } from "@/hooks/useOnboardingProfileAvatar";
-import { useProfile } from "@/hooks/useProfile";
-import { useGeneralSettings } from "@/hooks/useGeneralSettings";
+import { useOnboarding } from "@/hooks/auth/useOnboarding";
+import { useOnboardingProfileAvatar } from "@/hooks/auth/useOnboardingProfileAvatar";
+import { useProfile } from "@/hooks/auth/useProfile";
+import { useGeneralSettings } from "@/hooks/settings/useGeneralSettings";
 import { ProfileFormFields } from "@/components/settings/ProfileFormFields";
 import { LanguageSelectField } from "@/components/settings/LanguageSelectField";
 

@@ -1,7 +1,7 @@
 import React, { useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/core";
-import { usePageByTitle, useGhostLinkReferenced } from "@/hooks/usePageQueries";
+import { usePageByTitle, useGhostLinkReferenced } from "@/hooks/pages/usePageQueries";
 import { WikiLinkPreviewContent } from "@/components/wikiLink/WikiLinkPreviewContent";
 import { useWikiLinkHover } from "./useWikiLinkHover";
 

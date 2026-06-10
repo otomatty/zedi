@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@zedi/ui";
 import { useWikiLinkNavigation } from "@/components/editor/TiptapEditor/useWikiLinkNavigation";
 import { CreatePageDialog } from "@/components/editor/TiptapEditor/CreatePageDialog";
-import { usePageByTitle, useGhostLinkReferenced } from "@/hooks/usePageQueries";
+import { usePageByTitle, useGhostLinkReferenced } from "@/hooks/pages/usePageQueries";
 import { WikiLinkPreviewContent } from "../wikiLink/WikiLinkPreviewContent";
 
 interface AIChatWikiLinkProps {

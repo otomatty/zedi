@@ -15,7 +15,7 @@ import {
   ResizablePanelGroup,
   useIsMobile,
 } from "@zedi/ui";
-import { useWikiComposeSession } from "@/hooks/useWikiComposeSession";
+import { useWikiComposeSession } from "@/hooks/wiki/useWikiComposeSession";
 import { COMPOSE_SEED_STATE_KEY, type ComposeNavigationSeed } from "@/lib/wikiCompose/navigation";
 import type { DraftedSection } from "@/lib/wikiCompose/types";
 import { EditorPane } from "@/components/wikiCompose/EditorPane";

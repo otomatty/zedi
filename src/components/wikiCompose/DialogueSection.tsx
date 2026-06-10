@@ -21,7 +21,7 @@ import type {
 } from "@/lib/wikiCompose/types";
 import { BriefQuestionCard } from "./BriefQuestionCard";
 import { OutlineEditor } from "./OutlineEditor";
-import type { ComposePhase } from "@/hooks/useWikiComposeSession";
+import type { ComposePhase } from "@/hooks/wiki/useWikiComposeSession";
 
 export interface DialogueSectionProps {
   phase: ComposePhase;

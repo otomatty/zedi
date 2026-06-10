@@ -5,8 +5,8 @@ import { Skeleton } from "@zedi/ui";
 import { LinkSection } from "./LinkSection";
 import { LinkGroupRow } from "./LinkGroupRow";
 import { GhostLinkCard } from "./GhostLinkCard";
-import { useLinkedPages } from "@/hooks/useLinkedPages";
-import { useCreatePage } from "@/hooks/usePageQueries";
+import { useLinkedPages } from "@/hooks/pages/useLinkedPages";
+import { useCreatePage } from "@/hooks/pages/usePageQueries";
 
 interface LinkedPagesSectionProps {
   pageId: string;
