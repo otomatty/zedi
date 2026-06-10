@@ -26,7 +26,7 @@ import { sources } from "../schema/sources.js";
 import { pageSources } from "../schema/pageSources.js";
 import { eq, and } from "drizzle-orm";
 import { extractArticleFromUrl } from "../services/articleExtractor.js";
-import { validateModelAccessOrThrow } from "../lib/aiAccessHelpers.js";
+import { validateModelAccessOrThrow } from "../services/aiAccessHelpers.js";
 import { callProvider, getProviderApiKeyName } from "../services/aiProviders.js";
 import { getUserTier } from "../services/subscriptionService.js";
 import { checkUsage, calculateCost, recordUsage } from "../services/usageService.js";

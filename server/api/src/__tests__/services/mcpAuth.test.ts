@@ -28,7 +28,7 @@ import {
   MCP_JWT_AUDIENCE,
   MCP_REVOKED_PREFIX,
   MCP_JWT_EXP_DAYS_DEFAULT,
-} from "../../lib/mcpAuth.js";
+} from "../../services/mcpAuth.js";
 import { createHash } from "node:crypto";
 
 /**

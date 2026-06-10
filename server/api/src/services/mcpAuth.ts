@@ -14,7 +14,7 @@
 import { createHash } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import type { Redis } from "ioredis";
-import { getEnv, getOptionalEnv } from "./env.js";
+import { getEnv, getOptionalEnv } from "../lib/env.js";
 
 // ── Constants / 定数 ────────────────────────────────────────────────────────
 

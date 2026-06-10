@@ -20,7 +20,7 @@ import {
   MCP_SCOPE_WRITE,
   hasScope,
   McpRevocationLookupError,
-} from "../lib/mcpAuth.js";
+} from "../services/mcpAuth.js";
 import { users } from "../schema/users.js";
 import type { AppEnv } from "../types/index.js";
 

@@ -20,7 +20,7 @@
 import { randomUUID } from "node:crypto";
 import type { Context } from "hono";
 import { adminAuditLogs } from "../schema/auditLogs.js";
-import { extractClientIp as extractClientIpShared } from "./clientIp.js";
+import { extractClientIp as extractClientIpShared } from "../lib/clientIp.js";
 import type { AppEnv, Database } from "../types/index.js";
 
 /**

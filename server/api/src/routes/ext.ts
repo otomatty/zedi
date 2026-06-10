@@ -16,11 +16,11 @@ import {
   isRedirectUriAllowed,
   issueExtensionToken,
   storeExtensionCode,
-} from "../lib/extAuth.js";
+} from "../services/extAuth.js";
 import { extractYouTubeVideoId } from "../services/articleExtractor.js";
-import { clipAndCreate } from "../lib/clipAndCreate.js";
+import { clipAndCreate } from "../services/clipAndCreate.js";
 import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "../lib/clipUrlPolicy.js";
-import { resolveAiConfigForRequest } from "../lib/aiAccessHelpers.js";
+import { resolveAiConfigForRequest } from "../services/aiAccessHelpers.js";
 import { calculateCost, recordUsage } from "../services/usageService.js";
 import type { AppEnv, AIProviderType } from "../types/index.js";
 
