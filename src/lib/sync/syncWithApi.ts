@@ -413,9 +413,19 @@ function finishSyncIfNoPushNeeded(
   res: { server_time?: string },
   isInitialSync: boolean,
   localPageCount: number,
+  pulledPageIds: Set<string>,
   pagesForPush: PageMetadata[],
 ): Promise<boolean> {
-  const noPush = (isInitialSync && localPageCount === 0) || pagesForPush.length === 0;
+  // Issue #1020: `getAllPages()` hides legacy `noteId: null` rows until
+  // `reassignNullNotePages` runs in `applyPull`, so `localPageCount` can be 0
+  // while local-only pages still exist. Only skip push on initial sync when
+  // every row we would push was just pulled from the server (redundant echo).
+  const onlyEchoingPulledPages =
+    isInitialSync &&
+    localPageCount === 0 &&
+    pagesForPush.length > 0 &&
+    pagesForPush.every((p) => pulledPageIds.has(p.id));
+  const noPush = pagesForPush.length === 0 || onlyEchoingPulledPages;
   if (!noPush) return Promise.resolve(false);
   return finishSyncNoPush(adapter, res).then(() => true);
 }
@@ -496,7 +506,16 @@ export async function syncWithApi(
       res.default_note_id,
     );
 
-    if (await finishSyncIfNoPushNeeded(adapter, res, isInitialSync, localPageCount, pagesForPush)) {
+    if (
+      await finishSyncIfNoPushNeeded(
+        adapter,
+        res,
+        isInitialSync,
+        localPageCount,
+        pulledPageIds,
+        pagesForPush,
+      )
+    ) {
       return;
     }
 
