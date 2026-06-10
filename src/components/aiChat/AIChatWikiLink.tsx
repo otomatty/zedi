@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@zedi/ui";
 import { useWikiLinkNavigation } from "@/components/editor/TiptapEditor/useWikiLinkNavigation";
 import { CreatePageDialog } from "@/components/editor/TiptapEditor/CreatePageDialog";
-import { usePageStore } from "../../stores/pageStore";
+import { usePageByTitle, useGhostLinkReferenced } from "@/hooks/usePageQueries";
 import { WikiLinkPreviewContent } from "../wikiLink/WikiLinkPreviewContent";
 
 interface AIChatWikiLinkProps {
@@ -27,10 +27,14 @@ const LONG_PRESS_MS = 500;
  */
 export function AIChatWikiLink({ title }: AIChatWikiLinkProps) {
   const normalizedTitle = title.trim();
-  const page = usePageStore((state) => state.getPageByTitle(normalizedTitle));
-  const referenced = usePageStore(
-    (state) => !page && state.ghostLinks.some((gl) => gl.linkText === normalizedTitle),
-  );
+  // 旧ゲストストア (`pageStore`) は Issue #1020 で廃止したため、リポジトリ
+  // （IndexedDB）ベースのクエリでページ解決とゴースト参照判定を行う。
+  // The legacy guest store (`pageStore`) was retired by issue #1020; resolve
+  // the page and the ghost-reference state via the repository (IndexedDB).
+  const { data: resolvedPage } = usePageByTitle(normalizedTitle);
+  const page = resolvedPage ?? undefined;
+  const { data: ghostReferenced = false } = useGhostLinkReferenced(normalizedTitle);
+  const referenced = !page && ghostReferenced;
 
   const {
     handleLinkClick: navigateWikiLinkByTitle,

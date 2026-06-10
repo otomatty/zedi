@@ -47,7 +47,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-a",
           ownerUserId: userId,
-          noteId: null,
+          noteId: "note-default",
           title: "Page A",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -93,7 +93,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-a",
           ownerUserId: userId,
-          noteId: null,
+          noteId: "note-default",
           title: "Page A",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -142,7 +142,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-a",
           ownerUserId: userId,
-          noteId: null,
+          noteId: "note-default",
           title: "Page A",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -154,7 +154,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-b",
           ownerUserId: userId,
-          noteId: null,
+          noteId: "note-default",
           title: "Page B",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -190,7 +190,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "page-a",
           ownerUserId: userId,
-          noteId: null,
+          noteId: "note-default",
           title: "Page A",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -227,7 +227,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: sourcePageId,
           ownerUserId: userId,
-          noteId: null,
+          noteId: "note-default",
           title: "My Page",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -269,7 +269,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "personal-a",
           ownerUserId: userId,
-          noteId: null,
+          noteId: "note-default",
           title: "Personal A",
           contentPreview: undefined,
           thumbnailUrl: undefined,
@@ -397,7 +397,7 @@ describe("syncLinksWithRepo", () => {
         {
           id: "tag-target",
           ownerUserId: userId,
-          noteId: null,
+          noteId: "note-default",
           title: "Foo",
           contentPreview: undefined,
           thumbnailUrl: undefined,

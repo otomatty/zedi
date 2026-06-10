@@ -23,11 +23,11 @@ import { useFloatingActionButtonHandlers } from "./useFloatingActionButtonHandle
 type FloatingActionButtonProps = {
   noteId?: string;
   /**
-   * 追加で非表示にするメニュー項目。未ログイン時の `url` 非表示ロジックは
-   * 内部で自動適用されるため、重ねて渡す必要はない。
+   * 追加で非表示にするメニュー項目。未サインイン時は FAB 自体が描画されない
+   * （ページ作成はサインイン必須、Issue #1020）。
    *
-   * Additional menu options to hide. The built-in `url` hide rule for guests is
-   * applied automatically, so callers don't need to re-specify it.
+   * Additional menu options to hide. For guests the FAB renders nothing at
+   * all — page creation requires sign-in (issue #1020).
    */
   hiddenOptions?: FABMenuOption[];
 } & (
@@ -75,12 +75,16 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
     noteId,
   });
 
-  const mergedHidden: FABMenuOption[] = [
-    ...(isSignedIn ? [] : (["url"] as FABMenuOption[])),
-    ...(extraHiddenOptions ?? []),
-  ];
   const hiddenOptions: FABMenuOption[] | undefined =
-    mergedHidden.length > 0 ? mergedHidden : undefined;
+    extraHiddenOptions && extraHiddenOptions.length > 0 ? extraHiddenOptions : undefined;
+
+  // ページ作成はサインイン必須（Issue #1020 でゲストのローカル作成を廃止）。
+  // FAB のメニューは全てページ作成系のため、未サインイン時は FAB 自体を出さない。
+  // Page creation requires sign-in (guest-local creation was retired by issue
+  // #1020). Every FAB menu option creates a page, so hide the FAB for guests.
+  if (!isSignedIn) {
+    return null;
+  }
 
   const fabButton = (
     <TooltipProvider delayDuration={300}>

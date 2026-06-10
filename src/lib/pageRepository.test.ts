@@ -51,7 +51,7 @@ function createInMemoryRepository(
       const page: Page = {
         id,
         ownerUserId: userId,
-        noteId: null,
+        noteId: "note-default",
         title,
         content,
         thumbnailUrl: opts?.thumbnailUrl ?? undefined,
@@ -432,6 +432,7 @@ function createMockAdapter(): StorageAdapter {
     getPage: vi.fn().mockResolvedValue(null),
     upsertPage: vi.fn().mockResolvedValue(undefined),
     deletePage: vi.fn().mockResolvedValue(undefined),
+    reassignNullNotePages: vi.fn().mockResolvedValue(undefined),
     getYDocState: vi.fn().mockResolvedValue(null),
     saveYDocState: vi.fn().mockResolvedValue(undefined),
     getYDocVersion: vi.fn().mockResolvedValue(0),
@@ -470,12 +471,23 @@ describe("StorageAdapterPageRepository (production) satisfies IPageRepository", 
     repo = new StorageAdapterPageRepository(adapter, api as ApiClient);
   });
 
-  it("delegates createPage (guest) to adapter.upsertPage and skips api.createPage", async () => {
+  it("delegates createPage to api.createPage + adapter.upsertPage (guest-local creation retired by issue #1020)", async () => {
+    (api.createPage as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "api-page-1",
+      owner_id: "auth-user",
+      note_id: "note-default",
+      title: "Hello",
+      content_preview: null,
+      source_page_id: null,
+      thumbnail_url: null,
+      source_url: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      is_deleted: false,
+    });
     await repo.createPage("local-user", "Hello");
+    expect(api.createPage).toHaveBeenCalledOnce();
     expect(adapter.upsertPage).toHaveBeenCalledOnce();
-    // CodeRabbit のレビュー対応: ゲスト経路で API が呼ばれない不変条件をガード。
-    // Guard the guest-path invariant: API must not be invoked for `local-user`.
-    expect(api.createPage).not.toHaveBeenCalled();
   });
 
   it("delegates getPage to adapter.getPage", async () => {

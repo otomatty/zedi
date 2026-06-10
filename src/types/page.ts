@@ -6,25 +6,14 @@ export interface Page {
   id: string;
   ownerUserId: string;
   /**
-   * 所属ノート ID。`null` は「個人ページ（`note_id IS NULL`）」を表す。
+   * 所属ノート ID。すべてのページはちょうど 1 つのノートに属する（Issue #823）。
+   * 旧「個人ページ」（`noteId === null`）は Issue #1020 でソースから根絶済み。
    *
-   * Issue #823/#825 はデフォルトノート導入に伴いこの概念を廃止する方針だが、
-   * ストレージ層（`PageMetadata.noteId: string | null`）・ゲストストア
-   * (`pageStore`)・IndexedDB の個人ページ判定 (`noteId === null`) が依然として
-   * `null` を生成・依存しているため、フロントのドメイン型も実態に合わせて
-   * `string | null` とする（`strict: true` 化で型穴を顕在化）。`null` をソース
-   * から完全に除去して non-null へ再 tighten するのは個人ページ概念の根絶
-   * エピックで対応する。
-   *
-   * Owning note ID. `null` denotes a legacy "personal page" (`note_id IS NULL`).
-   * Issues #823/#825 aim to retire this concept, but the storage layer
-   * (`PageMetadata.noteId: string | null`), the guest store (`pageStore`), and
-   * IndexedDB's personal-page filter (`noteId === null`) still produce and rely
-   * on `null`, so the frontend domain type matches reality as `string | null`
-   * (surfaced by enabling `strict: true`). Eliminating `null` at the source and
-   * re-tightening to non-null is tracked by the personal-page removal epic.
+   * Owning note ID. Every page belongs to exactly one note (issue #823); the
+   * legacy "personal page" (`noteId === null`) concept was eradicated at the
+   * source by issue #1020.
    */
-  noteId: string | null;
+  noteId: string;
   title: string;
   content: string; // Tiptap JSON stringified
   contentPreview?: string;
@@ -43,13 +32,10 @@ export interface PageSummary {
   id: string;
   ownerUserId: string;
   /**
-   * 所属ノート ID。`Page.noteId` と同様、`null` は個人ページを表す暫定形。
-   * 詳細と今後の方針（個人ページ概念の根絶エピック）は `Page.noteId` を参照。
-   *
-   * Owning note ID. Like `Page.noteId`, `null` denotes a personal page as an
-   * interim shape; see `Page.noteId` for details and the planned removal epic.
+   * 所属ノート ID。`Page.noteId` と同じ non-null 契約（Issue #823 / #1020）。
+   * Owning note ID; same non-null contract as `Page.noteId` (issues #823 / #1020).
    */
-  noteId: string | null;
+  noteId: string;
   title: string;
   contentPreview?: string;
   thumbnailUrl?: string;

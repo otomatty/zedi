@@ -1,7 +1,7 @@
 import React, { useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/core";
-import { usePageStore } from "@/stores/pageStore";
+import { usePageByTitle, useGhostLinkReferenced } from "@/hooks/usePageQueries";
 import { WikiLinkPreviewContent } from "@/components/wikiLink/WikiLinkPreviewContent";
 import { useWikiLinkHover } from "./useWikiLinkHover";
 
@@ -39,16 +39,15 @@ export const WikiLinkHoverCardLayer: React.FC<WikiLinkHoverCardLayerProps> = ({
   const { target, isVisible, cardRef, closeCard, handleCardMouseEnter, handleCardMouseLeave } =
     useWikiLinkHover(editor, editorContainerRef);
 
-  const page = usePageStore((state) => {
-    if (!target) return undefined;
-    return state.getPageByTitle(target.title);
-  });
+  // 旧ゲストストア (`pageStore`) は Issue #1020 で廃止したため、リポジトリ
+  // （IndexedDB）ベースのクエリでページ解決とゴースト参照判定を行う。
+  // The legacy guest store (`pageStore`) was retired by issue #1020; resolve
+  // the page and the ghost-reference state via the repository (IndexedDB).
+  const { data: resolvedPage } = usePageByTitle(target?.title ?? "");
+  const page = resolvedPage ?? undefined;
 
-  const referenced = usePageStore((state) => {
-    if (!target) return false;
-    const resolved = state.getPageByTitle(target.title);
-    return !resolved && state.ghostLinks.some((gl) => gl.linkText === target.title);
-  });
+  const { data: ghostReferenced = false } = useGhostLinkReferenced(target?.title ?? "");
+  const referenced = !page && ghostReferenced;
 
   const handleCardClick = useCallback(() => {
     if (!target) return;

@@ -98,7 +98,6 @@
     "aws-jwt-verify",
     "ioredis",
     "@types/sql.js",
-    "@types/uuid",
     "@vitejs/plugin-react",
     "wrangler",
     "@tauri-apps/plugin-shell",

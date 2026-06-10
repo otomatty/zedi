@@ -135,7 +135,7 @@ export function LinkedPagesSection({
    * Navigate to a linked page. `PageCard` carries `noteId`, so we can build
    * `/notes/:noteId/:pageId` directly (Issue #889 Phase 3).
    */
-  const handlePageClick = (id: string, noteId: string | null) => {
+  const handlePageClick = (id: string, noteId: string) => {
     navigate(`/notes/${noteId}/${id}`);
   };
 

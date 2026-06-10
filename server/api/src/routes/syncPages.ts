@@ -56,6 +56,11 @@ app.get("/", authRequired, async (c) => {
     .select({
       id: pages.id,
       owner_id: pages.ownerId,
+      // Issue #1020: クライアントが `noteId: null`（旧個人ページ）を生成し続け
+      // ないよう、各行の所属ノート ID をワイヤに載せる。
+      // Issue #1020: carry the owning note id so clients stop materializing
+      // legacy `noteId: null` personal pages.
+      note_id: pages.noteId,
       title: pages.title,
       content_preview: pages.contentPreview,
       thumbnail_url: pages.thumbnailUrl,
@@ -110,6 +115,11 @@ app.get("/", authRequired, async (c) => {
       original_target_page_id: g.originalTargetPageId,
       original_note_id: g.originalNoteId,
     })),
+    // Issue #1020: 既存クライアントの `noteId: null` 行をデフォルトノートへ
+    // 付け替えるための移行情報。pages が 0 件でも参照できるようトップレベルに置く。
+    // Issue #1020: lets clients reassign legacy `noteId: null` rows to the
+    // default note even when the pull returns zero pages.
+    default_note_id: defaultNote.id,
     server_time: new Date().toISOString(),
   });
 });

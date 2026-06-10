@@ -138,3 +138,195 @@ describe("IndexedDBStorageAdapter.resetDatabase (issue #608)", () => {
     expect(nullCauseError.originalError).toBeUndefined();
   });
 });
+
+/**
+ * `my_pages` ストアだけを持つ最小のインメモリ IDBDatabase モック。
+ * `getAll` / `openCursor` (+`cursor.update`) を実装し、Issue #1020 の
+ * レガシー `noteId: null` 行の移行・除外ロジックを検証する。
+ *
+ * Minimal in-memory IDBDatabase mock exposing only `my_pages` with `getAll`
+ * and `openCursor` (+ `cursor.update`), enough to exercise the issue #1020
+ * legacy `noteId: null` migration / exclusion logic.
+ */
+function makePagesDb(rows: Array<Record<string, unknown>>): {
+  db: IDBDatabase;
+  data: Map<string, Record<string, unknown>>;
+} {
+  const data = new Map(rows.map((r) => [r.id as string, { ...r }]));
+
+  function makeTransaction() {
+    const tx: {
+      oncomplete: (() => void) | null;
+      onerror: (() => void) | null;
+      onabort: (() => void) | null;
+      error: null;
+      objectStore: (name: string) => unknown;
+    } = {
+      oncomplete: null,
+      onerror: null,
+      onabort: null,
+      error: null,
+      objectStore: () => store,
+    };
+
+    const store = {
+      getAll: () => {
+        const req: { result?: unknown; onsuccess: (() => void) | null; onerror: null } = {
+          onsuccess: null,
+          onerror: null,
+        };
+        queueMicrotask(() => {
+          req.result = [...data.values()].map((r) => ({ ...r }));
+          req.onsuccess?.();
+        });
+        return req;
+      },
+      get: (id: string) => {
+        const req: { result?: unknown; onsuccess: (() => void) | null; onerror: null } = {
+          onsuccess: null,
+          onerror: null,
+        };
+        queueMicrotask(() => {
+          req.result = data.has(id) ? { ...data.get(id) } : undefined;
+          req.onsuccess?.();
+        });
+        return req;
+      },
+      openCursor: () => {
+        const ids = [...data.keys()];
+        const req: { result: unknown; onsuccess: (() => void) | null; onerror: null } = {
+          result: null,
+          onsuccess: null,
+          onerror: null,
+        };
+        let index = 0;
+        const step = () => {
+          if (index >= ids.length) {
+            req.result = null;
+            req.onsuccess?.();
+            // 全行を走査し終えたら version-change なしの readwrite tx として
+            // oncomplete を発火する。Fire oncomplete once iteration ends.
+            queueMicrotask(() => tx.oncomplete?.());
+            return;
+          }
+          const id = ids[index];
+          index += 1;
+          req.result = {
+            value: { ...data.get(id) },
+            update: (newRow: Record<string, unknown>) => {
+              data.set(id, { ...newRow });
+            },
+            continue: () => queueMicrotask(step),
+          };
+          req.onsuccess?.();
+        };
+        queueMicrotask(step);
+        return req;
+      },
+    };
+
+    return tx;
+  }
+
+  const db = {
+    transaction: vi.fn(() => makeTransaction()),
+    close: vi.fn(),
+  } as unknown as IDBDatabase;
+
+  return { db, data };
+}
+
+describe("IndexedDBStorageAdapter legacy noteId:null rows (issue #1020)", () => {
+  const originalIndexedDB = (globalThis as { indexedDB?: IDBFactory }).indexedDB;
+  let userCounter = 0;
+
+  /**
+   * モック DB を `indexedDB.open` に差し込み、ユニークな userId で初期化済みの
+   * adapter を返す。Install the mock DB behind `indexedDB.open` and return an
+   * adapter initialized with a unique user id.
+   */
+  async function setupAdapter(rows: Array<Record<string, unknown>>) {
+    const { db, data } = makePagesDb(rows);
+    (globalThis as { indexedDB?: IDBFactory }).indexedDB = {
+      open: vi.fn(() => {
+        const req: {
+          result: unknown;
+          onsuccess: (() => void) | null;
+          onerror: null;
+          onupgradeneeded: null;
+        } = { result: db, onsuccess: null, onerror: null, onupgradeneeded: null };
+        queueMicrotask(() => req.onsuccess?.());
+        return req as unknown as IDBOpenDBRequest;
+      }),
+      deleteDatabase: vi.fn(),
+    } as unknown as IDBFactory;
+
+    const adapter = new IndexedDBStorageAdapter();
+    userCounter += 1;
+    await adapter.initialize(`legacy-user-${userCounter}`);
+    return { adapter, data };
+  }
+
+  afterEach(async () => {
+    // モジュールスコープの adapterDb を確実に解放する。Release the module-scoped handle.
+    await new IndexedDBStorageAdapter().close();
+    if (originalIndexedDB === undefined) {
+      delete (globalThis as { indexedDB?: IDBFactory }).indexedDB;
+    } else {
+      (globalThis as { indexedDB?: IDBFactory }).indexedDB = originalIndexedDB;
+    }
+    vi.restoreAllMocks();
+  });
+
+  const legacyRow = {
+    id: "legacy-1",
+    ownerId: "u",
+    noteId: null,
+    sourcePageId: null,
+    title: "Legacy",
+    contentPreview: null,
+    thumbnailUrl: null,
+    sourceUrl: null,
+    createdAt: 1,
+    updatedAt: 2,
+    isDeleted: false,
+  };
+  const migratedRow = {
+    ...legacyRow,
+    id: "migrated-1",
+    noteId: "note-default",
+    title: "Migrated",
+  };
+
+  it("getAllPages / getPage exclude rows whose noteId is still null (pending migration)", async () => {
+    const { adapter } = await setupAdapter([legacyRow, migratedRow]);
+
+    const pages = await adapter.getAllPages();
+    expect(pages.map((p) => p.id)).toEqual(["migrated-1"]);
+
+    expect(await adapter.getPage("legacy-1")).toBeNull();
+    expect((await adapter.getPage("migrated-1"))?.noteId).toBe("note-default");
+  });
+
+  it("reassignNullNotePages adopts null rows into the given note and leaves others untouched", async () => {
+    const { adapter, data } = await setupAdapter([legacyRow, migratedRow]);
+
+    await adapter.reassignNullNotePages("note-default");
+
+    expect(data.get("legacy-1")?.noteId).toBe("note-default");
+    expect(data.get("migrated-1")?.noteId).toBe("note-default");
+
+    const pages = await adapter.getAllPages();
+    expect(pages.map((p) => p.id).sort()).toEqual(["legacy-1", "migrated-1"]);
+  });
+
+  it("reassignNullNotePages also adopts v1 rows that lack the noteId field entirely", async () => {
+    const v1Row = { ...legacyRow, id: "v1-1" } as Record<string, unknown>;
+    delete v1Row.noteId;
+    const { adapter, data } = await setupAdapter([v1Row]);
+
+    await adapter.reassignNullNotePages("note-default");
+
+    expect(data.get("v1-1")?.noteId).toBe("note-default");
+  });
+});

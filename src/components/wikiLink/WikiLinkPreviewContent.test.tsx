@@ -14,7 +14,7 @@ function renderWithI18n(ui: React.ReactElement) {
 const createMockPage = (overrides?: Partial<Page>): Page => ({
   id: "page-1",
   ownerUserId: "user-1",
-  noteId: null,
+  noteId: "note-default",
   title: "テストページ",
   content:
     '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"これはテストのプレビューです"}]}]}',

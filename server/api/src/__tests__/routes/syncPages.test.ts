@@ -63,6 +63,47 @@ function createSyncApp(dbResults: unknown[]) {
   return { app, chains: mock.chains };
 }
 
+describe("GET /api/sync/pages — note_id / default_note_id in response (issue #1020)", () => {
+  it("returns note_id on each page row and default_note_id at the top level", async () => {
+    const now = new Date("2025-06-01T00:00:00Z");
+    const { app } = createSyncApp([
+      // 1: pages query
+      [
+        {
+          id: OWNED_PAGE,
+          owner_id: TEST_USER_ID,
+          note_id: "sync-default-note-id",
+          title: "P",
+          content_preview: null,
+          thumbnail_url: null,
+          source_url: null,
+          source_page_id: null,
+          is_deleted: false,
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+      // 2: links query
+      [],
+      // 3: ghost_links query
+      [],
+    ]);
+
+    const res = await app.request("/api/sync/pages", {
+      method: "GET",
+      headers: authHeaders(),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      pages: Array<{ id: string; note_id: string }>;
+      default_note_id: string;
+    };
+    expect(body.default_note_id).toBe("sync-default-note-id");
+    expect(body.pages[0]?.note_id).toBe("sync-default-note-id");
+  });
+});
+
 describe("GET /api/sync/pages — link_type in response (issue #725 Phase 1)", () => {
   it("returns link_type on each links row and ghost_links row", async () => {
     const now = new Date("2025-06-01T00:00:00Z");
@@ -72,6 +113,7 @@ describe("GET /api/sync/pages — link_type in response (issue #725 Phase 1)", (
         {
           id: OWNED_PAGE,
           owner_id: TEST_USER_ID,
+          note_id: "sync-default-note-id",
           title: "P",
           content_preview: null,
           thumbnail_url: null,

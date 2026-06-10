@@ -139,7 +139,7 @@ export const NotePagePublicView: React.FC<NotePagePublicViewProps> = ({ pageId, 
       showToolbar={false}
       onContentChange={NOOP}
       onContentError={NOOP}
-      pageNoteId={page.noteId ?? null}
+      pageNoteId={page.noteId}
     />
   );
 };

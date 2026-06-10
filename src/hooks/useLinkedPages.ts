@@ -19,9 +19,7 @@ import type { PagePublicLinksResponse, PagePublicLinkCard } from "@/lib/api/type
  */
 export interface PageCard {
   id: string;
-  // `null` は個人ページ（`Page.noteId` の暫定 `string | null` を反映）。
-  // `null` is a personal page, mirroring the interim `string | null` on `Page.noteId`.
-  noteId: string | null;
+  noteId: string;
   title: string;
   preview: string; // Content preview (50 chars)
   updatedAt: number;
