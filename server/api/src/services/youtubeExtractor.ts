@@ -9,12 +9,8 @@
  * integrates seamlessly with clipAndCreate.ts and ingest.ts.
  */
 import { createHash } from "node:crypto";
-import {
-  fetchYouTubeContent,
-  formatDuration,
-  type YouTubeContent,
-} from "../services/youtubeService.js";
-import { callProvider } from "../services/aiProviders.js";
+import { fetchYouTubeContent, formatDuration, type YouTubeContent } from "./youtubeService.js";
+import { callProvider } from "./aiProviders.js";
 import type { TiptapNode } from "./articleExtractor.js";
 import type { AIProviderType, AIMessage, TokenUsage } from "../types/index.js";
 

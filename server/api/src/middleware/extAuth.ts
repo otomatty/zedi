@@ -5,7 +5,7 @@
  */
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
-import { verifyExtensionToken } from "../lib/extAuth.js";
+import { verifyExtensionToken } from "../services/extAuth.js";
 import type { AppEnv } from "../types/index.js";
 
 /** Bearer JWT を検証し、拡張用 userId をコンテキストにセットする。Validates Bearer JWT and sets extension userId on context. */

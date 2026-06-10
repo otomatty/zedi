@@ -19,8 +19,8 @@ import { and, eq, isNull, isNotNull, sql } from "drizzle-orm";
 import { pages, pageContents, userOnboardingStatus } from "../schema/index.js";
 import type { Database } from "../types/index.js";
 import type { DbOrTx } from "../types/dbOrTx.js";
-import { ensureDefaultNote } from "../services/defaultNoteService.js";
-import { VideoServer } from "./videoServerExtension.js";
+import { ensureDefaultNote } from "./defaultNoteService.js";
+import { VideoServer } from "../lib/videoServerExtension.js";
 import {
   welcomePageContent,
   WELCOME_PAGE_TITLE,

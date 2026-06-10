@@ -20,7 +20,7 @@ const { mockInsertWelcomePage, mockRetryWelcomePageIfNeeded } = vi.hoisted(() =>
   mockRetryWelcomePageIfNeeded: vi.fn(),
 }));
 
-vi.mock("../../lib/welcomePageService.js", () => ({
+vi.mock("../../services/welcomePageService.js", () => ({
   insertWelcomePage: mockInsertWelcomePage,
   retryWelcomePageIfNeeded: mockRetryWelcomePageIfNeeded,
 }));

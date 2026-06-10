@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Context } from "hono";
 import type { AppEnv } from "../../types/index.js";
-import { extractClientIp, recordAuditLog } from "../../lib/auditLog.js";
+import { extractClientIp, recordAuditLog } from "../../services/auditLog.js";
 
 /**
  * Build a minimal Hono-like Context double for tests.

@@ -19,7 +19,7 @@
  */
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
-import { issueMcpToken, MCP_SCOPE_READ, MCP_SCOPE_WRITE } from "../src/lib/mcpAuth.js";
+import { issueMcpToken, MCP_SCOPE_READ, MCP_SCOPE_WRITE } from "../src/services/mcpAuth.js";
 
 /** プロジェクトルートの .env を読み込み process.env にマージする (未設定のキーのみ) */
 function loadEnvFromRoot() {
