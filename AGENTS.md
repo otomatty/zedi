@@ -156,13 +156,13 @@ terraform/        # インフラ定義
 - 理由 / Rationale:
   - Railway の Dockerfile ビルドは「各サービスの Root Directory」を build context に取る (例: `server/mcp`)。ここからルート `bun.lock` を参照するのは面倒で、context をサービス単位に閉じるほうが再現性が高い。  
     _Railway Dockerfile builds take each service's Root Directory as the build context. Scoping `bun.lock` per service keeps the build self-contained and reproducible._
-  - Bun workspace が Railway 上で安定して扱えるようになった時点で再検討する（`.github/workflows/ci.yml` の `api-typecheck` / `mcp-test` ジョブにも同じメモあり）。  
+  - Bun workspace が Railway 上で安定して扱えるようになった時点で再検討する（`.github/workflows/ci.yml` の `api-typecheck` / `api-test` / `mcp-test` / `hocuspocus-test` ジョブにも同じメモあり）。  
     _Revisit when Bun workspaces are first-class on Railway (the same note lives in `ci.yml`)._
 - 運用上の影響 / Operational impact:
   - ルートで `bun install` を実行しても `server/*` の依存は入らない。各サービスに入るには `cd server/<service> && bun install` する必要がある。  
     _Running `bun install` at the repo root does **not** install `server/*` dependencies; run `bun install` inside each service directory._
-  - CI (`.github/workflows/ci.yml`) でも各サービスディレクトリで個別に `bun install` → typecheck / test を行う。  
-    _CI installs and tests each service individually._
+  - CI (`.github/workflows/ci.yml`) でも各サービスディレクトリで個別に `bun install` してから typecheck / test を実行する。具体的には `server/api` は `api-typecheck`（型チェック）と `api-test`（vitest）、`server/mcp` は `mcp-test`（型チェック + テスト）、`server/hocuspocus` は `hocuspocus-test`（vitest）の各ジョブが担当する。  
+    _CI installs each service individually, then runs its checks: `server/api` via `api-typecheck` (types) + `api-test` (vitest), `server/mcp` via `mcp-test` (types + tests), and `server/hocuspocus` via `hocuspocus-test` (vitest)._
 - デプロイ / Deploy:
   - `server/api`, `server/hocuspocus`, `server/mcp` は Railway の GitHub 連携で自動デプロイされる (Root Directory をサービスディレクトリに設定)。CI (`deploy-dev.yml` / `deploy-prod.yml`) はフロントエンド (Cloudflare Pages) のデプロイと DB マイグレーションを担当する。  
     _All three `server/*` services auto-deploy via Railway's GitHub integration (each Railway service is configured with the matching Root Directory). The `deploy-*.yml` workflows cover Cloudflare Pages deploys and DB migrations only._
