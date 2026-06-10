@@ -62,7 +62,23 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
 
   useEffect(() => {
     if (!isSignedIn) {
-      queueMicrotask(() => setIsWebClipperOpen(false));
+      // サインアウト遷移ではコンポーネントは unmount されず `null` を返すだけ
+      // なので、開いたままのメニュー / ダイアログ状態が残ると再サインイン時に
+      // 突然再表示される。ローカル UI 状態をここで畳む（PR #1023 CodeRabbit）。
+      // `initialClipUrl` の破棄はしない — サインイン往復（#826 の clipUrl
+      // handoff）ではセッション読込中に一時的に未サインイン判定になるため、
+      // ここで親に閉じ通知すると正規の handoff を壊してしまう。
+      // On sign-out the component stays mounted and merely renders null, so
+      // stale open-menu/dialog state would resurface on the next sign-in.
+      // Collapse the local UI state here (PR #1023 CodeRabbit review). Do NOT
+      // clear `initialClipUrl`: the sign-in round trip (#826 clipUrl handoff)
+      // passes through a transient unauthenticated state, and notifying the
+      // parent here would destroy the legitimate handoff.
+      queueMicrotask(() => {
+        setIsMenuOpen(false);
+        setIsWebClipperOpen(false);
+        setIsImageDialogOpen(false);
+      });
     }
   }, [isSignedIn]);
 

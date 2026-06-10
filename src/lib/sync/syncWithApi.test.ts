@@ -721,6 +721,8 @@ describe("syncWithApi", () => {
 
     expect(adapter.reassignNullNotePages).toHaveBeenCalledWith(DEFAULT_NOTE_ID);
     expect(callOrder[0]).toBe("reassign");
+    expect(callOrder).toContain("upsert");
+    expect(callOrder.indexOf("reassign")).toBeLessThan(callOrder.indexOf("upsert"));
   });
 
   it("fails the sync when the response lacks default_note_id (pre-#1020 server)", async () => {

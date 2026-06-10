@@ -133,7 +133,13 @@ function NotePageEditorEditable({
   noteId: string;
   collaboration: UseCollaborationReturn;
   isCollaborationEnabled: boolean;
-  /** ページ所有者のみタイトル編集可。Only the page owner can edit the title. */
+  /**
+   * ノート編集権限（`access.canEdit`）があればタイトル編集可（Issue #1020 で
+   * 旧「ページ所有者のみ」ルールを廃止し、`canEdit` と同一の判定に統一）。
+   * Title renaming is allowed whenever the note-level `access.canEdit` is
+   * true — the legacy owner-only rule was retired by issue #1020 and this now
+   * mirrors `canEdit`.
+   */
   isTitleEditable: boolean;
   /**
    * URL クリッパー等の作成経路から渡される Tiptap JSON 文字列。Hocuspocus の
