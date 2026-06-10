@@ -1,7 +1,8 @@
 /**
  * C3-7: Page repository backed by StorageAdapter + ApiClient.
  * Uses StorageAdapter + API for reads and writes. Page "content" is Y.Doc (returned as "").
- * When userId is LOCAL_USER_ID (guest), create/delete use adapter only (no API).
+ * Guest-local page creation was retired by issue #1020; only deletes still
+ * branch on LOCAL_USER_ID (guest deletes stay local and skip the API).
  */
 
 import type { StorageAdapter } from "@/lib/storageAdapter/StorageAdapter";
@@ -31,7 +32,7 @@ function syncPageItemToMetadata(row: SyncPageItem): PageMetadata {
   return {
     id: row.id,
     ownerId: row.owner_id,
-    noteId: row.note_id ?? null,
+    noteId: row.note_id,
     sourcePageId: row.source_page_id ?? null,
     title: row.title ?? null,
     contentPreview: row.content_preview ?? null,
@@ -47,7 +48,7 @@ function metadataToPage(m: PageMetadata): Page {
   return {
     id: m.id,
     ownerUserId: m.ownerId,
-    noteId: m.noteId ?? null,
+    noteId: m.noteId,
     title: m.title ?? "",
     content: "", // Y.Doc; load via adapter.getYDocState or API
     contentPreview: m.contentPreview ?? undefined,
@@ -63,7 +64,7 @@ function metadataToPageSummary(m: PageMetadata): PageSummary {
   return {
     id: m.id,
     ownerUserId: m.ownerId,
-    noteId: m.noteId ?? null,
+    noteId: m.noteId,
     title: m.title ?? "",
     contentPreview: m.contentPreview ?? undefined,
     thumbnailUrl: m.thumbnailUrl ?? undefined,
@@ -76,12 +77,13 @@ function metadataToPageSummary(m: PageMetadata): PageSummary {
 
 /**
  * ローカル IndexedDB (StorageAdapter) と REST API (ApiClient) を束ねる
- * ページリポジトリ。ゲスト (`LOCAL_USER_ID`) は adapter のみを使い、
- * 認証済みユーザーは adapter + API の両方を使って CRUD を行う。
+ * ページリポジトリ。読み取りはローカル優先、作成は API 経由（所属は
+ * デフォルトノート）。ゲスト (`LOCAL_USER_ID`) の削除のみローカル完結。
  *
  * Page repository that bridges the local IndexedDB (StorageAdapter) with the
- * REST API (ApiClient). Guest users (`LOCAL_USER_ID`) go through the adapter
- * only, while authenticated users read/write via adapter + API.
+ * REST API (ApiClient). Reads are local-first; creation goes through the API
+ * (landing in the default note). Only guest (`LOCAL_USER_ID`) deletes stay
+ * local.
  */
 export class StorageAdapterPageRepository {
   /**
@@ -94,46 +96,21 @@ export class StorageAdapterPageRepository {
   ) {}
 
   /**
-   * 新しいページを作成する。ゲストはローカルのみ、認証済みは API 経由で作成。
-   * Create a new page. Guest users stay local; authenticated users hit the API.
+   * 新しいページを作成する（API 経由、所属は呼び出し元のデフォルトノート）。
+   * 旧ゲスト向けローカル作成（`noteId: null` の個人ページ）は Issue #1020 で
+   * 廃止した。未認証で呼ばれた場合は API 側で 401 になる。
+   *
+   * Create a new page via the API; it lands in the caller's default note.
+   * Guest-local creation (legacy `noteId: null` personal pages) was retired
+   * by issue #1020 — unauthenticated calls now fail with the API's 401.
    */
   async createPage(
-    userId: string,
+    _userId: string,
     title: string = "",
     content: string = "",
     options?: CreatePageOptions,
   ): Promise<Page> {
-    if (userId === LOCAL_USER_ID) {
-      return this.createPageLocal(title, content, options);
-    }
     return this.createPageRemote(title, content, options);
-  }
-
-  private async createPageLocal(
-    title: string,
-    content: string,
-    options?: CreatePageOptions,
-  ): Promise<Page> {
-    const contentPreview = getPageListPreview(content);
-    const now = Date.now();
-    const id = crypto.randomUUID();
-    const meta: PageMetadata = {
-      id,
-      ownerId: LOCAL_USER_ID,
-      // ローカル (ゲスト) で作るのは個人ページのみ。Issue #713。
-      // Local (guest) creation always produces a personal page. Issue #713.
-      noteId: null,
-      sourcePageId: null,
-      title: title || null,
-      contentPreview: contentPreview || null,
-      thumbnailUrl: options?.thumbnailUrl ?? null,
-      sourceUrl: options?.sourceUrl ?? null,
-      createdAt: now,
-      updatedAt: now,
-      isDeleted: false,
-    };
-    await this.adapter.upsertPage(meta);
-    return metadataToPage(meta);
   }
 
   private async createPageRemote(
@@ -150,26 +127,6 @@ export class StorageAdapterPageRepository {
       thumbnail_object_id: options?.thumbnailObjectId ?? undefined,
     });
     const meta = syncPageItemToMetadata(created);
-    await this.adapter.upsertPage(meta);
-    return metadataToPage(meta);
-  }
-
-  /**
-   * サーバーから取得済みの個人ページ行（`SyncPageItem`）を、API 呼び出しなしで
-   * ローカル IndexedDB に書き戻す。「ノート → 個人に取り込み」など、サーバー側で
-   * 既に作成済みのページを `/home` へ即時反映させたい場合に使う。
-   * `note_id !== null` のノートネイティブページは個人 `/home` のスコープに入れない
-   * ため、呼び出し側で弾く（ここでは書き込みを行わず `null` を返す）。
-   *
-   * Write-through for a page row that was already created on the server.
-   * Used after "copy to personal" so the new personal page shows up on `/home`
-   * without a full sync. Note-native pages (`note_id !== null`) belong to a
-   * note, not the caller's personal `/home`, so they are rejected here (no
-   * IDB write; returns `null`). See issue #713 Phase 3.
-   */
-  async importPersonalPageFromApi(page: SyncPageItem): Promise<Page | null> {
-    if (page.note_id != null) return null;
-    const meta = syncPageItemToMetadata(page);
     await this.adapter.upsertPage(meta);
     return metadataToPage(meta);
   }

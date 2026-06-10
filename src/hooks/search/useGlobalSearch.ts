@@ -43,26 +43,17 @@ type SharedResultRow = SearchResultRow;
 /**
  * Issue #718 Phase 5-4 の dedup 契約を一箇所に集約するヘルパー。
  *
- * `scope=shared` レスポンスは以下の 3 種類のページを返す
- * (`server/api/src/routes/search.ts`):
+ * `scope=shared` レスポンス (`server/api/src/routes/search.ts`) には、呼び出し元の
+ * デフォルトノート配下のページ（IDB が保持し `useSearchPages` でも出る）と、
+ * 参加ノートのページの両方が混ざる。ここでは「`useSearchPages` で既に出ている
+ * page id」を集合で受け取り、それと一致する shared 行だけを落とす。`note_id`
+ * では判定しない（呼び出し元のデフォルトノート ID をこのヘルパーは知らない）。
  *
- *  1. 呼び出し元自身の個人ページ (`owner_id = me AND note_id IS NULL`)
- *  2. ノートメンバーシップ / オーナーシップ経由で見えるリンク済み個人ページ
- *     (`note_pages` 経由、他ユーザー所有の `note_id IS NULL` ページも含み得る)
- *  3. ノートネイティブページ (`note_id IS NOT NULL`)
- *
- * IDB は (1) しか持たないので、ここでは「`useSearchPages` で既に出ている page
- * id」を集合で受け取り、それと一致する shared 行だけを落とす。`note_id` の
- * null/non-null では判定しない (それだと (2) のリンク済み個人ページが脱落する。
- * Codex 指摘)。
- *
- * Centralizes the Phase 5-4 dedup contract. `scope=shared` returns three kinds
- * of rows: (1) the caller's own personal pages, (2) linked personal pages
- * visible through note membership or ownership (these may belong to other
- * users and can have `note_id IS NULL`), and (3) note-native pages. IDB only
- * holds (1), so we dedup against the personal page id set instead of using
- * `note_id` as a proxy — otherwise (2) would silently disappear (Codex
- * review).
+ * Centralizes the Phase 5-4 dedup contract. `scope=shared` returns both pages
+ * under the caller's default note (also surfaced by the IDB-backed
+ * `useSearchPages`) and pages from notes the caller participates in. We dedup
+ * against the local page id set instead of `note_id` — this helper has no
+ * knowledge of the caller's default note id.
  *
  * Issue #864: PDF ハイライト行 (`kind="pdf_highlight"`) は別エンティティで個人
  * ページとは重複しないため、`page` 種別だけを dedup の対象とする。
@@ -113,17 +104,13 @@ export interface GlobalSearchPageResultItem extends GlobalSearchResultBase {
   kind: "page";
   pageId: string;
   /**
-   * 所属ノート ID。`null` は個人ページ（`Page.noteId` の暫定 `string | null` を
-   * 反映）。note-native ページでは `/notes/:noteId/:pageId` の遷移先に使う
-   * （Issue #889 Phase 3 で `/pages/:id` を廃止）。null 個人ページの遷移は
-   * 個人ページ概念の根絶エピックで解消する。
+   * 所属ノート ID。`/notes/:noteId/:pageId` の遷移先に使う（Issue #889 Phase 3
+   * で `/pages/:id` を廃止）。Issue #1020 以降は常に非 null。
    *
-   * Owning note id. `null` is a personal page (mirrors the interim
-   * `string | null` on `Page.noteId`). For note-native pages it builds the
-   * `/notes/:noteId/:pageId` target (Issue #889 Phase 3 retired `/pages/:id`).
-   * Navigating null personal pages is addressed by the personal-page removal epic.
+   * Owning note id; builds the `/notes/:noteId/:pageId` target (Issue #889
+   * Phase 3 retired `/pages/:id`). Always non-null since issue #1020.
    */
-  noteId: string | null;
+  noteId: string;
   sourceUrl?: string;
 }
 
@@ -291,15 +278,11 @@ export function buildPdfHighlightItem(
  * Exported so the dedup behavior can be tested without spinning up React
  * Query (Issue #718 Phase 5-4).
  *
- * **Dedup contract**: dedup is by `pageId` against the personal id set —
- * see {@link dedupSharedRowsAgainstPersonal}. We can't filter by `note_id`
- * alone because the server's `scope=shared` SQL returns linked personal
- * pages (other users' `note_id IS NULL` pages reachable via `note_pages`)
- * that are NOT covered by IDB.
+ * **Dedup contract**: dedup is by `pageId` against the local (IDB) result id
+ * set — see {@link dedupSharedRowsAgainstPersonal}.
  *
  * **重複排除の契約**: dedup は `pageId` 一致でのみ行う
- * ({@link dedupSharedRowsAgainstPersonal})。`note_id IS NULL` の中には IDB に
- * 載っていないリンク済み個人ページが混ざるので、`note_id` での絞り込みは不可。
+ * ({@link dedupSharedRowsAgainstPersonal})。
  *
  * Issue #864: shared 結果には `kind="pdf_highlight"` 行も混ざる。dedup は
  * `kind="page"` のみに作用し、ハイライトはスコア順序を保ったまま末尾に並ぶ。

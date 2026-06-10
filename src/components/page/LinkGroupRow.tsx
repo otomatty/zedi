@@ -10,7 +10,7 @@ interface LinkGroupRowProps {
    * `/notes/:noteId/:pageId` 遷移用に noteId も渡す（Issue #889 Phase 3）。
    * Passes `noteId` so the parent can build the `/notes/:noteId/:pageId` URL.
    */
-  onPageClick: (pageId: string, noteId: string | null) => void;
+  onPageClick: (pageId: string, noteId: string) => void;
 }
 
 /**

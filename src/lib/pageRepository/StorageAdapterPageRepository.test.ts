@@ -3,7 +3,6 @@ import { StorageAdapterPageRepository } from "./StorageAdapterPageRepository";
 import type { StorageAdapter } from "@/lib/storageAdapter/StorageAdapter";
 import type { ApiClient } from "@/lib/api/apiClient";
 import type { PageMetadata, Link } from "@/lib/storageAdapter/types";
-import type { SyncPageItem } from "@/lib/api/types";
 
 vi.mock("@/lib/contentUtils", () => ({
   getPageListPreview: vi.fn((content: string) => (content ? content.slice(0, 50) : "")),
@@ -16,6 +15,7 @@ function createMockAdapter(): StorageAdapter {
     getPage: vi.fn().mockResolvedValue(null),
     upsertPage: vi.fn().mockResolvedValue(undefined),
     deletePage: vi.fn().mockResolvedValue(undefined),
+    reassignNullNotePages: vi.fn().mockResolvedValue(undefined),
     getYDocState: vi.fn().mockResolvedValue(null),
     saveYDocState: vi.fn().mockResolvedValue(undefined),
     getYDocVersion: vi.fn().mockResolvedValue(0),
@@ -59,6 +59,7 @@ function createMockApi(): ApiClient {
 }
 
 const LOCAL_USER_ID = "local-user";
+const DEFAULT_NOTE_ID = "default-note-1";
 const AUTH_USER_ID = "auth-user-123";
 
 describe("StorageAdapterPageRepository", () => {
@@ -73,14 +74,28 @@ describe("StorageAdapterPageRepository", () => {
   });
 
   describe("createPage", () => {
-    it("creates page locally without API call for local user", async () => {
-      const page = await repo.createPage(LOCAL_USER_ID, "Test Title", "");
+    it("always creates via the API, even for the local user (guest-local creation retired by issue #1020)", async () => {
+      const now = new Date().toISOString();
+      (api.createPage as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: "api-page-1",
+        owner_id: AUTH_USER_ID,
+        note_id: DEFAULT_NOTE_ID,
+        title: "API Page",
+        content_preview: "preview",
+        source_page_id: null,
+        thumbnail_url: null,
+        source_url: null,
+        created_at: now,
+        updated_at: now,
+        is_deleted: false,
+      });
 
+      const page = await repo.createPage(LOCAL_USER_ID, "API Page", "body");
+
+      expect(api.createPage).toHaveBeenCalledOnce();
       expect(adapter.upsertPage).toHaveBeenCalledOnce();
-      expect(api.createPage).not.toHaveBeenCalled();
-      expect(page.title).toBe("Test Title");
-      expect(page.ownerUserId).toBe(LOCAL_USER_ID);
-      expect(page.id).toBeTruthy();
+      expect(page.id).toBe("api-page-1");
+      expect(page.noteId).toBe(DEFAULT_NOTE_ID);
     });
 
     it("calls API and stores in adapter for authenticated user", async () => {
@@ -88,6 +103,7 @@ describe("StorageAdapterPageRepository", () => {
       (api.createPage as ReturnType<typeof vi.fn>).mockResolvedValue({
         id: "api-page-1",
         owner_id: AUTH_USER_ID,
+        note_id: DEFAULT_NOTE_ID,
         title: "API Page",
         content_preview: "preview",
         source_page_id: null,
@@ -113,7 +129,7 @@ describe("StorageAdapterPageRepository", () => {
       const meta: PageMetadata = {
         id: "page-1",
         ownerId: LOCAL_USER_ID,
-        noteId: null,
+        noteId: DEFAULT_NOTE_ID,
         sourcePageId: null,
         title: "Hello",
         contentPreview: "preview",
@@ -145,7 +161,7 @@ describe("StorageAdapterPageRepository", () => {
         {
           id: "p1",
           ownerId: LOCAL_USER_ID,
-          noteId: null,
+          noteId: DEFAULT_NOTE_ID,
           sourcePageId: null,
           title: "A",
           contentPreview: null,
@@ -158,7 +174,7 @@ describe("StorageAdapterPageRepository", () => {
         {
           id: "p2",
           ownerId: LOCAL_USER_ID,
-          noteId: null,
+          noteId: DEFAULT_NOTE_ID,
           sourcePageId: null,
           title: "B",
           contentPreview: null,
@@ -183,7 +199,7 @@ describe("StorageAdapterPageRepository", () => {
       const existing: PageMetadata = {
         id: "page-1",
         ownerId: LOCAL_USER_ID,
-        noteId: null,
+        noteId: DEFAULT_NOTE_ID,
         sourcePageId: null,
         title: "Old Title",
         contentPreview: null,
@@ -328,7 +344,7 @@ describe("StorageAdapterPageRepository", () => {
       {
         id: "p1",
         ownerId: LOCAL_USER_ID,
-        noteId: null,
+        noteId: DEFAULT_NOTE_ID,
         sourcePageId: null,
         title: "Unique Title",
         contentPreview: null,
@@ -341,7 +357,7 @@ describe("StorageAdapterPageRepository", () => {
       {
         id: "p2",
         ownerId: LOCAL_USER_ID,
-        noteId: null,
+        noteId: DEFAULT_NOTE_ID,
         sourcePageId: null,
         title: "Another Title",
         contentPreview: null,
@@ -373,28 +389,22 @@ describe("StorageAdapterPageRepository", () => {
     });
   });
 
-  describe("noteId passthrough (issue #713 Phase 2)", () => {
-    // 個人ページ作成 (`createPage`) は常に `noteId = null` のメタデータを書き、
-    // 取得系は adapter から渡された `noteId` をそのまま `Page` / `PageSummary`
-    // に伝播させる。ノートネイティブページは `note-native` の値を保つ。
+  describe("noteId passthrough (issues #713 / #1020)", () => {
+    // 作成系はサーバが返す `note_id`（呼び出し元のデフォルトノート）をそのまま
+    // 書き、取得系は adapter から渡された `noteId` をそのまま `Page` /
+    // `PageSummary` に伝播させる。
     //
-    // `createPage` always writes personal-page metadata (`noteId = null`); read
-    // paths surface whatever `noteId` the adapter returns into `Page` /
-    // `PageSummary` unchanged so callers can scope behaviour without re-querying.
+    // Creation persists the server-returned `note_id` (the caller's default
+    // note); read paths surface whatever `noteId` the adapter returns into
+    // `Page` / `PageSummary` unchanged so callers can scope behaviour without
+    // re-querying.
 
-    it("createPage (local) writes noteId: null to the adapter", async () => {
-      await repo.createPage(LOCAL_USER_ID, "Personal", "");
-      const upsertMock = adapter.upsertPage as ReturnType<typeof vi.fn>;
-      expect(upsertMock).toHaveBeenCalledOnce();
-      const stored = upsertMock.mock.calls[0][0] as PageMetadata;
-      expect(stored.noteId).toBeNull();
-    });
-
-    it("createPage (remote) defaults noteId to null when API omits it", async () => {
+    it("createPage persists the API note_id to the adapter", async () => {
       const now = new Date().toISOString();
       (api.createPage as ReturnType<typeof vi.fn>).mockResolvedValue({
         id: "api-page-1",
         owner_id: AUTH_USER_ID,
+        note_id: DEFAULT_NOTE_ID,
         title: "API Page",
         content_preview: null,
         source_page_id: null,
@@ -405,19 +415,19 @@ describe("StorageAdapterPageRepository", () => {
         is_deleted: false,
       });
       const page = await repo.createPage(AUTH_USER_ID, "API Page");
-      expect(page.noteId).toBeNull();
+      expect(page.noteId).toBe(DEFAULT_NOTE_ID);
       const upsertMock = adapter.upsertPage as ReturnType<typeof vi.fn>;
       const stored = upsertMock.mock.calls[0][0] as PageMetadata;
-      expect(stored.noteId).toBeNull();
+      expect(stored.noteId).toBe(DEFAULT_NOTE_ID);
     });
 
     it("getPage / getPagesSummary forward adapter noteId verbatim", async () => {
-      const personal: PageMetadata = {
+      const defaultNotePage: PageMetadata = {
         id: "p1",
         ownerId: LOCAL_USER_ID,
-        noteId: null,
+        noteId: DEFAULT_NOTE_ID,
         sourcePageId: null,
-        title: "Personal",
+        title: "Default-note page",
         contentPreview: null,
         thumbnailUrl: null,
         sourceUrl: null,
@@ -444,85 +454,13 @@ describe("StorageAdapterPageRepository", () => {
       expect(fetched?.noteId).toBe("note-1");
 
       (adapter.getAllPages as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
-        personal,
+        defaultNotePage,
         noteNative,
       ]);
       const summaries = await repo.getPagesSummary(LOCAL_USER_ID);
       const byId = new Map(summaries.map((s) => [s.id, s]));
-      expect(byId.get("p1")?.noteId).toBeNull();
+      expect(byId.get("p1")?.noteId).toBe(DEFAULT_NOTE_ID);
       expect(byId.get("p2")?.noteId).toBe("note-1");
-    });
-  });
-
-  describe("importPersonalPageFromApi (issue #713 Phase 3, Codex P1)", () => {
-    // 「ノート → 個人に取り込み」で生まれた新ページをサーバーレスポンスから直接 IDB に
-    // 書き戻す経路をカバーする。こうすることで `/home` は次回 sync を待たずに表示可能。
-    // `note_id` があるページ（ノートネイティブ）は個人 `/home` に属さないので拒否し、
-    // 呼び出し側に `null` を返して誤書き込みを防ぐ。
-    //
-    // Exercises the write-through path used after "copy to personal": the server
-    // response is persisted to IDB immediately so `/home` does not need to wait
-    // for the next sync pull. Rows with `note_id != null` are note-native and do
-    // not belong on personal `/home`; the helper returns `null` and skips the
-    // adapter write so we cannot accidentally leak them into the personal grid.
-
-    it("writes a personal page (`note_id: null`) through to the adapter and returns it", async () => {
-      const nowIso = "2026-04-23T00:00:00.000Z";
-      // Personal copies arrive from the API with note_id = null (SyncPageItem types
-      // it as string; importPersonalPageFromApi handles null at runtime).
-      const page = await repo.importPersonalPageFromApi({
-        id: "copy-1",
-        owner_id: AUTH_USER_ID,
-        note_id: null,
-        source_page_id: "src-note-page",
-        title: "Copied Page",
-        content_preview: "preview",
-        thumbnail_url: null,
-        source_url: null,
-        created_at: nowIso,
-        updated_at: nowIso,
-        is_deleted: false,
-      } as unknown as SyncPageItem);
-
-      expect(page).not.toBeNull();
-      expect(page?.id).toBe("copy-1");
-      expect(page?.noteId).toBeNull();
-
-      const upsertMock = adapter.upsertPage as ReturnType<typeof vi.fn>;
-      expect(upsertMock).toHaveBeenCalledOnce();
-      const stored = upsertMock.mock.calls[0][0] as PageMetadata;
-      expect(stored).toMatchObject({
-        id: "copy-1",
-        ownerId: AUTH_USER_ID,
-        noteId: null,
-        sourcePageId: "src-note-page",
-        title: "Copied Page",
-        isDeleted: false,
-      });
-    });
-
-    it("returns null and skips the adapter write when the page is note-native", async () => {
-      // ノートネイティブページが誤って個人スコープの IDB に入らないことを保証する。
-      // `/home` のフィルタは `note_id IS NULL` なので、ここを堅牢に弾くと二重防御になる。
-      // Defensively reject note-native rows so they cannot slip into the
-      // personal grid (whose filter is `note_id IS NULL`).
-      const nowIso = "2026-04-23T00:00:00.000Z";
-      const result = await repo.importPersonalPageFromApi({
-        id: "note-native-1",
-        owner_id: AUTH_USER_ID,
-        note_id: "some-note",
-        source_page_id: null,
-        title: "Note-native",
-        content_preview: null,
-        thumbnail_url: null,
-        source_url: null,
-        created_at: nowIso,
-        updated_at: nowIso,
-        is_deleted: false,
-      });
-
-      expect(result).toBeNull();
-      expect(adapter.upsertPage).not.toHaveBeenCalled();
     });
   });
 });

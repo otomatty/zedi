@@ -1154,34 +1154,6 @@ describe("NotePageView", () => {
     consoleError.mockRestore();
   });
 
-  it("keeps linked personal page titles read-only for non-owners", async () => {
-    vi.mocked(useNote).mockReturnValue({
-      note: { id: "note-1" },
-      access: { canView: true, canEdit: true },
-      source: "local",
-      isLoading: false,
-    } as never);
-    vi.mocked(useNotePage).mockReturnValue({
-      data: {
-        id: "page-1",
-        title: "Original title",
-        content: "{}",
-        ownerUserId: "user-other",
-        noteId: null,
-      },
-      isLoading: false,
-    } as never);
-
-    renderNotePageView();
-    fireEvent.click(screen.getByText("change-title"));
-    vi.advanceTimersByTime(500);
-    await Promise.resolve();
-
-    expect(screen.getByTestId("page-title")).toHaveTextContent("Original title");
-    expect(mockApi.updatePageMetadata).not.toHaveBeenCalled();
-    expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
-  });
-
   it("keeps note-native pages read-only for owners without note edit permission", async () => {
     vi.mocked(useNote).mockReturnValue({
       note: { id: "note-1" },
@@ -1242,34 +1214,6 @@ describe("NotePageView", () => {
       expect.objectContaining({
         pageId: "page-1",
         noteId: "note-1",
-      }),
-    );
-  });
-
-  it("keeps AI chat on personal scope for linked personal pages", () => {
-    vi.mocked(useNote).mockReturnValue({
-      note: { id: "note-1" },
-      access: { canView: true, canEdit: true },
-      source: "local",
-      isLoading: false,
-    } as never);
-    vi.mocked(useNotePage).mockReturnValue({
-      data: {
-        id: "page-1",
-        title: "Linked personal",
-        content: "{}",
-        ownerUserId: "user-1",
-        noteId: null,
-      },
-      isLoading: false,
-    } as never);
-
-    renderNotePageView();
-
-    expect(mockSetPageContext).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pageId: "page-1",
-        noteId: undefined,
       }),
     );
   });

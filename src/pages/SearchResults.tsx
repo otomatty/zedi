@@ -83,6 +83,7 @@ export default function SearchResults() {
           kind: "page",
           pageId: page.id,
           noteId: page.noteId,
+          isShared: false,
           title: page.title || t("common.untitledPage"),
           snippet,
           highlightedSnippet,
@@ -95,14 +96,11 @@ export default function SearchResults() {
       });
 
     // Issue #718 Phase 5-4: dedup 契約は `dedupSharedRowsAgainstPersonal` に集約。
-    // 個人 IDB に既に出ている page id だけを shared から落とす。`note_id` が
-    // null でも他ユーザー所有のリンク済み個人ページは IDB に無いので残す
-    // (Codex / CodeRabbit 指摘)。
+    // ローカル (IDB) 検索で既に出ている page id だけを shared から落とす。
     //
     // Issue #718 Phase 5-4: dedup is centralized in
-    // `dedupSharedRowsAgainstPersonal` and works by `pageId` so linked personal
-    // pages owned by other note members (which IDB does not have) survive
-    // (Codex / CodeRabbit review).
+    // `dedupSharedRowsAgainstPersonal` and works by `pageId` against the
+    // local (IDB) result set.
     const personalIds = new Set(personal.map((item) => item.pageId));
     const dedupedShared = dedupSharedRowsAgainstPersonal(sharedResults, personalIds);
 
@@ -119,6 +117,7 @@ export default function SearchResults() {
           kind: "page",
           pageId: r.id,
           noteId: r.note_id,
+          isShared: true,
           title: r.title?.trim() ? r.title : t("common.untitledPage"),
           snippet,
           highlightedSnippet,

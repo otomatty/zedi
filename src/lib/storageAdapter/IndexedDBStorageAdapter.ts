@@ -32,11 +32,15 @@ interface StoredPage {
   id: string;
   ownerId: string;
   /**
-   * 所属ノート ID。`null` は個人ページ、文字列値はノートネイティブページ。
-   * Web 版の同期パスは個人ページしか持ち込まないので、実運用では常に `null`。
+   * 所属ノート ID。新規行は常に非 null（呼び出し元のデフォルトノート）。
+   * 旧「個人ページ」時代に永続化された行は `null` のまま残っているため、
+   * 同期時に `reassignNullNotePages` でデフォルトノートへ付け替えるまでは
+   * `null` があり得る（Issue #1020）。
    *
-   * Owning note ID; `null` is a personal page. The web sync path only ever
-   * imports personal pages, so this is always `null` in practice.
+   * Owning note ID. New rows are always non-null (the caller's default
+   * note). Rows persisted under the retired "personal page" model may still
+   * carry `null` until `reassignNullNotePages` adopts them during sync
+   * (issue #1020).
    */
   noteId: string | null;
   sourcePageId: string | null;
@@ -77,7 +81,7 @@ function pageToStored(p: PageMetadata): StoredPage {
   return {
     id: p.id,
     ownerId: p.ownerId,
-    noteId: p.noteId ?? null,
+    noteId: p.noteId,
     sourcePageId: p.sourcePageId ?? null,
     title: p.title ?? null,
     contentPreview: p.contentPreview ?? null,
@@ -89,12 +93,21 @@ function pageToStored(p: PageMetadata): StoredPage {
   };
 }
 
-function storedToPage(s: StoredPage): PageMetadata {
-  // v1 で永続化された行は `noteId` を持たない。`null` を返して個人ページ扱いに
-  // 揃える。Issue #713。
-  // Rows persisted under v1 lack `noteId`; coerce to `null` so they read as
-  // personal pages. Issue #713.
-  return { ...s, noteId: s.noteId ?? null };
+/**
+ * `noteId` が確定している行かを判定する型ガード。旧個人ページ時代の `null` /
+ * 未設定行は `reassignNullNotePages` による移行が済むまで読み出し対象から外す
+ * （Issue #1020）。
+ *
+ * Type guard for rows whose `noteId` is materialized. Legacy `null` /
+ * missing rows are excluded from reads until `reassignNullNotePages`
+ * migrates them (issue #1020).
+ */
+function hasNoteId(s: StoredPage): s is StoredPage & { noteId: string } {
+  return typeof s.noteId === "string";
+}
+
+function storedToPage(s: StoredPage & { noteId: string }): PageMetadata {
+  return { ...s };
 }
 
 function ensureDb(): Promise<IDBDatabase> {
@@ -509,25 +522,15 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
   // ── メタデータ / Page metadata ──
 
   /**
-   * 削除されていない個人ページ（`noteId === null`）を `updatedAt` 降順で返す。
-   * ノートネイティブページ（issue #713）はサーバー API 経由でのみ表示するため
-   * IndexedDB には基本的に持ち込まれないが、混入時もここで除外する。
+   * 削除されていないページを `updatedAt` 降順で返す。IndexedDB が保持するのは
+   * 呼び出し元のデフォルトノート配下のページのみ（Issue #823 / #1020）。
+   * 旧個人ページ時代の `noteId: null` 行は `reassignNullNotePages` による
+   * 移行が済むまで除外する。
    *
-   * Return all non-deleted personal pages (`noteId === null`), sorted by
-   * `updatedAt` descending. Note-native pages (issue #713) are not expected
-   * to land in IndexedDB but are filtered defensively if they do.
-   *
-   * NOTE: `by_note` index は `noteId = null` の行をインデックスから除外する
-   * （IndexedDB 仕様: キー値が null の場合レコードは index に含まれない）。
-   * そのため `index("by_note").getAll(IDBKeyRange.only(null))` は 0 件しか
-   * 返せず、ここでは使えない。`by_note` index は将来ノートネイティブページを
-   * 扱う実装（Phase 3 以降）で noteId 指定クエリ側に使う想定。
-   *
-   * NOTE: the `by_note` index excludes rows whose `noteId` is null (per the
-   * IndexedDB spec, records are dropped from an index when the key value is
-   * null). `index("by_note").getAll(IDBKeyRange.only(null))` therefore returns
-   * zero rows and cannot replace this scan. The index is reserved for future
-   * note-scoped queries once note-native pages are fetched into IDB.
+   * Return all non-deleted pages sorted by `updatedAt` descending. IndexedDB
+   * only holds pages under the caller's default note (issues #823 / #1020).
+   * Legacy `noteId: null` rows are excluded until `reassignNullNotePages`
+   * migrates them.
    */
   async getAllPages(): Promise<PageMetadata[]> {
     const db = await ensureDb();
@@ -537,12 +540,73 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
       req.onsuccess = () => {
         const rows = (req.result as StoredPage[]) || [];
         const list = rows
-          .filter((r) => !r.isDeleted && (r.noteId ?? null) === null)
+          .filter((r): r is StoredPage & { noteId: string } => !r.isDeleted && hasNoteId(r))
           .map(storedToPage);
         list.sort((a, b) => b.updatedAt - a.updatedAt);
         resolve(list);
       };
       req.onerror = () => reject(req.error);
+    });
+  }
+
+  /**
+   * 旧個人ページ時代に `noteId: null` / 未設定で永続化された行を、指定ノート
+   * （呼び出し元のデフォルトノート）へ付け替える（Issue #1020）。冪等。
+   *
+   * 高速パス: `by_note` index は noteId が null / 欠落の行を含まない
+   * （IndexedDB 仕様: index キーが有効値でない行はインデックスから除外される）
+   * ため、`store.count()` と `index.count()` が一致すればレガシー行は存在せず、
+   * 全行カーソル走査をスキップできる。毎同期で呼ばれてもコストは count 2 回。
+   *
+   * Adopt legacy rows persisted with `noteId: null` / missing into the given
+   * note — the caller's default note (issue #1020). Idempotent.
+   *
+   * Fast path: the `by_note` index omits rows whose noteId is null / missing
+   * (per the IndexedDB spec, records without a valid index key are excluded),
+   * so equal `store.count()` / `index.count()` proves there are no legacy
+   * rows and the full cursor scan is skipped. Calling this on every sync
+   * costs just two O(log n) counts.
+   */
+  async reassignNullNotePages(noteId: string): Promise<void> {
+    const db = await ensureDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("my_pages", "readwrite");
+      const store = tx.objectStore("my_pages");
+
+      const totalReq = store.count();
+      const indexedReq = store.index("by_note").count();
+      let total = -1;
+      let indexed = -1;
+
+      const maybeScan = () => {
+        if (total < 0 || indexed < 0) return;
+        // すべての行が by_note index に載っている = レガシー行なし。
+        // Every row is present in the index — nothing to migrate.
+        if (total === indexed) return;
+        const cursorReq = store.openCursor();
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (!cursor) return;
+          const row = cursor.value as StoredPage;
+          if (!hasNoteId(row)) {
+            cursor.update({ ...row, noteId });
+          }
+          cursor.continue();
+        };
+      };
+
+      totalReq.onsuccess = () => {
+        total = totalReq.result;
+        maybeScan();
+      };
+      indexedReq.onsuccess = () => {
+        indexed = indexedReq.result;
+        maybeScan();
+      };
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
     });
   }
 
@@ -557,7 +621,7 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
       const req = tx.objectStore("my_pages").get(pageId);
       req.onsuccess = () => {
         const row = req.result as StoredPage | undefined;
-        resolve(row && !row.isDeleted ? storedToPage(row) : null);
+        resolve(row && !row.isDeleted && hasNoteId(row) ? storedToPage(row) : null);
       };
       req.onerror = () => reject(req.error);
     });
