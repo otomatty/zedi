@@ -207,45 +207,67 @@ jobs:
 
       - uses: ./.github/actions/setup-toolchain
 
-      # Issue #1017: E2E (web) の Playwright ブラウザインストールが恒常的に
-      # exit 124（timeout）で失敗していた問題の恒久対応。
+      # === Issue #1017 診断ステップ（原因の切り分け。恒久対応ではない）=========
+      # 経過:
+      #   * run 27243476723 の `DEBUG=pw:install` で、chromium zip の DL は ~1.4s で
+      #     完了し、直後の `extracting archive`（展開）で停止することを確認。
+      #   * そこで「Bun の zlib/stream が原因」と仮説を立て、展開を Node(`npx`)で
+      #     実行するよう変更したが、run 27243906347 で **Node でも同一の停止**が
+      #     再現（DL 100% 到達後に無音 → timeout 124）。→ ランタイム(Node/Bun)は
+      #     原因ではないと確定。展開処理そのものが環境要因で停止している疑いが濃厚。
       #
-      # 切り分けの結果（run 27243476723 の `DEBUG=pw:install` ログ）:
-      #   * chromium zip の DL は ~1.4s で完了（`download complete` までは正常）。
-      #   * 直後の `pw:install extracting archive`（zip 展開）で停止し、5 分後に
-      #     timeout で打ち切られていた。→ ネットワークではなく「展開処理」が原因。
+      # 本ステップは「Playwright の JS 展開」と「環境（ディスク/FS/CPU）」を切り分ける:
+      #   1. df/free/nproc でディスク空き・メモリ・CPU を記録
+      #   2. 同じ zip を curl で取得（DL 自体の健全性を再確認）
+      #   3. システムの `unzip` で $HOME 配下へ展開（Playwright を介さない展開）
+      # → システム unzip も停止すれば runner 環境（FS/ディスク）が原因。
+      #   unzip が成功すれば Playwright 1.57 の展開コードが原因と切り分けられる。
       #
-      # 展開は extract-zip（yauzl + Node の zlib stream）が担う純粋なローカル処理。
-      # これを `bunx`（= Bun ランタイム）で実行していたため、Bun の zlib/stream
-      # 実装で展開がハングしていた。ワークフロー未変更でも `setup-bun` の
-      # `bun-version: "1.3"` が実行時に最新 1.3.x を引くため、5 月末の Bun 更新で
-      # 静かに退行したと考えられる（5/28 以前は成功、の観測と整合）。
-      #
-      # 対応: 展開を含む `playwright install` を Bun ではなく **Node**（`npx`）で
-      # 実行する。apt 依存は別ステップのまま（Bun でも正常なので据え置き）。
-      # ネットワーク揺らぎに備え timeout + wretry で最大 2 回リトライする。
-      #
-      # Permanent fix for Issue #1017. The `DEBUG=pw:install` trace (run
-      # 27243476723) showed the chromium zip downloads in ~1.4s, then Playwright
-      # hangs in `extracting archive` until `timeout` kills it — so the culprit
-      # is zip extraction, not the network. Extraction is extract-zip (yauzl +
-      # Node zlib streams), a pure local op. We were running it via `bunx` (Bun
-      # runtime), and Bun's zlib/stream implementation hangs on it. The workflow
-      # was unchanged, but `setup-bun`'s `bun-version: "1.3"` resolves the latest
-      # 1.3.x at run time, so a late-May Bun update silently regressed this
-      # (consistent with "passed before 5/28"). Fix: run `playwright install`
-      # (and thus the extraction) under Node via `npx` instead of Bun. apt deps
-      # stay in their own step (they work fine under Bun). Bound each attempt
-      # with `timeout` and retry up to twice for network flake.
+      # Diagnostic for Issue #1017 (NOT a fix). The `npx` run (27243906347)
+      # reproduced the exact same post-download stall under Node, disproving the
+      # Bun-runtime hypothesis: extraction hangs regardless of runtime, so the
+      # cause is environmental or in Playwright's own extraction. This step
+      # isolates "Playwright's JS extraction" from "the runner filesystem/disk"
+      # by downloading the same zip with curl and extracting it with the system
+      # `unzip`. If system unzip also stalls → runner FS/disk is the culprit; if
+      # it succeeds → Playwright 1.57's extraction code is.
       - name: Install Playwright system dependencies
         run: bunx playwright install-deps chromium
 
-      - name: Install Playwright browsers (Node runtime, with retry)
-        uses: Wandalen/wretry.action@v3
-        with:
-          command: timeout 300 npx playwright install chromium
-          attempt_limit: 2
-          attempt_delay: 10000
+      - name: Diagnose browser extraction (env vs Playwright) (#1017)
+        run: |
+          set -x
+          echo "::group::disk / memory / cpu"
+          df -h
+          free -h || true
+          nproc
+          echo "::endgroup::"
+          ZIP_URL="https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/1200/chromium-linux.zip"
+          TMP_ZIP="${RUNNER_TEMP:-/tmp}/chromium-linux.zip"
+          echo "::group::download via curl"
+          time timeout 120 curl -sSL -o "$TMP_ZIP" "$ZIP_URL"
+          ls -la "$TMP_ZIP"
+          echo "::endgroup::"
+          echo "::group::extract via system unzip into \$HOME"
+          rm -rf "$HOME/pw-extract-test"
+          mkdir -p "$HOME/pw-extract-test"
+          if time timeout 240 unzip -q "$TMP_ZIP" -d "$HOME/pw-extract-test"; then
+            echo "SYSTEM_UNZIP_RESULT=ok"
+          else
+            echo "SYSTEM_UNZIP_RESULT=fail exit=$?"
+          fi
+          du -sh "$HOME/pw-extract-test" 2>/dev/null || true
+          df -h
+          echo "::endgroup::"
+
+      # 上の切り分け結果と比較するため、Playwright 本来の install も DEBUG 付き・
+      # 単発・短い timeout で 1 回だけ走らせ、同一環境で展開が停止することを再確認する。
+      # Run Playwright's own install once (DEBUG, single attempt, short timeout)
+      # to confirm it still stalls in the same environment, for direct comparison.
+      - name: Install Playwright browsers (diagnostic, DEBUG=pw:install)
+        env:
+          DEBUG: pw:install
+        run: timeout 180 npx playwright install chromium
 
       - name: Run PDF knowledge E2E
         run: bunx playwright test e2e/pdf-knowledge.spec.ts
