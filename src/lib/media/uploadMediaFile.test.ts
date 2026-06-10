@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   ALLOWED_IMAGE_MIME,
@@ -7,9 +10,23 @@ import {
   uploadMediaFile,
 } from "./uploadMediaFile";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 function makeFile(name: string, type: string, size = 1): File {
   const file = new File([new Uint8Array(size)], name, { type });
   return file;
+}
+
+/**
+ * サーバ `server/api/src/routes/media.ts` の `new Set([...])` リテラルから MIME 値を
+ * 抽出する。ワークスペース外のサーバ定数を import できないため、ファイルを読んで照合する。
+ * Extract MIME values from a `new Set([...])` literal in the server file; the
+ * server constant cannot be imported (it lives outside the workspace).
+ */
+function extractServerMimeSet(source: string, constName: string): Set<string> {
+  const match = source.match(new RegExp(`${constName}\\s*=\\s*new Set\\(\\[([\\s\\S]*?)\\]\\)`));
+  if (!match) throw new Error(`${constName} not found in server media.ts`);
+  return new Set([...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]));
 }
 
 describe("uploadMediaFile validation", () => {
@@ -51,9 +68,19 @@ describe("uploadMediaFile validation", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  // クライアントの許可 MIME がサーバ `ALLOWED_UPLOAD_TYPES` とドリフトすると、ユーザーに
+  // ローカライズ前の生 HTTP 415 が見えてしまう。AGENTS.md のドリフト検知方針に従い、
+  // サーバファイルを読んで文字列一致を CI で担保する（cf. tagCharacterClassSync.test.ts）。
+  // If the client allowlist drifts from the server's ALLOWED_UPLOAD_TYPES, users
+  // see a raw HTTP 415 instead of a localized error. Per AGENTS.md, read the
+  // server file and assert equality in CI (cf. tagCharacterClassSync.test.ts).
   it("keeps the allowed MIME sets in sync with the server contract", () => {
-    expect(ALLOWED_VIDEO_MIME.has("video/webm")).toBe(true);
-    expect(ALLOWED_VIDEO_MIME.has("video/mp4")).toBe(true);
-    expect(ALLOWED_IMAGE_MIME.has("image/png")).toBe(true);
+    const serverFilePath = resolve(__dirname, "../../../server/api/src/routes/media.ts");
+    const source = readFileSync(serverFilePath, "utf8");
+    const serverImages = extractServerMimeSet(source, "SAFE_INLINE_IMAGE_TYPES");
+    const serverVideos = extractServerMimeSet(source, "SAFE_INLINE_VIDEO_TYPES");
+
+    expect([...ALLOWED_IMAGE_MIME].sort()).toEqual([...serverImages].sort());
+    expect([...ALLOWED_VIDEO_MIME].sort()).toEqual([...serverVideos].sort());
   });
 });

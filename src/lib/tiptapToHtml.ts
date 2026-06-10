@@ -224,7 +224,10 @@ const HTML_ESCAPES: Record<string, string> = {
   "'": "&#39;",
 };
 
-/** Escape text nodes for safe HTML body insertion. */
+/**
+ * テキストノードを安全に HTML body へ挿入するためエスケープする。
+ * Escape text nodes for safe HTML body insertion.
+ */
 export function escapeHtml(input: string): string {
   return input.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c] ?? c);
 }
@@ -238,7 +241,7 @@ function escapeHtmlAttr(input: string): string {
  * 安全な URL スキームだけを許可する。`javascript:` 等をはじいて XSS を防ぐ。
  * Allow only safe URL schemes; strip `javascript:` and friends to prevent XSS.
  */
-function sanitizeUrl(input: string): string {
+export function sanitizeUrl(input: string): string {
   const trimmed = input.trim();
   if (!trimmed) return "";
   if (/^(https?:|mailto:|tel:|\/|#)/i.test(trimmed)) return trimmed;

@@ -279,6 +279,14 @@ describe("tiptapToMarkdown", () => {
     expect(md).toContain("&quot;&gt;");
   });
 
+  it("drops a video node whose src uses an unsafe scheme", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "video", attrs: { src: "javascript:alert(1)", alt: "x" } }],
+    });
+    expect(tiptapToMarkdown(content)).toBe("");
+  });
+
   it("emits nothing for a video node without src", () => {
     const content = JSON.stringify({
       type: "doc",

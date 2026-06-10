@@ -1,6 +1,6 @@
 // Convert Tiptap JSON to Markdown
 
-import { escapeHtml } from "./tiptapToHtml";
+import { escapeHtml, sanitizeUrl } from "./tiptapToHtml";
 
 interface TiptapNode {
   type: string;
@@ -99,14 +99,16 @@ Object.assign<Record<string, NodeHandler>, Record<string, NodeHandler>>(nodeHand
   video: (n) => {
     // Markdown に動画の標準構文は無いため HTML <video> タグで出力する。ハンドラ未登録だと
     // convertChildren へフォールバックして空出力になる（mermaid と同型の罠）。
-    // 生 HTML を吐くため、src / alt は HTML エスケープして属性のブレイクアウト経由の
-    // XSS/HTML インジェクションを防ぐ。
-    // Markdown has no native video syntax, so emit an HTML <video> tag. Because
-    // this is raw HTML, escape src / alt to prevent attribute breakout (XSS).
+    // 生 HTML を吐くため、src は安全なスキームのみ許可（sanitizeUrl で javascript: 等を
+    // 排除）し、src / alt は HTML エスケープして属性ブレイクアウト経由の XSS を防ぐ。
+    // Because this is raw HTML, restrict src to safe schemes (sanitizeUrl drops
+    // javascript: etc.) and HTML-escape src / alt to prevent attribute-breakout XSS.
     const src = typeof n.attrs?.src === "string" ? n.attrs.src : "";
     if (!src) return "";
+    const safeSrc = sanitizeUrl(src);
+    if (!safeSrc) return "";
     const alt = typeof n.attrs?.alt === "string" ? n.attrs.alt : "";
-    return `<video src="${escapeHtml(src)}" controls>${escapeHtml(alt)}</video>\n\n`;
+    return `<video src="${escapeHtml(safeSrc)}" controls>${escapeHtml(alt)}</video>\n\n`;
   },
   youtubeEmbed: (n) => {
     // 異常な videoId が Markdown 構文を壊さないよう、厳格に検証してからエンコードする
