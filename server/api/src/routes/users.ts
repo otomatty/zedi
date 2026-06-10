@@ -11,7 +11,23 @@ app.get("/me", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 
-  const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  // Project only the fields clients need. `select()` would also leak internal
+  // moderation columns (status / suspendedAt / suspendedReason / suspendedBy)
+  // to the account owner; those are server-only.
+  const result = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      emailVerified: users.emailVerified,
+      image: users.image,
+      role: users.role,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
   if (!result.length) {
     throw new HTTPException(404, { message: "User not found" });
   }
