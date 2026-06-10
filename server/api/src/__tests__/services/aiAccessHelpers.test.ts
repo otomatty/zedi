@@ -144,9 +144,7 @@ describe("resolveAiConfigForRequest", () => {
   ])(
     "片方だけ指定すると 400 を投げる: %s / throws 400 when only one of provider/model is supplied",
     async (_label, provider, model) => {
-      const err = await catchHttp(
-        resolveAiConfigForRequest({ userId: "u1", db, provider, model }),
-      );
+      const err = await catchHttp(resolveAiConfigForRequest({ userId: "u1", db, provider, model }));
 
       expect(err.status).toBe(400);
       expect(err.message).toBe("provider and model must be specified together");

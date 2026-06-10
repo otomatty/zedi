@@ -20,10 +20,7 @@ vi.mock("../../services/youtubeExtractor.js", () => ({
   extractYouTubeContent: vi.fn(),
 }));
 
-import {
-  ClipFetchBlockedError,
-  fetchClipHtmlWithRedirects,
-} from "../../lib/clipServerFetch.js";
+import { ClipFetchBlockedError, fetchClipHtmlWithRedirects } from "../../lib/clipServerFetch.js";
 import { extractYouTubeContent } from "../../services/youtubeExtractor.js";
 import {
   buildArticleSchema,
@@ -72,7 +69,11 @@ describe("extractYouTubeVideoId", () => {
     ["youtu.be 短縮 URL", "https://youtu.be/dQw4w9WgXcQ", "dQw4w9WgXcQ"],
     ["embed URL", "https://www.youtube.com/embed/dQw4w9WgXcQ", "dQw4w9WgXcQ"],
     ["shorts URL", "https://www.youtube.com/shorts/dQw4w9WgXcQ", "dQw4w9WgXcQ"],
-    ["watch + 追加クエリ", "https://www.youtube.com/watch?feature=share&v=dQw4w9WgXcQ", "dQw4w9WgXcQ"],
+    [
+      "watch + 追加クエリ",
+      "https://www.youtube.com/watch?feature=share&v=dQw4w9WgXcQ",
+      "dQw4w9WgXcQ",
+    ],
   ])("動画 ID を抽出する: %s / extracts the video id", (_label, url, expected) => {
     expect(extractYouTubeVideoId(url)).toBe(expected);
   });
@@ -151,6 +152,7 @@ describe("extractArticleFromUrl", () => {
     mockFetchHtml.mockResolvedValue({
       html: ARTICLE_HTML,
       finalUrl: "https://blog.example.com/post",
+      contentType: "text/html",
     });
 
     const result = await extractArticleFromUrl({
@@ -181,7 +183,11 @@ describe("extractArticleFromUrl", () => {
 
   it("og:image が無ければ thumbnailUrl は null で画像ノードを差し込まない / no thumbnail node when og:image is absent", async () => {
     const noImageHtml = ARTICLE_HTML.replace(/<meta property="og:image"[^>]*>/, "");
-    mockFetchHtml.mockResolvedValue({ html: noImageHtml, finalUrl: "https://blog.example.com/p2" });
+    mockFetchHtml.mockResolvedValue({
+      html: noImageHtml,
+      finalUrl: "https://blog.example.com/p2",
+      contentType: "text/html",
+    });
 
     const result = await extractArticleFromUrl({ url: "https://blog.example.com/p2" });
 
@@ -209,6 +215,7 @@ describe("extractArticleFromUrl", () => {
     mockFetchHtml.mockResolvedValue({
       html: "<html><body></body></html>",
       finalUrl: "https://empty.example.com",
+      contentType: "text/html",
     });
 
     await expect(extractArticleFromUrl({ url: "https://empty.example.com" })).rejects.toThrow(

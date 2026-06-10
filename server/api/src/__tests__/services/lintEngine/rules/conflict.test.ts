@@ -4,10 +4,7 @@
  * `runConflictRule`).
  */
 import { describe, it, expect } from "vitest";
-import {
-  extractFacts,
-  runConflictRule,
-} from "../../../../services/lintEngine/rules/conflict.js";
+import { extractFacts, runConflictRule } from "../../../../services/lintEngine/rules/conflict.js";
 import { createMockDb } from "../../../createMockDb.js";
 import type { Database } from "../../../../types/index.js";
 

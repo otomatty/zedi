@@ -258,7 +258,9 @@ describe("fetchAnthropicModels", () => {
   it("has_more に従ってページを辿り after_id を引き継ぐ / follows has_more across pages, carrying after_id", async () => {
     mockFetch
       .mockResolvedValueOnce(
-        textRes(JSON.stringify({ data: [{ id: "claude-a" }], has_more: true, last_id: "cursor-1" })),
+        textRes(
+          JSON.stringify({ data: [{ id: "claude-a" }], has_more: true, last_id: "cursor-1" }),
+        ),
       )
       .mockResolvedValueOnce(
         textRes(JSON.stringify({ data: [{ id: "claude-b" }], has_more: false })),
