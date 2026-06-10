@@ -1,7 +1,7 @@
 /**
  * クライアント側からのドメイン入力検証 (`note_domain_access`, issue #663) の入口。
  * 真実の値は `@zedi/shared/freeEmailDomains` に集約されており、サーバ側 (
- * `server/api/src/lib/freeEmailDomains.ts`) にも同じ値が二重定義されている。
+ * `server/api/src/services/freeEmailDomains.ts`) にも同じ値が二重定義されている。
  * 同期は `src/lib/freeEmailDomainsSync.test.ts` のドリフト検知テストで担保する。
  *
  * Client-side entry point for domain-input validation used by the

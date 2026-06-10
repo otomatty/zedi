@@ -17,7 +17,7 @@
  * impact aggregation and the cascade order/payload of the anonymization step.
  */
 import { describe, it, expect } from "vitest";
-import { getUserImpact, anonymizeUser } from "../../lib/userDelete.js";
+import { getUserImpact, anonymizeUser } from "../../services/userDelete.js";
 import { users, session, account } from "../../schema/users.js";
 import { notes } from "../../schema/notes.js";
 import { subscriptions } from "../../schema/subscriptions.js";

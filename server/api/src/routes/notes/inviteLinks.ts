@@ -12,7 +12,7 @@ import { HTTPException } from "hono/http-exception";
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { noteInviteLinks, notes } from "../../schema/index.js";
 import { authRequired } from "../../middleware/auth.js";
-import { recordAuditLog } from "../../lib/auditLog.js";
+import { recordAuditLog } from "../../services/auditLog.js";
 import type { AppEnv } from "../../types/index.js";
 import { getNoteRole, requireNoteOwner } from "./helpers.js";
 import {

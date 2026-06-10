@@ -62,8 +62,8 @@ const mockIsMcpRedirectUriAllowed = vi.fn();
 const mockIssueMcpToken = vi.fn();
 const mockStoreMcpCode = vi.fn();
 const mockStoreMcpRevocation = vi.fn();
-vi.mock("../../lib/mcpAuth.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../lib/mcpAuth.js")>();
+vi.mock("../../services/mcpAuth.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../services/mcpAuth.js")>();
   return {
     ...actual,
     consumeMcpCode: (...args: unknown[]) => mockConsumeMcpCode(...args),
@@ -75,7 +75,7 @@ vi.mock("../../lib/mcpAuth.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../../lib/clipAndCreate.js", () => ({
+vi.mock("../../services/clipAndCreate.js", () => ({
   clipAndCreate: vi.fn().mockResolvedValue({
     page_id: "page-mcp-001",
     title: "Mock MCP Title",

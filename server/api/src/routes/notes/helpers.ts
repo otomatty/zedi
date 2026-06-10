@@ -8,7 +8,7 @@ import { notes, noteMembers, noteDomainAccess, pages, users } from "../../schema
 import type { Note } from "../../schema/index.js";
 import type { Database } from "../../types/index.js";
 import type { NoteApiFields, NoteRole, NoteMemberRole } from "./types.js";
-import { extractEmailDomain } from "../../lib/freeEmailDomains.js";
+import { extractEmailDomain } from "../../services/freeEmailDomains.js";
 
 // ── Mappers ─────────────────────────────────────────────────────────────────
 

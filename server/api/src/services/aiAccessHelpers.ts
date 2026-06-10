@@ -11,9 +11,9 @@
  * This utility maps them to proper client-facing 4xx exceptions.
  */
 import { HTTPException } from "hono/http-exception";
-import { checkUsage, validateModelAccess } from "../services/usageService.js";
-import { getProviderApiKeyName } from "../services/aiProviders.js";
-import { getUserTier } from "../services/subscriptionService.js";
+import { checkUsage, validateModelAccess } from "./usageService.js";
+import { getProviderApiKeyName } from "./aiProviders.js";
+import { getUserTier } from "./subscriptionService.js";
 import type { AIProviderType, Database, UserTier } from "../types/index.js";
 
 /**
