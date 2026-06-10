@@ -4,14 +4,12 @@ import {
   appendTiptapContent,
   buildSuggestedWikiLinksMarkdown,
   convertMarkdownToTiptapContent,
-  getCreatePageOutline,
   getMissingSuggestedWikiLinkTitles,
   normalizePageTitle,
   resolveReferencedPagesFromContent,
   serializeChatMessagesForPageGeneration,
   MAX_CHAT_CONTEXT_CHARS,
 } from "./aiChatActionHelpers";
-import type { CreatePageAction } from "@/types/aiChat";
 import { MAX_REFERENCED_PAGES } from "@/types/aiChat";
 
 describe("normalizePageTitle", () => {
@@ -390,56 +388,6 @@ describe("convertMarkdownToTiptapContent (URL sanitization)", () => {
     expect(paragraph.content?.[0]?.marks?.[0]?.attrs).toMatchObject({
       href: "https://example.com",
     });
-  });
-});
-
-describe("getCreatePageOutline", () => {
-  it("returns trimmed outline", () => {
-    const action: CreatePageAction = {
-      type: "create-page",
-      title: "T",
-      content: "",
-      outline: "- A\n- B",
-      suggestedLinks: [],
-      reason: "r",
-    };
-    expect(getCreatePageOutline(action)).toBe("- A\n- B");
-  });
-
-  it("returns empty string when outline missing", () => {
-    const action: CreatePageAction = {
-      type: "create-page",
-      title: "T",
-      content: "",
-      suggestedLinks: [],
-      reason: "r",
-    };
-    expect(getCreatePageOutline(action)).toBe("");
-  });
-
-  it("uses outline field, not title", () => {
-    const action: CreatePageAction = {
-      type: "create-page",
-      title: "TitleOnly",
-      content: "",
-      outline: "OutlineBody",
-      suggestedLinks: [],
-      reason: "r",
-    };
-    expect(getCreatePageOutline(action)).toBe("OutlineBody");
-    expect(getCreatePageOutline(action)).not.toContain("TitleOnly");
-  });
-
-  it("trims outline whitespace via optional chain", () => {
-    const action: CreatePageAction = {
-      type: "create-page",
-      title: "T",
-      content: "",
-      outline: "  padded  ",
-      suggestedLinks: [],
-      reason: "r",
-    };
-    expect(getCreatePageOutline(action)).toBe("padded");
   });
 });
 
