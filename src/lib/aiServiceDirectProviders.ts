@@ -182,7 +182,7 @@ export async function callAnthropic(
 
     callbacks.onComplete?.({
       content,
-      finishReason: response.stop_reason,
+      finishReason: response.stop_reason ?? undefined,
     });
   }
 }

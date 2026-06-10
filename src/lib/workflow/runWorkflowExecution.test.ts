@@ -49,7 +49,8 @@ describe("runWorkflowExecution", () => {
 
     expect(r).toEqual({ outcome: "completed" });
     expect(streamClaudeQuery).toHaveBeenCalledTimes(1);
-    const lastNote = onNote.mock.calls.at(-1)?.[0] as string;
+    const calls = onNote.mock.calls;
+    const lastNote = calls[calls.length - 1]?.[0] as string;
     expect(lastNote).toContain("base");
     expect(lastNote).toContain("Workflow: W");
     expect(lastNote).toContain("done");

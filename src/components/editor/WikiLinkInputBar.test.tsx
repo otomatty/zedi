@@ -21,7 +21,9 @@ vi.mock("@/hooks/useWikiLinkCandidates", () => ({
 
 const mockCheckExistence = vi.fn();
 const mockCheckReferenced = vi.fn();
-const mockUseWikiLinkExistsChecker = vi.fn(() => ({ checkExistence: mockCheckExistence }));
+const mockUseWikiLinkExistsChecker = vi.fn((_options: unknown) => ({
+  checkExistence: mockCheckExistence,
+}));
 vi.mock("@/hooks/usePageQueries", () => ({
   useWikiLinkExistsChecker: (options: unknown) => mockUseWikiLinkExistsChecker(options),
   useCheckGhostLinkReferenced: () => ({ checkReferenced: mockCheckReferenced }),

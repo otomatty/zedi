@@ -12,7 +12,7 @@ interface LinkSectionProps {
    * `/notes/:noteId/:pageId` requires both ids — pass the page's `noteId` to
    * the parent (Issue #889 Phase 3).
    */
-  onPageClick: (pageId: string, noteId: string) => void;
+  onPageClick: (pageId: string, noteId: string | null) => void;
 }
 
 /**

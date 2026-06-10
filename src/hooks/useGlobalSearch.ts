@@ -113,15 +113,17 @@ export interface GlobalSearchPageResultItem extends GlobalSearchResultBase {
   kind: "page";
   pageId: string;
   /**
-   * 所属ノート ID。Issue #823 / #825 で全ページが non-null `note_id` を持つ
-   * ようになって以降は必須。`/notes/:noteId/:pageId` の遷移先を組み立てる
-   * （Issue #889 Phase 3 で `/pages/:id` を廃止）。
+   * 所属ノート ID。`null` は個人ページ（`Page.noteId` の暫定 `string | null` を
+   * 反映）。note-native ページでは `/notes/:noteId/:pageId` の遷移先に使う
+   * （Issue #889 Phase 3 で `/pages/:id` を廃止）。null 個人ページの遷移は
+   * 個人ページ概念の根絶エピックで解消する。
    *
-   * Owning note id. Required since every page has a non-null `note_id` after
-   * Issues #823 / #825, and Issue #889 Phase 3 retired the standalone
-   * `/pages/:id` route — navigation always lands on `/notes/:noteId/:pageId`.
+   * Owning note id. `null` is a personal page (mirrors the interim
+   * `string | null` on `Page.noteId`). For note-native pages it builds the
+   * `/notes/:noteId/:pageId` target (Issue #889 Phase 3 retired `/pages/:id`).
+   * Navigating null personal pages is addressed by the personal-page removal epic.
    */
-  noteId: string;
+  noteId: string | null;
   sourceUrl?: string;
 }
 

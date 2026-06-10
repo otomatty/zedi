@@ -60,7 +60,7 @@ function useEditorControllers(args: {
   tagSuggestionRef: RefObject<TagSuggestionHandle | null>;
   handleInsertImageClick: () => void;
   handleInsertCameraImageClick: () => void;
-  handleImageUpload: (files: File[]) => Promise<void>;
+  handleImageUpload: (files: FileList | File[]) => void;
   /** Note-linked workspace root for `@file:` (Issue #461). */
   workspaceRoot: string | null;
   /** Note id for Tauri workspace registry (Issue #461). */
@@ -233,7 +233,7 @@ export function useTiptapEditorController({
   const editorControllers = useEditorControllers({
     content,
     onChange,
-    placeholder,
+    placeholder: placeholder ?? "",
     autoFocus,
     pageId: pageId ?? "",
     isReadOnly,

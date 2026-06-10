@@ -288,7 +288,6 @@ function createSharedRow(
 ): SearchPageResultRow {
   return {
     kind: "page",
-    id: overrides.id,
     note_id: "note-default" as string,
     owner_id: "u1",
     title: "shared",
@@ -311,7 +310,6 @@ function createHighlightRow(
 ): SearchPdfHighlightResultRow {
   return {
     kind: "pdf_highlight",
-    highlight_id: overrides.highlight_id,
     source_id: "src-1",
     owner_id: "u1",
     pdf_page: 1,

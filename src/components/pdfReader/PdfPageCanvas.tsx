@@ -92,6 +92,7 @@ function PdfPageCanvasImpl({ pdfDoc, pageNumber, scale, onViewportReady }: PdfPa
         }
 
         renderTask = page.render({
+          canvas,
           canvasContext: ctx,
           viewport,
           // dpr=1 のときは undefined を渡してデフォルトパスを温存する。

@@ -417,9 +417,9 @@ describe("useAIChatPanelContentLogic - handlers wiring", () => {
 
     act(() => {
       // Move to a different tab first to assert the switch back to "chat".
-      result.current.setActiveViewTab("branchTree");
+      result.current.setActiveViewTab("branch");
     });
-    expect(result.current.activeViewTab).toBe("branchTree");
+    expect(result.current.activeViewTab).toBe("branch");
 
     act(() => {
       result.current.handleSelectBranch("u1");

@@ -25,7 +25,11 @@ vi.mock("@/lib/messageTree", async (importOriginal) => {
 import { executeSendMessage, executeRegenerateAssistant } from "./useAIChatExecute";
 import { patchMessageInTree } from "@/lib/messageTree";
 
-function createParams(overrides: Partial<Parameters<typeof useAIChatMessageCallbacks>[0]> = {}) {
+type CallbackParams = Parameters<typeof useAIChatMessageCallbacks>[0];
+
+function createParams(
+  overrides: Partial<CallbackParams> = {},
+): CallbackParams & { setTree: ReturnType<typeof vi.fn> } {
   const userMsg: TreeChatMessage = {
     id: "u1",
     role: "user",
@@ -60,7 +64,7 @@ function createParams(overrides: Partial<Parameters<typeof useAIChatMessageCallb
     abortControllerRef: { current: null },
     pendingBranchFromUserIdRef: { current: null },
     ...overrides,
-  } as ReturnType<typeof createParams>;
+  } as CallbackParams & { setTree: ReturnType<typeof vi.fn> };
 }
 
 describe("useAIChatMessageCallbacks", () => {

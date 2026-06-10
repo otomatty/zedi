@@ -29,6 +29,7 @@ function createMockAdapter(overrides: Partial<StorageAdapter> = {}): StorageAdap
     setLastSyncTime: vi.fn().mockResolvedValue(undefined),
     initialize: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
+    resetDatabase: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -661,7 +662,10 @@ describe("syncWithApi", () => {
 
     const upsertMock = adapter.upsertPage as ReturnType<typeof vi.fn>;
     const upsertedById = new Map<string, PageMetadata>(
-      upsertMock.mock.calls.map(([m]: [PageMetadata]) => [m.id, m]),
+      upsertMock.mock.calls.map((call) => {
+        const m = call[0] as PageMetadata;
+        return [m.id, m] as [string, PageMetadata];
+      }),
     );
     expect(upsertedById.get("p1")?.noteId).toBeNull();
     expect(upsertedById.get("p2")?.noteId).toBe("note-1");

@@ -5,7 +5,6 @@
  * 共通レイアウト: ヘッダー・メイン（左サイドバーなし）・モバイルボトムナビ、
  * および CSS 変数。
  */
-import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { AppLayout } from "./AppLayout";

@@ -52,7 +52,10 @@ const NoteView: React.FC = () => {
   } = useNote(noteId ?? "", { allowRemote: true });
 
   const noteSource = source === "remote" ? "remote" : "local";
-  const { canView, canEdit, canManageMembers } = getNoteViewPermissions(access, noteSource);
+  const { canView, canEdit, canManageMembers } = getNoteViewPermissions(
+    access ?? undefined,
+    noteSource,
+  );
   const isLoading = isNoteLoading;
   const isNotFound = !note || !access?.canView;
 
@@ -123,13 +126,15 @@ const NoteView: React.FC = () => {
       floatingAction={
         canEdit ? (
           <div className="mr-4 mb-4 flex flex-col items-end gap-2">
-            <FloatingActionButton
-              noteId={note.id}
-              initialClipUrl={validClipUrl ?? undefined}
-              onClipDialogClosedWithInitialUrl={
-                validClipUrl ? handleClipDialogClosedWithInitialUrl : undefined
-              }
-            />
+            {validClipUrl ? (
+              <FloatingActionButton
+                noteId={note.id}
+                initialClipUrl={validClipUrl}
+                onClipDialogClosedWithInitialUrl={handleClipDialogClosedWithInitialUrl}
+              />
+            ) : (
+              <FloatingActionButton noteId={note.id} />
+            )}
           </div>
         ) : undefined
       }

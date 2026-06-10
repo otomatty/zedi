@@ -71,10 +71,21 @@ jobs:
 
       - uses: ./.github/actions/setup-toolchain
 
-      - run: bunx tsc --noEmit
+      # ルート `tsconfig.json` は `files: []` + project references のため、
+      # `bunx tsc --noEmit`（`-b` なし）はメインフロントエンド `src/` を一切
+      # 型チェックしない（参照プロジェクトは `-b` でしか処理されない）。Issue
+      # #1011 で `tsconfig.app.json` を `strict: true` 化したのに合わせ、`-p` で
+      # 明示してフロントの型エラーを PR で確実に検出する。
+      #
+      # The root `tsconfig.json` uses `files: []` + project references, so a bare
+      # `bunx tsc --noEmit` (without `-b`) type-checks none of the main frontend
+      # `src/` (referenced projects are only processed with `-b`). After Issue
+      # #1011 enabled `strict: true` in `tsconfig.app.json`, point `-p` at it so
+      # frontend type errors are actually caught in PRs.
+      - run: bunx tsc --noEmit -p tsconfig.app.json
 
-      # `bunx tsc --noEmit` 単独はルートの tsconfig（`src/` のみ）しか見ない
-      # ため、workspace パッケージ `@zedi/ui` を別途型チェックする。これを
+      # `tsc --noEmit -p tsconfig.app.json` はルートの tsconfig（`src/` のみ）しか
+      # 見ないため、workspace パッケージ `@zedi/ui` を別途型チェックする。これを
       # 怠ると `packages/ui` だけで起きる型エラー（例: Issue #913 の
       # react-day-picker v10 互換問題）が deploy 時まで気付かれない。
       #

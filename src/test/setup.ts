@@ -38,4 +38,5 @@ global.IntersectionObserver = class IntersectionObserver {
   unobserve = vi.fn();
   disconnect = vi.fn();
   takeRecords = vi.fn().mockReturnValue([]);
-};
+  // Test stub: shape matches the runtime usage, not the full DOM lib type.
+} as unknown as typeof IntersectionObserver;

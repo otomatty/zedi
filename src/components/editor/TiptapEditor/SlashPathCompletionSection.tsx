@@ -3,7 +3,7 @@
  * メインスラッシュメニュー下のワークスペースパス補完一覧。
  */
 
-import React, { forwardRef } from "react";
+import { forwardRef } from "react";
 import { cn } from "@zedi/ui";
 
 interface SlashPathCompletionSectionProps {

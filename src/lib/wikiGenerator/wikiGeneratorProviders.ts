@@ -93,12 +93,9 @@ function isClaudeWebSearchSupported(model: string): boolean {
 }
 
 /** Anthropic messages.stream に渡すパラメータ（tools はオプション） */
-interface AnthropicStreamParams {
-  model: string;
-  max_tokens: number;
-  messages: Array<{ role: "user"; content: string }>;
+type AnthropicStreamParams = Anthropic.MessageStreamParams & {
   tools?: Array<{ type: "web_search_20250305"; name: string; max_uses: number }>;
-}
+};
 
 /**
  * Anthropicでストリーミング生成（Web検索対応）
