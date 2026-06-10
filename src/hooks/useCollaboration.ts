@@ -16,7 +16,7 @@ import type {
   UseCollaborationReturn,
 } from "@/lib/collaboration/types";
 import { getUserColor } from "@/lib/collaboration/types";
-import { useAuth, useUser } from "@/hooks/useAuth";
+import { useAuth, useUser } from "@/hooks/auth/useAuth";
 
 const LOCAL_USER_ID = "local-user";
 

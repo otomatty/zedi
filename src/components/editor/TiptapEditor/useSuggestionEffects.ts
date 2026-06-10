@@ -11,7 +11,7 @@ import {
 import { tagSuggestionPluginKey, type TagSuggestionState } from "../extensions/tagSuggestionPlugin";
 import type { SuggestionItem } from "../extensions/WikiLinkSuggestion";
 import type { TagSuggestionItem } from "../extensions/TagSuggestion";
-import { useCheckGhostLinkReferenced } from "@/hooks/usePageQueries";
+import { useCheckGhostLinkReferenced } from "@/hooks/pages/usePageQueries";
 
 interface UseSuggestionEffectsOptions {
   editor: Editor | null;

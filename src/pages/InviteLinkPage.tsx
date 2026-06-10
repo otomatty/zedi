@@ -21,8 +21,8 @@ import {
   useToast,
 } from "@zedi/ui";
 import { signIn } from "@/lib/auth";
-import { useAuth } from "@/hooks/useAuth";
-import { useInviteLinkPreview, useRedeemInviteLink } from "@/hooks/useInviteLinks";
+import { useAuth } from "@/hooks/auth/useAuth";
+import { useInviteLinkPreview, useRedeemInviteLink } from "@/hooks/auth/useInviteLinks";
 import { ApiError } from "@/lib/api/apiClient";
 import type { InviteLinkPreviewResponse, InviteLinkStatus } from "@/lib/api/types";
 

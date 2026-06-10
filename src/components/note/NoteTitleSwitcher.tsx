@@ -12,11 +12,11 @@ import {
   ScrollArea,
 } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "@/hooks/useAuth";
-import { useMyNote, useNotes } from "@/hooks/useNoteQueries";
+import { useAuth } from "@/hooks/auth/useAuth";
+import { useMyNote, useNotes } from "@/hooks/notes/useNoteQueries";
 import { buildSwitcherNotes } from "@/lib/noteListSections";
 import { isNotePinned } from "@/lib/notePinnedStorage";
-import { usePinnedNotes } from "@/hooks/usePinnedNotes";
+import { usePinnedNotes } from "@/hooks/notes/usePinnedNotes";
 import { NoteSwitcherRow } from "./NoteListRow";
 
 /**

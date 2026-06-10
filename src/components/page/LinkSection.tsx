@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { PageLinkCard } from "./PageLinkCard";
-import type { PageCard } from "@/hooks/useLinkedPages";
+import type { PageCard } from "@/hooks/pages/useLinkedPages";
 
 interface LinkSectionProps {
   title?: string;

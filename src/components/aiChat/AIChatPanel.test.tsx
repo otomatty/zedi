@@ -52,11 +52,11 @@ vi.mock("../../contexts/AIChatContext", () => ({
   }),
 }));
 
-vi.mock("../../hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   usePagesSummary: () => ({ data: [] }),
 }));
 
-vi.mock("../../hooks/useAIChatConversations", () => ({
+vi.mock("@/hooks/aiChat/useAIChatConversations", () => ({
   useAIChatConversations: () => ({
     createConversation: mocks.createConversation,
     updateConversation: mocks.updateConversation,
@@ -66,13 +66,13 @@ vi.mock("../../hooks/useAIChatConversations", () => ({
   }),
 }));
 
-vi.mock("../../hooks/useAIChatActions", () => ({
+vi.mock("@/hooks/aiChat/useAIChatActions", () => ({
   useAIChatActions: () => ({
     handleExecuteAction: vi.fn(),
   }),
 }));
 
-vi.mock("../../hooks/useAIChat", () => ({
+vi.mock("@/hooks/aiChat/useAIChat", () => ({
   useAIChat: () => ({
     messages: [],
     messageMap: {},

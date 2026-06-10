@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Label, Switch, useToast } from "@zedi/ui";
-import { useUpdateNote } from "@/hooks/useNoteQueries";
+import { useUpdateNote } from "@/hooks/notes/useNoteQueries";
 import { useNoteSettingsContext } from "../NoteSettingsContext";
-import { useTagFilterBarPreference } from "@/hooks/useTagFilterBarPreference";
+import { useTagFilterBarPreference } from "@/hooks/tags/useTagFilterBarPreference";
 
 /**
  * `/notes/:noteId/settings/filter-bar` — オーナー向け「タグフィルタバー」設定。

@@ -2,13 +2,13 @@ import React, { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { cn } from "@zedi/ui";
-import { useCreateNewPage } from "@/hooks/useCreateNewPage";
+import { useCreateNewPage } from "@/hooks/pages/useCreateNewPage";
 import { FABMenu, type FABMenuOption } from "./FABMenu";
 import { WebClipperDialog } from "@/components/editor/WebClipperDialog";
 import { ImageCreateDialog } from "./ImageCreateDialog";
 import { useTranslation } from "react-i18next";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@zedi/ui";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/auth/useAuth";
 import { useFloatingActionButtonHandlers } from "./useFloatingActionButtonHandlers";
 
 /**

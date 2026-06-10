@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useCreateNewPage } from "./useCreateNewPage";
+import { useCreateNewPage } from "@/hooks/pages/useCreateNewPage";
 
 interface KeyboardShortcutsOptions {
   onShowShortcuts?: () => void;

@@ -2,7 +2,7 @@
  * Re-export `NotePageSummary` from note queries (single source of truth).
  * `useNotePages` と同一の型をここからも参照できるようにする。
  */
-export type { NotePageSummary } from "@/hooks/useNoteQueries";
+export type { NotePageSummary } from "@/hooks/notes/useNoteQueries";
 
 /**
  * Derives permission flags for the note view from access and note source.

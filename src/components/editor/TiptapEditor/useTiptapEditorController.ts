@@ -7,9 +7,9 @@ import type { WikiLinkGhostCompletionCandidate } from "../extensions/wikiLinkGho
 import type { WikiLinkSuggestionHandle } from "../extensions/WikiLinkSuggestion";
 import type { TagSuggestionHandle } from "../extensions/TagSuggestion";
 import type { SlashSuggestionHandle } from "./SlashSuggestionLayer";
-import { useAuth } from "@/hooks/useAuth";
-import { useGeneralSettings } from "@/hooks/useGeneralSettings";
-import { useWikiLinkCandidates } from "@/hooks/useWikiLinkCandidates";
+import { useAuth } from "@/hooks/auth/useAuth";
+import { useGeneralSettings } from "@/hooks/settings/useGeneralSettings";
+import { useWikiLinkCandidates } from "@/hooks/wiki/useWikiLinkCandidates";
 import { useWikiLinkNavigation } from "./useWikiLinkNavigation";
 import { useEditorSetup } from "./useEditorSetup";
 import { useSuggestionEffects } from "./useSuggestionEffects";

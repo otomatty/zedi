@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { Editor } from "@tiptap/core";
-import { useWikiLinkExistsChecker } from "@/hooks/usePageQueries";
+import { useWikiLinkExistsChecker } from "@/hooks/pages/usePageQueries";
 
 /**
  * `useBubbleMenuWikiLink` のオプション。バブルメニューから WikiLink への

@@ -29,8 +29,8 @@ import {
   noteKeys,
   useNoteApi,
   useRemovePageFromNote,
-} from "@/hooks/useNoteQueries";
-import { useAuth } from "@/hooks/useAuth";
+} from "@/hooks/notes/useNoteQueries";
+import { useAuth } from "@/hooks/auth/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { ContentWithAIChat } from "@/components/aiChat/ContentWithAIChat";
 import { NoteWorkspaceProvider, useNoteWorkspaceOptional } from "@/contexts/NoteWorkspaceContext";
@@ -38,7 +38,7 @@ import { useAIChatContext } from "@/contexts/AIChatContext";
 import { NoteWorkspaceToolbar } from "@/components/note/NoteWorkspaceToolbar";
 import { useMarkdownExport } from "@/components/editor/PageEditor/useMarkdownExport";
 import { usePdfExport } from "@/components/editor/PageEditor/usePdfExport";
-import { usePagePublicContent } from "@/hooks/usePagePublicContent";
+import { usePagePublicContent } from "@/hooks/pages/usePagePublicContent";
 import { PageHistoryModal } from "@/components/editor/pageHistory/PageHistoryModal";
 import { convertMarkdownToTiptapContent } from "@/lib/markdownToTiptap";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";

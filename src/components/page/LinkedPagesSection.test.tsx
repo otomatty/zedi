@@ -3,8 +3,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LinkedPagesSection } from "./LinkedPagesSection";
 import { TestWrapper, createTestQueryClient } from "@/test/testWrapper";
-import type { LinkedPagesData } from "@/hooks/useLinkedPages";
-import { useLinkedPages } from "@/hooks/useLinkedPages";
+import type { LinkedPagesData } from "@/hooks/pages/useLinkedPages";
+import { useLinkedPages } from "@/hooks/pages/useLinkedPages";
 
 // Mock the hooks
 const mockNavigate = vi.fn();
@@ -25,14 +25,14 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-vi.mock("@/hooks/useLinkedPages", () => ({
+vi.mock("@/hooks/pages/useLinkedPages", () => ({
   useLinkedPages: vi.fn(() => ({
     data: mockLinkedPagesData,
     isLoading: false,
   })),
 }));
 
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useCreatePage: () => ({
     mutateAsync: mockCreatePage,
   }),

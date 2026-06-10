@@ -6,7 +6,7 @@ import type { PageSummary } from "@/types/page";
 // 仮想化の検証だけにフォーカスし、PageCard とその依存ツリーをモックする。
 // Focus the test on virtualization by mocking PageCard and its dep tree.
 
-vi.mock("@/hooks/useAuth", () => ({
+vi.mock("@/hooks/auth/useAuth", () => ({
   useAuth: () => ({ isSignedIn: true, user: null }),
 }));
 
@@ -37,7 +37,7 @@ const noteInfiniteData: {
   fetchNextPage: vi.fn(),
 };
 
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   usePagesSummary: () => ({
     data: personalQueryData.current,
     isLoading: personalQueryData.isLoading,
@@ -45,7 +45,7 @@ vi.mock("@/hooks/usePageQueries", () => ({
   useSyncStatus: () => "idle",
 }));
 
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   useInfiniteNotePages: () => ({
     pages: noteInfiniteData.current ?? [],
     rawPages: [],
@@ -65,7 +65,7 @@ vi.mock("@/hooks/useNoteQueries", () => ({
 // PageGrid wires `useNotePageEvents` to subscribe to the note SSE feed in
 // note context. This test focuses on virtualization, so stub the hook to a
 // no-op and skip the QueryClientProvider it would otherwise require.
-vi.mock("@/hooks/useNotePageEvents", () => ({
+vi.mock("@/hooks/notes/useNotePageEvents", () => ({
   useNotePageEvents: vi.fn(),
 }));
 

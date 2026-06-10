@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@zedi/ui";
-import { WikiGeneratorStatus } from "@/hooks/useWikiGenerator";
+import { WikiGeneratorStatus } from "@/hooks/wiki/useWikiGenerator";
 import { isAIConfigured } from "@/lib/aiSettings";
 
 interface WikiGeneratorButtonProps {

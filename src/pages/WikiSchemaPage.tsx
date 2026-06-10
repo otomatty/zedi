@@ -8,7 +8,7 @@ import { Button, useToast } from "@zedi/ui";
 import Container from "@/components/layout/Container";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useTranslation } from "react-i18next";
-import { useWikiSchema } from "@/hooks/useWikiSchema";
+import { useWikiSchema } from "@/hooks/wiki/useWikiSchema";
 
 /**
  * Textarea-based schema editing page. Users define heading structure, naming

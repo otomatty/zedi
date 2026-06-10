@@ -13,7 +13,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Circle, CircleDashed } from "lucide-react";
 import { cn } from "@zedi/ui";
-import type { ComposePhase } from "@/hooks/useWikiComposeSession";
+import type { ComposePhase } from "@/hooks/wiki/useWikiComposeSession";
 
 const PHASE_ORDER: ComposePhase[] = ["brief", "research", "structure", "draft", "completed"];
 

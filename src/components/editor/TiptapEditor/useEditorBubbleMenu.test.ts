@@ -3,7 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useEditorBubbleMenu } from "./useEditorBubbleMenu";
 import type { Editor } from "@tiptap/core";
 
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useWikiLinkExistsChecker: () =>
     ({
       checkExistence: vi.fn().mockResolvedValue({

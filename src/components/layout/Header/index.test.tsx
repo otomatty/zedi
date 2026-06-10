@@ -6,7 +6,7 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import Header from "./index";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/auth/useAuth";
 import { useIsMobile } from "@zedi/ui";
 
 const { signedInAuth, signedOutAuth } = vi.hoisted(() => {
@@ -38,7 +38,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useAuth", () => ({
+vi.mock("@/hooks/auth/useAuth", () => ({
   useAuth: vi.fn(() => ({ ...signedInAuth })),
 }));
 
