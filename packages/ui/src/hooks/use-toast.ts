@@ -68,6 +68,10 @@ const addToRemoveQueue = (toastId: string) => {
   toastTimeouts.set(toastId, timeout);
 };
 
+/**
+ * Pure reducer for toast state (add / update / dismiss / remove).
+ * トースト状態の純粋な reducer（追加・更新・非表示・削除）。
+ */
 export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case actionTypes.ADD_TOAST:
@@ -134,6 +138,10 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">;
 
+/**
+ * Show a toast imperatively. Returns its `id` plus `dismiss` / `update` handles.
+ * トーストを命令的に表示する。`id` と `dismiss` / `update` ハンドルを返す。
+ */
 function toast({ ...props }: Toast) {
   const id = genId();
 
@@ -163,6 +171,10 @@ function toast({ ...props }: Toast) {
   };
 }
 
+/**
+ * Subscribe to toast state and expose the `toast` / `dismiss` helpers.
+ * トースト状態を購読し、`toast` / `dismiss` ヘルパーを公開するフック。
+ */
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState);
 
