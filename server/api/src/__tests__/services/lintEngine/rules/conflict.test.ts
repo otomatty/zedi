@@ -1,9 +1,15 @@
 /**
- * conflict ルールの単体テスト（純粋関数 extractFacts のテスト）。
- * Unit tests for the conflict rule (pure function extractFacts).
+ * conflict ルールの単体テスト（純粋関数 extractFacts + runConflictRule）。
+ * Unit tests for the conflict rule (pure `extractFacts` and the DB-backed
+ * `runConflictRule`).
  */
 import { describe, it, expect } from "vitest";
-import { extractFacts } from "../../../../services/lintEngine/rules/conflict.js";
+import {
+  extractFacts,
+  runConflictRule,
+} from "../../../../services/lintEngine/rules/conflict.js";
+import { createMockDb } from "../../../createMockDb.js";
+import type { Database } from "../../../../types/index.js";
 
 describe("extractFacts", () => {
   it("空文字列からは何も抽出しない / extracts nothing from empty string", () => {
@@ -108,5 +114,93 @@ describe("extractFacts", () => {
     const text = "東京タワーの高さは 333m で、1958年12月23日 に完成した。";
     const facts = extractFacts(text);
     expect(facts.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("runConflictRule", () => {
+  /**
+   * `{id, title, contentText}` 行を返す DB モックでルールを実行するヘルパー。
+   * Runs the rule against a mock DB returning the given joined page rows.
+   */
+  async function runWith(
+    rows: Array<{ id: string; title: string | null; contentText: string | null }>,
+  ) {
+    const { db } = createMockDb([rows]);
+    return runConflictRule("owner-1", db as unknown as Database);
+  }
+
+  it("同じ事柄に異なる値を持つ 2 ページを矛盾として報告する / reports two pages disagreeing on the same fact", async () => {
+    const result = await runWith([
+      { id: "p1", title: "タワー (旧)", contentText: "東京タワーの高さは 333m です。" },
+      { id: "p2", title: null, contentText: "東京タワーの高さは 300m です。" },
+    ]);
+
+    expect(result.rule).toBe("conflict");
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toEqual({
+      rule: "conflict",
+      severity: "warn",
+      pageIds: ["p1", "p2"],
+      detail: {
+        factKey: "東京タワーの高さは",
+        claims: [
+          { pageId: "p1", title: "タワー (旧)", value: "333m" },
+          // title が null のページは "(無題 / untitled)" にフォールバックする。
+          // A null page title falls back to the "(無題 / untitled)" placeholder.
+          { pageId: "p2", title: "(無題 / untitled)", value: "300m" },
+        ],
+        suggestion:
+          "同じ事柄に異なる値が記載されています。確認してください / Different values found for the same fact. Please verify.",
+      },
+    });
+  });
+
+  it("同じ事柄に同じ値なら矛盾としない / does not report when both pages agree on the value", async () => {
+    const result = await runWith([
+      { id: "p1", title: "A", contentText: "東京タワーの高さは 333m です。" },
+      { id: "p2", title: "B", contentText: "東京タワーの高さは 333m です。" },
+    ]);
+
+    expect(result.findings).toEqual([]);
+  });
+
+  it("1 ページ内だけで値が食い違ってもページ跨ぎでなければ報告しない / a single page disagreeing with itself is not a cross-page conflict", async () => {
+    // 同一キーで 2 つの異なる値を持つが、出所が 1 ページなので報告対象外。
+    // Same key, two differing values, but only one distinct page → not reported.
+    const result = await runWith([
+      {
+        id: "p1",
+        title: "A",
+        contentText: `コストは 100円${" ".repeat(20)}コストは 200円`,
+      },
+    ]);
+
+    expect(result.findings).toEqual([]);
+  });
+
+  it("同じキーの主張が 1 件だけなら矛盾としない / a single claim for a key is not a conflict", async () => {
+    const result = await runWith([
+      { id: "p1", title: "A", contentText: "東京タワーの高さは 333m です。" },
+    ]);
+
+    expect(result.findings).toEqual([]);
+  });
+
+  it("contentText が null のページはスキップする / skips pages with null contentText", async () => {
+    const result = await runWith([
+      { id: "p1", title: "A", contentText: null },
+      { id: "p2", title: "B", contentText: "東京タワーの高さは 300m です。" },
+    ]);
+
+    expect(result.findings).toEqual([]);
+  });
+
+  it("ファクトが無ければ検出なし / no findings when no facts are present", async () => {
+    const result = await runWith([
+      { id: "p1", title: "A", contentText: "特に数値はありません。" },
+      { id: "p2", title: "B", contentText: "ここにも数値はありません。" },
+    ]);
+
+    expect(result.findings).toEqual([]);
   });
 });
