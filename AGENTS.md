@@ -52,6 +52,8 @@ bun run test:run       # Vitest 単体テスト
 
 - TypeScript strict。`any` 禁止、型を明示する。
 - export する関数・型・インターフェースには TSDoc / JSDoc を付与する。
+  - 例外: `packages/ui/src/components/` 直下の shadcn/ui 由来コンポーネントは対象外。自前実装（`packages/ui` の hooks / lib / sidebar 分割実装）は `jsdoc/require-jsdoc` を error で強制する（`eslint.config.js` 参照）。
+    _Exception: shadcn/ui-vendored components under `packages/ui/src/components/` are exempt; in-house code (hooks / lib / the split sidebar implementation) enforces `jsdoc/require-jsdoc` as an error (see `eslint.config.js`)._
 - コメントやドキュメントは、原則として日本語と英語の両方を併記する。
 - `bun run lint` と `bun run format:check` が通る状態を維持する。
 - 既存のディレクトリ構成・命名規則に合わせる。
