@@ -151,8 +151,11 @@ describe("IndexedDBStorageAdapter.resetDatabase (issue #608)", () => {
 function makePagesDb(rows: Array<Record<string, unknown>>): {
   db: IDBDatabase;
   data: Map<string, Record<string, unknown>>;
+  /** `openCursor` の呼び出し回数（高速パス検証用）。Cursor-scan call count. */
+  cursorScans: { count: number };
 } {
   const data = new Map(rows.map((r) => [r.id as string, { ...r }]));
+  const cursorScans = { count: 0 };
 
   function makeTransaction() {
     const tx: {
@@ -169,15 +172,36 @@ function makePagesDb(rows: Array<Record<string, unknown>>): {
       objectStore: () => store,
     };
 
+    // 実 IndexedDB の auto-commit を模す: 進行中リクエストが 0 になったら
+    // `oncomplete` を一度だけ発火する。
+    // Mimic IndexedDB auto-commit: fire `oncomplete` once after the last
+    // in-flight request settles.
+    let pending = 0;
+    let committed = false;
+    const begin = () => {
+      pending += 1;
+    };
+    const end = () => {
+      pending -= 1;
+      queueMicrotask(() => {
+        if (!committed && pending === 0) {
+          committed = true;
+          tx.oncomplete?.();
+        }
+      });
+    };
+
     const store = {
       getAll: () => {
         const req: { result?: unknown; onsuccess: (() => void) | null; onerror: null } = {
           onsuccess: null,
           onerror: null,
         };
+        begin();
         queueMicrotask(() => {
           req.result = [...data.values()].map((r) => ({ ...r }));
           req.onsuccess?.();
+          end();
         });
         return req;
       },
@@ -186,27 +210,60 @@ function makePagesDb(rows: Array<Record<string, unknown>>): {
           onsuccess: null,
           onerror: null,
         };
+        begin();
         queueMicrotask(() => {
           req.result = data.has(id) ? { ...data.get(id) } : undefined;
           req.onsuccess?.();
+          end();
         });
         return req;
       },
+      count: () => {
+        const req: { result?: number; onsuccess: (() => void) | null; onerror: null } = {
+          onsuccess: null,
+          onerror: null,
+        };
+        begin();
+        queueMicrotask(() => {
+          req.result = data.size;
+          req.onsuccess?.();
+          end();
+        });
+        return req;
+      },
+      // `by_note` index: noteId が string の行だけがインデックスに載る
+      // （IndexedDB は無効な index キーの行を除外する）。
+      // Rows with a string noteId are the only ones present in `by_note`.
+      index: (_name: string) => ({
+        count: () => {
+          const req: { result?: number; onsuccess: (() => void) | null; onerror: null } = {
+            onsuccess: null,
+            onerror: null,
+          };
+          begin();
+          queueMicrotask(() => {
+            req.result = [...data.values()].filter((r) => typeof r.noteId === "string").length;
+            req.onsuccess?.();
+            end();
+          });
+          return req;
+        },
+      }),
       openCursor: () => {
+        cursorScans.count += 1;
         const ids = [...data.keys()];
         const req: { result: unknown; onsuccess: (() => void) | null; onerror: null } = {
           result: null,
           onsuccess: null,
           onerror: null,
         };
+        begin();
         let index = 0;
         const step = () => {
           if (index >= ids.length) {
             req.result = null;
             req.onsuccess?.();
-            // 全行を走査し終えたら version-change なしの readwrite tx として
-            // oncomplete を発火する。Fire oncomplete once iteration ends.
-            queueMicrotask(() => tx.oncomplete?.());
+            end();
             return;
           }
           const id = ids[index];
@@ -233,7 +290,7 @@ function makePagesDb(rows: Array<Record<string, unknown>>): {
     close: vi.fn(),
   } as unknown as IDBDatabase;
 
-  return { db, data };
+  return { db, data, cursorScans };
 }
 
 describe("IndexedDBStorageAdapter legacy noteId:null rows (issue #1020)", () => {
@@ -246,7 +303,7 @@ describe("IndexedDBStorageAdapter legacy noteId:null rows (issue #1020)", () => 
    * adapter initialized with a unique user id.
    */
   async function setupAdapter(rows: Array<Record<string, unknown>>) {
-    const { db, data } = makePagesDb(rows);
+    const { db, data, cursorScans } = makePagesDb(rows);
     (globalThis as { indexedDB?: IDBFactory }).indexedDB = {
       open: vi.fn(() => {
         const req: {
@@ -264,7 +321,7 @@ describe("IndexedDBStorageAdapter legacy noteId:null rows (issue #1020)", () => 
     const adapter = new IndexedDBStorageAdapter();
     userCounter += 1;
     await adapter.initialize(`legacy-user-${userCounter}`);
-    return { adapter, data };
+    return { adapter, data, cursorScans };
   }
 
   afterEach(async () => {
@@ -328,5 +385,30 @@ describe("IndexedDBStorageAdapter legacy noteId:null rows (issue #1020)", () => 
     await adapter.reassignNullNotePages("note-default");
 
     expect(data.get("v1-1")?.noteId).toBe("note-default");
+  });
+
+  it("reassignNullNotePages skips the cursor scan when every row already has a noteId (count fast path)", async () => {
+    // 毎同期で呼ばれる前提のため、レガシー行が無い定常状態では
+    // `store.count()` と `by_note` index の count 比較だけで終わり、
+    // 全行カーソル走査を行わない（PR #1023 gemini-code-assist review）。
+    // Steady state (no legacy rows) must resolve via the two-count
+    // comparison without opening a cursor, since sync calls this every run.
+    const { adapter, cursorScans } = await setupAdapter([
+      migratedRow,
+      { ...migratedRow, id: "migrated-2" },
+    ]);
+
+    await adapter.reassignNullNotePages("note-default");
+
+    expect(cursorScans.count).toBe(0);
+  });
+
+  it("reassignNullNotePages runs the cursor scan when a legacy row is present (counts differ)", async () => {
+    const { adapter, cursorScans, data } = await setupAdapter([legacyRow, migratedRow]);
+
+    await adapter.reassignNullNotePages("note-default");
+
+    expect(cursorScans.count).toBe(1);
+    expect(data.get("legacy-1")?.noteId).toBe("note-default");
   });
 });

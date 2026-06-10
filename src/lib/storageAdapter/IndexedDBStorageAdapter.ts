@@ -553,24 +553,57 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
    * 旧個人ページ時代に `noteId: null` / 未設定で永続化された行を、指定ノート
    * （呼び出し元のデフォルトノート）へ付け替える（Issue #1020）。冪等。
    *
+   * 高速パス: `by_note` index は noteId が null / 欠落の行を含まない
+   * （IndexedDB 仕様: index キーが有効値でない行はインデックスから除外される）
+   * ため、`store.count()` と `index.count()` が一致すればレガシー行は存在せず、
+   * 全行カーソル走査をスキップできる。毎同期で呼ばれてもコストは count 2 回。
+   *
    * Adopt legacy rows persisted with `noteId: null` / missing into the given
    * note — the caller's default note (issue #1020). Idempotent.
+   *
+   * Fast path: the `by_note` index omits rows whose noteId is null / missing
+   * (per the IndexedDB spec, records without a valid index key are excluded),
+   * so equal `store.count()` / `index.count()` proves there are no legacy
+   * rows and the full cursor scan is skipped. Calling this on every sync
+   * costs just two O(log n) counts.
    */
   async reassignNullNotePages(noteId: string): Promise<void> {
     const db = await ensureDb();
     return new Promise((resolve, reject) => {
       const tx = db.transaction("my_pages", "readwrite");
       const store = tx.objectStore("my_pages");
-      const cursorReq = store.openCursor();
-      cursorReq.onsuccess = () => {
-        const cursor = cursorReq.result;
-        if (!cursor) return;
-        const row = cursor.value as StoredPage;
-        if (!hasNoteId(row)) {
-          cursor.update({ ...row, noteId });
-        }
-        cursor.continue();
+
+      const totalReq = store.count();
+      const indexedReq = store.index("by_note").count();
+      let total = -1;
+      let indexed = -1;
+
+      const maybeScan = () => {
+        if (total < 0 || indexed < 0) return;
+        // すべての行が by_note index に載っている = レガシー行なし。
+        // Every row is present in the index — nothing to migrate.
+        if (total === indexed) return;
+        const cursorReq = store.openCursor();
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (!cursor) return;
+          const row = cursor.value as StoredPage;
+          if (!hasNoteId(row)) {
+            cursor.update({ ...row, noteId });
+          }
+          cursor.continue();
+        };
       };
+
+      totalReq.onsuccess = () => {
+        total = totalReq.result;
+        maybeScan();
+      };
+      indexedReq.onsuccess = () => {
+        indexed = indexedReq.result;
+        maybeScan();
+      };
+
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
       tx.onabort = () => reject(tx.error);
