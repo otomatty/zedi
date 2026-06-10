@@ -66,6 +66,65 @@ describe("parseRequestLine", () => {
     });
   });
 
+  it("validates http/sse mcpServers entries and normalizes them", () => {
+    const r = parseRequestLine(
+      JSON.stringify({
+        type: "query",
+        id: "a",
+        prompt: "hi",
+        mcpServers: {
+          api: { type: "http", url: "https://example.com", headers: { Auth: "token" } },
+          stream: { type: "sse", url: "https://example.com/sse" },
+        },
+      }),
+    );
+    expect(r).toEqual({
+      type: "query",
+      id: "a",
+      prompt: "hi",
+      mcpServers: {
+        api: { type: "http", url: "https://example.com", headers: { Auth: "token" } },
+        stream: { type: "sse", url: "https://example.com/sse" },
+      },
+    });
+  });
+
+  it("rejects unknown mcpServers transport types", () => {
+    expect(() =>
+      parseRequestLine(
+        JSON.stringify({
+          type: "query",
+          id: "a",
+          prompt: "hi",
+          mcpServers: { bad: { type: "websocket", url: "ws://x" } },
+        }),
+      ),
+    ).toThrow(/unknown transport type/);
+  });
+
+  it("rejects http/sse mcpServers entries with a non-string url or bad headers", () => {
+    expect(() =>
+      parseRequestLine(
+        JSON.stringify({
+          type: "query",
+          id: "a",
+          prompt: "hi",
+          mcpServers: { api: { type: "http", url: 123 } },
+        }),
+      ),
+    ).toThrow(/url must be a string/);
+    expect(() =>
+      parseRequestLine(
+        JSON.stringify({
+          type: "query",
+          id: "a",
+          prompt: "hi",
+          mcpServers: { api: { type: "http", url: "https://example.com", headers: { X: 1 } } },
+        }),
+      ),
+    ).toThrow(/headers must be a string map/);
+  });
+
   it("rejects malformed mcpServers entries", () => {
     expect(() =>
       parseRequestLine(

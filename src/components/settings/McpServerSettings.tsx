@@ -66,9 +66,7 @@ export const McpServerSettings: React.FC = () => {
       // `mcpServers` object — never the rest of `~/.claude.json` (which can hold
       // API keys / OAuth tokens). The WebView is no longer granted raw fs read.
       const { invoke } = await import("@tauri-apps/api/core");
-      const mcpServers = await invoke<Record<string, Record<string, unknown>> | null>(
-        "read_claude_mcp_servers",
-      );
+      const mcpServers = await invoke<Record<string, unknown> | null>("read_claude_mcp_servers");
 
       if (!mcpServers || Object.keys(mcpServers).length === 0) {
         toast({
