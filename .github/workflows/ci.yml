@@ -23,9 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -46,9 +46,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -63,9 +63,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -91,9 +91,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -123,7 +123,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coverage-report
           path: coverage/
@@ -135,9 +135,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -199,26 +199,42 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
       - uses: ./.github/actions/setup-toolchain
 
-      # Playwright のブラウザバイナリ + 必要な OS 依存を入れる。
-      # ネットワーク起因の停滞に備え、各試行を `timeout` で打ち切りつつ最大 3 回
-      # リトライする（既存の checkout と同じ wretry.action を使用）。停滞した試行
-      # はハングのまま終わらないため、`timeout` で非ゼロ終了させてリトライを促す。
-      # Install Playwright's browser binaries plus the matching OS deps. Guard
-      # against network stalls: bound each attempt with `timeout` (so a hung
-      # download exits non-zero and triggers a retry) and retry up to 3 times
-      # via the same wretry.action used for checkout above.
+      # Playwright のブラウザバイナリと OS 依存を入れる。
+      #
+      # Issue #1017: Playwright < 1.60 は Node 24.16+ 上で zip 展開（yauzl）が無限
+      # ハングする既知バグ（microsoft/playwright#40724）を持つ。GitHub ランナー
+      # 画像の Node が 24.16+ に上がった 5 月末以降、本ジョブの install が
+      # `extracting archive` で停止し timeout(exit 124) で恒常的に失敗していた
+      # （ワークフロー自体は不変）。切り分けで、同じ zip はシステムの `unzip` だと
+      # ~3s で展開でき（環境・ディスク・ネットワークは健全）、Playwright の JS 展開
+      # のみが停止することを確認済み。恒久対応は @playwright/test を 1.60 へ更新する
+      # こと（package.json / bun.lock）。本ワークフローはバージョン更新で直る。
+      # 展開を含む install は修正が検証済みの Node(`npx`)で実行する。apt 取得や
+      # 一過性のネットワーク停滞に備え、`--with-deps` ごと timeout + wretry で最大
+      # 3 回リトライする（checkout と同じ wretry.action。apt も retry 対象に含める）。
+      #
+      # Playwright <1.60 hangs forever unzipping (yauzl) on Node 24.16+
+      # (microsoft/playwright#40724). When the GitHub runner image moved to Node
+      # 24.16+ in late May, this job's install began stalling at `extracting
+      # archive` and failing with exit 124 — the workflow itself never changed.
+      # Isolation confirmed the same zip extracts in ~3s with the system `unzip`
+      # (env/disk/network all healthy); only Playwright's JS extraction hangs.
+      # The permanent fix is bumping @playwright/test to 1.60 (package.json /
+      # bun.lock). Run the install (which does the extraction) under Node via
+      # npx; keep apt deps inside `--with-deps` so the whole step (apt + browser
+      # download/extract) stays under wretry's bounded retry on transient stalls.
       - name: Install Playwright browsers (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          command: timeout 300 bunx playwright install --with-deps chromium
+          command: timeout 300 npx playwright install --with-deps chromium
           attempt_limit: 3
           attempt_delay: 10000
 
@@ -227,7 +243,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: playwright-report-pdf-knowledge
           path: playwright-report/
@@ -239,9 +255,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -273,9 +289,9 @@ jobs:
       # PR ベースとの diff を取るため履歴を全部取得する。
       # Need full history so the script can diff against the PR base.
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           with: |
             fetch-depth: 0
           attempt_limit: 3
@@ -310,9 +326,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -334,9 +350,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -372,9 +388,9 @@ jobs:
         run: echo "MUTATION_START=$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -392,7 +408,7 @@ jobs:
 
       - name: Upload mutation report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: mutation-report
           path: reports/mutation/
@@ -412,9 +428,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           with: |
             fetch-depth: 0
           attempt_limit: 3
@@ -431,6 +447,6 @@ jobs:
       # Detect accidentally committed secrets (API keys, private keys, tokens).
       # 誤ってコミットされた秘密情報（API キー、秘密鍵、トークン）を検出する。
       - name: Detect secrets (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
