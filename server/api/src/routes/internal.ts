@@ -28,22 +28,22 @@
  *     of silently allowing unauthenticated calls.
  */
 
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../types/index.js";
 import { syncPageGraphFromStoredYDoc } from "../services/pageGraphSyncService.js";
 
 /**
- * Constant-time string comparison to avoid leaking the secret via response
- * timing. Returns false on length mismatch without an early-exit byte compare.
- * 応答時間から秘密が漏れないよう定数時間で比較する。
+ * Constant-time string comparison via fixed-length SHA-256 digests. Hashing
+ * first means `timingSafeEqual` always compares 32-byte buffers, so neither the
+ * length nor the contents of the secret leak through response timing.
+ * 固定長 SHA-256 ダイジェストで定数時間比較する。長さも内容も漏らさない。
  */
 function safeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
+  const hashA = createHash("sha256").update(a).digest();
+  const hashB = createHash("sha256").update(b).digest();
+  return timingSafeEqual(hashA, hashB);
 }
 
 const app = new Hono<AppEnv>();
