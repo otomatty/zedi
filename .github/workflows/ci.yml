@@ -103,12 +103,14 @@ jobs:
 
       # Workspace package tests are not picked up by the root vitest config,
       # so run their dedicated configs explicitly. Keep this list in sync with
-      # the `test:run` script in root package.json. server/mcp has its own job
-      # (`mcp-test`); server/hocuspocus is invoked only via `test:run` and not
+      # the `test:run` script in root package.json. The standalone server
+      # projects have their own jobs: server/api (`api-test`), server/mcp
+      # (`mcp-test`), server/hocuspocus (`hocuspocus-test`); they are not
       # duplicated here.
       # ルートの vitest 設定はワークスペース配下のテストを含まないため、
-      # 各パッケージの vitest.config を明示的に実行する。server/mcp は別 job
-      # （`mcp-test`）で動かすためここには含めない。
+      # 各パッケージの vitest.config を明示的に実行する。server/api・server/mcp・
+      # server/hocuspocus はそれぞれ別 job（`api-test` / `mcp-test` /
+      # `hocuspocus-test`）で動かすためここには含めない。
       - name: Run admin tests
         run: bunx vitest run --config admin/vitest.config.ts
 
@@ -273,6 +275,36 @@ jobs:
         working-directory: server/api
         run: bunx tsc --noEmit
 
+  api-test:
+    name: API Tests
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
+        with:
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          # server/api 配下で個別に install するため、ルートの install は不要。
+          # The job installs deps inside server/api instead of the root.
+          install-deps: "false"
+
+      # server/api はルートの Bun workspace に含まれないため、テストの前に
+      # ローカルで依存関係をインストールする (api-typecheck / mcp-test と同じ構成)。
+      # server/api is not part of the root Bun workspace; install its
+      # dependencies locally before running the vitest suite.
+      - name: Install API dependencies
+        working-directory: server/api
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        working-directory: server/api
+        run: bunx vitest run
+
   drizzle-migration-check:
     name: Drizzle Migration Check
     # Drizzle TS スキーマを変更したら必ずマイグレーション SQL を追加するルールの強制。
@@ -376,6 +408,36 @@ jobs:
 
       - name: Run tests
         working-directory: server/mcp
+        run: bun run test
+
+  hocuspocus-test:
+    name: Hocuspocus Server Tests
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
+        with:
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          # server/hocuspocus 配下で個別に install するため、ルートの install は不要。
+          # The job installs deps inside server/hocuspocus instead of the root.
+          install-deps: "false"
+
+      # server/hocuspocus はルートの Bun workspace に含まれないため、
+      # テストの前にローカルで依存関係をインストールする。
+      # server/hocuspocus is not part of the root Bun workspace; install its
+      # dependencies locally before running the vitest suite.
+      - name: Install Hocuspocus dependencies
+        working-directory: server/hocuspocus
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        working-directory: server/hocuspocus
         run: bun run test
 
   mutation-light:
