@@ -62,35 +62,14 @@ export const McpServerSettings: React.FC = () => {
     if (!isTauriDesktop()) return;
 
     try {
-      const { readTextFile, BaseDirectory } = await import("@tauri-apps/plugin-fs");
+      // Read MCP definitions via a gated Rust command that returns ONLY the
+      // `mcpServers` object — never the rest of `~/.claude.json` (which can hold
+      // API keys / OAuth tokens). The WebView is no longer granted raw fs read.
+      const { invoke } = await import("@tauri-apps/api/core");
+      const mcpServers = await invoke<Record<string, Record<string, unknown>> | null>(
+        "read_claude_mcp_servers",
+      );
 
-      let configText: string | null = null;
-      try {
-        configText = await readTextFile(".claude/claude_desktop_config.json", {
-          baseDir: BaseDirectory.Home,
-        });
-      } catch {
-        try {
-          configText = await readTextFile(".claude.json", {
-            baseDir: BaseDirectory.Home,
-          });
-        } catch {
-          // Neither file found
-        }
-      }
-
-      if (!configText) {
-        toast({
-          title: t("aiSettings.mcp.importFromClaude"),
-          description: t("aiSettings.mcp.importNone"),
-        });
-        return;
-      }
-
-      const parsed = JSON.parse(configText) as {
-        mcpServers?: Record<string, Record<string, unknown>>;
-      };
-      const mcpServers = parsed.mcpServers;
       if (!mcpServers || Object.keys(mcpServers).length === 0) {
         toast({
           title: t("aiSettings.mcp.importFromClaude"),

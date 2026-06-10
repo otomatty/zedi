@@ -5312,7 +5312,6 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
- "tauri-plugin-fs",
  "tauri-plugin-shell",
  "tauri-plugin-store",
  "tauri-plugin-updater",

@@ -1,5 +1,6 @@
 import { Server as HocuspocusServer } from "@hocuspocus/server";
 import { IncomingMessage, ServerResponse } from "http";
+import { timingSafeEqual } from "node:crypto";
 import { Redis } from "@hocuspocus/extension-redis";
 import { Pool, PoolClient } from "pg";
 import * as Y from "yjs";
@@ -79,7 +80,13 @@ function getPool(): Pool {
 
 function isAuthorizedInternalRequest(req: IncomingMessage): boolean {
   if (!INTERNAL_SECRET) return false;
-  return req.headers["x-internal-secret"] === INTERNAL_SECRET;
+  const provided = req.headers["x-internal-secret"];
+  if (typeof provided !== "string") return false;
+  // Constant-time compare so response timing does not leak the secret.
+  // 応答時間から秘密が漏れないよう定数時間で比較する。
+  const a = Buffer.from(provided);
+  const b = Buffer.from(INTERNAL_SECRET);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 async function verifySession(

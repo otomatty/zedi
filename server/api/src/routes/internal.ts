@@ -28,10 +28,23 @@
  *     of silently allowing unauthenticated calls.
  */
 
+import { timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../types/index.js";
 import { syncPageGraphFromStoredYDoc } from "../services/pageGraphSyncService.js";
+
+/**
+ * Constant-time string comparison to avoid leaking the secret via response
+ * timing. Returns false on length mismatch without an early-exit byte compare.
+ * 応答時間から秘密が漏れないよう定数時間で比較する。
+ */
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
 
 const app = new Hono<AppEnv>();
 
@@ -54,7 +67,7 @@ function assertInternalAuth(c: { req: { header: (name: string) => string | undef
     throw new HTTPException(503, { message: "Internal API not configured" });
   }
   const provided = c.req.header("x-internal-secret")?.trim();
-  if (!provided || provided !== expected) {
+  if (!provided || !safeEqual(provided, expected)) {
     throw new HTTPException(401, { message: "Unauthorized" });
   }
 }
