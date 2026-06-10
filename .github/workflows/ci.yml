@@ -207,67 +207,37 @@ jobs:
 
       - uses: ./.github/actions/setup-toolchain
 
-      # === Issue #1017 診断ステップ（原因の切り分け。恒久対応ではない）=========
-      # 経過:
-      #   * run 27243476723 の `DEBUG=pw:install` で、chromium zip の DL は ~1.4s で
-      #     完了し、直後の `extracting archive`（展開）で停止することを確認。
-      #   * そこで「Bun の zlib/stream が原因」と仮説を立て、展開を Node(`npx`)で
-      #     実行するよう変更したが、run 27243906347 で **Node でも同一の停止**が
-      #     再現（DL 100% 到達後に無音 → timeout 124）。→ ランタイム(Node/Bun)は
-      #     原因ではないと確定。展開処理そのものが環境要因で停止している疑いが濃厚。
+      # Playwright のブラウザバイナリと OS 依存を入れる。
       #
-      # 本ステップは「Playwright の JS 展開」と「環境（ディスク/FS/CPU）」を切り分ける:
-      #   1. df/free/nproc でディスク空き・メモリ・CPU を記録
-      #   2. 同じ zip を curl で取得（DL 自体の健全性を再確認）
-      #   3. システムの `unzip` で $HOME 配下へ展開（Playwright を介さない展開）
-      # → システム unzip も停止すれば runner 環境（FS/ディスク）が原因。
-      #   unzip が成功すれば Playwright 1.57 の展開コードが原因と切り分けられる。
+      # Issue #1017: Playwright < 1.60 は Node 24.16+ 上で zip 展開（yauzl）が無限
+      # ハングする既知バグ（microsoft/playwright#40724）を持つ。GitHub ランナー
+      # 画像の Node が 24.16+ に上がった 5 月末以降、本ジョブの install が
+      # `extracting archive` で停止し timeout(exit 124) で恒常的に失敗していた
+      # （ワークフロー自体は不変）。切り分けで、同じ zip はシステムの `unzip` だと
+      # ~3s で展開でき（環境・ディスク・ネットワークは健全）、Playwright の JS 展開
+      # のみが停止することを確認済み。恒久対応は @playwright/test を 1.60 へ更新する
+      # こと（package.json / bun.lock）。本ワークフローはバージョン更新で直る。
+      # 展開を含む install は修正が検証済みの Node(`npx`)で実行し、OS 依存(apt)は
+      # 別ステップに分ける（apt は Bun でも正常）。
       #
-      # Diagnostic for Issue #1017 (NOT a fix). The `npx` run (27243906347)
-      # reproduced the exact same post-download stall under Node, disproving the
-      # Bun-runtime hypothesis: extraction hangs regardless of runtime, so the
-      # cause is environmental or in Playwright's own extraction. This step
-      # isolates "Playwright's JS extraction" from "the runner filesystem/disk"
-      # by downloading the same zip with curl and extracting it with the system
-      # `unzip`. If system unzip also stalls → runner FS/disk is the culprit; if
-      # it succeeds → Playwright 1.57's extraction code is.
+      # Playwright <1.60 hangs forever unzipping (yauzl) on Node 24.16+
+      # (microsoft/playwright#40724). When the GitHub runner image moved to Node
+      # 24.16+ in late May, this job's install began stalling at `extracting
+      # archive` and failing with exit 124 — the workflow itself never changed.
+      # Isolation confirmed the same zip extracts in ~3s with the system `unzip`
+      # (env/disk/network all healthy); only Playwright's JS extraction hangs.
+      # The permanent fix is bumping @playwright/test to 1.60 (package.json /
+      # bun.lock). Run the install (which does the extraction) under Node via
+      # npx, where the fix is validated; keep apt deps in their own step.
       - name: Install Playwright system dependencies
         run: bunx playwright install-deps chromium
 
-      - name: Diagnose browser extraction (env vs Playwright) (#1017)
-        run: |
-          set -x
-          echo "::group::disk / memory / cpu"
-          df -h
-          free -h || true
-          nproc
-          echo "::endgroup::"
-          ZIP_URL="https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/1200/chromium-linux.zip"
-          TMP_ZIP="${RUNNER_TEMP:-/tmp}/chromium-linux.zip"
-          echo "::group::download via curl"
-          time timeout 120 curl -sSL -o "$TMP_ZIP" "$ZIP_URL"
-          ls -la "$TMP_ZIP"
-          echo "::endgroup::"
-          echo "::group::extract via system unzip into \$HOME"
-          rm -rf "$HOME/pw-extract-test"
-          mkdir -p "$HOME/pw-extract-test"
-          if time timeout 240 unzip -q "$TMP_ZIP" -d "$HOME/pw-extract-test"; then
-            echo "SYSTEM_UNZIP_RESULT=ok"
-          else
-            echo "SYSTEM_UNZIP_RESULT=fail exit=$?"
-          fi
-          du -sh "$HOME/pw-extract-test" 2>/dev/null || true
-          df -h
-          echo "::endgroup::"
-
-      # 上の切り分け結果と比較するため、Playwright 本来の install も DEBUG 付き・
-      # 単発・短い timeout で 1 回だけ走らせ、同一環境で展開が停止することを再確認する。
-      # Run Playwright's own install once (DEBUG, single attempt, short timeout)
-      # to confirm it still stalls in the same environment, for direct comparison.
-      - name: Install Playwright browsers (diagnostic, DEBUG=pw:install)
-        env:
-          DEBUG: pw:install
-        run: timeout 180 npx playwright install chromium
+      - name: Install Playwright browsers (with retry)
+        uses: Wandalen/wretry.action@v3
+        with:
+          command: timeout 300 npx playwright install chromium
+          attempt_limit: 3
+          attempt_delay: 10000
 
       - name: Run PDF knowledge E2E
         run: bunx playwright test e2e/pdf-knowledge.spec.ts
