@@ -29,7 +29,7 @@ function makePersonalSummary(overrides: Partial<PageSummary> = {}): PageSummary 
   return {
     id: overrides.id ?? "p-1",
     ownerUserId: overrides.ownerUserId ?? "user-1",
-    noteId: null,
+    noteId: "note-default",
     title: overrides.title ?? "Personal",
     contentPreview: undefined,
     thumbnailUrl: undefined,

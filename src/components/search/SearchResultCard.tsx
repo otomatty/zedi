@@ -38,13 +38,20 @@ export interface SearchResultCardPageItem extends SearchResultCardBase {
   kind: "page";
   pageId: string;
   /**
-   * 所属ノート ID。`null` は個人ページ（`Boolean(noteId)` で shared/personal を
-   * 判定）。note-native ページは `/notes/:noteId/:pageId` へ遷移する（Issue #889
-   * Phase 3）。`Page.noteId` の暫定 `string | null` を反映。
-   * Owning note id; `null` is a personal page (shared vs personal is decided by
-   * `Boolean(noteId)`). Mirrors the interim `string | null` on `Page.noteId`.
+   * 所属ノート ID。`/notes/:noteId/:pageId` 遷移用（Issue #889 Phase 3）。
+   * Issue #1020 以降は常に非 null。
+   * Owning note id used for `/notes/:noteId/:pageId` routing (Issue #889
+   * Phase 3). Always non-null since issue #1020.
    */
-  noteId: string | null;
+  noteId: string;
+  /**
+   * 共有検索（参加ノート横断の API 検索）由来の行か。「共有」バッジの表示に使う。
+   * `noteId` の有無では判定できない（Issue #1020 で全ページが noteId を持つため）。
+   * Whether the row came from the shared (cross-note API) search; drives the
+   * "共有" badge. Cannot be derived from `noteId` anymore — every page carries
+   * one since issue #1020.
+   */
+  isShared: boolean;
   sourceUrl?: string;
 }
 
@@ -101,7 +108,7 @@ export function SearchResultCard({ item, onClick }: SearchResultCardProps) {
   );
 
   const isPdf = item.kind === "pdf_highlight";
-  const isShared = item.kind === "page" && Boolean(item.noteId);
+  const isShared = item.kind === "page" && item.isShared;
   const hasSourceUrl = item.kind === "page" && Boolean(item.sourceUrl);
 
   return (

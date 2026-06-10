@@ -48,29 +48,15 @@ const TITLE_SAVE_DEBOUNCE_MS = 500;
 
 function canEditPage(
   access: { canEdit?: boolean; canView?: boolean } | undefined,
-  userId: string | undefined,
-  page: { ownerUserId?: string; noteId?: string | null } | null | undefined,
-): boolean {
-  if (!access?.canView || !page) return false;
-  if (page.noteId !== null && page.noteId !== undefined) {
-    return Boolean(access.canEdit);
-  }
-  if (access.canEdit) return true;
-  return Boolean(userId && page?.ownerUserId && page.ownerUserId === userId);
-}
-
-/**
- * リンク済み個人ページ (`noteId === null`) のタイトル更新はページ所有者だけに許す。
- * ノートネイティブページ (`noteId !== null`) はノート権限 (`canEdit`) 側で別判定する。
- * For linked personal pages (`noteId === null`), only the page owner may edit
- * the title. Note-native pages (`noteId !== null`) are gated separately by
- * note-level edit permission.
- */
-function canEditTitle(
-  userId: string | undefined,
   page: { ownerUserId?: string } | null | undefined,
 ): boolean {
-  return Boolean(userId && page?.ownerUserId && page.ownerUserId === userId);
+  // Issue #1020: 旧「リンク済み個人ページ」（`noteId === null`）の所有者特例は
+  // 廃止。全ページがノート所属になったため、編集可否はノート権限で一元判定する。
+  // Issue #1020: the legacy owner-override for "linked personal pages"
+  // (`noteId === null`) is gone — every page belongs to a note, so edit
+  // permission is decided solely by the note-level role.
+  if (!access?.canView || !page) return false;
+  return Boolean(access.canEdit);
 }
 
 /**
@@ -147,7 +133,13 @@ function NotePageEditorEditable({
   noteId: string;
   collaboration: UseCollaborationReturn;
   isCollaborationEnabled: boolean;
-  /** ページ所有者のみタイトル編集可。Only the page owner can edit the title. */
+  /**
+   * ノート編集権限（`access.canEdit`）があればタイトル編集可（Issue #1020 で
+   * 旧「ページ所有者のみ」ルールを廃止し、`canEdit` と同一の判定に統一）。
+   * Title renaming is allowed whenever the note-level `access.canEdit` is
+   * true — the legacy owner-only rule was retired by issue #1020 and this now
+   * mirrors `canEdit`.
+   */
   isTitleEditable: boolean;
   /**
    * URL クリッパー等の作成経路から渡される Tiptap JSON 文字列。Hocuspocus の
@@ -218,7 +210,7 @@ function NotePageEditorEditable({
     setPageContext({
       type: "editor",
       pageId: page.id,
-      noteId: page.noteId ?? undefined,
+      noteId: page.noteId,
       claudeWorkspaceRoot: workspaceRoot ?? undefined,
       pageTitle: title,
       pageContent: editorContent.slice(0, 3000),
@@ -499,7 +491,7 @@ function NotePageEditorEditable({
           collaboration={isCollaborationEnabled ? collaboration : undefined}
           insertAtCursorRef={editorInsertRef}
           pageActionHubRef={pageActionHubRef}
-          pageNoteId={page.noteId ?? null}
+          pageNoteId={page.noteId}
           initialContent={initialContent}
           onInitialContentApplied={onInitialContentApplied}
           wikiComposeHref={
@@ -766,7 +758,7 @@ const NotePageView: React.FC = () => {
   const { noteId, pageId } = useParams<{ noteId: string; pageId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { isSignedIn, userId } = useAuth();
+  const { isSignedIn } = useAuth();
   const { t } = useTranslation();
   const { toast } = useToast();
   const removeFromNoteMutation = useRemovePageFromNote();
@@ -873,11 +865,8 @@ const NotePageView: React.FC = () => {
     navigate(`/notes/${noteId}`);
   }, [navigate, noteId]);
 
-  const canEdit = canEditPage(access ?? undefined, userId ?? undefined, page);
-  const isTitleEditable =
-    page?.noteId != null
-      ? Boolean(access?.canEdit)
-      : canEdit && canEditTitle(userId ?? undefined, page);
+  const canEdit = canEditPage(access ?? undefined, page);
+  const isTitleEditable = canEdit;
   const collaborationPageId = page?.id ?? "";
   const isCollaborationEnabled = Boolean(collaborationPageId && isSignedIn && canEdit);
   const collaboration = useCollaboration({

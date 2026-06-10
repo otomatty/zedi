@@ -43,6 +43,8 @@ export const pageKeys = {
   byTitle: (userId: string, title: string) => [...pageKeys.byTitles(userId), title.trim()] as const,
   search: (userId: string, query: string) => [...pageKeys.all, "search", userId, query] as const,
   searchShared: (query: string) => [...pageKeys.all, "searchShared", query] as const,
+  ghostReferenced: (userId: string, linkText: string) =>
+    [...pageKeys.all, "ghostReferenced", userId, linkText] as const,
 };
 
 /**
@@ -271,27 +273,22 @@ export function usePage(pageId: string, options?: UsePageOptions) {
 }
 
 /**
- * 個人スコープ専用のページ検索フック（IndexedDB 経由）。
+ * ローカル（IndexedDB）ページ検索フック。
  *
- * **スコープ契約 (Issue #718 Phase 5-4)**:
- * - 返すのは `noteId === null` の個人ページのみ。
- * - 実装は `IndexedDBStorageAdapter.searchPages` に委ねており、IDB には個人
- *   ページしか永続化されない（`getAllPages` も `noteId === null` で防御的に
- *   フィルタしている）。ノートネイティブページは API 経由で取得する。
- * - ノート配下の検索が必要な場合は `useSearchSharedNotes`（混在）か、将来
- *   実装される note-scoped 検索フック（Phase 5-2 の
- *   `GET /api/notes/:noteId/search` を呼ぶ）を使うこと。
+ * **スコープ契約 (Issue #718 Phase 5-4 / #1020)**:
+ * - IndexedDB は呼び出し元のデフォルトノート配下のページのみを保持するため、
+ *   返るのはデフォルトノートのページに限られる。
+ * - 他ノートの検索は `useSearchSharedNotes`（参加ノート横断）か
+ *   `GET /api/notes/:noteId/search`（ノートスコープ）を使うこと。
  *
- * Personal-scope-only page search (via IndexedDB).
+ * Local (IndexedDB) page search.
  *
- * **Scope contract (Issue #718 Phase 5-4)**: returns only personal pages
- * (`noteId === null`). The implementation delegates to
- * `IndexedDBStorageAdapter.searchPages`, which only ever holds personal pages.
- * For note-native results, callers must reach for `useSearchSharedNotes` (mixed
- * scope) or a future note-scoped hook backed by Phase 5-2's
+ * **Scope contract (Issues #718 Phase 5-4 / #1020)**: IndexedDB only holds
+ * pages under the caller's default note, so results are limited to that note.
+ * For other notes, use `useSearchSharedNotes` (cross-note) or the note-scoped
  * `GET /api/notes/:noteId/search` endpoint.
  *
- * @returns React Query result whose `data` is `Page[]` of personal pages.
+ * @returns React Query result whose `data` is `Page[]` of default-note pages.
  */
 export function useSearchPages(query: string) {
   const { getRepository, userId, isLoaded } = useRepository();
@@ -318,24 +315,19 @@ export function useSearchPages(query: string) {
 }
 
 /**
- * 混在スコープのページ検索フック（API: `GET /api/search?q=&scope=shared`）。
+ * 参加ノート横断のページ検索フック（API: `GET /api/search?q=&scope=shared`）。
  * C3-8 / Issue #718 Phase 5-4。
  *
- * **スコープ挙動**:
- * - サーバーは個人ページ (`note_id IS NULL`) と、自分が参加するノートの
- *   ネイティブページの両方を返す（Phase 5-1 で `scope=own` の方は
- *   `note_id IS NULL` の防御フィルタを追加済みだが、`shared` は意図的に
- *   混在のまま）。
- * - 各行は `note_id: string | null` を含むので、呼び出し側は必要に応じて
- *   個人 / ノートネイティブを判別できる（`useGlobalSearch` /
- *   `SearchResults` は個人ページ重複を避けるためここでフィルタしている）。
+ * サーバーは呼び出し元のデフォルトノートを含む、参加している全ノートの
+ * ページを返す。各行は `note_id`（non-null）を持つ。`useSearchPages`
+ * （ローカル）との重複は `useGlobalSearch` / `SearchResults` 側で page id
+ * ベースの dedup を行う。
  *
- * Mixed-scope search hook (`GET /api/search?q=&scope=shared`).
- *
- * The server returns both personal pages and note-native pages from notes the
- * caller participates in. Each row carries `note_id: string | null` so callers
- * can branch on it (`useGlobalSearch` / `SearchResults` filter to note-native
- * rows so personal pages from `useSearchPages` are not double-counted).
+ * Cross-note search hook (`GET /api/search?q=&scope=shared`). The server
+ * returns pages from every note the caller participates in, including the
+ * default note; each row carries a non-null `note_id`. Overlap with the
+ * local `useSearchPages` results is deduped by page id in `useGlobalSearch`
+ * / `SearchResults`.
  */
 export function useSearchSharedNotes(query: string) {
   const { getToken, isSignedIn } = useAuth();
@@ -412,8 +404,6 @@ export function useCreatePage() {
       const newSummary: PageSummary = {
         id: newPage.id,
         ownerUserId: newPage.ownerUserId,
-        // useCreatePage は個人ページ作成しか経由しないので常に `null`。Issue #713。
-        // useCreatePage only creates personal pages, so noteId is always null.
         noteId: newPage.noteId,
         title: newPage.title,
         contentPreview: newPage.contentPreview,
@@ -678,6 +668,31 @@ export function useCheckGhostLinkReferenced() {
 }
 
 /**
+ * 指定リンクテキストが ghost_links（WikiLink バケット）に登場するかを返す
+ * リアクティブ版フック。WikiLink ホバープレビューの「未作成（参照あり）」
+ * 表示に使う。旧ゲストストア (`pageStore`) の ghostLinks 参照を置き換える
+ * （Issue #1020）。
+ *
+ * Reactive variant of the ghost-link reference check, used by WikiLink hover
+ * previews to render the "not created (with refs)" state. Replaces the
+ * retired guest store's (`pageStore`) ghostLinks lookup (issue #1020).
+ */
+export function useGhostLinkReferenced(linkText: string) {
+  const { getRepository, userId, isLoaded } = useRepository();
+  const normalized = linkText.trim();
+
+  return useQuery({
+    queryKey: pageKeys.ghostReferenced(userId, normalized),
+    queryFn: async (): Promise<boolean> => {
+      const repo = await getRepository();
+      const sources = await repo.getGhostLinkSources(normalized, "wiki");
+      return sources.length > 0;
+    },
+    enabled: isLoaded && normalized.length > 0,
+  });
+}
+
+/**
  * Hook to check for duplicate page titles
  */
 export function useCheckDuplicateTitle() {
@@ -733,18 +748,19 @@ export function usePromoteGhostLink() {
 }
 
 /**
- * `useSyncWikiLinks` のオプション。WikiLink 同期のスコープを個人ページと
- * ノートネイティブページで切り替える（Issue #713 Phase 4）。
+ * `useSyncWikiLinks` のオプション。WikiLink 同期のスコープを切り替える
+ * （Issue #713 Phase 4 / #1020）。
  *
- * - `pageNoteId === null` / 省略: 個人スコープ。`repo.getPagesSummary()`
- *   が返す個人ページのみを解決候補にする。
+ * - `pageNoteId === null` / 省略: ローカルスコープ。`repo.getPagesSummary()`
+ *   が返すローカル（IndexedDB＝デフォルトノート）のページのみを解決候補にする。
  * - `pageNoteId !== null`: ノートスコープ。呼び出し側は同じノートに所属する
  *   ページ一覧（`useNotePages` で取得）を `notePages` に渡す。
  *
- * Options for {@link useSyncWikiLinks}. Switches sync scope between personal
- * and note-native pages. When `pageNoteId` is set, callers must supply
- * `notePages` (typically from `useNotePages`) because the repository does
- * not hold note-native page summaries locally. See issue #713 Phase 4.
+ * Options for {@link useSyncWikiLinks}. Switches sync scope between the local
+ * (IndexedDB = default note) page set and an explicit note. When `pageNoteId`
+ * is set, callers must supply `notePages` (typically from `useNotePages`)
+ * because the repository does not hold other notes' page summaries locally.
+ * See issues #713 Phase 4 / #1020.
  */
 export type UseSyncWikiLinksOptions = {
   pageNoteId?: string | null;
@@ -815,26 +831,28 @@ export function useSyncWikiLinks(options: UseSyncWikiLinksOptions = {}) {
 
 /**
  * `useWikiLinkExistsChecker` のオプション。WikiLink の解決スコープを
- * 個人ページとノートネイティブページで切り替える（Issue #713 Phase 4）。
+ * 切り替える（Issue #713 Phase 4 / #1020）。
  *
  * Options for {@link useWikiLinkExistsChecker}. Switches WikiLink resolution
- * scope between personal pages and note-native pages. See issue #713 Phase 4.
+ * scope between the local (IndexedDB = default note) page set and an
+ * explicit note. See issues #713 Phase 4 / #1020.
  */
 export type UseWikiLinkExistsCheckerOptions = {
   /**
-   * 編集中ページの noteId。`null`（既定）は個人ページ、文字列は
-   * ノートネイティブページ。
+   * 編集中ページの noteId。`null`（既定）はノートコンテキスト外で、ローカル
+   * （IndexedDB＝デフォルトノート）スコープ。文字列はそのノートのスコープ。
    *
-   * Owning note ID. `null` (default) → personal scope; string → note scope.
+   * Owning note ID. `null` (default) → local (default-note) scope; string →
+   * note scope.
    */
   pageNoteId?: string | null;
   /**
    * `pageNoteId !== null` のときに使う候補ページ一覧。IndexedDB には
-   * ノートネイティブページが載らないため、API 経由で取得したノート配下の
+   * 他ノートのページが載らないため、API 経由で取得したノート配下の
    * ページ一覧を呼び出し側が渡す。
    *
    * Candidate pages used when `pageNoteId` is a string. IndexedDB does not
-   * hold note-native pages, so callers must supply the note's page list
+   * hold other notes' pages, so callers must supply the note's page list
    * (typically from `useNotePages`).
    */
   notePages?: Array<Pick<PageSummary, "id" | "title">>;
