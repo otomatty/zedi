@@ -221,7 +221,13 @@ describe("useMermaidGenerator", () => {
   });
 
   it("checkAIConfigured returns true and sets flag when settings load", async () => {
-    mockGetAISettingsOrThrow.mockResolvedValue({ provider: "google" });
+    mockGetAISettingsOrThrow.mockResolvedValue({
+      provider: "google",
+      apiKey: "",
+      model: "",
+      modelId: "",
+      isConfigured: true,
+    });
 
     const { result } = renderHook(() => useMermaidGenerator());
 

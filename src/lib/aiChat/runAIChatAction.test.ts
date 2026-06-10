@@ -56,6 +56,7 @@ describe("runAIChatAction — create", () => {
     await runAIChatAction(deps, {
       type: "create-page",
       title: "Wiki Topic",
+      content: "",
       outline: "- A\n- B",
       suggestedLinks: [],
       reason: "test",
@@ -414,6 +415,7 @@ describe("runAIChatAction — create navigation guards", () => {
     await runAIChatAction(deps, {
       type: "create-page",
       title: "T",
+      content: "",
       outline: "",
       suggestedLinks: [],
       reason: "r",

@@ -9,7 +9,6 @@
  * {@link NavigationMenu} のテスト。項目は共通の {@link PRIMARY_NAV_ITEMS} を参照し、
  * ヘッダーとモバイルボトムナビの表示項目が常に一致することを保証する。
  */
-import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

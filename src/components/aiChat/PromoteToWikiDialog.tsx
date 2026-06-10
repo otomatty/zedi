@@ -8,7 +8,7 @@
  * 3. User selects entities to create as wiki pages
  * 4. Selected entities are created as new pages via the existing create-page flow
  */
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Loader2, X } from "lucide-react";
 import { Button, useToast } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
@@ -253,7 +253,8 @@ function PromoteToWikiDialogBody({
       // Treat a missing `noteId` as a failed creation rather than navigating
       // to `/notes/undefined/...`.
       const firstCreated = created.find(
-        (p): p is NonNullable<typeof p> => p != null && Boolean(p.id) && Boolean(p.noteId),
+        (p): p is NonNullable<typeof p> & { noteId: string } =>
+          p != null && Boolean(p.id) && Boolean(p.noteId),
       );
       if (!firstCreated) throw new Error("no pages created");
 

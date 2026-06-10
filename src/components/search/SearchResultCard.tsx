@@ -38,11 +38,13 @@ export interface SearchResultCardPageItem extends SearchResultCardBase {
   kind: "page";
   pageId: string;
   /**
-   * 所属ノート ID。Issue #889 Phase 3 で `/pages/:id` を廃止し、全ページ結果が
-   * `/notes/:noteId/:pageId` に統合された。Issue #825 で型も non-null。
-   * Owning note id; required after Issue #889 Phase 3 / #825.
+   * 所属ノート ID。`null` は個人ページ（`Boolean(noteId)` で shared/personal を
+   * 判定）。note-native ページは `/notes/:noteId/:pageId` へ遷移する（Issue #889
+   * Phase 3）。`Page.noteId` の暫定 `string | null` を反映。
+   * Owning note id; `null` is a personal page (shared vs personal is decided by
+   * `Boolean(noteId)`). Mirrors the interim `string | null` on `Page.noteId`.
    */
-  noteId: string;
+  noteId: string | null;
   sourceUrl?: string;
 }
 

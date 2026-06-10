@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, act } from "@testing-library/react";
 import { useTagStatusSync } from "./useTagStatusSync";
@@ -21,7 +20,7 @@ vi.mock("@/hooks/useNoteQueries", () => ({
 vi.mock("@/hooks/usePageQueries", () => ({
   useWikiLinkExistsChecker: vi.fn(
     (options?: { notePages?: MockNotePage[]; pageNoteId?: string | null }) => ({
-      checkExistence: vi.fn(async (titles: string[]) => {
+      checkExistence: vi.fn(async () => {
         const inScope = options?.pageNoteId ? (options.notePages ?? []) : [];
         const pageTitles = new Set(inScope.map((page) => page.title.toLowerCase().trim()));
         // issue #737: `pageTitleToId` を返すモック契約。

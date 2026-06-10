@@ -93,14 +93,14 @@ export async function clipWebPage(
     throw new Error("本文の抽出に失敗しました。このページは対応していない可能性があります。");
   }
 
-  const sanitizedContent = sanitizeHtml(article.content);
+  const sanitizedContent = sanitizeHtml(article.content ?? "");
   return {
     title: ogp.title || article.title || doc.title || "無題",
     content: sanitizedContent,
-    textContent: article.textContent,
+    textContent: article.textContent ?? "",
     excerpt: ogp.description || article.excerpt || "",
-    byline: article.byline,
-    siteName: ogp.siteName || article.siteName,
+    byline: article.byline ?? null,
+    siteName: ogp.siteName || article.siteName || null,
     thumbnailUrl: resolveUrl(url, ogp.image),
     sourceUrl: url,
   };

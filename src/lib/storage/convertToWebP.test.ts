@@ -50,7 +50,7 @@ describe("convertToWebP", () => {
           queueMicrotask(() => {
             Object.defineProperty(this, "naturalWidth", { value: 1 });
             Object.defineProperty(this, "naturalHeight", { value: 1 });
-            this.onload?.();
+            this.onload?.(new Event("load"));
           });
         }
       },
@@ -90,7 +90,7 @@ describe("convertToWebP", () => {
           queueMicrotask(() => {
             Object.defineProperty(this, "naturalWidth", { value: 1 });
             Object.defineProperty(this, "naturalHeight", { value: 1 });
-            this.onload?.();
+            this.onload?.(new Event("load"));
           });
         }
       },
@@ -121,7 +121,7 @@ describe("convertToWebP", () => {
           queueMicrotask(() => {
             Object.defineProperty(this, "naturalWidth", { value: 1 });
             Object.defineProperty(this, "naturalHeight", { value: 1 });
-            this.onload?.();
+            this.onload?.(new Event("load"));
           });
         }
       },
@@ -156,7 +156,7 @@ describe("convertToWebP", () => {
           queueMicrotask(() => {
             Object.defineProperty(this, "naturalWidth", { value: 1 });
             Object.defineProperty(this, "naturalHeight", { value: 1 });
-            this.onload?.();
+            this.onload?.(new Event("load"));
           });
         }
       },

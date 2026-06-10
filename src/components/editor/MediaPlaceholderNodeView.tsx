@@ -152,6 +152,7 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
   const replaceWithMediaNode = useCallback(
     (attrs: { src: string; alt: string; poster?: string | null }) => {
       const pos = getPos();
+      if (pos === undefined) return;
       const { view, state } = editor;
       const schema = state.schema;
       const type = schema.nodes[targetNodeType];

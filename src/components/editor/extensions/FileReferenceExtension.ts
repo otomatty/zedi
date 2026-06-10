@@ -113,7 +113,7 @@ export const FileReference = Mark.create<FileReferenceOptions>({
       new Plugin({
         key: new PluginKey("fileReferenceClick"),
         props: {
-          handleClick: (view, _pos, event) => {
+          handleClick: (_view, _pos, event) => {
             const target = event.target as HTMLElement | null;
             const el = target?.closest?.("[data-file-ref]") as HTMLElement | null;
             if (!el) return false;

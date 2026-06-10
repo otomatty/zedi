@@ -65,7 +65,15 @@ function ensureWorkerConfigured(): void {
  */
 export function getPdfDocument(data: Uint8Array): Promise<PdfDocumentProxy> {
   ensureWorkerConfigured();
-  return pdfjsLib.getDocument({
+  // `isEvalSupported` は実行時に有効なオプションだが、この pdfjs-dist の型定義
+  // (DocumentInitParameters) からは外れているため、その項目だけ型を拡張する。
+  // `isEvalSupported` is a valid runtime option but is missing from this
+  // pdfjs-dist version's DocumentInitParameters type, so widen just that field.
+  type DocumentInitParameters = Extract<
+    Parameters<typeof pdfjsLib.getDocument>[0],
+    { data?: unknown }
+  >;
+  const params: DocumentInitParameters & { isEvalSupported?: boolean } = {
     data,
     cMapUrl: CMAP_URL,
     cMapPacked: true,
@@ -74,7 +82,8 @@ export function getPdfDocument(data: Uint8Array): Promise<PdfDocumentProxy> {
     // Disable internal eval for untrusted PDFs as a defense-in-depth measure.
     isEvalSupported: false,
     // Workers are configured globally; using a fresh task per call is fine.
-  }).promise;
+  };
+  return pdfjsLib.getDocument(params).promise;
 }
 
 /**

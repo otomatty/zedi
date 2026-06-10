@@ -1,4 +1,3 @@
-import React from "react";
 import { Play, Bot, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@zedi/ui";

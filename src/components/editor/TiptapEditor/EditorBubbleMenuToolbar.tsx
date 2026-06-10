@@ -1,4 +1,3 @@
-import React from "react";
 import type { Editor } from "@tiptap/core";
 import { cn } from "@zedi/ui";
 import {

@@ -3,6 +3,7 @@ import { StorageAdapterPageRepository } from "./StorageAdapterPageRepository";
 import type { StorageAdapter } from "@/lib/storageAdapter/StorageAdapter";
 import type { ApiClient } from "@/lib/api/apiClient";
 import type { PageMetadata, Link } from "@/lib/storageAdapter/types";
+import type { SyncPageItem } from "@/lib/api/types";
 
 vi.mock("@/lib/contentUtils", () => ({
   getPageListPreview: vi.fn((content: string) => (content ? content.slice(0, 50) : "")),
@@ -29,6 +30,7 @@ function createMockAdapter(): StorageAdapter {
     setLastSyncTime: vi.fn().mockResolvedValue(undefined),
     initialize: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
+    resetDatabase: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -466,6 +468,8 @@ describe("StorageAdapterPageRepository", () => {
 
     it("writes a personal page (`note_id: null`) through to the adapter and returns it", async () => {
       const nowIso = "2026-04-23T00:00:00.000Z";
+      // Personal copies arrive from the API with note_id = null (SyncPageItem types
+      // it as string; importPersonalPageFromApi handles null at runtime).
       const page = await repo.importPersonalPageFromApi({
         id: "copy-1",
         owner_id: AUTH_USER_ID,
@@ -478,7 +482,7 @@ describe("StorageAdapterPageRepository", () => {
         created_at: nowIso,
         updated_at: nowIso,
         is_deleted: false,
-      });
+      } as unknown as SyncPageItem);
 
       expect(page).not.toBeNull();
       expect(page?.id).toBe("copy-1");

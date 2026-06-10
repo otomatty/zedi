@@ -373,8 +373,10 @@ describe("useWorkflowRunSession - cleanup and signals", () => {
   });
 
   it("handlePause aborts the current step controller", async () => {
-    let capturedStepAbort: AbortController | null = null;
-    let resolveExecution: ((value: WorkflowExecutionOutcome) => void) | null = null;
+    // `null as` keeps the declared type from being narrowed to `null` when the
+    // variable is only assigned inside the mock callback below.
+    let capturedStepAbort = null as AbortController | null;
+    let resolveExecution = null as ((value: WorkflowExecutionOutcome) => void) | null;
 
     mockRunWorkflowExecution.mockImplementation(
       async (params: {
@@ -412,9 +414,11 @@ describe("useWorkflowRunSession - cleanup and signals", () => {
   });
 
   it("handleStop aborts both workflow and current-step controllers", async () => {
-    let capturedStepAbort: AbortController | null = null;
-    let capturedWorkflowSignal: AbortSignal | null = null;
-    let resolveExecution: ((value: WorkflowExecutionOutcome) => void) | null = null;
+    // `null as` keeps the declared type from being narrowed to `null` when the
+    // variable is only assigned inside the mock callback below.
+    let capturedStepAbort = null as AbortController | null;
+    let capturedWorkflowSignal = null as AbortSignal | null;
+    let resolveExecution = null as ((value: WorkflowExecutionOutcome) => void) | null;
 
     mockRunWorkflowExecution.mockImplementation(
       async (params: {
@@ -453,9 +457,11 @@ describe("useWorkflowRunSession - cleanup and signals", () => {
   });
 
   it("aborts in-flight controllers on unmount", async () => {
-    let capturedStepAbort: AbortController | null = null;
-    let capturedWorkflowSignal: AbortSignal | null = null;
-    let resolveExecution: ((value: WorkflowExecutionOutcome) => void) | null = null;
+    // `null as` keeps the declared type from being narrowed to `null` when the
+    // variable is only assigned inside the mock callback below.
+    let capturedStepAbort = null as AbortController | null;
+    let capturedWorkflowSignal = null as AbortSignal | null;
+    let resolveExecution = null as ((value: WorkflowExecutionOutcome) => void) | null;
 
     mockRunWorkflowExecution.mockImplementation(
       async (params: {

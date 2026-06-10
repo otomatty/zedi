@@ -49,7 +49,8 @@ describe("yXmlFragmentToTiptapJson", () => {
     const doc = new Y.Doc();
     const fragment = doc.getXmlFragment("default");
     const heading = new Y.XmlElement("heading");
-    heading.setAttribute("level", 2);
+    // Tiptap stores heading level as a number; Y typings expect string attrs.
+    heading.setAttribute("level", 2 as unknown as string);
     const text = new Y.XmlText();
     text.insert(0, "Title");
     heading.insert(0, [text]);

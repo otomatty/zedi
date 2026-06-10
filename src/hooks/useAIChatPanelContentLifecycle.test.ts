@@ -128,7 +128,7 @@ describe("useAIChatPanelContentLifecycle", () => {
 
   it("resets conversation when page context changes", () => {
     const params: LifecycleParams = {
-      pageContext: { type: "note", pageId: "p1", pageTitle: "Page 1", pageContent: "" },
+      pageContext: { type: "editor", pageId: "p1", pageTitle: "Page 1", pageContent: "" },
       activeConversationId: "c1",
       activeConversation: makeConversation("c1"),
       messages: [],
@@ -149,7 +149,7 @@ describe("useAIChatPanelContentLifecycle", () => {
     rerender({
       params: {
         ...params,
-        pageContext: { type: "note", pageId: "p2", pageTitle: "Page 2", pageContent: "" },
+        pageContext: { type: "editor", pageId: "p2", pageTitle: "Page 2", pageContent: "" },
       },
     });
 
