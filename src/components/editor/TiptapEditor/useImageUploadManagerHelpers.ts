@@ -177,3 +177,7 @@ export async function runSingleUpload(params: RunUploadParams): Promise<void> {
 export function filterImageFiles(files: FileList | File[]): File[] {
   return Array.from(files).filter((file) => file.type.startsWith("image/"));
 }
+
+export function filterVideoFiles(files: FileList | File[]): File[] {
+  return Array.from(files).filter((file) => file.type.startsWith("video/"));
+}

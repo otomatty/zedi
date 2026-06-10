@@ -245,6 +245,28 @@ describe("tiptapToMarkdown", () => {
     expect(md).toContain("![Photo](https://example.com/img.png)");
   });
 
+  it("handles video nodes as an HTML <video> tag", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "video",
+          attrs: { src: "https://example.com/clip.webm", alt: "Demo" },
+        },
+      ],
+    });
+    const md = tiptapToMarkdown(content);
+    expect(md).toContain('<video src="https://example.com/clip.webm" controls>Demo</video>');
+  });
+
+  it("emits nothing for a video node without src", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "video", attrs: { alt: "no source" } }],
+    });
+    expect(tiptapToMarkdown(content)).toBe("");
+  });
+
   it("returns empty string for empty input", () => {
     expect(tiptapToMarkdown("")).toBe("");
   });

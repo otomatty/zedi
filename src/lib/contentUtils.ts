@@ -16,6 +16,7 @@ const SUPPORTED_NODE_TYPES = new Set([
   "mermaid",
   "image", // 画像挿入機能のサポート
   "imageUpload", // 画像アップロード中のプレースホルダー
+  "video", // 動画埋め込み（mediaPlaceholder は一時ノードのため意図的に除外し、保存時に落とす）
   // Phase 1: タスクリスト
   "taskList",
   "taskItem",
