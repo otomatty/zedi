@@ -102,14 +102,20 @@ export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImag
         const videoItems = Array.from(items).filter((item) => item.type.startsWith("video/"));
 
         if (videoItems.length > 0) {
-          event.preventDefault();
           const videoFiles = videoItems
             .map((item) => item.getAsFile())
             .filter((file): file is File => file !== null);
-          void uploadVideoFilesAndInsert(editor, videoFiles, (description) => {
-            toast({ title: "動画アップロード", description, variant: "destructive" });
-          });
-          return;
+          // getAsFile() が全て null だった場合は preventDefault せず、デフォルトの
+          // ペースト挙動に委ねる（サイレントに握りつぶさない）。
+          // If every getAsFile() returned null, don't preventDefault — fall back
+          // to the default paste behavior instead of silently swallowing it.
+          if (videoFiles.length > 0) {
+            event.preventDefault();
+            void uploadVideoFilesAndInsert(editor, videoFiles, (description) => {
+              toast({ title: "動画アップロード", description, variant: "destructive" });
+            });
+            return;
+          }
         }
       }
 

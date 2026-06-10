@@ -259,6 +259,26 @@ describe("tiptapToMarkdown", () => {
     expect(md).toContain('<video src="https://example.com/clip.webm" controls>Demo</video>');
   });
 
+  it("HTML-escapes video src and alt to prevent attribute breakout (XSS)", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "video",
+          attrs: {
+            src: 'https://example.com/x.mp4"><script>alert(1)</script>',
+            alt: '"><img onerror=alert(1)>',
+          },
+        },
+      ],
+    });
+    const md = tiptapToMarkdown(content);
+    expect(md).not.toContain("<script>");
+    expect(md).not.toContain("<img");
+    expect(md).toContain("&lt;script&gt;");
+    expect(md).toContain("&quot;&gt;");
+  });
+
   it("emits nothing for a video node without src", () => {
     const content = JSON.stringify({
       type: "doc",

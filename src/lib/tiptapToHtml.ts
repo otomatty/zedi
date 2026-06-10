@@ -225,7 +225,7 @@ const HTML_ESCAPES: Record<string, string> = {
 };
 
 /** Escape text nodes for safe HTML body insertion. */
-function escapeHtml(input: string): string {
+export function escapeHtml(input: string): string {
   return input.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c] ?? c);
 }
 

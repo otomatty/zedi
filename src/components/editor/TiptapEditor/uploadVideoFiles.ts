@@ -33,9 +33,15 @@ export async function uploadVideoFilesAndInsert(
   for (const file of files) {
     try {
       const { src } = await uploadMediaFile(file, { allowedMime: ALLOWED_VIDEO_MIME });
+      // アップロード中にページ遷移などでエディタが破棄された場合、破棄済みインスタンスへ
+      // のコマンド実行や不要なエラートーストを避けるため早期リターンする。
+      // If the editor was destroyed mid-upload, bail out before touching the
+      // stale instance or surfacing a now-irrelevant error toast.
+      if (editor.isDestroyed) return;
       const alt = file.name.replace(/\.[^./\\]+$/u, "");
       editor.chain().focus().setVideo({ src, alt }).run();
     } catch (error) {
+      if (editor.isDestroyed) return;
       onError(describeVideoUploadError(error));
     }
   }
