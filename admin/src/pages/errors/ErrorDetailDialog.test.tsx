@@ -149,4 +149,93 @@ describe("ErrorDetailDialog", () => {
 
     expect(screen.getByTestId("status-select")).toHaveValue("open");
   });
+
+  it("calls onUpdateStatus when save is clicked after changing status", async () => {
+    const onUpdateStatus = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ErrorDetailDialog
+        row={baseRow}
+        saving={false}
+        saveError={null}
+        onClose={onClose}
+        onUpdateStatus={onUpdateStatus}
+      />,
+    );
+
+    await userEvent.selectOptions(screen.getByTestId("status-select"), "resolved");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(onUpdateStatus).toHaveBeenCalledWith(baseRow.id, "resolved");
+  });
+
+  it("does not call onUpdateStatus when save is clicked without changes", async () => {
+    const onUpdateStatus = vi.fn();
+    render(
+      <ErrorDetailDialog
+        row={baseRow}
+        saving={false}
+        saveError={null}
+        onClose={onClose}
+        onUpdateStatus={onUpdateStatus}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(onUpdateStatus).not.toHaveBeenCalled();
+  });
+
+  it("displays saveError in an alert region", () => {
+    render(
+      <ErrorDetailDialog
+        row={baseRow}
+        saving={false}
+        saveError="save failed"
+        onClose={onClose}
+        onUpdateStatus={onUpdateStatus}
+      />,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("save failed");
+  });
+
+  it("renders AI analysis sections when present", () => {
+    render(
+      <ErrorDetailDialog
+        row={{
+          ...baseRow,
+          aiSummary: "Summary text",
+          aiRootCause: "Root cause text",
+          aiSuggestedFix: "Fix text",
+          aiSuspectedFiles: [{ path: "src/foo.ts", line: 10, reason: "null ref" }],
+        }}
+        saving={false}
+        saveError={null}
+        onClose={onClose}
+        onUpdateStatus={onUpdateStatus}
+      />,
+    );
+
+    expect(screen.getByText("AI による要約")).toBeInTheDocument();
+    expect(screen.getByText("Summary text")).toBeInTheDocument();
+    expect(screen.getByText("AI による原因仮説")).toBeInTheDocument();
+    expect(screen.getByText("Root cause text")).toBeInTheDocument();
+    expect(screen.getByText("AI による修正方針")).toBeInTheDocument();
+    expect(screen.getByText("Fix text")).toBeInTheDocument();
+    expect(screen.getByText("関連が疑われるファイル")).toBeInTheDocument();
+    expect(screen.getByText(/src\/foo\.ts/)).toBeInTheDocument();
+    expect(screen.getByText(/null ref/)).toBeInTheDocument();
+  });
+
+  it("renders linked GitHub issue number when present", () => {
+    render(
+      <ErrorDetailDialog
+        row={{ ...baseRow, githubIssueNumber: 1234 }}
+        saving={false}
+        saveError={null}
+        onClose={onClose}
+        onUpdateStatus={onUpdateStatus}
+      />,
+    );
+    expect(screen.getByText("関連 GitHub Issue: #1234")).toBeInTheDocument();
+  });
 });
