@@ -40,7 +40,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run && vitest run --config packages/shared/vitest.config.ts && vitest run --config packages/ui/vitest.config.ts && vitest run --config packages/claude-sidecar/vitest.config.ts && vitest run --config server/hocuspocus/vitest.config.ts && vitest run --config server/mcp/vitest.config.ts && vitest run --config admin/vitest.config.ts",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "node scripts/run-workspace-coverage.mjs --with-servers",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
