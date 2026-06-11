@@ -1,9 +1,12 @@
 import React from "react";
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ErrorsContent } from "./ErrorsContent";
 import type { ApiErrorRow } from "@/api/admin";
+
+const selectCallbacks: Map<string, (v: string) => void> = new Map();
+let selectCount = 0;
 
 vi.mock("@zedi/ui", () => ({
   Badge: ({ children }: { children: React.ReactNode }) => (
@@ -22,7 +25,22 @@ vi.mock("@zedi/ui", () => ({
       {children}
     </button>
   ),
-  Select: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Select: ({
+    children,
+    value,
+    onValueChange,
+  }: {
+    children: React.ReactNode;
+    value?: string;
+    onValueChange?: (v: string) => void;
+  }) => {
+    if (onValueChange) {
+      const key = selectCount === 0 ? "status" : "severity";
+      selectCallbacks.set(key, onValueChange);
+      selectCount++;
+    }
+    return <div data-value={value}>{children}</div>;
+  },
   SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => (
     <option value={value}>{children}</option>
@@ -77,6 +95,11 @@ const defaultProps = {
 };
 
 describe("ErrorsContent", () => {
+  beforeEach(() => {
+    selectCallbacks.clear();
+    selectCount = 0;
+  });
+
   it("renders the page title", () => {
     render(<ErrorsContent {...defaultProps} />);
     expect(screen.getByRole("heading", { name: "API エラー" })).toBeInTheDocument();
@@ -113,5 +136,73 @@ describe("ErrorsContent", () => {
   it("renders the error message in an alert region", () => {
     render(<ErrorsContent {...defaultProps} error="server is down" />);
     expect(screen.getByRole("alert")).toHaveTextContent("server is down");
+  });
+
+  it("calls onStatusFilterChange when status filter changes", () => {
+    const onStatusFilterChange = vi.fn();
+    render(
+      <ErrorsContent
+        {...defaultProps}
+        severityFilter="high"
+        onStatusFilterChange={onStatusFilterChange}
+      />,
+    );
+
+    const statusCallback = selectCallbacks.get("status");
+    expect(statusCallback).toBeDefined();
+    React.act(() => {
+      statusCallback?.("open");
+    });
+    expect(onStatusFilterChange).toHaveBeenCalledWith("open");
+  });
+
+  it("calls onSeverityFilterChange when severity filter changes", () => {
+    const onSeverityFilterChange = vi.fn();
+    render(
+      <ErrorsContent
+        {...defaultProps}
+        statusFilter="open"
+        onSeverityFilterChange={onSeverityFilterChange}
+      />,
+    );
+
+    const severityCallback = selectCallbacks.get("severity");
+    expect(severityCallback).toBeDefined();
+    React.act(() => {
+      severityCallback?.("high");
+    });
+    expect(onSeverityFilterChange).toHaveBeenCalledWith("high");
+  });
+
+  it("displays total count below the table", () => {
+    render(<ErrorsContent {...defaultProps} total={42} />);
+    expect(screen.getByText("合計 42 件")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["open", "未対応"],
+    ["investigating", "調査中"],
+    ["resolved", "解決済み"],
+    ["ignored", "無視"],
+  ] as const)("renders status badge for %s", (status, label) => {
+    render(
+      <ErrorsContent {...defaultProps} rows={[{ ...baseRow, id: `status-${status}`, status }]} />,
+    );
+    expect(within(screen.getByRole("table")).getByText(label)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["high", "高"],
+    ["medium", "中"],
+    ["low", "低"],
+    ["unknown", "未判定"],
+  ] as const)("renders severity badge for %s", (severity, label) => {
+    render(
+      <ErrorsContent
+        {...defaultProps}
+        rows={[{ ...baseRow, id: `severity-${severity}`, severity }]}
+      />,
+    );
+    expect(within(screen.getByRole("table")).getByText(label)).toBeInTheDocument();
   });
 });
