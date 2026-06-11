@@ -243,4 +243,114 @@ describe("useApiErrors", () => {
     await waitFor(() => expect(getApiErrors).toHaveBeenCalled());
     expect(lastInstance).toBeNull();
   });
+
+  it("surfaces REST load failure as error", async () => {
+    vi.mocked(getApiErrors).mockRejectedValueOnce(new Error("REST failed"));
+    const { result } = renderHook(() => useApiErrors({ intervalMs: 0 }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe("REST failed");
+    expect(result.current.errors).toEqual([]);
+  });
+
+  it("refetch() triggers another getApiErrors call", async () => {
+    const { result } = renderHook(() => useApiErrors({ intervalMs: 0, enableStream: false }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const callsBefore = vi.mocked(getApiErrors).mock.calls.length;
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    expect(vi.mocked(getApiErrors).mock.calls.length).toBe(callsBefore + 1);
+  });
+
+  it("ignores SSE update events with invalid JSON", async () => {
+    const { result } = renderHook(() => useApiErrors({ intervalMs: 0 }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => {
+      getInstance().dispatch("ready", "");
+      getInstance().dispatch("update", "not-json");
+    });
+
+    expect(result.current.errors).toHaveLength(1);
+    expect(result.current.errors[0]?.title).toBe("old error");
+    expect(result.current.total).toBe(1);
+  });
+
+  it("drops an existing row via dropRowById when SSE update no longer matches filter", async () => {
+    const { result } = renderHook(() => useApiErrors({ status: "open", intervalMs: 0 }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => {
+      getInstance().dispatch("ready", "");
+      getInstance().dispatch("update", {
+        ...getBaseRow(),
+        status: "resolved",
+      });
+    });
+
+    expect(result.current.errors).toHaveLength(0);
+    expect(result.current.total).toBe(0);
+  });
+
+  it("polls via fallback interval when stream is disabled", async () => {
+    vi.useFakeTimers();
+    const { unmount } = renderHook(() => useApiErrors({ intervalMs: 1000, enableStream: false }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const callsBefore = vi.mocked(getApiErrors).mock.calls.length;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+      await Promise.resolve();
+    });
+
+    expect(vi.mocked(getApiErrors).mock.calls.length).toBeGreaterThan(callsBefore);
+    unmount();
+    vi.useRealTimers();
+  });
+
+  it("ignores stale REST responses when a newer request finishes first", async () => {
+    const firstResponse: GetApiErrorsResponse = {
+      errors: [getBaseRow()],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    };
+    const secondResponse: GetApiErrorsResponse = {
+      errors: [{ ...getBaseRow(), id: "00000000-0000-0000-0000-0000000000bb", title: "fresh" }],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    };
+
+    const pendingResolvers: Array<(value: GetApiErrorsResponse) => void> = [];
+    vi.mocked(getApiErrors).mockImplementation((params) => {
+      if (params?.status === "open") {
+        return new Promise((resolve) => {
+          pendingResolvers.push(resolve);
+        });
+      }
+      return Promise.resolve(secondResponse);
+    });
+
+    const { result, rerender } = renderHook(
+      ({ status }: { status?: "open" | "resolved" }) =>
+        useApiErrors({ status, intervalMs: 0, enableStream: false }),
+      { initialProps: { status: "open" as const } },
+    );
+
+    rerender({ status: "resolved" });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.errors[0]?.title).toBe("fresh");
+
+    await act(async () => {
+      pendingResolvers.forEach((resolve) => resolve(firstResponse));
+      await Promise.resolve();
+    });
+
+    expect(result.current.errors[0]?.title).toBe("fresh");
+  });
 });
