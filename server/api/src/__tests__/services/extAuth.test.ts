@@ -131,7 +131,18 @@ describe("extAuth", () => {
     it("returns null for invalid or tampered token", async () => {
       expect(await verifyExtensionToken("invalid.jwt.token")).toBeNull();
       const { access_token } = await issueExtensionToken("user-1");
-      const tampered = access_token.slice(0, -2) + "xx";
+      // 署名の先頭 1 文字を必ず別の base64url 文字に反転させて、改ざんを決定的に
+      // 無効化する。先頭文字は署名 1 バイト目の上位 6 ビットを表すため、値を変えれば
+      // 必ずバイト列が変化する。
+      // Deterministically tamper by flipping the first signature character to a
+      // different base64url char. That char encodes the top 6 bits of the first
+      // signature byte, so the decoded bytes always change. (The previous
+      // `slice(0, -2) + "xx"` was flaky: base64url's trailing unused bits can
+      // decode to the same signature, leaving the token valid.)
+      const sigStart = access_token.lastIndexOf(".") + 1;
+      const headerAndPayload = access_token.slice(0, sigStart); // "header.payload."
+      const signature = access_token.slice(sigStart);
+      const tampered = `${headerAndPayload}${signature[0] === "A" ? "B" : "A"}${signature.slice(1)}`;
       expect(await verifyExtensionToken(tampered)).toBeNull();
     });
 
