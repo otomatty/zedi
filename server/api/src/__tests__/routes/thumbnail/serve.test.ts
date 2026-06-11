@@ -172,6 +172,19 @@ describe("GET /api/thumbnail/serve/:id", () => {
     expect(mockS3Send).not.toHaveBeenCalled();
   });
 
+  it("scopes GET lookup by caller userId so foreign-owned rows are not served", async () => {
+    // Proxy DB returns [] when userId does not match (row may exist for another user).
+    const { app, chains } = createServeApp([[]]);
+    const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
+      headers: { "x-test-user-id": ATTACKER_ID },
+    });
+    expect(res.status).toBe(404);
+    expect(mockS3Send).not.toHaveBeenCalled();
+    const selectChain = chains.find((c) => c.startMethod === "select");
+    expect(selectChain?.ops.some((op) => op.method === "where")).toBe(true);
+    expect(selectChain?.ops.some((op) => op.method === "limit")).toBe(true);
+  });
+
   it("streams image bytes when owned row exists", async () => {
     const imageBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
     mockS3Send.mockResolvedValueOnce({

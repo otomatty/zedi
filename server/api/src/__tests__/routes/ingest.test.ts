@@ -38,6 +38,7 @@ const {
   mockGraphRunnerResume,
   mockResolveCheckpointerForRun,
   mockAssertComposeBackendReady,
+  mockGetRegisteredGraph,
 } = vi.hoisted(() => ({
   mockGetUserTier: vi.fn(),
   mockValidateModelAccessOrThrow: vi.fn(),
@@ -53,6 +54,7 @@ const {
   mockGraphRunnerResume: vi.fn(),
   mockResolveCheckpointerForRun: vi.fn(),
   mockAssertComposeBackendReady: vi.fn(),
+  mockGetRegisteredGraph: vi.fn(),
 }));
 
 vi.mock("../../services/subscriptionService.js", () => ({
@@ -101,6 +103,14 @@ vi.mock("../../agents/runner/graphRunner.js", () => ({
 vi.mock("../../agents/core/checkpoint/index.js", () => ({
   resolveCheckpointerForRun: (...args: unknown[]) => mockResolveCheckpointerForRun(...args),
 }));
+
+vi.mock("../../agents/registry/graphRegistry.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../agents/registry/graphRegistry.js")>();
+  return {
+    ...actual,
+    getRegisteredGraph: (...args: unknown[]) => mockGetRegisteredGraph(...args),
+  };
+});
 
 vi.mock("../../agents/core/composeBackendValidation.js", () => ({
   assertComposeBackendReady: (...args: unknown[]) => mockAssertComposeBackendReady(...args),
@@ -175,6 +185,7 @@ beforeEach(() => {
   });
   mockResolveCheckpointerForRun.mockReset().mockResolvedValue(false);
   mockAssertComposeBackendReady.mockReset().mockResolvedValue(undefined);
+  mockGetRegisteredGraph.mockReset().mockReturnValue(undefined);
   process.env = { ...ORIGINAL_ENV, OPENAI_API_KEY: "sk-test" };
 });
 
@@ -416,6 +427,26 @@ describe("POST /api/ingest/graph/run", () => {
     );
   });
 
+  it("returns 403 when threadId is tied to another user's checkpoint", async () => {
+    mockResolveCheckpointerForRun.mockResolvedValue({});
+    mockGetRegisteredGraph.mockReturnValue({
+      factory: () => ({
+        getState: async () => ({ values: { userId: OTHER_USER_ID } }),
+      }),
+    });
+    const app = createIngestApp([]);
+    const res = await app.request("/api/ingest/graph/run", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        ...graphBody,
+        threadId: "shared-thread",
+      }),
+    });
+    expect(res.status).toBe(403);
+    expect(mockGraphRunnerInvoke).not.toHaveBeenCalled();
+  });
+
   it("returns graph output on success", async () => {
     const app = createIngestApp([]);
     const res = await app.request("/api/ingest/graph/run", {
@@ -462,6 +493,23 @@ describe("POST /api/ingest/graph/resume", () => {
       body: JSON.stringify({ threadId: "t1", resume: { approvedSourceIds: [] } }),
     });
     expect(res.status).toBe(503);
+  });
+
+  it("returns 403 when resuming another user's threadId", async () => {
+    mockResolveCheckpointerForRun.mockResolvedValue({});
+    mockGetRegisteredGraph.mockReturnValue({
+      factory: () => ({
+        getState: async () => ({ values: { userId: OTHER_USER_ID } }),
+      }),
+    });
+    const app = createIngestApp([]);
+    const res = await app.request("/api/ingest/graph/resume", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ threadId: "t1", resume: { approvedSourceIds: [] } }),
+    });
+    expect(res.status).toBe(403);
+    expect(mockGraphRunnerResume).not.toHaveBeenCalled();
   });
 
   it("resumes graph when checkpointing is enabled", async () => {
