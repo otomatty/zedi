@@ -116,6 +116,11 @@ bun run dev
    bun run format:check
    ```
 
+   > **E2E policy (issue #1036):** never use `page.waitForTimeout()` in Playwright specs.
+   > Wait on state instead — `expect(...).toBeVisible()`, `waitForURL`, `waitForRequest` /
+   > `waitForResponse`. Fixed sleeps are the primary source of flaky E2E runs.
+   > （Playwright spec での `page.waitForTimeout()` は新規使用禁止。状態ベースの待機を使うこと。）
+
    > **Note:** [husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/lint-staged/lint-staged) run lint and format on commit.
    > Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) ([commitlint](https://commitlint.js.org/) validates them).
 
