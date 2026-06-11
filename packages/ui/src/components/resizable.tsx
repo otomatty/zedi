@@ -16,11 +16,7 @@ const ResizablePanelGroup = ({
   direction = "horizontal",
   ...props
 }: ResizablePanelGroupProps) => (
-  <Group
-    {...props}
-    orientation={direction}
-    className={cn("flex h-full w-full aria-[orientation=vertical]:flex-col", className)}
-  />
+  <Group {...props} orientation={direction} className={cn("flex h-full w-full", className)} />
 );
 
 const ResizablePanel = Panel;
@@ -35,7 +31,13 @@ type ResizableHandleProps = React.ComponentProps<typeof Separator> & {
 const ResizableHandle = ({ withHandle, className, ...props }: ResizableHandleProps) => (
   <Separator
     className={cn(
-      "bg-border focus-visible:ring-ring relative flex w-px items-center justify-center after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:ring-1 focus-visible:ring-offset-1 focus-visible:outline-none aria-[orientation=vertical]:h-px aria-[orientation=vertical]:w-full aria-[orientation=vertical]:after:left-0 aria-[orientation=vertical]:after:h-1 aria-[orientation=vertical]:after:w-full aria-[orientation=vertical]:after:translate-x-0 aria-[orientation=vertical]:after:-translate-y-1/2 [&[aria-orientation=vertical]>div]:rotate-90",
+      // react-resizable-panels v4 は ARIA 規約どおり「separator 自身の見た目の向き」を
+      // aria-orientation に設定する: 左右分割 → vertical（細い縦線・基底クラス）、
+      // 上下分割 → horizontal（全幅の横線・バリアントで上書き）。
+      // v4 sets aria-orientation to the separator's own visual orientation:
+      // a left/right split yields `vertical` (thin line, base classes) and a
+      // stacked split yields `horizontal` (full-width line, variant below).
+      "bg-border focus-visible:ring-ring relative flex w-px items-center justify-center after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:ring-1 focus-visible:ring-offset-1 focus-visible:outline-none aria-[orientation=horizontal]:h-px aria-[orientation=horizontal]:w-full aria-[orientation=horizontal]:after:left-0 aria-[orientation=horizontal]:after:h-1 aria-[orientation=horizontal]:after:w-full aria-[orientation=horizontal]:after:translate-x-0 aria-[orientation=horizontal]:after:-translate-y-1/2 [&[aria-orientation=horizontal]>div]:rotate-90",
       className,
     )}
     {...props}
