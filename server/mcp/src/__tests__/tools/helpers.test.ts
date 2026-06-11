@@ -8,7 +8,7 @@
  * Tests for the MCP tool helpers, including #562 rate-limit rendering.
  */
 import { describe, it, expect } from "vitest";
-import { wrapToolHandler } from "../../tools/helpers.js";
+import { jsonResult, textResult, wrapToolHandler } from "../../tools/helpers.js";
 import { ZediApiError } from "../../client/errors.js";
 
 describe("wrapToolHandler", () => {
@@ -57,6 +57,15 @@ describe("wrapToolHandler", () => {
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toMatch(/Unexpected error/);
     expect(result.content[0]?.text).toMatch(/boom/);
+  });
+
+  it("jsonResult serializes values as pretty-printed JSON", () => {
+    const result = jsonResult([1, 2]);
+    expect(result.content[0]?.text).toBe(JSON.stringify([1, 2], null, 2));
+  });
+
+  it("textResult returns a single text content item", () => {
+    expect(textResult("ping")).toEqual({ content: [{ type: "text", text: "ping" }] });
   });
 
   it("passes through successful results untouched", async () => {

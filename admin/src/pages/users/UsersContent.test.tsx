@@ -1,6 +1,6 @@
 import React from "react";
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { UsersContent } from "./UsersContent";
 import type { UserAdmin } from "@/api/admin";
@@ -76,10 +76,12 @@ vi.mock("@/components/ConfirmActionDialog", () => ({
     open,
     title,
     confirmLabel,
+    onOpenChange,
   }: {
     open: boolean;
     title: string;
     confirmLabel?: string;
+    onOpenChange?: (open: boolean) => void;
   }) => {
     if (!open) return null;
     return (
@@ -87,6 +89,13 @@ vi.mock("@/components/ConfirmActionDialog", () => ({
         <span data-testid="confirm-dialog-title">{title}</span>
         <button type="button" data-testid={`confirm-btn-${title}`}>
           {confirmLabel ?? "確認"}
+        </button>
+        <button
+          type="button"
+          data-testid={`cancel-dialog-${title}`}
+          onClick={() => onOpenChange?.(false)}
+        >
+          cancel
         </button>
       </div>
     );
@@ -106,7 +115,7 @@ const mockCancelDelete = vi.fn();
 
 let hookRoleChangeTarget: { user: UserAdmin; newRole: string } | null = null;
 let hookUnsuspendTarget: UserAdmin | null = null;
-const hookDeleteTarget: { user: UserAdmin; impact: null; loadingImpact: boolean } | null = null;
+let hookDeleteTarget: { user: UserAdmin; impact: null; loadingImpact: boolean } | null = null;
 
 vi.mock("./useConfirmDialogs", () => ({
   useConfirmDialogs: () => ({
@@ -168,6 +177,51 @@ const defaultProps = {
 };
 
 describe("UsersContent", () => {
+  beforeEach(() => {
+    selectCallbacks.clear();
+    hookRoleChangeTarget = null;
+    hookUnsuspendTarget = null;
+    hookDeleteTarget = null;
+    mockRequestRoleChange.mockClear();
+    mockConfirmRoleChange.mockClear();
+    mockCancelRoleChange.mockClear();
+    mockRequestUnsuspend.mockClear();
+    mockConfirmUnsuspend.mockClear();
+    mockCancelUnsuspend.mockClear();
+    mockRequestDelete.mockClear();
+    mockConfirmDelete.mockClear();
+    mockCancelDelete.mockClear();
+  });
+
+  it("shows error banner when error prop is set", () => {
+    render(<UsersContent {...defaultProps} error="something went wrong" />);
+    expect(screen.getByText("something went wrong")).toBeInTheDocument();
+  });
+
+  it("shows loading state when loading and no users yet", () => {
+    render(<UsersContent {...defaultProps} users={[]} total={0} loading={true} />);
+    expect(screen.getByText("読み込み中...")).toBeInTheDocument();
+  });
+
+  it("calls onSearchChange when search input changes", async () => {
+    const onSearchChange = vi.fn();
+    render(<UsersContent {...defaultProps} onSearchChange={onSearchChange} />);
+
+    await userEvent.type(screen.getByLabelText("メールで検索"), "a");
+    expect(onSearchChange).toHaveBeenCalled();
+  });
+
+  it("calls onStatusFilterChange when status filter changes", () => {
+    const onStatusFilterChange = vi.fn();
+    render(<UsersContent {...defaultProps} onStatusFilterChange={onStatusFilterChange} />);
+
+    const statusCallback = selectCallbacks.get("all");
+    React.act(() => {
+      statusCallback?.("suspended");
+    });
+    expect(onStatusFilterChange).toHaveBeenCalledWith("suspended");
+  });
+
   it("shows range and total when users are loaded", () => {
     render(<UsersContent {...defaultProps} />);
 
@@ -259,6 +313,76 @@ describe("UsersContent", () => {
       render(<UsersContent {...defaultProps} />);
 
       expect(screen.queryByTestId("confirm-dialog-ロールを変更")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("ステータスバッジと操作ボタン / Status badges and action buttons", () => {
+    it("shows suspended status badge", () => {
+      const suspendedUser: UserAdmin = {
+        ...mockUser,
+        status: "suspended",
+        suspendedAt: "2026-01-01T00:00:00Z",
+        suspendedReason: "short reason",
+        suspendedBy: "admin-1",
+      };
+      render(<UsersContent {...defaultProps} users={[suspendedUser]} />);
+      expect(within(screen.getByRole("table")).getByText("suspended")).toBeInTheDocument();
+    });
+
+    it("shows deleted status badge and deleted state text", () => {
+      const deletedUser: UserAdmin = {
+        ...mockUser,
+        status: "deleted",
+      };
+      render(<UsersContent {...defaultProps} users={[deletedUser]} />);
+      expect(within(screen.getByRole("table")).getByText("deleted")).toBeInTheDocument();
+      expect(screen.getByText("削除済み")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "サスペンド" })).not.toBeInTheDocument();
+    });
+
+    it("truncates suspended reason longer than 20 characters", () => {
+      const longReason = "abcdefghijklmnopqrstuvwxyz";
+      const suspendedUser: UserAdmin = {
+        ...mockUser,
+        status: "suspended",
+        suspendedAt: "2026-01-01T00:00:00Z",
+        suspendedReason: longReason,
+        suspendedBy: "admin-1",
+      };
+      render(<UsersContent {...defaultProps} users={[suspendedUser]} />);
+      expect(screen.getByText("(abcdefghijklmnopqrst...)")).toBeInTheDocument();
+    });
+
+    it("shows suspend and delete buttons for active users", () => {
+      render(<UsersContent {...defaultProps} />);
+      expect(screen.getByRole("button", { name: "サスペンド" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "削除" })).toBeInTheDocument();
+    });
+
+    it("calls requestDelete when delete button is clicked", async () => {
+      render(<UsersContent {...defaultProps} />);
+      await userEvent.click(screen.getByRole("button", { name: "削除" }));
+      expect(mockRequestDelete).toHaveBeenCalledWith(mockUser);
+    });
+
+    it("shows saving state instead of action buttons", () => {
+      render(<UsersContent {...defaultProps} savingIds={new Set([mockUser.id])} />);
+      expect(screen.getByText("保存中...")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "サスペンド" })).not.toBeInTheDocument();
+    });
+
+    it("shows delete confirmation dialog when deleteTarget is set", () => {
+      hookDeleteTarget = { user: mockUser, impact: null, loadingImpact: false };
+      render(<UsersContent {...defaultProps} />);
+      expect(screen.getByTestId("confirm-dialog-ユーザーを削除")).toBeInTheDocument();
+    });
+
+    it("calls cancelRoleChange when role dialog is closed via onOpenChange", async () => {
+      hookRoleChangeTarget = { user: mockUser, newRole: "admin" };
+      render(<UsersContent {...defaultProps} />);
+
+      await userEvent.click(screen.getByTestId("cancel-dialog-ロールを変更"));
+      expect(mockCancelRoleChange).toHaveBeenCalled();
     });
   });
 

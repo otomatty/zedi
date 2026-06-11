@@ -12,6 +12,13 @@ import {
   getApiErrors,
   getApiErrorById,
   patchApiErrorStatus,
+  getUsers,
+  patchUserRole,
+  suspendUser,
+  unsuspendUser,
+  getUserImpact,
+  deleteUser,
+  getAuditLogs,
   type ApiErrorRow,
 } from "./admin";
 
@@ -328,5 +335,230 @@ describe("patchApiErrorStatus", () => {
     await expect(patchApiErrorStatus(sampleErrorRow.id, "resolved")).rejects.toThrow(
       /status changed concurrently/,
     );
+  });
+});
+
+const sampleUser = {
+  id: "user-1",
+  email: "user@example.com",
+  name: "Test User",
+  role: "user" as const,
+  status: "active" as const,
+  suspendedAt: null,
+  suspendedReason: null,
+  suspendedBy: null,
+  createdAt: "2026-01-01T00:00:00Z",
+  pageCount: 3,
+};
+
+describe("getUsers", () => {
+  beforeEach(() => {
+    vi.mocked(adminFetch).mockReset();
+  });
+
+  it("200 なら users と total を返す", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ users: [sampleUser], total: 1 }), { status: 200 }),
+    );
+    const result = await getUsers({ search: "test", status: "active", limit: 10, offset: 0 });
+    expect(result.users).toEqual([sampleUser]);
+    expect(result.total).toBe(1);
+    expect(adminFetch).toHaveBeenCalledWith(
+      "/api/admin/users?search=test&status=active&limit=10&offset=0",
+    );
+  });
+
+  it("!res.ok なら throw する", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "users failed" }), { status: 500 }),
+    );
+    await expect(getUsers()).rejects.toThrow("users failed");
+  });
+});
+
+describe("patchUserRole", () => {
+  beforeEach(() => {
+    vi.mocked(adminFetch).mockReset();
+  });
+
+  it("200 なら更新後 user を返す", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ user: { ...sampleUser, role: "admin" } }), { status: 200 }),
+    );
+    const result = await patchUserRole("user-1", "admin");
+    expect(result.user.role).toBe("admin");
+    expect(adminFetch).toHaveBeenCalledWith(
+      "/api/admin/users/user-1",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ role: "admin" }),
+      }),
+    );
+  });
+
+  it("!res.ok なら throw する", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "role failed" }), { status: 400 }),
+    );
+    await expect(patchUserRole("user-1", "admin")).rejects.toThrow("role failed");
+  });
+});
+
+describe("suspendUser", () => {
+  beforeEach(() => {
+    vi.mocked(adminFetch).mockReset();
+  });
+
+  it("200 なら suspended user を返す", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ user: { ...sampleUser, status: "suspended", suspendedReason: "spam" } }),
+        { status: 200 },
+      ),
+    );
+    const result = await suspendUser("user-1", "spam");
+    expect(result.user.status).toBe("suspended");
+    expect(adminFetch).toHaveBeenCalledWith(
+      "/api/admin/users/user-1/suspend",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ reason: "spam" }),
+      }),
+    );
+  });
+
+  it("!res.ok なら throw する", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "suspend failed" }), { status: 500 }),
+    );
+    await expect(suspendUser("user-1")).rejects.toThrow("suspend failed");
+  });
+});
+
+describe("unsuspendUser", () => {
+  beforeEach(() => {
+    vi.mocked(adminFetch).mockReset();
+  });
+
+  it("200 なら active user を返す", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ user: sampleUser }), { status: 200 }),
+    );
+    const result = await unsuspendUser("user-1");
+    expect(result.user.status).toBe("active");
+    expect(adminFetch).toHaveBeenCalledWith("/api/admin/users/user-1/unsuspend", {
+      method: "POST",
+    });
+  });
+
+  it("!res.ok なら throw する", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "unsuspend failed" }), { status: 500 }),
+    );
+    await expect(unsuspendUser("user-1")).rejects.toThrow("unsuspend failed");
+  });
+});
+
+describe("getUserImpact", () => {
+  beforeEach(() => {
+    vi.mocked(adminFetch).mockReset();
+  });
+
+  it("200 なら impact を返す", async () => {
+    const impact = {
+      notesCount: 2,
+      sessionsCount: 1,
+      activeSubscription: true,
+      lastAiUsageAt: "2026-01-01T00:00:00Z",
+    };
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify(impact), { status: 200 }),
+    );
+    const result = await getUserImpact("user-1");
+    expect(result).toEqual(impact);
+    expect(adminFetch).toHaveBeenCalledWith("/api/admin/users/user-1/impact");
+  });
+
+  it("!res.ok なら throw する", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "impact failed" }), { status: 500 }),
+    );
+    await expect(getUserImpact("user-1")).rejects.toThrow("impact failed");
+  });
+});
+
+describe("deleteUser", () => {
+  beforeEach(() => {
+    vi.mocked(adminFetch).mockReset();
+  });
+
+  it("200 なら deleted user を返す", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ user: { ...sampleUser, status: "deleted" } }), {
+        status: 200,
+      }),
+    );
+    const result = await deleteUser("user-1");
+    expect(result.user.status).toBe("deleted");
+    expect(adminFetch).toHaveBeenCalledWith("/api/admin/users/user-1", { method: "DELETE" });
+  });
+
+  it("!res.ok なら throw する", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "delete failed" }), { status: 500 }),
+    );
+    await expect(deleteUser("user-1")).rejects.toThrow("delete failed");
+  });
+});
+
+describe("getAuditLogs", () => {
+  beforeEach(() => {
+    vi.mocked(adminFetch).mockReset();
+  });
+
+  it("200 なら logs と total を返す", async () => {
+    const logs = [
+      {
+        id: "log-1",
+        actorUserId: "admin-1",
+        actorEmail: "admin@example.com",
+        actorName: "Admin",
+        action: "user.role.update",
+        targetType: "user",
+        targetId: "user-1",
+        targetEmail: "user@example.com",
+        targetName: "User",
+        before: { role: "user" },
+        after: { role: "admin" },
+        ipAddress: null,
+        userAgent: null,
+        createdAt: "2026-01-01T00:00:00Z",
+      },
+    ];
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ logs, total: 1 }), { status: 200 }),
+    );
+    const result = await getAuditLogs({
+      actorUserId: "admin-1",
+      action: "user.role.update",
+      targetType: "user",
+      targetId: "user-1",
+      from: "2026-01-01T00:00:00Z",
+      to: "2026-01-02T00:00:00Z",
+      limit: 20,
+      offset: 0,
+    });
+    expect(result.logs).toEqual(logs);
+    expect(result.total).toBe(1);
+    expect(adminFetch).toHaveBeenCalledWith(
+      "/api/admin/audit-logs?actorUserId=admin-1&action=user.role.update&targetType=user&targetId=user-1&from=2026-01-01T00%3A00%3A00Z&to=2026-01-02T00%3A00%3A00Z&limit=20&offset=0",
+    );
+  });
+
+  it("!res.ok なら throw する", async () => {
+    vi.mocked(adminFetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "audit failed" }), { status: 500 }),
+    );
+    await expect(getAuditLogs()).rejects.toThrow("audit failed");
   });
 });
