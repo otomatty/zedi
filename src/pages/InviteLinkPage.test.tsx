@@ -248,7 +248,7 @@ describe("InviteLinkPage", () => {
       await waitFor(() => expect(mockSignInSocial).toHaveBeenCalledTimes(1));
       expect(mockSignInSocial).toHaveBeenCalledWith({
         provider: "google",
-        callbackURL: "http://localhost:3000/auth/callback?returnTo=%2Finvite-links%2Fshare-token",
+        callbackURL: `${window.location.origin}/auth/callback?returnTo=%2Finvite-links%2Fshare-token`,
       });
     });
 
@@ -259,7 +259,7 @@ describe("InviteLinkPage", () => {
       await waitFor(() => expect(mockSignInSocial).toHaveBeenCalledTimes(1));
       expect(mockSignInSocial).toHaveBeenCalledWith({
         provider: "github",
-        callbackURL: "http://localhost:3000/auth/callback?returnTo=%2Finvite-links%2Fshare-token",
+        callbackURL: `${window.location.origin}/auth/callback?returnTo=%2Finvite-links%2Fshare-token`,
       });
     });
 

@@ -162,9 +162,8 @@ describe("WikiComposePage", () => {
           pageSnapshot: {
             pageId: "page-1",
             title: "Architecture Notes",
-            content: "",
-            tags: [],
-            updatedAt: "2026-05-24T00:00:00Z",
+            body: "",
+            hasContent: false,
           },
         }),
       );
@@ -172,6 +171,14 @@ describe("WikiComposePage", () => {
       renderWikiCompose();
 
       expect(screen.getByText("Architecture Notes")).toBeInTheDocument();
+    });
+
+    it("shows fallback title in the header when page snapshot is missing", () => {
+      vi.mocked(useWikiComposeSession).mockReturnValue(createMockSession({ pageSnapshot: null }));
+
+      renderWikiCompose();
+
+      expect(screen.getByText("wikiCompose.page.titleFallback")).toBeInTheDocument();
     });
 
     it("shows raw phase text when the translation key is unresolved", () => {
