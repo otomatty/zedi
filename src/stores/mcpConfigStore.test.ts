@@ -122,9 +122,7 @@ describe("useMcpConfigStore", () => {
         useMcpConfigStore.getState().toggleServer("alpha", false);
         useMcpConfigStore
           .getState()
-          .setServerStatus("alpha", "connected", undefined, [
-            { name: "tool", description: "d", inputSchema: {} },
-          ]);
+          .setServerStatus("alpha", "connected", undefined, [{ name: "tool", description: "d" }]);
         useMcpConfigStore.getState().addServer("alpha", HTTP_CONFIG);
       });
 
@@ -162,9 +160,7 @@ describe("useMcpConfigStore", () => {
         useMcpConfigStore.getState().toggleServer("alpha", false);
         useMcpConfigStore
           .getState()
-          .setServerStatus("alpha", "failed", "boom", [
-            { name: "tool", description: "d", inputSchema: {} },
-          ]);
+          .setServerStatus("alpha", "failed", "boom", [{ name: "tool", description: "d" }]);
         useMcpConfigStore.getState().updateServer("alpha", HTTP_CONFIG);
       });
 
@@ -174,7 +170,7 @@ describe("useMcpConfigStore", () => {
         enabled: false,
         status: "unknown",
         error: "boom",
-        tools: [{ name: "tool", description: "d", inputSchema: {} }],
+        tools: [{ name: "tool", description: "d" }],
       });
     });
 
@@ -199,7 +195,7 @@ describe("useMcpConfigStore", () => {
 
   describe("setServerStatus", () => {
     it("updates status, error, and tools", () => {
-      const tools = [{ name: "search", description: "search", inputSchema: {} }];
+      const tools = [{ name: "search", description: "search" }];
       useMcpConfigStore.getState().addServer("alpha", STDIO_CONFIG);
       useMcpConfigStore.getState().setServerStatus("alpha", "connected", undefined, tools);
 
@@ -211,7 +207,7 @@ describe("useMcpConfigStore", () => {
     });
 
     it("keeps existing tools when tools argument is undefined", () => {
-      const tools = [{ name: "search", description: "search", inputSchema: {} }];
+      const tools = [{ name: "search", description: "search" }];
       act(() => {
         useMcpConfigStore.getState().addServer("alpha", STDIO_CONFIG);
         useMcpConfigStore.getState().setServerStatus("alpha", "connected", undefined, tools);
@@ -298,9 +294,7 @@ describe("useMcpConfigStore", () => {
         useMcpConfigStore.getState().addServer("alpha", STDIO_CONFIG);
         useMcpConfigStore
           .getState()
-          .setServerStatus("alpha", "connected", "err", [
-            { name: "tool", description: "d", inputSchema: {} },
-          ]);
+          .setServerStatus("alpha", "connected", "err", [{ name: "tool", description: "d" }]);
         useMcpConfigStore.getState().toggleServer("alpha", false);
       });
 

@@ -281,6 +281,27 @@ describe("DomainsSection", () => {
     expect((input as HTMLInputElement).value).toBe("acme.co.jp");
   });
 
+  it("shows destructive toast when API rejects a duplicate domain", async () => {
+    createMutateAsync.mockRejectedValueOnce(new ApiError("domain already exists", 409));
+    renderSection();
+    const input = screen.getByPlaceholderText("notes.domainPlaceholder");
+
+    fireEvent.change(input, { target: { value: "company.co.jp" } });
+    fireEvent.click(screen.getByRole("button", { name: "notes.domainTabAdd" }));
+
+    await waitFor(() => {
+      expect(createMutateAsync).toHaveBeenCalledWith({
+        domain: "company.co.jp",
+        role: "viewer",
+      });
+      expect(toastMock).toHaveBeenCalledWith({
+        title: "notes.domainTabCreateFailed",
+        description: "domain already exists",
+        variant: "destructive",
+      });
+    });
+  });
+
   it("shows destructive toast with ApiError message on create failure", async () => {
     createMutateAsync.mockRejectedValueOnce(new ApiError("duplicate domain", 409));
     renderSection();

@@ -107,6 +107,7 @@ describe("useNoteMembersController", () => {
 
     const { result } = renderHook(() => useNoteMembersController("note-1", false));
 
+    expect(useNoteMembers).toHaveBeenCalledWith("note-1", false);
     expect(result.current.members).toEqual([]);
     expect(result.current.isMembersLoading).toBe(false);
   });
