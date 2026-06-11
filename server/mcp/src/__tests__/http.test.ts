@@ -19,9 +19,9 @@ vi.mock("../server.js", () => ({
 }));
 
 vi.mock("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js", () => ({
-  WebStandardStreamableHTTPServerTransport: vi.fn().mockImplementation(
-    class MockWebStandardStreamableHTTPServerTransport {
-      handleRequest = mockHandleRequest;
+  WebStandardStreamableHTTPServerTransport: vi.fn(
+    function MockWebStandardStreamableHTTPServerTransport() {
+      return { handleRequest: mockHandleRequest };
     },
   ),
 }));
@@ -58,16 +58,12 @@ describe("createHttpApp", () => {
         headers: { "Content-Type": "application/json" },
       }),
     );
-    mockHttpZediClient.mockImplementation(
-      class MockHttpZediClient {
-        baseUrl: string;
-        token: string;
-        constructor(opts: { baseUrl: string; token: string }) {
-          this.baseUrl = opts.baseUrl;
-          this.token = opts.token;
-        }
-      },
-    );
+    mockHttpZediClient.mockImplementation(function MockHttpZediClient(opts: {
+      baseUrl: string;
+      token: string;
+    }) {
+      return { baseUrl: opts.baseUrl, token: opts.token };
+    });
   });
 
   it("GET /health returns ok", async () => {

@@ -6,6 +6,7 @@ import { ErrorsContent } from "./ErrorsContent";
 import type { ApiErrorRow } from "@/api/admin";
 
 const selectCallbacks: Map<string, (v: string) => void> = new Map();
+let selectCount = 0;
 
 vi.mock("@zedi/ui", () => ({
   Badge: ({ children }: { children: React.ReactNode }) => (
@@ -33,8 +34,10 @@ vi.mock("@zedi/ui", () => ({
     value?: string;
     onValueChange?: (v: string) => void;
   }) => {
-    if (onValueChange && value) {
-      selectCallbacks.set(value, onValueChange);
+    if (onValueChange) {
+      const key = selectCount === 0 ? "status" : "severity";
+      selectCallbacks.set(key, onValueChange);
+      selectCount++;
     }
     return <div data-value={value}>{children}</div>;
   },
@@ -94,6 +97,7 @@ const defaultProps = {
 describe("ErrorsContent", () => {
   beforeEach(() => {
     selectCallbacks.clear();
+    selectCount = 0;
   });
 
   it("renders the page title", () => {
@@ -144,7 +148,7 @@ describe("ErrorsContent", () => {
       />,
     );
 
-    const statusCallback = selectCallbacks.get("__any__");
+    const statusCallback = selectCallbacks.get("status");
     expect(statusCallback).toBeDefined();
     React.act(() => {
       statusCallback?.("open");
@@ -162,7 +166,7 @@ describe("ErrorsContent", () => {
       />,
     );
 
-    const severityCallback = selectCallbacks.get("__any__");
+    const severityCallback = selectCallbacks.get("severity");
     expect(severityCallback).toBeDefined();
     React.act(() => {
       severityCallback?.("high");

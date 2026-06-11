@@ -17,8 +17,20 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createMcpServer } from "../../server.js";
 import type { ZediClient } from "../../client/ZediClient.js";
 import { ZediApiError } from "../../client/errors.js";
-import { jsonResult, textResult, type ToolResult } from "../../tools/helpers.js";
+import type { ToolResult } from "../../tools/helpers.js";
 import { ALL_TOOL_NAMES, registerAllTools } from "../../tools/index.js";
+
+const sampleNoteRow = {
+  id: "n1",
+  title: "Note",
+  visibility: "private" as const,
+  edit_permission: "owner_only" as const,
+  is_official: false,
+  owner_id: "user-1",
+  view_count: 0,
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+};
 
 /** Tools already exercised end-to-end in `server.test.ts`. / server.test.ts で e2e 済みのツール */
 const TOOLS_COVERED_IN_SERVER_TEST = new Set<string>([
@@ -182,12 +194,7 @@ const TOOL_HANDLER_CASES: ToolHandlerCase[] = [
     args: {},
     setup: (client) => {
       vi.mocked(client.listNotes).mockResolvedValue([
-        {
-          id: "n1",
-          title: "Note",
-          visibility: "private",
-          updated_at: "2026-01-01T00:00:00Z",
-        },
+        { ...sampleNoteRow, role: "owner", page_count: 1, member_count: 1 },
       ]);
     },
     assertClient: (client) => {
@@ -219,16 +226,7 @@ const TOOL_HANDLER_CASES: ToolHandlerCase[] = [
     name: "zedi_create_note",
     args: { title: "Draft" },
     setup: (client) => {
-      vi.mocked(client.createNote).mockResolvedValue({
-        id: "n1",
-        title: "Draft",
-        visibility: "private",
-        edit_permission: "owner_only",
-        is_official: false,
-        owner_id: "user-1",
-        created_at: "2026-01-01T00:00:00Z",
-        updated_at: "2026-01-01T00:00:00Z",
-      });
+      vi.mocked(client.createNote).mockResolvedValue({ ...sampleNoteRow, title: "Draft" });
     },
     assertClient: (client) => {
       expect(client.createNote).toHaveBeenCalledWith({ title: "Draft" });
@@ -239,13 +237,8 @@ const TOOL_HANDLER_CASES: ToolHandlerCase[] = [
     args: { note_id: "n1", title: "Renamed" },
     setup: (client) => {
       vi.mocked(client.updateNote).mockResolvedValue({
-        id: "n1",
+        ...sampleNoteRow,
         title: "Renamed",
-        visibility: "private",
-        edit_permission: "owner_only",
-        is_official: false,
-        owner_id: "user-1",
-        created_at: "2026-01-01T00:00:00Z",
         updated_at: "2026-01-02T00:00:00Z",
       });
     },
@@ -539,20 +532,5 @@ describe("registerAllTools tool handlers", () => {
 
     expect(result.isError).toBe(true);
     expect(client.addNoteMember).not.toHaveBeenCalled();
-  });
-});
-
-describe("jsonResult / textResult helpers", () => {
-  it("jsonResult serializes data as formatted JSON text content", () => {
-    const result = jsonResult({ ok: true, count: 2 });
-    expect(result.isError).toBeUndefined();
-    expect(result.content).toEqual([
-      { type: "text", text: JSON.stringify({ ok: true, count: 2 }, null, 2) },
-    ]);
-  });
-
-  it("textResult wraps plain text in a single content item", () => {
-    const result = textResult("hello");
-    expect(result).toEqual({ content: [{ type: "text", text: "hello" }] });
   });
 });

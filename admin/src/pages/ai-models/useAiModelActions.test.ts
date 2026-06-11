@@ -403,8 +403,8 @@ describe("useAiModelActions.handleSetSystemDefault", () => {
       }),
     );
 
-    let first: Promise<void>;
-    let second: Promise<void>;
+    let first = Promise.resolve();
+    let second = Promise.resolve();
     await act(async () => {
       first = result.current.handleSetSystemDefault(baseModel);
       second = result.current.handleSetSystemDefault(baseModel);

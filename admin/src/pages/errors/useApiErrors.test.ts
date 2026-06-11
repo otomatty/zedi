@@ -12,7 +12,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { ApiErrorRow, GetApiErrorsResponse } from "@/api/admin";
+import type { ApiErrorRow, ApiErrorStatus, GetApiErrorsResponse } from "@/api/admin";
 
 // `getApiErrors` を mock してネットワーク呼び出しを避ける。
 // Mock the REST helper so the hook's bootstrap fetch returns a fixed payload.
@@ -296,20 +296,23 @@ describe("useApiErrors", () => {
 
   it("polls via fallback interval when stream is disabled", async () => {
     vi.useFakeTimers();
-    const { unmount } = renderHook(() => useApiErrors({ intervalMs: 1000, enableStream: false }));
-    await act(async () => {
-      await Promise.resolve();
-    });
-    const callsBefore = vi.mocked(getApiErrors).mock.calls.length;
+    try {
+      const { unmount } = renderHook(() => useApiErrors({ intervalMs: 1000, enableStream: false }));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      const callsBefore = vi.mocked(getApiErrors).mock.calls.length;
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
-      await Promise.resolve();
-    });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+        await Promise.resolve();
+      });
 
-    expect(vi.mocked(getApiErrors).mock.calls.length).toBeGreaterThan(callsBefore);
-    unmount();
-    vi.useRealTimers();
+      expect(vi.mocked(getApiErrors).mock.calls.length).toBeGreaterThan(callsBefore);
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("ignores stale REST responses when a newer request finishes first", async () => {
@@ -337,9 +340,9 @@ describe("useApiErrors", () => {
     });
 
     const { result, rerender } = renderHook(
-      ({ status }: { status?: "open" | "resolved" }) =>
+      ({ status }: { status?: ApiErrorStatus }) =>
         useApiErrors({ status, intervalMs: 0, enableStream: false }),
-      { initialProps: { status: "open" as const } },
+      { initialProps: { status: "open" as ApiErrorStatus } },
     );
 
     rerender({ status: "resolved" });
