@@ -45,16 +45,63 @@ vi.mock("../../services/userAiCredentialService.js", () => ({
   getUserAiCredentialPlaintext: (...args: unknown[]) => mockGetUserAiCredentialPlaintext(...args),
 }));
 
+const { mockLoadComposeSessionProjection, mockGraphRunnerStreamEvents, mockGraphRunnerResume } =
+  vi.hoisted(() => ({
+    mockLoadComposeSessionProjection: vi.fn(),
+    mockGraphRunnerStreamEvents: vi.fn(),
+    mockGraphRunnerResume: vi.fn(),
+  }));
+
+vi.mock("../../routes/composeSessionProjection.js", () => ({
+  loadComposeSessionProjection: (...args: unknown[]) => mockLoadComposeSessionProjection(...args),
+  projectComposeStateValues: vi.fn(),
+}));
+
+vi.mock("../../agents/runner/graphRunner.js", () => ({
+  GraphRunner: class {
+    streamEvents = (...args: unknown[]) => mockGraphRunnerStreamEvents(...args);
+    invoke = vi.fn();
+    resume = (...args: unknown[]) => mockGraphRunnerResume(...args);
+  },
+}));
+
+vi.mock("../../agents/core/checkpoint/index.js", () => ({
+  resolveCheckpointerForRun: vi.fn().mockResolvedValue(false),
+}));
+
 import { Hono } from "hono";
 import composeSessionRoutes from "../../routes/composeSessions.js";
 import { errorHandler } from "../../middleware/errorHandler.js";
 import { createMockDb } from "../createMockDb.js";
-import { __resetRegistryForTests, registerGraph } from "../../agents/registry/graphRegistry.js";
+import {
+  __resetRegistryForTests,
+  GraphNotRegisteredError,
+  registerGraph,
+} from "../../agents/registry/graphRegistry.js";
 
 const OWNER_ID = "owner-1";
+const OTHER_USER_ID = "other-user-99";
 const PAGE_ID = "page-1";
 const NOTE_ID = "note-1";
 const GRAPH_ID = "test-graph";
+
+function sessionRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "sess-default",
+    pageId: PAGE_ID,
+    userId: OWNER_ID,
+    graphId: GRAPH_ID,
+    phase: "init",
+    backend: "zedi_managed",
+    status: "pending",
+    metadata: null,
+    lastError: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    closedAt: null,
+    ...overrides,
+  };
+}
 
 function authHeaders(userId: string = OWNER_ID) {
   return {
@@ -112,6 +159,11 @@ beforeEach(() => {
     inputCostUnits: 1,
     outputCostUnits: 2,
   });
+  mockLoadComposeSessionProjection.mockReset().mockResolvedValue(null);
+  mockGraphRunnerStreamEvents.mockReset().mockImplementation(async function* () {
+    yield { event: "on_chain_end", data: {} };
+  });
+  mockGraphRunnerResume.mockReset().mockRejectedValue(new GraphNotRegisteredError("graph-removed"));
   __resetRegistryForTests();
   // Register a graph the routes can resolve. Body is irrelevant for CRUD tests.
   registerGraph({
@@ -261,6 +313,38 @@ describe("POST /api/pages/:pageId/compose-sessions", () => {
 });
 
 describe("GET /api/pages/:pageId/compose-sessions/:id", () => {
+  it("returns 401 without auth", async () => {
+    const { app } = createComposeApp([]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-2`);
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when caller has no role on the note (private note, non-member)", async () => {
+    const privateNote = {
+      id: NOTE_ID,
+      ownerId: OTHER_USER_ID,
+      title: "n",
+      visibility: "private" as const,
+      editPermission: "owner_only" as const,
+      isOfficial: false,
+      viewCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      isDeleted: false,
+    };
+    const { app } = createComposeApp([
+      [{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: NOTE_ID }],
+      [{ email: "owner@example.com" }],
+      [privateNote],
+      [],
+      [],
+    ]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-2`, {
+      headers: authHeaders(OWNER_ID),
+    });
+    expect(res.status).toBe(403);
+  });
+
   it("returns 404 when the session row is not found", async () => {
     const { app } = createComposeApp([
       ...pageAccessPrefix(),
@@ -294,6 +378,181 @@ describe("GET /api/pages/:pageId/compose-sessions/:id", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { session: { id: string } };
     expect(body.session.id).toBe("sess-2");
+  });
+
+  it("returns session without projection when backend is unsupported (stale row)", async () => {
+    const row = sessionRow({ id: "sess-byok-read", backend: "byok", status: "interrupted" });
+    const { app } = createComposeApp([...pageAccessPrefix(), [row]]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-byok-read`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { session: { backend: string }; projection: null };
+    expect(body.session.backend).toBe("byok");
+    expect(body.projection).toBeNull();
+    expect(mockLoadComposeSessionProjection).not.toHaveBeenCalled();
+  });
+
+  it("includes projection for interrupted sessions", async () => {
+    const row = sessionRow({ id: "sess-int", status: "interrupted", phase: "brief:await_user" });
+    mockLoadComposeSessionProjection.mockResolvedValue({
+      phase: "brief",
+      briefQuestions: [{ id: "q1" }],
+    });
+    const { app } = createComposeApp([...pageAccessPrefix(), [row]]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-int`, {
+      headers: authHeaders(),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      session: { status: string };
+      projection: { phase: string };
+    };
+    expect(body.session.status).toBe("interrupted");
+    expect(body.projection.phase).toBe("brief");
+    expect(mockLoadComposeSessionProjection).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: "sess-int", graphId: GRAPH_ID }),
+    );
+  });
+});
+
+describe("POST /api/pages/:pageId/compose-sessions/:id/run", () => {
+  it("returns 401 without auth", async () => {
+    const { app } = createComposeApp([]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-run/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 404 when session is missing", async () => {
+    const { app } = createComposeApp([...pageAccessPrefix(), []]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/missing/run`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 409 when session is interrupted", async () => {
+    const row = sessionRow({ id: "sess-int", status: "interrupted" });
+    const { app } = createComposeApp([...pageAccessPrefix(), [row]]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-int/run`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toMatch(/PATCH \/resume/i);
+  });
+
+  it("returns 409 when session is already completed", async () => {
+    const row = sessionRow({ id: "sess-done", status: "completed" });
+    const { app } = createComposeApp([...pageAccessPrefix(), [row]]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-done/run`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("returns 400 when session backend is unsupported at run time", async () => {
+    const row = sessionRow({ id: "sess-byok-run", status: "pending", backend: "byok" });
+    const { app } = createComposeApp([...pageAccessPrefix(), [row]]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-byok-run/run`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("marks session interrupted when stream emits interrupt events", async () => {
+    mockGraphRunnerStreamEvents.mockImplementation(async function* () {
+      yield {
+        event: "on_chain_end",
+        data: { output: { __interrupt__: [{ value: { kind: "human_review_brief" } }] } },
+      };
+    });
+    const row = sessionRow({ id: "sess-interrupt", status: "pending" });
+    const claimed = { ...row, status: "running" };
+    const { app } = createComposeApp([
+      ...pageAccessPrefix(),
+      [row],
+      [claimed],
+      [{ id: "sess-interrupt" }],
+    ]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-interrupt/run`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ input: {} }),
+    });
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toMatch(/interrupt|done/);
+  });
+
+  it("streams SSE events for a pending session", async () => {
+    const row = sessionRow({ id: "sess-run", status: "pending" });
+    const claimed = { ...row, status: "running" };
+    const { app } = createComposeApp([
+      ...pageAccessPrefix(),
+      [row],
+      [claimed],
+      [{ id: "sess-run" }],
+    ]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-run/run`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ input: {} }),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
+    const text = await res.text();
+    expect(text).toContain("event:");
+    expect(mockGraphRunnerStreamEvents).toHaveBeenCalled();
+  });
+});
+
+describe("PATCH /api/pages/:pageId/compose-sessions/:id/resume", () => {
+  it("returns 200 when resume completes successfully", async () => {
+    mockGraphRunnerResume.mockResolvedValue({
+      status: "completed",
+      output: { markdown: "## Done" },
+    });
+    const row = sessionRow({ id: "sess-resume-ok", status: "interrupted" });
+    const { app } = createComposeApp([
+      ...pageAccessPrefix(),
+      [row],
+      [{ ...row, status: "running" }],
+      [{ id: "sess-resume-ok" }],
+    ]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-resume-ok/resume`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ resume: { approvedSourceIds: ["s1"] } }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string; output: unknown };
+    expect(body.status).toBe("completed");
+    expect(body.output).toEqual({ markdown: "## Done" });
+    expect(mockGraphRunnerResume).toHaveBeenCalled();
+  });
+
+  it("returns 409 when session is not interrupted", async () => {
+    const row = sessionRow({ id: "sess-pending", status: "pending" });
+    const { app } = createComposeApp([...pageAccessPrefix(), [row]]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-pending/resume`, {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ resume: { ok: true } }),
+    });
+    expect(res.status).toBe(409);
   });
 });
 

@@ -7,9 +7,10 @@
  *
  * 重要 / Important:
  *  - 1 つの `sourceId` に対し doc は 1 度だけロードされる（依存配列で制御）。
- *  - アンマウント時は doc の破棄を行い、内部 worker への参照を解放する。
+ *  - アンマウント時は {@link PdfDocumentProxy.loadingTask}.destroy() を呼び、
+ *    worker 参照を解放する。pdfjs-dist v6 で PDFDocumentProxy.destroy() は廃止。
  *  - The document is loaded exactly once per `sourceId`; on unmount we call
- *    `pdfDoc.loadingTask.destroy()` to release the worker reference.
+ *    `pdfDoc.loadingTask.destroy()` (pdfjs-dist v6 removed `PDFDocumentProxy.destroy`).
  */
 import { useEffect, useRef, useState } from "react";
 import { readPdfBytes, PdfKnowledgeUnsupportedError } from "@/lib/pdfKnowledge/tauriBridge";

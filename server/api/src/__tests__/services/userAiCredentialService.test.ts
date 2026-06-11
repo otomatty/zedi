@@ -7,7 +7,7 @@
  * while the real crypto module is used so the encryption round-trip and the
  * decrypt-failure fallback are exercised end to end.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   deleteUserAiCredential,
   getUserAiCredentialPlaintext,
