@@ -114,6 +114,26 @@ describe("extractFacts", () => {
   });
 });
 
+// 注意（カバレッジ）: 本ファイルは conflict.ts のライン 100% を達成するが、
+// ブランチは ~77% で 80% に届かない。未到達ブランチはすべて private な正規化
+// ヘルパー (normalizeDateValue / normalizeNumberValue) 内の防御コードで、
+// public API (extractFacts / runConflictRule) からは構造的に到達不能:
+//   - `if (!m) return raw`（normalizeDateValue は DATE_PATTERN のマッチ文字列を
+//     受けるため内部正規表現が外れない）
+//   - `parseInt(m[1] ?? "0", …)` 等の `?? "0"` 既定値（マッチ済みのため右辺なし）
+//   - `if (!unitMatch)` / `if (!Number.isFinite(parsed))`（NUMBER_PATTERN が
+//     数値 + 単位の構造を保証するため）
+// これらの helper は export されておらず、export してまで直接叩くのは
+// テスト観点リファレンス §8 のアンチパターンのため見送る。ライン 100% で
+// ルール本体のロジック分岐自体は網羅済み。
+//
+// Coverage note: this file reaches 100% lines on conflict.ts but ~77% branches
+// (below the 80% target). Every uncovered branch is defensive code inside the
+// private normalize helpers (normalizeDateValue / normalizeNumberValue) — the
+// `!m` guard, the `?? "0"` defaults, and the `!unitMatch` / `!Number.isFinite`
+// checks — all unreachable via the public API because the DATE/NUMBER regexes
+// guarantee the matched structure. Those helpers are not exported, and
+// exporting them just to test would be the test-perspectives §8 anti-pattern.
 describe("runConflictRule", () => {
   /**
    * `{id, title, contentText}` 行を返す DB モックでルールを実行するヘルパー。
