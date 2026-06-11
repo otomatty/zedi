@@ -208,7 +208,10 @@ export interface ComprehensionAids {
   questions: string[];
 }
 
-/** One glossary entry in {@link ComprehensionAids}. */
+/**
+ * One glossary entry in {@link ComprehensionAids}.
+ * {@link ComprehensionAids} の用語集エントリ 1 件。
+ */
 export interface ComprehensionKeyTerm {
   /** Term / concept name. */
   term: string;
@@ -234,6 +237,7 @@ export interface ComposeCompletion {
   /**
    * Understanding-layer scaffolds derived from the article. `null` when
    * generation failed or produced nothing (kept non-fatal).
+   * 記事から導出した理解支援。生成失敗・空のときは `null`（非致命）。
    */
   comprehensionAids?: ComprehensionAids | null;
 }

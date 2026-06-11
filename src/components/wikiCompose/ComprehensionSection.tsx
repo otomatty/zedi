@@ -15,7 +15,12 @@ import { BookOpen, Check, HelpCircle, Sparkles } from "lucide-react";
 import { cn } from "@zedi/ui";
 import type { ComprehensionAids } from "@/lib/wikiCompose/types";
 
+/**
+ * Props for {@link ComprehensionSection}.
+ * {@link ComprehensionSection} の props。
+ */
 export interface ComprehensionSectionProps {
+  /** Understanding Layer scaffolds to render. 表示する理解支援スキャフォールド。 */
   aids: ComprehensionAids;
 }
 

@@ -42,7 +42,10 @@ export interface ComposePanelProps {
 
   outlineProposal: OutlineSection[];
 
-  /** Understanding Layer scaffolds, shown once the article completes. */
+  /**
+   * Understanding Layer scaffolds, shown once the article completes.
+   * 記事完成後に表示する理解支援スキャフォールド。
+   */
   comprehensionAids: ComprehensionAids | null;
 
   activity: ComposeActivity[];

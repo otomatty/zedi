@@ -114,6 +114,9 @@ export interface ComprehensionAids {
  * Final compose output. Mirrors the backend `ComposeCompletion` and is carried
  * by the `compose_completion` SSE event (instant mode) and the resume response
  * (guided mode).
+ *
+ * Compose の最終成果物。バックエンドの `ComposeCompletion` をミラーし、
+ * instant モードは `compose_completion` SSE、guided モードは resume 応答で運ぶ。
  */
 export interface ComposeCompletion {
   markdown: string;
@@ -261,5 +264,8 @@ export const WIKI_COMPOSE_GRAPH_ID = "wiki-compose";
 /**
  * Compose run mode. `instant` streams a draft immediately (no gates);
  * `guided` keeps the Brief / Research / Outline human-in-the-loop steps.
+ *
+ * Compose 実行モード。`instant` はゲート無しで即ドラフトをストリームし、
+ * `guided` は Brief / 調査 / 構成の human-in-the-loop ステップを維持する。
  */
 export type ComposeMode = "guided" | "instant";

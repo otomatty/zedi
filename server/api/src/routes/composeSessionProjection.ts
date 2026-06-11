@@ -29,7 +29,10 @@ export interface ComposeSessionUiProjection {
   outlineProposal?: unknown[];
   draftedSections?: unknown[];
   completedMarkdown?: string | null;
-  /** Understanding Layer scaffolds (TL;DR / key terms / questions). */
+  /**
+   * Understanding Layer scaffolds (TL;DR / key terms / questions).
+   * 理解支援スキャフォールド（TL;DR / 重要用語 / 理解度チェック）。
+   */
   comprehensionAids?: unknown;
 }
 

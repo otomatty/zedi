@@ -29,9 +29,11 @@ export const comprehensionAidsSchema = z.object({
         definition: z.string().min(1).max(400),
       }),
     )
-    .max(8)
+    // Bounds mirror the system prompt (3–6 terms) so schema and instructions agree.
+    .max(6)
     .default([]),
-  questions: z.array(z.string().min(1).max(300)).max(5).default([]),
+  // Bounds mirror the system prompt (2–4 questions).
+  questions: z.array(z.string().min(1).max(300)).max(4).default([]),
 });
 
 const SYSTEM_PROMPT =
