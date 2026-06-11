@@ -178,12 +178,13 @@ export async function draftSections(
         body += chunkContent(chunk);
       }
     } catch (err) {
-      // Per-section failure must not abort the whole Draft. Surface the
-      // failure as an inline note inside the section body so the user sees
-      // what happened without losing earlier sections.
-      // セクション 1 件の失敗で Draft 全体を止めない。エラーは本文に追記。
-      const message = err instanceof Error ? err.message : String(err);
-      body = body || `*(Section draft failed: ${message})*`;
+      // Per-section failure must not abort the whole Draft. Surface a generic
+      // inline note so the user knows the section failed without leaking
+      // provider error details into persisted content (#976).
+      // セクション 1 件の失敗で Draft 全体を止めない。詳細はログのみ。
+      console.error("[draftSections] per-section draft error:", err);
+      const fallback = "*(Section draft failed. Please retry drafting this section.)*";
+      body = body ? `${body.trim()}\n\n${fallback}` : fallback;
     }
 
     const citedIds = collectCitedSourceIds(body, state.approvedResearch, section.sourceIds);
