@@ -7,7 +7,8 @@
  *
  * 重要 / Important:
  *  - 1 つの `sourceId` に対し doc は 1 度だけロードされる（依存配列で制御）。
- *  - アンマウント時は doc の破棄を行い、内部 worker への参照を解放する。
+ *  - アンマウント時は {@link PdfDocumentProxy.loadingTask}.destroy() を呼び、
+ *    worker 参照を解放する。pdfjs-dist v6 で PDFDocumentProxy.destroy() は廃止。
  *  - The document is loaded exactly once per `sourceId`; on unmount we call
  *    `pdfDoc.loadingTask.destroy()` (pdfjs-dist v6 removed `PDFDocumentProxy.destroy`).
  */
@@ -59,6 +60,10 @@ export function usePdfDocument(sourceId: string | undefined): UsePdfDocumentResu
         const doc = await getPdfDocument(bytes);
         if (cancelled) {
           // Lost the race: dispose immediately.
+          // pdfjs v6 では PDFDocumentProxy.destroy() が廃止され、破棄は
+          // loadingTask.destroy()（旧 destroy() の委譲先）に一本化された。
+          // pdfjs v6 removed PDFDocumentProxy.destroy(); disposal now goes
+          // through loadingTask.destroy() (the old method's delegate).
           void doc.loadingTask.destroy();
           return;
         }
