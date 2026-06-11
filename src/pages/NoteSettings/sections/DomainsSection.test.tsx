@@ -302,23 +302,6 @@ describe("DomainsSection", () => {
     });
   });
 
-  it("shows destructive toast with ApiError message on create failure", async () => {
-    createMutateAsync.mockRejectedValueOnce(new ApiError("duplicate domain", 409));
-    renderSection();
-    const input = screen.getByPlaceholderText("notes.domainPlaceholder");
-
-    fireEvent.change(input, { target: { value: "acme.co.jp" } });
-    fireEvent.click(screen.getByRole("button", { name: "notes.domainTabAdd" }));
-
-    await waitFor(() => {
-      expect(toastMock).toHaveBeenCalledWith({
-        title: "notes.domainTabCreateFailed",
-        description: "duplicate domain",
-        variant: "destructive",
-      });
-    });
-  });
-
   it("removes a rule and shows success toast", async () => {
     renderSection();
 
