@@ -3,7 +3,7 @@
  * Tests invite-link create/copy/revoke flows and role-based UI constraints.
  */
 import React from "react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { NoteInviteLinksSection } from "./NoteInviteLinksSection";
 import {
@@ -94,15 +94,16 @@ describe("NoteInviteLinksSection", () => {
     Object.defineProperty(window, "location", {
       value: { origin: "https://app.example.com" },
       writable: true,
+      configurable: true,
     });
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText: writeTextMock },
       configurable: true,
     });
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    Object.defineProperty(document, "execCommand", {
+      value: vi.fn().mockReturnValue(false),
+      configurable: true,
+    });
   });
 
   it("shows loading text while links are fetching", () => {
@@ -329,6 +330,35 @@ describe("NoteInviteLinksSection", () => {
     expect(toastMock).toHaveBeenCalledWith({
       title: "notes.inviteLinkCopied",
       description: "https://app.example.com/invite-links/existing-token",
+    });
+  });
+
+  it("falls back to execCommand when clipboard API is unavailable", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: undefined,
+      configurable: true,
+    });
+    const execCommandMock = vi.fn().mockReturnValue(true);
+    Object.defineProperty(document, "execCommand", {
+      value: execCommandMock,
+      configurable: true,
+    });
+
+    vi.mocked(useInviteLinksForNote).mockReturnValue({
+      data: [makeLink({ token: "fallback-token" })],
+      isLoading: false,
+    } as never);
+
+    renderSection();
+
+    fireEvent.click(screen.getByLabelText("notes.inviteLinksCopyAria"));
+
+    await waitFor(() => {
+      expect(execCommandMock).toHaveBeenCalledWith("copy");
+    });
+    expect(toastMock).toHaveBeenCalledWith({
+      title: "notes.inviteLinkCopied",
+      description: "https://app.example.com/invite-links/fallback-token",
     });
   });
 

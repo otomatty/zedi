@@ -257,6 +257,13 @@ describe("useMcpConfigStore", () => {
   });
 
   describe("importServers", () => {
+    it("is a no-op for an empty import list", () => {
+      useMcpConfigStore.getState().addServer("alpha", STDIO_CONFIG);
+      useMcpConfigStore.getState().importServers([]);
+
+      expect(useMcpConfigStore.getState().servers).toHaveLength(1);
+    });
+
     it("appends only new names", () => {
       useMcpConfigStore.getState().addServer("existing", STDIO_CONFIG);
       useMcpConfigStore.getState().importServers([
@@ -343,6 +350,26 @@ describe("useMcpConfigStore", () => {
           status: "unknown",
         },
       ]);
+    });
+
+    it("leaves v2 persisted data unchanged on rehydrate", async () => {
+      const persisted = {
+        name: "alpha",
+        config: { type: "http" as const, url: "https://example.com/mcp" },
+        enabled: false,
+        status: "unknown" as const,
+      };
+      localStorage.setItem(
+        "mcp-config-storage",
+        JSON.stringify({
+          version: 2,
+          state: { servers: [persisted] },
+        }),
+      );
+
+      await useMcpConfigStore.persist.rehydrate();
+
+      expect(useMcpConfigStore.getState().servers[0]).toEqual(persisted);
     });
 
     it("migrates v1 persisted configs by stripping secrets", async () => {

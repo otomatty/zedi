@@ -218,6 +218,40 @@ describe("useNoteMembersController", () => {
     expect(updateMutateAsync).not.toHaveBeenCalled();
   });
 
+  it("skips remove when noteId is empty", async () => {
+    const { result } = renderHook(() => useNoteMembersController("", true));
+
+    await act(async () => {
+      await result.current.handleRemoveMember("guest@example.com");
+    });
+
+    expect(removeMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("skips resend when noteId is empty", async () => {
+    const { result } = renderHook(() => useNoteMembersController("", true));
+
+    await act(async () => {
+      await result.current.handleResendInvitation("guest@example.com");
+    });
+
+    expect(resendMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("skips add when email is whitespace only", async () => {
+    const { result } = renderHook(() => useNoteMembersController("note-1", true));
+
+    act(() => {
+      result.current.setMemberEmail("   ");
+    });
+
+    await act(async () => {
+      await result.current.handleAddMember();
+    });
+
+    expect(addMutateAsync).not.toHaveBeenCalled();
+  });
+
   it("removes a member and toasts on success", async () => {
     const { result } = renderHook(() => useNoteMembersController("note-1", true));
 
