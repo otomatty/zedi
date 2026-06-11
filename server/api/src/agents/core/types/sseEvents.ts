@@ -207,6 +207,21 @@ export interface SseComposeSectionEvent {
 }
 
 /**
+ * Wiki Compose のページスナップショット通知。`brief_dialogue` がセッション開始
+ * 直後に発火し、クライアントへページのタイトル/本文を早期に伝える。instant
+ * モードでは Brief 割り込みが無いため、これが無いとエディタが「無題」のまま
+ * になる。`pageSnapshot` の shape は `PageSnapshot`。
+ *
+ * Page snapshot event emitted by `brief_dialogue` at session start so the client
+ * shows the real title/body immediately (instant mode has no Brief interrupt to
+ * carry it). Kept `unknown` here to avoid coupling core wire types to the graph.
+ */
+export interface SseComposeSnapshotEvent {
+  type: "compose_snapshot";
+  pageSnapshot: unknown;
+}
+
+/**
  * Wiki Compose (#950) の完了通知。`completed` ノードが発火し、最終 Markdown・
  * セクション・引用ソース・理解支援（Understanding Layer）を 1 イベントで運ぶ。
  * 割り込みの無い instant モード実行で、単一 SSE ストリーム内に最終成果物を
@@ -241,6 +256,7 @@ export type SseEvent =
   | SseResearchBatchEvent
   | SseComposePhaseEvent
   | SseComposeSectionEvent
+  | SseComposeSnapshotEvent
   | SseComposeCompletionEvent;
 
 /**
@@ -265,5 +281,6 @@ export const SSE_EVENT_NAMES = {
   researchBatch: "research_batch",
   composePhase: "compose_phase",
   composeSection: "compose_section",
+  composeSnapshot: "compose_snapshot",
   composeCompletion: "compose_completion",
 } as const satisfies Record<string, SseEvent["type"]>;

@@ -19,7 +19,7 @@ import { createZediChatModel } from "../../../core/llm/modelFactory.js";
 import { resolveWikiComposeModelId } from "../../../core/llm/wikiComposeModelId.js";
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
 import { loadPageSnapshot } from "./shared/loadPageSnapshot.js";
-import { dispatchComposePhase } from "./shared/dispatch.js";
+import { dispatchComposePhase, dispatchComposeSnapshot } from "./shared/dispatch.js";
 import type { WikiComposeStateType, WikiComposeStateUpdate } from "../state.js";
 import type { BriefQuestion } from "../types.js";
 
@@ -116,6 +116,11 @@ export async function briefDialogue(
   // Load the snapshot once. Subsequent phases read from state, never the DB.
   // セッション開始時に 1 度だけ読み、以後は state を参照する。
   const snapshot = state.pageSnapshot ?? (await loadPageSnapshot(ctx.db, ctx.pageId));
+
+  // Surface the page title/body to the client early (both modes). In instant
+  // mode there is no Brief interrupt to carry the snapshot, so the editor would
+  // otherwise show "untitled" until completion.
+  await dispatchComposeSnapshot({ pageSnapshot: snapshot }, config);
 
   // Instant mode: skip Brief question generation entirely so the article can
   // stream immediately from the title. Zero questions routes straight to

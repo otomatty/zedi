@@ -214,6 +214,8 @@ function mapCustomEvent(event: LangGraphRuntimeEvent): SseEvent[] {
       return mapComposePhase(data);
     case "compose_section":
       return mapComposeSection(data);
+    case "compose_snapshot":
+      return mapComposeSnapshot(data);
     case "compose_completion":
       return mapComposeCompletion(data);
     default:
@@ -277,6 +279,15 @@ function mapComposeSection(data: Record<string, unknown>): SseComposeSectionEven
     return [];
   }
   return [{ type: "compose_section", sectionId, heading, status, index, total }];
+}
+
+function mapComposeSnapshot(data: Record<string, unknown>): SseEvent[] {
+  const snap = data.pageSnapshot;
+  if (!snap || typeof snap !== "object" || Array.isArray(snap)) return [];
+  const s = snap as { title?: unknown };
+  // Require at least a string title so the client has something useful.
+  if (typeof s.title !== "string") return [];
+  return [{ type: "compose_snapshot", pageSnapshot: snap }];
 }
 
 function mapComposeCompletion(data: Record<string, unknown>): SseEvent[] {

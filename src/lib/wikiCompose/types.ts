@@ -247,6 +247,10 @@ export type ComposeSseEvent =
       total: number;
     }
   | {
+      type: "compose_snapshot";
+      pageSnapshot: PageSnapshot;
+    }
+  | {
       type: "compose_completion";
       completion: ComposeCompletion;
     };

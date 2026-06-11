@@ -211,4 +211,23 @@ describe("mapLangGraphEvent", () => {
     };
     expect(mapLangGraphEvent(ev)).toEqual([]);
   });
+
+  it("maps on_custom_event compose_snapshot to a typed compose_snapshot event", () => {
+    const pageSnapshot = { pageId: "page-1", title: "Photosynthesis", body: "", hasContent: false };
+    const ev: LangGraphRuntimeEvent = {
+      event: "on_custom_event",
+      name: "compose_snapshot",
+      data: { pageSnapshot },
+    };
+    expect(mapLangGraphEvent(ev)).toEqual([{ type: "compose_snapshot", pageSnapshot }]);
+  });
+
+  it("drops compose_snapshot when the snapshot has no string title", () => {
+    const ev: LangGraphRuntimeEvent = {
+      event: "on_custom_event",
+      name: "compose_snapshot",
+      data: { pageSnapshot: { pageId: "page-1" } },
+    };
+    expect(mapLangGraphEvent(ev)).toEqual([]);
+  });
 });

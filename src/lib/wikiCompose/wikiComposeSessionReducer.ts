@@ -376,6 +376,9 @@ export function reduceComposeSseEvent(
         sectionBuffers: { ...prev.sectionBuffers, [id]: prior + event.content },
       };
     }
+    case "compose_snapshot":
+      // Early page title/body for both modes (instant has no Brief interrupt).
+      return event.pageSnapshot ? { pageSnapshot: event.pageSnapshot } : {};
     case "compose_completion":
       return applyCompletion(prev, event.completion);
     case "interrupt":
