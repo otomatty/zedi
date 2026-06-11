@@ -92,6 +92,12 @@
     "streaming": "Streaming…",
     "finalMarkdown": "Final Markdown"
   },
+  "comprehension": {
+    "title": "Deepen your understanding",
+    "summary": "TL;DR",
+    "keyTerms": "Key terms",
+    "selfCheck": "Check your understanding"
+  },
   "activity": {
     "title": "Activity",
     "live": "live",

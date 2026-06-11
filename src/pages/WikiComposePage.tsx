@@ -17,7 +17,7 @@ import {
 } from "@zedi/ui";
 import { useWikiComposeSession } from "@/hooks/wiki/useWikiComposeSession";
 import { COMPOSE_SEED_STATE_KEY, type ComposeNavigationSeed } from "@/lib/wikiCompose/navigation";
-import type { DraftedSection } from "@/lib/wikiCompose/types";
+import type { ComposeMode, DraftedSection } from "@/lib/wikiCompose/types";
 import { EditorPane } from "@/components/wikiCompose/EditorPane";
 import { ComposePanel } from "@/components/wikiCompose/ComposePanel";
 
@@ -39,6 +39,12 @@ const WikiComposePage: React.FC = () => {
   const noteId = params.noteId ?? "";
   const pageId = params.pageId ?? "";
   const sessionId = params.sessionId ?? null;
+
+  // Default to the zero-friction instant draft; `?mode=guided` opts into the
+  // classic human-in-the-loop flow (Brief → Research → Outline gates).
+  // 既定は即時ドラフト。`?mode=guided` で従来の対話フローに切り替える。
+  const mode: ComposeMode =
+    new URLSearchParams(location.search).get("mode") === "guided" ? "guided" : "instant";
 
   const [composeSeed] = useState((): ComposeNavigationSeed | undefined => {
     const raw = (location.state as Record<string, unknown> | null)?.[COMPOSE_SEED_STATE_KEY];
@@ -69,6 +75,7 @@ const WikiComposePage: React.FC = () => {
     startPolicy: sessionId ? "on-mount" : "when-backend-ready",
     composeSeed,
     initialInput,
+    mode,
   });
 
   useEffect(() => {
@@ -197,6 +204,7 @@ const WikiComposePage: React.FC = () => {
       approvedSources={session.approvedSources}
       researchConflictSummary={session.researchConflictSummary}
       outlineProposal={session.outlineProposal}
+      comprehensionAids={session.comprehensionAids}
       activity={session.activity}
       onSubmitBrief={session.submitBrief}
       onSubmitResearchApproval={session.submitResearchApproval}

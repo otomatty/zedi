@@ -25,6 +25,7 @@ import {
 import { useInitialComposeBackend } from "@/hooks/wiki/useInitialComposeBackend";
 import type {
   BriefAnswer,
+  ComposeMode,
   ComposeSession,
   DraftedSection,
   OutlineSection,
@@ -52,6 +53,12 @@ export interface UseWikiComposeSessionArgs {
   /** When to auto-invoke `start()`. Default `on-mount`. */
   startPolicy?: ComposeStartPolicy;
   backend?: ComposeExecutionBackend;
+  /**
+   * Run mode. `instant` (default) streams a draft immediately with no gates;
+   * `guided` keeps the Brief / Research / Outline human-in-the-loop steps.
+   * Sent in the first `POST /run` input so the orchestrator picks the path.
+   */
+  mode?: ComposeMode;
 }
 
 /** Hook return shape. */
@@ -89,6 +96,7 @@ export function useWikiComposeSession(
     initialInput,
     composeSeed,
     backend: backendOverride = "zedi_managed",
+    mode = "instant",
   } = args;
 
   const startPolicy = resolveStartPolicy(args);
@@ -164,13 +172,15 @@ export function useWikiComposeSession(
       update({ session, status: session.status, error: null, ...projectionHydration });
 
       const metadataSeed = parseComposeSeedFromMetadata(session.metadata);
-      const runInput =
+      const baseInput =
         initialInput ??
         (metadataSeed
           ? {
               chatSeed: metadataSeed,
             }
-          : undefined);
+          : {});
+      // Always carry the run `mode` so the orchestrator picks instant vs guided.
+      const runInput = { ...baseInput, mode };
 
       if (session.status === "pending" || session.status === "failed") {
         await streamRun(session, withContentLocale(runInput));
@@ -179,7 +189,7 @@ export function useWikiComposeSession(
       const message = err instanceof Error ? err.message : String(err);
       update({ error: message });
     }
-  }, [pageId, initialSessionId, initialInput, composeSeed, backend, streamRun, update]);
+  }, [pageId, initialSessionId, initialInput, composeSeed, backend, mode, streamRun, update]);
 
   const submitBrief = useCallback<UseWikiComposeSessionReturn["submitBrief"]>(
     async (input) => {

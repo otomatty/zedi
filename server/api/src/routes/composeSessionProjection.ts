@@ -29,6 +29,11 @@ export interface ComposeSessionUiProjection {
   outlineProposal?: unknown[];
   draftedSections?: unknown[];
   completedMarkdown?: string | null;
+  /**
+   * Understanding Layer scaffolds (TL;DR / key terms / questions).
+   * 理解支援スキャフォールド（TL;DR / 重要用語 / 理解度チェック）。
+   */
+  comprehensionAids?: unknown;
 }
 
 function phaseFromSessionRow(phase: string, status: WikiComposeSessionStatus): string {
@@ -79,13 +84,28 @@ export function projectComposeStateValues(
 
   const completion = state.completion;
   if (completion && typeof completion === "object") {
-    const c = completion as { markdown?: string; sections?: unknown[] };
+    const c = completion as {
+      markdown?: string;
+      sections?: unknown[];
+      comprehensionAids?: unknown;
+    };
     if (typeof c.markdown === "string") {
       projection.completedMarkdown = c.markdown;
     }
     if (Array.isArray(c.sections)) {
       projection.draftedSections = c.sections;
     }
+    if (c.comprehensionAids && typeof c.comprehensionAids === "object") {
+      projection.comprehensionAids = c.comprehensionAids;
+    }
+  }
+  // Fallback to the standalone state channel when completion isn't built yet.
+  if (
+    projection.comprehensionAids === undefined &&
+    state.comprehensionAids &&
+    typeof state.comprehensionAids === "object"
+  ) {
+    projection.comprehensionAids = state.comprehensionAids;
   }
 
   const interrupts = state.__interrupt__;

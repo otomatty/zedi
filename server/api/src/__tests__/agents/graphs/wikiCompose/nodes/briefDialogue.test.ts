@@ -36,6 +36,7 @@ vi.mock("../../../../../agents/graphs/wikiCompose/nodes/shared/loadPageSnapshot.
 
 vi.mock("../../../../../agents/graphs/wikiCompose/nodes/shared/dispatch.js", () => ({
   dispatchComposePhase: vi.fn(async () => undefined),
+  dispatchComposeSnapshot: vi.fn(async () => undefined),
 }));
 
 import { briefDialogue } from "../../../../../agents/graphs/wikiCompose/nodes/briefDialogue.js";
@@ -88,6 +89,8 @@ function state(overrides: Partial<WikiComposeStateType>): WikiComposeStateType {
     approvedOutline: null,
     draftedSections: [],
     completion: null,
+    mode: "guided",
+    comprehensionAids: null,
     chatSeed: null,
     pageSnapshot: null,
     ...overrides,

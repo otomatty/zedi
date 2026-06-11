@@ -56,6 +56,7 @@ import {
   structureDialogue,
   humanReviewOutline,
   draftSections,
+  comprehensionAids,
   completed,
   skipResearch,
   conflictResolution,
@@ -66,7 +67,7 @@ import { routeAfterBrief, routeAfterResearch } from "./routing.js";
 /** Registered graph id. */
 export const WIKI_COMPOSE_GRAPH_ID = "wiki-compose" as const;
 /** Registered graph version. Bump when behaviour changes meaningfully. */
-export const WIKI_COMPOSE_GRAPH_VERSION = "1.1.0";
+export const WIKI_COMPOSE_GRAPH_VERSION = "1.2.0";
 
 const factory: GraphFactory = ({ checkpointer }: GraphFactoryInput): CompiledGraphLike => {
   const builder = new StateGraph(WikiComposeState)
@@ -89,6 +90,7 @@ const factory: GraphFactory = ({ checkpointer }: GraphFactoryInput): CompiledGra
     .addNode("human_review_outline", humanReviewOutline)
     // Draft + completion
     .addNode("draft_sections", draftSections)
+    .addNode("comprehension_aids", comprehensionAids)
     .addNode("completed", completed)
     // Edges
     .addEdge(START, "brief_dialogue")
@@ -119,8 +121,9 @@ const factory: GraphFactory = ({ checkpointer }: GraphFactoryInput): CompiledGra
     // Structure phase.
     .addEdge("structure_dialogue", "human_review_outline")
     .addEdge("human_review_outline", "draft_sections")
-    // Draft + completion.
-    .addEdge("draft_sections", "completed")
+    // Draft → Understanding Layer → completion.
+    .addEdge("draft_sections", "comprehension_aids")
+    .addEdge("comprehension_aids", "completed")
     .addEdge("completed", END);
 
   return checkpointer ? builder.compile({ checkpointer }) : builder.compile();
@@ -135,10 +138,12 @@ export function registerWikiComposeGraph(): void {
     version: WIKI_COMPOSE_GRAPH_VERSION,
     phase: "orchestrator",
     description:
-      "Wiki Compose P2+P5 orchestrator. Brief → optional research → optional conflict resolution → " +
-      "structure → draft → completed. Conditional: skip research (empty Brief / chat outline seed), " +
-      "conflict resolution (≥2 rejected sources with ≥1 approved). Interrupts: brief, research, " +
-      "conflict (conditional), outline.",
+      "Wiki Compose orchestrator. Brief → optional research → optional conflict resolution → " +
+      "structure → draft → comprehension aids → completed. Conditional: skip research (empty Brief / " +
+      "chat outline seed), conflict resolution (≥2 rejected sources with ≥1 approved). Interrupts: " +
+      "brief, research, conflict (conditional), outline. `mode: instant` skips the brief/outline " +
+      "interrupts so the article streams immediately; the comprehension_aids node always adds an " +
+      "Understanding Layer (TL;DR / key terms / self-check questions) to the completion.",
     factory,
   });
 }
