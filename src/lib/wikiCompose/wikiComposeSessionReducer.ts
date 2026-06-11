@@ -11,6 +11,7 @@ import type {
   ComposeSessionStatus,
   ComposeSessionUiProjection,
   ComposeSseEvent,
+  ComprehensionAids,
   DraftedSection,
   OutlineSection,
   PageSnapshot,
@@ -48,6 +49,8 @@ export interface WikiComposeSessionState {
   sectionBuffers: Record<string, string>;
   activity: ComposeActivity[];
   completedMarkdown: string | null;
+  /** Understanding Layer scaffolds, surfaced once the article completes. */
+  comprehensionAids: ComprehensionAids | null;
   error: string | null;
   isStreaming: boolean;
 }
@@ -68,6 +71,7 @@ export const INITIAL_WIKI_COMPOSE_SESSION_STATE: WikiComposeSessionState = {
   sectionBuffers: {},
   activity: [],
   completedMarkdown: null,
+  comprehensionAids: null,
   error: null,
   isStreaming: false,
 };
@@ -188,6 +192,71 @@ function reduceInterrupt(
   }
 }
 
+/**
+ * Validate a loosely-typed `comprehensionAids` blob (from SSE / resume /
+ * projection) into a {@link ComprehensionAids}, or `null` when unusable.
+ */
+export function coerceComprehensionAids(value: unknown): ComprehensionAids | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as { summary?: unknown; keyTerms?: unknown; questions?: unknown };
+  const summary = typeof v.summary === "string" ? v.summary : "";
+  const keyTerms = Array.isArray(v.keyTerms)
+    ? v.keyTerms
+        .filter(
+          (t): t is { term: string; definition: string } =>
+            Boolean(t) &&
+            typeof t === "object" &&
+            typeof (t as { term?: unknown }).term === "string" &&
+            typeof (t as { definition?: unknown }).definition === "string",
+        )
+        .map((t) => ({ term: t.term, definition: t.definition }))
+    : [];
+  const questions = Array.isArray(v.questions)
+    ? v.questions.filter((q): q is string => typeof q === "string")
+    : [];
+  if (!summary && keyTerms.length === 0 && questions.length === 0) return null;
+  return { summary, keyTerms, questions };
+}
+
+/**
+ * Project a `ComposeCompletion`-shaped object into UI state. Shared by the
+ * `compose_completion` SSE event (instant mode) and the resume response body
+ * (guided mode). Builds an outline fallback from the section headings when the
+ * approved outline isn't otherwise available (instant mode has no outline gate).
+ */
+function applyCompletion(
+  prev: WikiComposeSessionState,
+  completion: { markdown?: unknown; sections?: unknown; comprehensionAids?: unknown },
+): Partial<WikiComposeSessionState> {
+  const partial: Partial<WikiComposeSessionState> = { phase: "completed" };
+  if (typeof completion.markdown === "string" && completion.markdown.length > 0) {
+    partial.completedMarkdown = completion.markdown;
+  }
+  if (Array.isArray(completion.sections)) {
+    const draftedSections: Record<string, DraftedSection> = {};
+    const outlineFromSections: OutlineSection[] = [];
+    for (const section of completion.sections) {
+      if (!section || typeof section !== "object") continue;
+      const s = section as DraftedSection;
+      if (typeof s.sectionId !== "string") continue;
+      draftedSections[s.sectionId] = s;
+      outlineFromSections.push({
+        id: s.sectionId,
+        heading: s.heading ?? "",
+        depth: 1,
+        intent: "",
+      });
+    }
+    partial.draftedSections = draftedSections;
+    if (prev.outlineProposal.length === 0 && outlineFromSections.length > 0) {
+      partial.outlineProposal = outlineFromSections;
+    }
+  }
+  const aids = coerceComprehensionAids(completion.comprehensionAids);
+  if (aids) partial.comprehensionAids = aids;
+  return partial;
+}
+
 /** Map an SSE event into a state update. */
 export function reduceComposeSseEvent(
   prev: WikiComposeSessionState,
@@ -267,8 +336,21 @@ export function reduceComposeSseEvent(
       };
     case "compose_section":
       if (event.status === "started") {
+        // Instant mode streams without an outline gate, so add a live outline
+        // entry on first sight of a section. The EditorPane renders by walking
+        // `outlineProposal`, so this is what makes tokens visible in real time.
+        // 即時モードはアウトライン承認が無いため、初出のセクションを
+        // outline に追加してトークンをライブ描画する。
+        const hasSection = prev.outlineProposal.some((s) => s.id === event.sectionId);
+        const outlineProposal = hasSection
+          ? prev.outlineProposal
+          : [
+              ...prev.outlineProposal,
+              { id: event.sectionId, heading: event.heading, depth: 1, intent: "" },
+            ];
         return {
           streamingSectionId: event.sectionId,
+          outlineProposal,
           sectionBuffers: { ...prev.sectionBuffers, [event.sectionId]: "" },
           activity: appendActivity(prev.activity, {
             label: i18n.t("wikiCompose.activity.drafting", { heading: event.heading }),
@@ -294,6 +376,8 @@ export function reduceComposeSseEvent(
         sectionBuffers: { ...prev.sectionBuffers, [id]: prior + event.content },
       };
     }
+    case "compose_completion":
+      return applyCompletion(prev, event.completion);
     case "interrupt":
       return reduceInterrupt(prev, event.payload);
     case "done":
@@ -343,6 +427,8 @@ export function hydrateComposeFromProjection(
   }
   if (projection.outlineProposal?.length) partial.outlineProposal = projection.outlineProposal;
   if (projection.completedMarkdown) partial.completedMarkdown = projection.completedMarkdown;
+  const hydratedAids = coerceComprehensionAids(projection.comprehensionAids);
+  if (hydratedAids) partial.comprehensionAids = hydratedAids;
   if (projection.draftedSections?.length) {
     const draftedSections: Record<string, DraftedSection> = {};
     for (const section of projection.draftedSections) {
@@ -389,7 +475,10 @@ export function reduceComposeResumeOutput(
     const c = completion as {
       markdown?: string;
       sections?: DraftedSection[];
+      comprehensionAids?: unknown;
     };
+    const aids = coerceComprehensionAids(c.comprehensionAids);
+    if (aids) partial.comprehensionAids = aids;
     if (typeof c.markdown === "string" && c.markdown.length > 0) {
       partial.completedMarkdown = c.markdown;
     }

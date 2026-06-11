@@ -92,6 +92,12 @@
     "streaming": "ストリーミング中…",
     "finalMarkdown": "完成 Markdown"
   },
+  "comprehension": {
+    "title": "理解を深める",
+    "summary": "要点（TL;DR）",
+    "keyTerms": "キーワード",
+    "selfCheck": "理解度チェック"
+  },
   "activity": {
     "title": "アクティビティ",
     "live": "ライブ",

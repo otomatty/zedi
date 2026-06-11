@@ -14,10 +14,12 @@ import { PhaseStepper } from "./PhaseStepper";
 import { DialogueSection } from "./DialogueSection";
 import { ResearchSection } from "./ResearchSection";
 import { ConflictResolutionSection } from "./ConflictResolutionSection";
+import { ComprehensionSection } from "./ComprehensionSection";
 import { ActivitySection } from "./ActivitySection";
 import type {
   BriefAnswer,
   BriefQuestion,
+  ComprehensionAids,
   OutlineSection,
   PageSnapshot,
   ResearchBatch,
@@ -39,6 +41,9 @@ export interface ComposePanelProps {
   researchConflictSummary: ResearchConflictSummary | null;
 
   outlineProposal: OutlineSection[];
+
+  /** Understanding Layer scaffolds, shown once the article completes. */
+  comprehensionAids: ComprehensionAids | null;
 
   activity: ComposeActivity[];
 
@@ -68,6 +73,7 @@ export const ComposePanel: React.FC<ComposePanelProps> = (props) => {
     approvedSources,
     researchConflictSummary,
     outlineProposal,
+    comprehensionAids,
     activity,
     onSubmitBrief,
     onSubmitResearchApproval,
@@ -117,6 +123,9 @@ export const ComposePanel: React.FC<ComposePanelProps> = (props) => {
             onSubmit={onSubmitResearchApproval}
           />
         ) : null}
+
+        {/* Understanding Layer — non-blocking, shown once aids are available. */}
+        {comprehensionAids ? <ComprehensionSection aids={comprehensionAids} /> : null}
 
         <ActivitySection activity={activity} isStreaming={isStreaming} />
       </div>
