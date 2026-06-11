@@ -25,7 +25,16 @@ const MESSAGE_SYNC = 0;
 const MESSAGE_AUTH = 2;
 const AUTH_AUTHENTICATED = 2;
 
-/** Hocuspocus サーバの最小モック。SyncStep1 に Step2 を返し onSynced を発火させる。 */
+/**
+ * Hocuspocus サーバの最小モックをページに導入する。SyncStep1 に SyncStep2 を
+ * 返して onSynced を発火させる。
+ * Install the minimal Hocuspocus mock on the page. Replies to SyncStep1 with
+ * SyncStep2 so the provider fires onSynced.
+ *
+ * @param page - 対象の Playwright Page / Playwright page to install the mock on.
+ * @returns WebSocket ルートの登録完了で解決する Promise / Resolves once the
+ *   WebSocket route is installed.
+ */
 export async function mockRealtime(page: Page): Promise<void> {
   await page.routeWebSocket(/localhost:1234/, (ws) => {
     const docs = new Map<string, Y.Doc>();

@@ -45,12 +45,20 @@ function renderGroup(direction: "horizontal" | "vertical") {
   if (!(separator instanceof HTMLElement)) {
     throw new Error("separator not rendered");
   }
-  return separator;
+  const group = separator.parentElement;
+  if (!(group instanceof HTMLElement)) {
+    throw new Error("group not rendered");
+  }
+  return { separator, group };
 }
 
 describe("ResizableHandle orientation contract", () => {
   it("left/right split: separator is a thin vertical line (aria-orientation=vertical)", () => {
-    const separator = renderGroup("horizontal");
+    const { separator, group } = renderGroup("horizontal");
+
+    // パネルの並びはライブラリがインライン style で制御する（Tailwind 不要）。
+    // The library drives panel flow via inline style; no Tailwind class needed.
+    expect(group.style.flexDirection).toBe("row");
 
     // v4 sets the separator's own orientation, not the group's.
     // v4 は group ではなく separator 自身の向きを設定する。
@@ -63,7 +71,11 @@ describe("ResizableHandle orientation contract", () => {
   });
 
   it("top/bottom split: separator is a full-width horizontal line (aria-orientation=horizontal)", () => {
-    const separator = renderGroup("vertical");
+    const { separator, group } = renderGroup("vertical");
+
+    // 縦積み（モバイル compose 等）はライブラリのインライン style が担保する。
+    // Stacked layout (mobile compose etc.) is guaranteed by the inline style.
+    expect(group.style.flexDirection).toBe("column");
 
     expect(separator.getAttribute("aria-orientation")).toBe("horizontal");
 

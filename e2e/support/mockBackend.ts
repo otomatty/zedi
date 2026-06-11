@@ -42,6 +42,12 @@ export interface MockPublicLinks {
   ghost_links: string[];
 }
 
+/**
+ * モックバックエンドの操作ハンドル。テストからの状態 seed と、404 で応答した
+ * 未対応リクエストの記録を提供する。
+ * Handle for the mock backend: lets tests seed state and inspect requests that
+ * were answered with 404.
+ */
 export interface MockBackend {
   /** モックが提供する唯一のノートの id / The id of the single note this mock serves. */
   noteId: string;
@@ -69,6 +75,12 @@ const EMPTY_LINKS: MockPublicLinks = {
  * ハンドルを返す。
  * Install the predicate route mocking everything under `/api/` and return a
  * handle for seeding state.
+ *
+ * @param page - 対象の Playwright Page / Playwright page to install the mock on.
+ * @param options - `noteId` でモックが提供するノート id を上書きできる /
+ *   Optional override for the note id this mock serves.
+ * @returns 状態 seed・未対応リクエスト確認用のハンドル / Handle for seeding
+ *   state and inspecting unhandled requests.
  */
 export async function installMockBackend(
   page: Page,
