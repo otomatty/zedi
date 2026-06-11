@@ -190,19 +190,18 @@ jobs:
 
   e2e-web:
     name: E2E (web)
-    # PDF 知識化フローの Web (非 Tauri) 側を Playwright で守るための job。
-    # 現状は issue #863 で追加した `pdf-knowledge.spec.ts` のみを実行する。
-    # 既存の他 spec (web-clipper, page-editor, ...) は CI 未通過のものが
-    # 混ざっている可能性が高いため、別 PR で順次取り込む。
+    # Web (非 Tauri) 側の Playwright E2E をすべて実行する job (issue #1036)。
+    # 各 spec はバックエンドを起動せず、REST は `page.route`、Hocuspocus は
+    # `page.routeWebSocket`（e2e/support/ 配下のモック基盤）で決定化している。
+    # 管理画面 SPA の spec (admin/e2e) も別ポート (30001) で本 job 内で実行する。
     #
     # Phase 2 (issue #863 follow-up): Tauri デスクトップ E2E は `tauri-driver`
     # を要するため、本 job ではなく専用の job (`e2e-tauri`) として追加予定。
     #
-    # Playwright job guarding the web-side (non-Tauri) of the PDF knowledge
-    # ingestion flow added by #863. Limited to the new `pdf-knowledge.spec.ts`
-    # for now; the existing e2e specs (web-clipper, page-editor, …) have not
-    # been wired into CI before and may regress separately — they are queued
-    # for a follow-up PR rather than risking a noisy first integration.
+    # Runs the full web-side (non-Tauri) Playwright suite (issue #1036). Specs
+    # never talk to a real backend: REST goes through `page.route` and the
+    # Hocuspocus realtime sync through `page.routeWebSocket` (see e2e/support/).
+    # The admin SPA spec (admin/e2e) runs in this job too, on its own port.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     # ブラウザ DL / apt が CI ネットワークの不調で停滞しても既定の 6h 待たずに
@@ -251,15 +250,31 @@ jobs:
           attempt_limit: 3
           attempt_delay: 10000
 
-      - name: Run PDF knowledge E2E
-        run: bunx playwright test e2e/pdf-knowledge.spec.ts
+      - name: Run web E2E
+        run: bunx playwright test
+
+      - name: Run admin E2E
+        # 管理画面はルートとは別の Vite サーバ (ポート 30001) を webServer として
+        # 起動するため、web 側と直列でも衝突しない。
+        # The admin config boots its own Vite server on port 30001, so it can
+        # run after the web suite without port conflicts.
+        if: always()
+        run: bunx playwright test --config admin/playwright.config.ts
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: playwright-report-pdf-knowledge
+          name: playwright-report-web
           path: playwright-report/
+          retention-days: 7
+
+      - name: Upload admin Playwright report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-report-admin
+          path: admin/playwright-report/
           retention-days: 7
 
   api-typecheck:
