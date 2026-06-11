@@ -6,6 +6,7 @@ import { readFileSync } from "fs";
 import { componentTagger } from "lovable-tagger";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
+import { createCoverageConfig, frontendTypeOnlyExcludes } from "./vitest.coverage.shared";
 
 const packageJson = JSON.parse(readFileSync(path.resolve(__dirname, "package.json"), "utf-8")) as {
   version: string;
@@ -94,18 +95,10 @@ export default defineConfig(({ mode }) => {
       environment: "jsdom",
       setupFiles: ["./src/test/setup.ts"],
       include: ["src/**/*.{test,spec}.{ts,tsx}"],
-      coverage: {
-        provider: "v8",
-        reporter: ["text", "json", "html"],
+      coverage: createCoverageConfig({
         include: ["src/**/*.{ts,tsx}"],
-        exclude: [
-          "src/**/*.test.{ts,tsx}",
-          "src/**/*.spec.{ts,tsx}",
-          "src/test/**",
-          "src/main.tsx",
-          "src/vite-env.d.ts",
-        ],
-      },
+        exclude: ["src/main.tsx", "src/App.tsx", "src/vite-env.d.ts", ...frontendTypeOnlyExcludes],
+      }),
     },
   };
 });

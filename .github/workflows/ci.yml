@@ -110,36 +110,21 @@ jobs:
 
       - uses: ./.github/actions/setup-toolchain
 
-      - run: bun run test:coverage
-
-      # Workspace package tests are not picked up by the root vitest config,
-      # so run their dedicated configs explicitly. Keep this list in sync with
-      # the `test:run` script in root package.json. The standalone server
-      # projects have their own jobs: server/api (`api-test`), server/mcp
-      # (`mcp-test`), server/hocuspocus (`hocuspocus-test`); they are not
-      # duplicated here.
-      # ルートの vitest 設定はワークスペース配下のテストを含まないため、
-      # 各パッケージの vitest.config を明示的に実行する。server/api・server/mcp・
-      # server/hocuspocus はそれぞれ別 job（`api-test` / `mcp-test` /
-      # `hocuspocus-test`）で動かすためここには含めない。
-      - name: Run admin tests
-        run: bunx vitest run --config admin/vitest.config.ts
-
-      - name: Run @zedi/shared tests
-        run: bunx vitest run --config packages/shared/vitest.config.ts
-
-      - name: Run @zedi/ui tests
-        run: bunx vitest run --config packages/ui/vitest.config.ts
-
-      - name: Run @zedi/claude-sidecar tests
-        run: bunx vitest run --config packages/claude-sidecar/vitest.config.ts
+      # Root workspaces only; standalone server/* jobs run their own coverage below.
+      # ルート配下のワークスペースのみ。server/* は各専用 job で coverage を計測する。
+      - run: node scripts/run-workspace-coverage.mjs
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coverage-report
-          path: coverage/
+          path: |
+            coverage/
+            admin/coverage/
+            packages/shared/coverage/
+            packages/ui/coverage/
+            packages/claude-sidecar/coverage/
           retention-days: 7
 
   build:
@@ -329,7 +314,15 @@ jobs:
 
       - name: Run tests
         working-directory: server/api
-        run: bunx vitest run
+        run: bunx vitest run --coverage
+
+      - name: Upload API coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-report-api
+          path: server/api/coverage/
+          retention-days: 7
 
   drizzle-migration-check:
     name: Drizzle Migration Check
@@ -434,7 +427,15 @@ jobs:
 
       - name: Run tests
         working-directory: server/mcp
-        run: bun run test
+        run: bun run test:coverage
+
+      - name: Upload MCP coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-report-mcp
+          path: server/mcp/coverage/
+          retention-days: 7
 
   hocuspocus-test:
     name: Hocuspocus Server Tests
@@ -464,7 +465,15 @@ jobs:
 
       - name: Run tests
         working-directory: server/hocuspocus
-        run: bun run test
+        run: bun run test:coverage
+
+      - name: Upload Hocuspocus coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-report-hocuspocus
+          path: server/hocuspocus/coverage/
+          retention-days: 7
 
   mutation-light:
     name: Mutation (light)

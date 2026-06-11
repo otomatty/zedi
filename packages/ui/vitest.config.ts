@@ -1,5 +1,6 @@
 import path from "path";
 import { defineConfig } from "vitest/config";
+import { createCoverageConfig } from "../../vitest.coverage.shared";
 
 /**
  * Vitest config for `@zedi/ui` package.
@@ -24,5 +25,15 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: [path.resolve(import.meta.dirname, "src/test/setup.ts")],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    coverage: createCoverageConfig({
+      // In-house hooks/lib/sidebar only; flat `components/*.tsx` are shadcn vendored (AGENTS.md).
+      // 自前実装のみ。直下の `components/*.tsx` は shadcn 由来のため母数から除外する。
+      include: [
+        "src/hooks/**/*.{ts,tsx}",
+        "src/lib/**/*.{ts,tsx}",
+        "src/components/sidebar/**/*.{ts,tsx}",
+        "src/components/resizable.tsx",
+      ],
+    }),
   },
 });

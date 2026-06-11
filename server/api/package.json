@@ -14,7 +14,8 @@
     "sync:ai-models": "tsx scripts/sync-ai-models.ts",
     "inspect:ai-models-cost": "tsx scripts/inspect-ai-models-cost.ts",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1002.0",
