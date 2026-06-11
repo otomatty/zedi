@@ -235,10 +235,12 @@ test.describe("Global search (header search bar)", () => {
     // アサーションは main 領域にスコープする。
     const main = page.getByRole("main");
 
-    // Heading and result count (2 API hits, no local hits).
-    // 見出しと件数（API ヒット 2 件、ローカルヒットなし）。
+    // Heading and result count (2 API hits, no local hits). Exact match on the
+    // count element so e.g. "12件" cannot satisfy the assertion.
+    // 見出しと件数（API ヒット 2 件、ローカルヒットなし）。"12件" 等の誤マッチを
+    // 排除するため、件数要素に exact 一致で固定する。
     await expect(page.getByRole("heading", { name: /「photo」の検索結果/ })).toBeVisible();
-    await expect(main).toContainText("2件", { timeout: 10000 });
+    await expect(main.getByText("2件", { exact: true })).toBeVisible({ timeout: 10000 });
 
     // Card 1: the hit title is rendered.
     // NOTE: 仕様書ではタイトルマッチ行に `タイトル` バッジが想定されるが、
@@ -257,8 +259,12 @@ test.describe("Global search (header search bar)", () => {
     await expect(untitledCard.getByText("本文", { exact: true })).toBeVisible();
 
     // Snippet highlights the keyword with <mark>, and shared rows get a badge.
+    // Scope the <mark> to the body-match card and pin its exact (case-sensitive)
+    // text: the snippet "Plants use photosynthesis…" highlights "photo" verbatim.
     // スニペットは <mark> でキーワードをハイライトし、共有行に `共有` バッジ。
-    await expect(main.locator("mark").first()).toContainText(/photo/i);
+    // <mark> は本文マッチのカード（無題のページカード）にスコープし、テキストを
+    // 大小区別の "photo" で固定する。
+    await expect(untitledCard.locator("mark")).toHaveText("photo");
     await expect(main.getByText("共有", { exact: true }).first()).toBeVisible();
   });
 
@@ -280,11 +286,14 @@ test.describe("Global search (header search bar)", () => {
     const listbox = page.locator("#header-search-list");
     await expect(listbox.getByText("ページが見つかりません")).toBeVisible();
 
-    // Escape closes the dropdown and blurs the input; the input itself stays.
-    // Escape でドロップダウンが閉じ入力は blur されるが、入力欄自体は残る。
+    // Escape closes the dropdown and blurs the input; the input itself stays
+    // AND keeps the typed query (Escape must not clear the text).
+    // Escape でドロップダウンが閉じ入力は blur されるが、入力欄自体は残り、
+    // 入力済みのクエリ文字列も保持される（Escape はテキストを消さない）。
     await page.keyboard.press("Escape");
     await expect(listbox).toBeHidden();
     await expect(searchInput).toBeVisible();
     await expect(searchInput).not.toBeFocused();
+    await expect(searchInput).toHaveValue("zzznohit");
   });
 });

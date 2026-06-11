@@ -141,6 +141,12 @@ test.describe("Web Clipper clipUrl flow", () => {
     await expect(dialog).toBeVisible({ timeout: 10000 });
     const urlInput = dialog.getByRole("textbox");
     await expect(urlInput).toHaveValue(clipUrl);
+
+    // The redirect chain must terminate at the concrete note URL — pinning
+    // that /home did not stall at an intermediate alias route.
+    // リダイレクトチェーンが具体的なノート URL /notes/:noteId に到達している
+    // こと（/home が中間ルートで止まっていないこと）を固定する。
+    await expect(page).toHaveURL(new RegExp(`/notes/${NOTE_ID}(\\?|$)`));
   });
 
   test("does not open the dialog when clipUrl fails the URL policy", async ({ page }) => {
@@ -154,6 +160,13 @@ test.describe("Web Clipper clipUrl flow", () => {
     await page.waitForURL((url) => {
       return url.pathname === `/notes/${NOTE_ID}` && !url.searchParams.has("clipUrl");
     });
+
+    // Positive signal first: the app shell actually rendered (header search
+    // input is visible) — otherwise the not-visible check below would also
+    // pass on a blank/broken page.
+    // まず正のシグナル: アプリシェルが実際に描画済み（ヘッダ検索入力が可視）
+    // であることを確認する。白画面でも下の不在チェックが通ってしまうため。
+    await expect(page.locator("#header-search-input")).toBeVisible();
 
     // Invalid URLs are stripped at /notes/me; the dialog must stay closed.
     // 無効な URL は /notes/me で剥がされるため、ダイアログは閉じたままになる。

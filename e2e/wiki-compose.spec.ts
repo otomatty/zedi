@@ -287,10 +287,21 @@ async function installPageViewMocks(page: Page): Promise<void> {
   );
 }
 
-/** Install the Compose API mocks (create / get / run / resume). */
-async function installComposeMocks(page: Page): Promise<void> {
+/**
+ * Install the Compose API mocks (create / get / run / resume).
+ * Returns the captured `PATCH .../resume` request bodies (in submission order)
+ * so the test can assert the client actually sends the user's selections —
+ * without this the mock would accept ANY body and the test would be
+ * self-satisfying (issue #1036 assertion-strength review).
+ *
+ * resume の受信ボディを提出順に捕捉して返す。モックは送信内容を無視して
+ * 次フェーズを返すため、ボディを検証しないとクライアントが空・誤値を
+ * 送っても green になる（issue #1036 アサーション強度レビュー対応）。
+ */
+async function installComposeMocks(page: Page): Promise<{ resumeBodies: unknown[] }> {
   let runCount = 0;
   let resumeCount = 0;
+  const resumeBodies: unknown[] = [];
 
   // POST /compose-sessions — create (201, wrapped in { session }).
   await page.route(
@@ -358,6 +369,7 @@ async function installComposeMocks(page: Page): Promise<void> {
   await page.route(
     (url) => url.pathname === `/api/pages/${PAGE_ID}/compose-sessions/${SESSION_ID}/resume`,
     async (route: Route) => {
+      resumeBodies.push(route.request().postDataJSON());
       const response = RESUME_RESPONSES[resumeCount];
       resumeCount += 1;
       if (!response) {
@@ -376,6 +388,8 @@ async function installComposeMocks(page: Page): Promise<void> {
       });
     },
   );
+
+  return { resumeBodies };
 }
 
 test.describe("Wiki Compose P2 happy path", () => {
@@ -383,7 +397,7 @@ test.describe("Wiki Compose P2 happy path", () => {
 
   test("walks Brief → Research → Outline → Completed", async ({ page }) => {
     await installPageViewMocks(page);
-    await installComposeMocks(page);
+    const { resumeBodies } = await installComposeMocks(page);
 
     await page.goto(`/notes/${NOTE_ID}/${PAGE_ID}/compose`);
 
@@ -400,12 +414,30 @@ test.describe("Wiki Compose P2 happy path", () => {
     const sourceRow = page.getByTestId(`source-row-${SOURCE_ID}`);
     await expect(sourceRow).toBeVisible({ timeout: 10000 });
 
+    // Wire contract: the brief resume body carries the picked option id inside
+    // `resume.answers`. Only the presence of the selected id is pinned — the
+    // exact answer shape is not part of the confirmed spec (do not over-pin).
+    // ワイヤ契約: brief の resume ボディは `resume.answers` に選択した選択肢 id
+    // を運ぶ。確定仕様は「選択 id が含まれること」のみなので全形は固定しない。
+    expect(resumeBodies).toHaveLength(1);
+    const briefBody = resumeBodies[0] as { resume?: { answers?: unknown } };
+    expect(Array.isArray(briefBody?.resume?.answers)).toBe(true);
+    expect(JSON.stringify(briefBody?.resume?.answers)).toContain(`"${BRIEF_OPTION_ID}"`);
+
     // Approve all sources and continue.
     await page.getByTestId("research-submit").click();
 
     // Outline interrupt — outline row appears (driven by the resume body).
     const outlineRow = page.getByTestId(`outline-row-${SECTION_ID}`);
     await expect(outlineRow).toBeVisible({ timeout: 10000 });
+
+    // Wire contract: the research resume body lists the approved source ids in
+    // `resume.approvedSourceIds` (approve-all → the demo source id).
+    // ワイヤ契約: research の resume ボディは `resume.approvedSourceIds` に
+    // 承認済みソース id を含む（全承認なのでデモソース id が入る）。
+    expect(resumeBodies).toHaveLength(2);
+    const researchBody = resumeBodies[1] as { resume?: { approvedSourceIds?: unknown } };
+    expect(researchBody?.resume?.approvedSourceIds).toContain(SOURCE_ID);
 
     // Approve outline and continue. The final resume responds with
     // `status: "completed"` + completion payload — no Draft token streaming.
@@ -416,6 +448,16 @@ test.describe("Wiki Compose P2 happy path", () => {
     await expect(page.getByTestId("phase-step-completed")).toHaveAttribute("aria-current", "step", {
       timeout: 10000,
     });
+
+    // Wire contract: the outline resume body carries the approved sections as
+    // an array in `resume.sections`, including the demo section id. Only the
+    // section id presence is pinned (exact section shape is unconfirmed).
+    // ワイヤ契約: outline の resume ボディは `resume.sections` 配列に承認済み
+    // セクションを含む。確定しているのはセクション id の包含のみ。
+    expect(resumeBodies).toHaveLength(3);
+    const outlineBody = resumeBodies[2] as { resume?: { sections?: unknown } };
+    expect(Array.isArray(outlineBody?.resume?.sections)).toBe(true);
+    expect(JSON.stringify(outlineBody?.resume?.sections)).toContain(`"${SECTION_ID}"`);
     await expect(page.getByTestId(`editor-section-${SECTION_ID}`)).toContainText(
       "Photosynthesis.",
       { timeout: 10000 },

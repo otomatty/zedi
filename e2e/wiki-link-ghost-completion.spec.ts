@@ -137,7 +137,10 @@ test.describe("Inline Ghost Completion (issue #930)", () => {
   });
 
   test("does not fire inside a code block", async ({ page }) => {
-    await openSourcePage(page, { withCandidate: true, sourceTitle: "Source CodeBlock" });
+    const editor = await openSourcePage(page, {
+      withCandidate: true,
+      sourceTitle: "Source CodeBlock",
+    });
 
     // Markdown shortcut for a code block (triple backtick + Enter). After this
     // the cursor sits inside the code block.
@@ -145,6 +148,12 @@ test.describe("Inline Ghost Completion (issue #930)", () => {
     await page.keyboard.type("```");
     await page.keyboard.press("Enter");
     await page.keyboard.type("Gho");
+
+    // Positive signal first: the input rule actually produced a code block and
+    // the prefix landed inside it — otherwise count(0) below would pass vacuously.
+    // まず正のシグナル: 入力規則で実際に code block 化され接頭辞がその中に
+    // 入ったことを確認する（さもないと下の count(0) が空虚に通る）。
+    await expect(editor.locator("pre code")).toContainText("Gho");
     await expect(page.locator(GHOST_SELECTOR)).toHaveCount(0);
   });
 
@@ -154,7 +163,10 @@ test.describe("Inline Ghost Completion (issue #930)", () => {
     // サジェストも出さない契約。
     // Acceptance: ghost must not fire inside inline code (single backticks)
     // since the WikiLink mark cannot apply there.
-    await openSourcePage(page, { withCandidate: true, sourceTitle: "Source InlineCode" });
+    const editor = await openSourcePage(page, {
+      withCandidate: true,
+      sourceTitle: "Source InlineCode",
+    });
 
     // Markdown 入力規則で「`Gho`」と打って `Gho` をインラインコードにする。
     // キャレットをインラインコード内に戻して 1 文字追加し、抑止を確認する。
@@ -162,6 +174,13 @@ test.describe("Inline Ghost Completion (issue #930)", () => {
     // move the caret back inside the span, add one more matching char, and
     // confirm the ghost stays suppressed.
     await page.keyboard.type("`Gho`");
+
+    // Positive signal first: the input rule actually wrapped "Gho" in inline
+    // code — otherwise count(0) below would pass vacuously.
+    // まず正のシグナル: 入力規則で "Gho" が実際にインラインコード化された
+    // ことを確認する（さもないと下の count(0) が空虚に通る）。
+    await expect(editor.locator("code")).toContainText("Gho");
+
     await page.keyboard.press("ArrowLeft");
     await page.keyboard.type("s");
     await expect(page.locator(GHOST_SELECTOR)).toHaveCount(0);
@@ -202,8 +221,11 @@ test.describe("Inline Ghost Completion (issue #930)", () => {
     await page.keyboard.press("Home");
     await page.keyboard.press("Tab");
 
-    // After Tab, the second item is nested → nested `<ul>` exists.
-    // Tab 後、2 つ目の `li` が入れ子になり `ul ul` が現れる。
+    // After Tab, the second item is nested → nested `<ul>` exists and holds
+    // exactly the "nested" item (pins WHICH item was indented).
+    // Tab 後、2 つ目の `li` が入れ子になり `ul ul` が現れる。入れ子になった
+    // のが "nested" の行であることまで固定する。
     await expect(editor.locator("ul ul")).toHaveCount(1);
+    await expect(editor.locator("ul ul")).toHaveText("nested");
   });
 });

@@ -157,10 +157,14 @@ export async function installMockBackend(
 
       // POST /api/notes/:noteId/pages — ノートへの付け替え（作成ページの
       // note_id が FAB の noteId と異なる場合のみ呼ばれる）。
+      // 実サーバは `page_id` / `pageId` のみ受け付ける（`id` は受けない）ので
+      // モックも同じキーだけを見る（issue #1036 アサーション強度レビュー）。
       // Re-attach a page to the note (only fired when note ids differ).
+      // The real server accepts only `page_id` / `pageId` (never `id`), so the
+      // mock reads exactly those keys (issue #1036 assertion-strength review).
       if (method === "POST" && pathname === `/api/notes/${noteId}/pages`) {
         const body = (request.postDataJSON() ?? {}) as Record<string, unknown>;
-        const pid = (body.page_id ?? body.pageId ?? body.id) as string | undefined;
+        const pid = (body.page_id ?? body.pageId) as string | undefined;
         const row = pid ? pages.get(pid) : undefined;
         if (!row) return json(route, { error: "page not found" }, 404);
         row.note_id = noteId;
@@ -174,6 +178,14 @@ export async function installMockBackend(
         const [, pid, rest] = pageMatch;
         const row = pages.get(pid);
         if (rest === "public-links" && method === "GET") {
+          // 実サーバ仕様: 存在しないページの public-links は 404（確認済み）。
+          // 存在するページでリンク未設定なら全空レスポンス。fail-loud 化により
+          // テストが誤った pageId を引いても空レスポンスで silent-pass しない。
+          // Real server behaviour (confirmed): public-links for a nonexistent
+          // page is 404; an existing page without links gets the all-empty
+          // shape. Failing loudly stops tests from silently passing on a
+          // wrong pageId.
+          if (!row) return json(route, { error: "not found" }, 404);
           return json(route, publicLinks.get(pid) ?? EMPTY_LINKS);
         }
         if (!rest && row && method === "GET") {

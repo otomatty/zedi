@@ -57,7 +57,11 @@ test.describe("Linked Pages journeys (issue #1036)", () => {
     await expect(page.locator('.tiptap[contenteditable="true"]')).toBeVisible();
 
     // public-links が全空の間はリンクセクション自体が DOM に存在しない。
-    // While public-links is entirely empty, the link section is absent from the DOM.
+    // 直前のエディタ可視アサーションが「画面が描画済み」の正のシグナルで、
+    // 下の不在チェックが白画面でも通ってしまうことを防いでいる。
+    // While public-links is entirely empty, the link section is absent from the
+    // DOM. The editor-visible assertion above is the positive signal proving
+    // the view rendered, so the absence checks below cannot pass vacuously.
     await publicLinksFetched;
     await expect(page.getByText(/^リンク \(\d+\)$/)).toHaveCount(0);
     await expect(page.getByText(/^新しいリンク \(\d+\)$/)).toHaveCount(0);
@@ -101,8 +105,20 @@ test.describe("Linked Pages journeys (issue #1036)", () => {
     await expect(suggestion).toHaveCount(0);
 
     // 閉じた `[[...]]` の内側にカーソルを戻してもサジェストは出ない。
+    // まず正のシグナル: `[[Closed]]` のテキストが実際に `[data-wiki-link]`
+    // マークの内側に入っていることを確認する（マーク内でなければ以降の
+    // 不在チェックは無意味）。観測上、確定直後のマークは後続入力にも伸長する
+    // ため、`data-title` ではなくテキスト包含でマーク内に居ることだけを固定する。
     // Moving the caret back inside a closed `[[...]]` must not reopen the popup.
+    // Positive signal first: the "[[Closed]]" text actually sits inside a
+    // `[data-wiki-link]` mark — without that the absence checks below would be
+    // meaningless. Observed behaviour: the just-confirmed mark extends over the
+    // following input, so we pin only "inside a wiki-link mark" via text
+    // containment, not a `data-title` value.
     await page.keyboard.type(" and [[Closed]]");
+    await expect(
+      editor.locator("[data-wiki-link]").filter({ hasText: "[[Closed]]" }),
+    ).toBeVisible();
     await expect(suggestion).toHaveCount(0);
     await page.keyboard.press("ArrowLeft");
     await page.keyboard.press("ArrowLeft");

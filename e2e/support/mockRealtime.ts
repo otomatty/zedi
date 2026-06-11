@@ -6,6 +6,14 @@
  * Minimal mock of the Hocuspocus WebSocket server (issue #1036). Replies to
  * SyncStep1 with SyncStep2 so the client fires onSynced and the body editor
  * (.tiptap) mounts without a real realtime backend.
+ *
+ * 制約 / Limitations (by design):
+ * - docs は WebSocket 接続ごとに空から始まる。リロードやページ再訪をまたぐ
+ *   本文の永続性は表現しない（永続化を検証するテストには使えない）。
+ *   `docs` starts empty for every WebSocket connection — persistence across
+ *   reloads / revisits is NOT modelled (do not use this mock to test it).
+ * - awareness メッセージ（presence / カーソル共有）は破棄する。
+ *   Awareness messages (presence / shared cursors) are dropped.
  */
 import type { Page } from "@playwright/test";
 import * as Y from "yjs";
