@@ -50,6 +50,14 @@ export function createMockDb(results: unknown[]) {
       if (prop === "transaction") {
         return (fn: (tx: typeof db) => Promise<unknown>) => fn(db);
       }
+      if (prop === "execute") {
+        return (...args: unknown[]) => {
+          const idx = chainIndex++;
+          const ops: { method: string; args: unknown[] }[] = [];
+          chains.push({ startMethod: "execute", startArgs: args, ops });
+          return makeChainProxy(idx, ops);
+        };
+      }
       return (...args: unknown[]) => {
         const idx = chainIndex++;
         const ops: { method: string; args: unknown[] }[] = [];

@@ -4,11 +4,11 @@ import { Link2, Copy, Trash2 } from "lucide-react";
 import type { PageSummary } from "@/types/page";
 import { ZEDI_PAGE_MIME_TYPE } from "@/types/aiChat";
 import { cn } from "@zedi/ui";
-import { useCreatePage, useDeletePage, usePage } from "@/hooks/usePageQueries";
-import { useRemovePageFromNote } from "@/hooks/useNoteQueries";
+import { useCreatePage, useDeletePage, usePage } from "@/hooks/pages/usePageQueries";
+import { useRemovePageFromNote } from "@/hooks/notes/useNoteQueries";
 import { useToast } from "@zedi/ui";
 import { useIsMobile } from "@zedi/ui/hooks/use-mobile";
-import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
+import { useAuthenticatedImageUrl } from "@/hooks/media/useAuthenticatedImageUrl";
 import {
   ContextMenu,
   ContextMenuContent,

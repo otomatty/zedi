@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, act } from "@testing-library/react";
 import { useWikiLinkStatusSync } from "./useWikiLinkStatusSync";
@@ -11,16 +10,16 @@ let mockNotePagesData: MockNotePage[] | undefined;
 // wiki link status sync は `id` / `title` だけ参照するため、最小 payload で十分。
 // Issue #860 Phase 6: replaced useNotePages mock with useNoteTitleIndex; the
 // status sync only reads `id` / `title`, so the minimal title row works.
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   useNoteTitleIndex: vi.fn(() => ({
     data: mockNotePagesData,
   })),
 }));
 
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useWikiLinkExistsChecker: vi.fn(
     (options?: { notePages?: MockNotePage[]; pageNoteId?: string | null }) => ({
-      checkExistence: vi.fn(async (titles: string[]) => {
+      checkExistence: vi.fn(async () => {
         const inScope = options?.pageNoteId ? (options.notePages ?? []) : [];
         const pageTitles = new Set(inScope.map((page) => page.title.toLowerCase().trim()));
         // issue #737: `pageTitleToId` を返すモック契約。`targetId` 解決を伴う

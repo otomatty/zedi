@@ -28,10 +28,23 @@
  *     of silently allowing unauthenticated calls.
  */
 
+import { createHash, timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../types/index.js";
 import { syncPageGraphFromStoredYDoc } from "../services/pageGraphSyncService.js";
+
+/**
+ * Constant-time string comparison via fixed-length SHA-256 digests. Hashing
+ * first means `timingSafeEqual` always compares 32-byte buffers, so neither the
+ * length nor the contents of the secret leak through response timing.
+ * 固定長 SHA-256 ダイジェストで定数時間比較する。長さも内容も漏らさない。
+ */
+function safeEqual(a: string, b: string): boolean {
+  const hashA = createHash("sha256").update(a).digest();
+  const hashB = createHash("sha256").update(b).digest();
+  return timingSafeEqual(hashA, hashB);
+}
 
 const app = new Hono<AppEnv>();
 
@@ -54,7 +67,7 @@ function assertInternalAuth(c: { req: { header: (name: string) => string | undef
     throw new HTTPException(503, { message: "Internal API not configured" });
   }
   const provided = c.req.header("x-internal-secret")?.trim();
-  if (!provided || provided !== expected) {
+  if (!provided || !safeEqual(provided, expected)) {
     throw new HTTPException(401, { message: "Unauthorized" });
   }
 }

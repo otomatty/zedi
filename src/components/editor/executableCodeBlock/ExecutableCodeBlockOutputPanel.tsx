@@ -1,4 +1,3 @@
-import React from "react";
 import { useTranslation } from "react-i18next";
 import { statusLabelForExecutableRun } from "./executableCodeBlockI18n";
 import type { ExecutableRunStatus } from "../extensions/ExecutableCodeBlockExtension";

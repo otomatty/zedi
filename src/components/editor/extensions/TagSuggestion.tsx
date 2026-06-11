@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { cn } from "@zedi/ui";
 import { Hash, Plus } from "lucide-react";
-import type { TagSuggestionCandidate } from "@/hooks/useTagCandidates";
+import type { TagSuggestionCandidate } from "@/hooks/tags/useTagCandidates";
 
 /**
  * 表示用の 1 アイテム。`exists=true` は既存ページに対応するタグ、`exists=false`

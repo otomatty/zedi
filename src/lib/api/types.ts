@@ -8,6 +8,13 @@ export interface SyncPagesResponse {
   pages: SyncPageItem[];
   links: SyncLinkItem[];
   ghost_links: SyncGhostLinkItem[];
+  /**
+   * 呼び出し元のデフォルトノート ID。旧クライアントが残した `noteId: null`
+   * 行をローカルで付け替えるために使う（Issue #1020）。
+   * The caller's default note id; used to reassign legacy `noteId: null`
+   * rows left behind by older clients (issue #1020).
+   */
+  default_note_id: string;
   server_time: string;
 }
 

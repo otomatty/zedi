@@ -3,7 +3,7 @@
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
-import { AISettings } from "@/types/ai";
+import { AISettings, AIProviderType } from "@/types/ai";
 import { loadAISettings } from "./aiSettings";
 import i18n from "@/i18n";
 
@@ -219,7 +219,7 @@ async function generateWithGoogle(
       },
     });
 
-    const code = response.text.trim();
+    const code = (response.text ?? "").trim();
 
     const detectedType = detectDiagramType(code, diagramTypes);
 
@@ -318,7 +318,11 @@ export async function generateMermaidDiagram(
   }
 
   // user_api_keyモード: 既存の直接SDK呼び出し
-  switch (settings.provider) {
+  // 上の guard で claude-code は除外済みだが、防御的な case を残すため広い union で switch する。
+  // The guard above already excludes claude-code, but widen the switch input back to the
+  // full provider union so the defensive `case "claude-code"` stays type-valid.
+  const provider = settings.provider as AIProviderType;
+  switch (provider) {
     case "openai":
       return generateWithOpenAI(settings, text, diagramTypes, callbacks);
     case "anthropic":
@@ -331,7 +335,7 @@ export async function generateMermaidDiagram(
       );
       break;
     default: {
-      const _exhaustive: never = settings.provider;
+      const _exhaustive: never = provider;
       callbacks.onError(new Error(`Unknown provider: ${_exhaustive}`));
     }
   }

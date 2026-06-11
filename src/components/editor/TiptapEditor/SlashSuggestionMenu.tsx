@@ -3,7 +3,7 @@
  * スラッシュコマンドメニュー本体（ref でキーボード）。ブロック＋任意の Claude エージェント行。
  */
 
-import React, { forwardRef } from "react";
+import { forwardRef } from "react";
 import { SlashMenuRows } from "./SlashMenuRows";
 import { SlashPathCompletionSection } from "./SlashPathCompletionSection";
 import type { SlashSuggestionHandle } from "./slashSuggestionHandle";

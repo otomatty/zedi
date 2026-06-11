@@ -15,9 +15,9 @@ import {
 } from "@zedi/ui";
 import { toast } from "@zedi/ui/components/sonner";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/auth/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
-import { pageKeys } from "@/hooks/usePageQueries";
+import { pageKeys } from "@/hooks/pages/usePageQueries";
 import { createStorageAdapter, ResetDatabasePageIdsReadError } from "@/lib/storageAdapter";
 import { runApiSync, resetSyncFailures } from "@/lib/sync";
 

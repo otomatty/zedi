@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Popover, PopoverAnchor } from "@zedi/ui";
-import type { GlobalSearchResultItem } from "@/hooks/useGlobalSearch";
+import type { GlobalSearchResultItem } from "@/hooks/search/useGlobalSearch";
 
 // ─── 仮想化のモック ────────────────────────────────────────────────
 // jsdom はレイアウトを行わずスクロール要素の高さが 0 になるため、PageGrid.test.tsx

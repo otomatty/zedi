@@ -8,7 +8,7 @@
  * 3. User selects entities to create as wiki pages
  * 4. Selected entities are created as new pages via the existing create-page flow
  */
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Loader2, X } from "lucide-react";
 import { Button, useToast } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
@@ -20,8 +20,8 @@ import {
 } from "@/lib/aiChat/extractEntitiesPrompt";
 import { callAIService } from "@/lib/aiService";
 import { loadAISettings } from "@/lib/aiSettings";
-import { useCreatePage } from "@/hooks/usePageQueries";
-import { useWikiSchema } from "@/hooks/useWikiSchema";
+import { useCreatePage } from "@/hooks/pages/usePageQueries";
+import { useWikiSchema } from "@/hooks/wiki/useWikiSchema";
 import { navigateToWikiCompose } from "@/lib/wikiCompose/navigation";
 import { EntityRow } from "./EntityRow";
 
@@ -245,16 +245,12 @@ function PromoteToWikiDialogBody({
         ),
       );
 
-      // Issue #889 Phase 3: 遷移先は `/notes/:noteId/:pageId` のため、`id` と
-      // `noteId` の両方が揃ったページのみ "successful" として扱う。`noteId`
-      // 欠落時は不正な URL を組み立ててしまうので作成失敗扱いにする。
+      // Issue #889 Phase 3: 遷移先は `/notes/:noteId/:pageId`。`Page.noteId` は
+      // Issue #1020 以降 non-null なので、作成成功ページがあればそのまま遷移できる。
       // Issue #889 Phase 3: the canonical landing route is
-      // `/notes/:noteId/:pageId`, so both `id` and `noteId` must be present.
-      // Treat a missing `noteId` as a failed creation rather than navigating
-      // to `/notes/undefined/...`.
-      const firstCreated = created.find(
-        (p): p is NonNullable<typeof p> => p != null && Boolean(p.id) && Boolean(p.noteId),
-      );
+      // `/notes/:noteId/:pageId`; `Page.noteId` is non-null since issue #1020,
+      // so any successfully created page can be navigated to directly.
+      const firstCreated = created.find((p): p is NonNullable<typeof p> => p != null);
       if (!firstCreated) throw new Error("no pages created");
 
       const firstEntity = selectedEntities[created.indexOf(firstCreated)];

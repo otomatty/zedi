@@ -37,7 +37,7 @@ import {
   useCreateDomainAccess,
   useDeleteDomainAccess,
   useDomainAccessForNote,
-} from "@/hooks/useDomainAccess";
+} from "@/hooks/auth/useDomainAccess";
 import { ApiError } from "@/lib/api";
 import { normalizeDomainInput } from "@/lib/domainValidation";
 import type { DomainValidationError, DomainValidationResult } from "@/lib/domainValidation";

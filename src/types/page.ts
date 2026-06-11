@@ -6,15 +6,12 @@ export interface Page {
   id: string;
   ownerUserId: string;
   /**
-   * 所属ノート ID。Issue #823 でデフォルトノート（マイノート）が導入され、
-   * すべてのページはちょうど 1 つのノートに所属するようになった。旧 `/home`
-   * 表示用の「個人ページ（`note_id IS NULL`）」概念は廃止され、Issue #825 で
-   * フロント型も non-null に揃えた。
+   * 所属ノート ID。すべてのページはちょうど 1 つのノートに属する（Issue #823）。
+   * 旧「個人ページ」（`noteId === null`）は Issue #1020 でソースから根絶済み。
    *
-   * Owning note ID. After issue #823 every page belongs to exactly one note
-   * (the caller's default note replaces the legacy "personal page" concept,
-   * where `note_id` was `null`). Issue #825 tightened the frontend type to
-   * non-null to match the API contract.
+   * Owning note ID. Every page belongs to exactly one note (issue #823); the
+   * legacy "personal page" (`noteId === null`) concept was eradicated at the
+   * source by issue #1020.
    */
   noteId: string;
   title: string;
@@ -35,11 +32,8 @@ export interface PageSummary {
   id: string;
   ownerUserId: string;
   /**
-   * 所属ノート ID。`Page.noteId` と同様、Issue #823 / #825 によりフロント型も
-   * non-null になった。
-   *
-   * Owning note ID. Mirrors the non-null contract on `Page.noteId` after
-   * issues #823 and #825.
+   * 所属ノート ID。`Page.noteId` と同じ non-null 契約（Issue #823 / #1020）。
+   * Owning note ID; same non-null contract as `Page.noteId` (issues #823 / #1020).
    */
   noteId: string;
   title: string;

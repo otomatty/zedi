@@ -3,7 +3,6 @@
  * ブロック＋エージェントのスラッシュ行を描画する。
  */
 
-import React from "react";
 import { cn } from "@zedi/ui";
 import { Bot } from "lucide-react";
 import { slashMenuIconMap, agentSlashIconName } from "./slashSuggestionIcons";

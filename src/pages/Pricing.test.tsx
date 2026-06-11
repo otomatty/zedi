@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Pricing from "./Pricing";
-import type { UseSubscriptionResult } from "@/hooks/useSubscription";
+import type { UseSubscriptionResult } from "@/hooks/settings/useSubscription";
 
 const { mockUseSubscription, mockUseAuth } = vi.hoisted(() => {
   return {
@@ -32,11 +32,11 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useAuth", () => ({
+vi.mock("@/hooks/auth/useAuth", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-vi.mock("@/hooks/useSubscription", () => ({
+vi.mock("@/hooks/settings/useSubscription", () => ({
   useSubscription: () => mockUseSubscription(),
 }));
 

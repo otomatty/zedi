@@ -4,8 +4,8 @@ import { Skeleton } from "@zedi/ui";
 import Container from "@/components/layout/Container";
 import { PageGridSkeleton } from "@/components/page/PageGrid";
 import { useContainerColumns } from "@/hooks/useContainerColumns";
-import { useMyNote } from "@/hooks/useNoteQueries";
-import { useOnboarding } from "@/hooks/useOnboarding";
+import { useMyNote } from "@/hooks/notes/useNoteQueries";
+import { useOnboarding } from "@/hooks/auth/useOnboarding";
 import { isClipUrlAllowed } from "@/lib/webClipper";
 
 /**

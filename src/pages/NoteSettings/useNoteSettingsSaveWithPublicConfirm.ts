@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@zedi/ui";
-import { useUpdateNote } from "@/hooks/useNoteQueries";
+import { useUpdateNote } from "@/hooks/notes/useNoteQueries";
 import type { Note, NoteEditPermission, NoteVisibility } from "@/types/note";
 import {
   shouldConfirmDefaultNotePublicSave,

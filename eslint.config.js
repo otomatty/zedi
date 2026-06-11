@@ -145,6 +145,24 @@ export default tseslint.config(
       "react/no-multi-comp": "warn",
     },
   },
+  // packages/ui: 自前実装の export（hooks / lib / sidebar 分割実装）は TSDoc を必須（error）とする。
+  // `packages/ui/src/components/` 直下のフラットなファイル群は shadcn/ui 由来のベンダーコードのため
+  // 対象外とし、`jsdoc/require-jsdoc` は共通設定の warn のまま据え置く（#1014）。
+  // packages/ui: in-house exports (hooks / lib / the split sidebar implementation) must
+  // have TSDoc (error). Flat files under `packages/ui/src/components/` are vendored from
+  // shadcn/ui, so they are out of scope and stay at the shared `warn` severity (#1014).
+  {
+    files: [
+      "packages/ui/src/hooks/**/*.{ts,tsx}",
+      "packages/ui/src/lib/**/*.{ts,tsx}",
+      "packages/ui/src/components/sidebar/**/*.{ts,tsx}",
+    ],
+    rules: {
+      // severity のみ指定し、共通設定のオプション（publicOnly / contexts 等）を引き継ぐ。
+      // Severity-only override; inherits the shared options (publicOnly / contexts).
+      "jsdoc/require-jsdoc": "error",
+    },
+  },
   // ユーザーメニュー: ドロップダウン／シート／トリガー／コンテンツを 1 ファイルに配置（分割より可読性を優先）
   {
     files: ["src/components/layout/Header/UnifiedMenu.tsx"],

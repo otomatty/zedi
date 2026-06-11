@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   setActiveViewTab: vi.fn(),
 }));
 
-vi.mock("@/hooks/useAIChatPanelContentLogic", () => ({
+vi.mock("@/hooks/aiChat/useAIChatPanelContentLogic", () => ({
   useAIChatPanelContentLogic: () => ({
     pageConversations: [],
     handleExecuteAction: vi.fn(),
@@ -39,7 +39,7 @@ vi.mock("@/contexts/AIChatContext", () => ({
   }),
 }));
 
-vi.mock("@/hooks/usePromoteToWiki", () => ({
+vi.mock("@/hooks/wiki/usePromoteToWiki", () => ({
   usePromoteToWiki: () => ({
     handlePromote: vi.fn(),
     open: false,

@@ -18,7 +18,7 @@ import {
 import { cn } from "@zedi/ui";
 import { useTranslation } from "react-i18next";
 import type { Conversation } from "@/types/aiChat";
-import { useDeleteAIConversation } from "@/hooks/useDeleteAIConversation";
+import { useDeleteAIConversation } from "@/hooks/aiChat/useDeleteAIConversation";
 
 /**
  * AI conversation row props (page-level list).

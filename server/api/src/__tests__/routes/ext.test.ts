@@ -50,7 +50,7 @@ const mockVerifyPKCE = vi.fn();
 const mockIsRedirectUriAllowed = vi.fn();
 const mockIssueExtensionToken = vi.fn();
 const mockStoreExtensionCode = vi.fn();
-vi.mock("../../lib/extAuth.js", () => ({
+vi.mock("../../services/extAuth.js", () => ({
   consumeExtensionCode: (...args: unknown[]) => mockConsumeExtensionCode(...args),
   verifyPKCE: (...args: unknown[]) => mockVerifyPKCE(...args),
   isRedirectUriAllowed: (...args: unknown[]) => mockIsRedirectUriAllowed(...args),
@@ -63,12 +63,12 @@ const mockClipAndCreate = vi.fn().mockResolvedValue({
   title: "Mock Title",
   thumbnail_url: "https://example.com/thumb.png",
 });
-vi.mock("../../lib/clipAndCreate.js", () => ({
+vi.mock("../../services/clipAndCreate.js", () => ({
   clipAndCreate: (...args: unknown[]) => mockClipAndCreate(...args),
 }));
 
 const mockResolveAiConfigForRequest = vi.fn();
-vi.mock("../../lib/aiAccessHelpers.js", () => ({
+vi.mock("../../services/aiAccessHelpers.js", () => ({
   resolveAiConfigForRequest: (...args: unknown[]) => mockResolveAiConfigForRequest(...args),
 }));
 

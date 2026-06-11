@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { WikiLink, WIKI_LINK_PASTE_REGEX } from "./WikiLinkExtension";
 
 /**
@@ -100,7 +100,10 @@ describe("WikiLinkExtension paste rule", () => {
         options: { HTMLAttributes: {}, onLinkClick },
         parent: undefined,
       };
-      const plugins = addProseMirrorPlugins.call(context) as Array<{
+      // Mock `this` context only needs the runtime fields the handler reads.
+      const plugins = addProseMirrorPlugins.call(
+        context as unknown as ThisParameterType<typeof addProseMirrorPlugins>,
+      ) as Array<{
         spec: {
           props: {
             handleClick?: HandleClick;
@@ -242,7 +245,10 @@ describe("WikiLinkExtension paste rule", () => {
           ...extension,
           parent: undefined,
         };
-        const attrs = addAttributes.call(context) as Record<string, unknown>;
+        // Mock `this` context only needs the runtime fields the handler reads.
+        const attrs = addAttributes.call(
+          context as unknown as ThisParameterType<typeof addAttributes>,
+        ) as Record<string, unknown>;
         const targetId = attrs.targetId as ReturnType<typeof getTargetIdSpec>;
         if (!targetId) throw new Error("targetId attribute missing");
         return targetId;

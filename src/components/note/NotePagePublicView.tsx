@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@zedi/ui";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
-import { usePagePublicContent } from "@/hooks/usePagePublicContent";
+import { usePagePublicContent } from "@/hooks/pages/usePagePublicContent";
 import { ApiError } from "@/lib/api";
 import { convertMarkdownToTiptapContent } from "@/lib/markdownToTiptap";
 import type { Page } from "@/types/page";
@@ -139,7 +139,7 @@ export const NotePagePublicView: React.FC<NotePagePublicViewProps> = ({ pageId, 
       showToolbar={false}
       onContentChange={NOOP}
       onContentError={NOOP}
-      pageNoteId={page.noteId ?? null}
+      pageNoteId={page.noteId}
     />
   );
 };

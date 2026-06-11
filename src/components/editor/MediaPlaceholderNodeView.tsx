@@ -4,43 +4,16 @@ import { useTranslation } from "react-i18next";
 import { FileImage, FileVideo, Link as LinkIcon, Loader2, Trash2, Upload } from "lucide-react";
 import { Button, Input } from "@zedi/ui";
 import type { MediaPlaceholderMode } from "./extensions/MediaPlaceholderExtension";
-
-/**
- * サーバーの `ALLOWED_UPLOAD_TYPES`（server/api/src/routes/media.ts）と一致させた
- * クライアント側の許可 MIME セット。ここが緩いとサーバーに弾かれて生の HTTP 415
- * 文字列がユーザーに見えてしまうため、二重定義してでも同期させる。
- *
- * Mirror of the server's `ALLOWED_UPLOAD_TYPES` so we surface the friendly
- * localized error before the request hits the server.
- */
-const ALLOWED_IMAGE_MIME = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "image/avif",
-  "image/apng",
-  "image/bmp",
-  "image/x-ms-bmp",
-]);
-const ALLOWED_VIDEO_MIME = new Set(["video/webm", "video/mp4"]);
+import {
+  ALLOWED_IMAGE_MIME,
+  ALLOWED_VIDEO_MIME,
+  MediaUploadError,
+  resolveApiBaseUrl,
+  uploadMediaFile,
+} from "@/lib/media/uploadMediaFile";
 
 const IMAGE_MIME_ACCEPT = [...ALLOWED_IMAGE_MIME].join(",");
 const VIDEO_MIME_ACCEPT = [...ALLOWED_VIDEO_MIME].join(",");
-const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
-
-/**
- * VITE_API_BASE_URL で分離構成される本番環境でも `/api/media/*` が正しい API
- * オリジンへ飛ぶよう、ベース URL を解決する。フロントエンド = API のときは空文字で
- * フォールバックし、相対 URL のまま発行する。
- *
- * Resolves the API origin so split deployments with `VITE_API_BASE_URL`
- * route `/api/media/*` to the correct host.
- */
-function resolveApiBaseUrl(): string {
-  const base = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
-  return base.replace(/\/$/, "");
-}
 
 /**
  * ファイル名から代替テキストを自動生成する（拡張子を外し、記号を空白に変換して
@@ -55,16 +28,6 @@ function deriveAltFromFileName(fileName: string): string {
     .replace(/[_\-.]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-/**
- * 動画/画像の MIME がモードに合っているかを判定する。
- * Validates that a file's MIME type matches the placeholder mode.
- */
-function isMimeAllowedForMode(mime: string, mode: MediaPlaceholderMode): boolean {
-  const normalized = mime.toLowerCase();
-  if (mode === "image") return ALLOWED_IMAGE_MIME.has(normalized);
-  return ALLOWED_VIDEO_MIME.has(normalized);
 }
 
 /**
@@ -83,26 +46,6 @@ type UploadState =
   | { kind: "idle" }
   | { kind: "uploading"; progress: number }
   | { kind: "error"; message: string };
-
-/**
- * レスポンスから人間向けエラーメッセージを抽出する。サーバーは
- * `{ ok: false, error: { message } }` または `{ message }` を返す。
- *
- * Extracts a human-readable message from an API error response; both the
- * envelope shape and the legacy `{ message }` shape are accepted.
- */
-async function extractErrorMessage(response: Response, fallback: string): Promise<string> {
-  try {
-    const data = (await response.json()) as {
-      ok?: boolean;
-      error?: { message?: string };
-      message?: string;
-    } | null;
-    return data?.error?.message ?? data?.message ?? `${fallback} (HTTP ${response.status})`;
-  } catch {
-    return `${fallback} (HTTP ${response.status})`;
-  }
-}
 
 /**
  * MediaPlaceholder の NodeView。File 選択 / URL 入力 / ドラッグ＆ドロップを
@@ -152,6 +95,7 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
   const replaceWithMediaNode = useCallback(
     (attrs: { src: string; alt: string; poster?: string | null }) => {
       const pos = getPos();
+      if (pos === undefined) return;
       const { view, state } = editor;
       const schema = state.schema;
       const type = schema.nodes[targetNodeType];
@@ -175,89 +119,28 @@ export function MediaPlaceholderNodeView({ node, editor, getPos, deleteNode }: N
    */
   const handleFileUpload = useCallback(
     async (file: File) => {
-      if (!isMimeAllowedForMode(file.type, mode)) {
-        setUploadState({
-          kind: "error",
-          message: t("editor.media.errors.unsupportedType"),
-        });
-        return;
-      }
-      if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-        setUploadState({
-          kind: "error",
-          message: t("editor.media.errors.tooLarge"),
-        });
-        return;
-      }
-
       setUploadState({ kind: "uploading", progress: 0 });
       try {
-        const presign = await fetch(`${apiBaseUrl}/api/media/upload`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            file_name: file.name,
-            content_type: file.type,
-            file_size: file.size,
-          }),
-        });
-        if (!presign.ok) {
-          throw new Error(
-            await extractErrorMessage(presign, t("editor.media.errors.uploadFailed")),
-          );
-        }
-        if (removedRef.current) return;
-        const { upload_url, media_id, s3_key } = (await presign.json()) as {
-          upload_url: string;
-          media_id: string;
-          s3_key: string;
-        };
-
-        const put = await fetch(upload_url, {
-          method: "PUT",
-          body: file,
-          headers: { "Content-Type": file.type },
-        });
-        if (!put.ok) {
-          throw new Error(`${t("editor.media.errors.uploadFailed")} (HTTP ${put.status})`);
-        }
-        if (removedRef.current) return;
-
-        const confirm = await fetch(`${apiBaseUrl}/api/media/confirm`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            media_id,
-            s3_key,
-            file_name: file.name,
-            content_type: file.type,
-            file_size: file.size,
-          }),
-        });
-        if (!confirm.ok) {
-          throw new Error(
-            await extractErrorMessage(confirm, t("editor.media.errors.uploadFailed")),
-          );
-        }
-        // confirm 成功後に placeholder が消されていたら、メディアは DB に残るが
+        const allowedMime = mode === "video" ? ALLOWED_VIDEO_MIME : ALLOWED_IMAGE_MIME;
+        const { src } = await uploadMediaFile(file, { apiBaseUrl, allowedMime });
+        // アップロード中に placeholder が削除されていたら、メディアは DB に残るが
         // ノードは挿入しない（ユーザーの削除意思を優先する）。DB 側のゴミは
         // 個別のクリーンアップジョブで回収可能。
-        // If the placeholder was deleted after confirm succeeded, skip the
-        // node replacement — the user asked to remove it. The confirmed media
-        // row becomes a sweepable orphan that later GC can reclaim.
+        // If the placeholder was deleted mid-upload, skip the node replacement —
+        // the user asked to remove it. The confirmed media row becomes a
+        // sweepable orphan that later GC can reclaim.
         if (removedRef.current) return;
 
         const derivedAlt = altValue.trim() || deriveAltFromFileName(file.name);
-        replaceWithMediaNode({
-          src: `${apiBaseUrl}/api/media/${media_id}`,
-          alt: derivedAlt,
-        });
+        replaceWithMediaNode({ src, alt: derivedAlt });
       } catch (error) {
         if (removedRef.current) return;
         const message =
-          error instanceof Error ? error.message : t("editor.media.errors.uploadFailed");
+          error instanceof MediaUploadError
+            ? error.message || t(`editor.media.errors.${error.code}`)
+            : error instanceof Error
+              ? error.message
+              : t("editor.media.errors.uploadFailed");
         setUploadState({ kind: "error", message });
       }
     },

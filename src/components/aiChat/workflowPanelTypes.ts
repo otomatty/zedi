@@ -8,5 +8,5 @@
  * {@link useWorkflowPanelLogic} の戻り値と同形。
  */
 export type WorkflowPanelFormProps = ReturnType<
-  typeof import("@/hooks/useWorkflowPanelLogic").useWorkflowPanelLogic
+  typeof import("@/hooks/workflow/useWorkflowPanelLogic").useWorkflowPanelLogic
 >;

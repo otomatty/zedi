@@ -52,6 +52,8 @@ bun run test:run       # Vitest 単体テスト
 
 - TypeScript strict。`any` 禁止、型を明示する。
 - export する関数・型・インターフェースには TSDoc / JSDoc を付与する。
+  - 例外: `packages/ui/src/components/` 直下の shadcn/ui 由来コンポーネントは対象外。自前実装（`packages/ui` の hooks / lib / sidebar 分割実装）は `jsdoc/require-jsdoc` を error で強制する（`eslint.config.js` 参照）。
+    _Exception: shadcn/ui-vendored components under `packages/ui/src/components/` are exempt; in-house code (hooks / lib / the split sidebar implementation) enforces `jsdoc/require-jsdoc` as an error (see `eslint.config.js`)._
 - コメントやドキュメントは、原則として日本語と英語の両方を併記する。
 - `bun run lint` と `bun run format:check` が通る状態を維持する。
 - 既存のディレクトリ構成・命名規則に合わせる。
@@ -126,6 +128,10 @@ terraform/        # インフラ定義
   _`src/hooks/` is for React hooks only; non-hook helpers belong in `src/lib/`._
 - `src/pages/` にフックを置かない。ページ専用フックも `src/hooks/` へ。  
   _Do not place hooks under `src/pages/`; page-specific hooks also go to `src/hooks/`._
+- `src/hooks/` 配下も同一ドメインのフックが **2 つ以上**になったらサブディレクトリへまとめる（例: `useAIChat*` 系は `src/hooks/aiChat/`）。ドメインに属さない汎用フック（`useDebouncedValue` など）は `src/hooks/` 直下に置く。テストは対象フックと同じサブディレクトリに同居させる。  
+  _Group two or more same-domain hooks under a `src/hooks/<domain>/` subdirectory (e.g. `useAIChat*` lives in `src/hooks/aiChat/`). Keep generic, domain-agnostic hooks (e.g. `useDebouncedValue`) directly under `src/hooks/`. Colocate tests in the same subdirectory as the hook._
+- フックへの import（コンポーネント・ページ等からの利用を含む）、フック間、およびフックから他ディレクトリへの import は相対パスではなく `@/` エイリアスを使う（サブディレクトリ移動時に壊れないため）。  
+  _Import hooks via the `@/` alias (from components, pages, and other hooks alike), and likewise import other directories from hooks via `@/` rather than relative paths, so they survive moving between subdirectories._
 - `src/lib/` 直下に同一ドメインのファイルが **2 つ以上**になったらサブディレクトリへまとめる（例: `aiChat*` 系は `src/lib/aiChat/`）。  
   _Group two or more same-domain files under a `src/lib/<domain>/` subdirectory._
 - `server/api` では再利用ロジックの置き場を区別する: ドメインロジックは `src/services/`、汎用ヘルパー（HTTP/環境変数/外部 API ラッパー等）は `src/lib/`。`*Service.ts` は `services/` に置く。  

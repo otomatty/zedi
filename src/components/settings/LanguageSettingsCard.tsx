@@ -1,4 +1,3 @@
-import React from "react";
 import { Languages } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@zedi/ui";
 import { useTranslation } from "react-i18next";

@@ -1,13 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
+import { DecorationSet } from "@tiptap/pm/view";
 import { useSuggestionEffects } from "./useSuggestionEffects";
 import type { Editor } from "@tiptap/core";
-import { wikiLinkSuggestionPluginKey } from "../extensions/wikiLinkSuggestionPlugin";
-import { slashSuggestionPluginKey } from "../extensions/slashSuggestionPlugin";
-import { tagSuggestionPluginKey } from "../extensions/tagSuggestionPlugin";
+import {
+  wikiLinkSuggestionPluginKey,
+  type WikiLinkSuggestionState,
+} from "../extensions/wikiLinkSuggestionPlugin";
+import {
+  slashSuggestionPluginKey,
+  type SlashSuggestionState,
+} from "../extensions/slashSuggestionPlugin";
+import { tagSuggestionPluginKey, type TagSuggestionState } from "../extensions/tagSuggestionPlugin";
 
 const mockCheckReferenced = vi.fn();
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useCheckGhostLinkReferenced: () => ({ checkReferenced: mockCheckReferenced }),
 }));
 
@@ -44,15 +51,13 @@ const editorContainerRef = { current: document.createElement("div") };
 describe("useSuggestionEffects", () => {
   const defaultOptions = {
     editor: null as Editor | null,
-    suggestionState: null as { active: boolean; range: { from: number; to: number } | null } | null,
-    slashState: null as { active: boolean; range: { from: number; to: number } | null } | null,
-    tagSuggestionState: null as {
-      active: boolean;
-      range: { from: number; to: number } | null;
-    } | null,
+    suggestionState: null as WikiLinkSuggestionState | null,
+    slashState: null as SlashSuggestionState | null,
+    tagSuggestionState: null as TagSuggestionState | null,
     editorContainerRef,
     pageId: "page-1",
     handleInsertImageClick: vi.fn(),
+    handleInsertCameraImageClick: vi.fn(),
   };
 
   beforeEach(() => {
@@ -63,7 +68,12 @@ describe("useSuggestionEffects", () => {
     const { result } = renderHook(() =>
       useSuggestionEffects({
         ...defaultOptions,
-        suggestionState: { active: true, range: { from: 0, to: 5 } },
+        suggestionState: {
+          active: true,
+          query: "",
+          range: { from: 0, to: 5 },
+          decorations: DecorationSet.empty,
+        },
       }),
     );
 
@@ -86,7 +96,12 @@ describe("useSuggestionEffects", () => {
       useSuggestionEffects({
         ...defaultOptions,
         editor: mockEditor,
-        suggestionState: { active: true, range: { from: 0, to: 5 } },
+        suggestionState: {
+          active: true,
+          query: "",
+          range: { from: 0, to: 5 },
+          decorations: DecorationSet.empty,
+        },
       }),
     );
 
@@ -114,7 +129,12 @@ describe("useSuggestionEffects", () => {
       useSuggestionEffects({
         ...defaultOptions,
         editor: mockEditor,
-        suggestionState: { active: true, range: { from: 0, to: 5 } },
+        suggestionState: {
+          active: true,
+          query: "",
+          range: { from: 0, to: 5 },
+          decorations: DecorationSet.empty,
+        },
       }),
     );
 
@@ -201,7 +221,12 @@ describe("useSuggestionEffects", () => {
       useSuggestionEffects({
         ...defaultOptions,
         editor: mockEditor,
-        tagSuggestionState: { active: true, range: { from: 1, to: 5 } },
+        tagSuggestionState: {
+          active: true,
+          query: "",
+          range: { from: 1, to: 5 },
+          decorations: DecorationSet.empty,
+        },
       }),
     );
 
@@ -238,7 +263,12 @@ describe("useSuggestionEffects", () => {
       useSuggestionEffects({
         ...defaultOptions,
         editor: mockEditor,
-        tagSuggestionState: { active: true, range: { from: 1, to: 5 } },
+        tagSuggestionState: {
+          active: true,
+          query: "",
+          range: { from: 1, to: 5 },
+          decorations: DecorationSet.empty,
+        },
       }),
     );
 
@@ -264,7 +294,12 @@ describe("useSuggestionEffects", () => {
     const { result } = renderHook(() =>
       useSuggestionEffects({
         ...defaultOptions,
-        tagSuggestionState: { active: true, range: { from: 0, to: 5 } },
+        tagSuggestionState: {
+          active: true,
+          query: "",
+          range: { from: 0, to: 5 },
+          decorations: DecorationSet.empty,
+        },
       }),
     );
 

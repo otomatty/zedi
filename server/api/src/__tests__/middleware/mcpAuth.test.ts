@@ -7,8 +7,8 @@ import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
 
 const mockVerifyMcpToken = vi.fn();
-vi.mock("../../lib/mcpAuth.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../lib/mcpAuth.js")>();
+vi.mock("../../services/mcpAuth.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../services/mcpAuth.js")>();
   return {
     ...actual,
     verifyMcpToken: (...args: unknown[]) => mockVerifyMcpToken(...args),
@@ -21,7 +21,7 @@ import {
   MCP_SCOPE_READ,
   MCP_SCOPE_WRITE,
   McpRevocationLookupError,
-} from "../../lib/mcpAuth.js";
+} from "../../services/mcpAuth.js";
 
 type MockStatusRow = { status: "active" | "suspended" | "deleted" };
 

@@ -13,7 +13,7 @@ import {
   Button,
   useToast,
 } from "@zedi/ui";
-import { useDeleteNote } from "@/hooks/useNoteQueries";
+import { useDeleteNote } from "@/hooks/notes/useNoteQueries";
 import { useNoteSettingsContext } from "../NoteSettingsContext";
 
 /**

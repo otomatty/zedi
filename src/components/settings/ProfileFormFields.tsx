@@ -21,7 +21,7 @@ export interface ProfileFormFieldsProps {
   onAvatarRemove: () => void;
   /** When true, show the "Remove avatar" button (user has set a custom avatar). / true のとき「アバターを削除」ボタンを表示。 */
   hasCustomAvatar: boolean;
-  fileInputRef: React.RefObject<HTMLInputElement>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   /** Optional error message below display name (e.g. "Display name is required"). / 表示名の下に出す任意のエラーメッセージ。 */
   displayNameError?: string;
   /** Optional id prefix for inputs (e.g. "onboarding" for onboarding-displayName). / 入力要素の id プレフィックス（例: onboarding）。 */

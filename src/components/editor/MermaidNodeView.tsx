@@ -17,7 +17,12 @@ async function getMermaid() {
       mermaid.initialize({
         startOnLoad: false,
         theme: "default",
-        securityLevel: "loose",
+        // `strict` keeps Mermaid's built-in DOMPurify sanitization of diagram
+        // labels and disables interactive HTML/click handlers. The rendered SVG
+        // is injected via dangerouslySetInnerHTML and the diagram source is
+        // user-controlled (pasted/imported markdown, shared/public pages), so
+        // `loose` would allow stored XSS. No diagram interactivity is used.
+        securityLevel: "strict",
         fontFamily: "inherit",
       });
       mermaidInitialized = true;

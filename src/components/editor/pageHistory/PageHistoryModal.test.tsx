@@ -32,7 +32,7 @@ const mockSnapshots: PageSnapshot[] = [
   },
 ];
 
-vi.mock("@/hooks/usePageSnapshotQueries", () => ({
+vi.mock("@/hooks/pages/usePageSnapshotQueries", () => ({
   usePageSnapshots: () => ({ data: mockSnapshots, isLoading: false }),
   usePageSnapshot: (_pageId: string, snapshotId: string | null) => ({
     data: snapshotId

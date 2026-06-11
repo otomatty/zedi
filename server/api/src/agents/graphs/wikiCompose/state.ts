@@ -33,6 +33,8 @@ import type {
   BriefResult,
   ComposeChatSeed,
   ComposeCompletion,
+  ComposeMode,
+  ComprehensionAids,
   DraftedSection,
   OutlineSection,
   PageSnapshot,
@@ -94,6 +96,19 @@ function mergeSectionsById(
  */
 export const WikiComposeState = Annotation.Root({
   ...BaseState.spec,
+
+  /**
+   * 実行モード。`instant` のときは Brief / Outline の interrupt をスキップして
+   * 即座にドラフトする（初回 `POST /run` input から投影）。既定は `guided`。
+   *
+   * Run mode. `instant` skips the Brief/Outline interrupts so the article
+   * drafts immediately; `guided` (default) keeps the human-in-the-loop gates.
+   * Projected from the first `POST /run` input.
+   */
+  mode: Annotation<ComposeMode>({
+    reducer: (prev, next) => next ?? prev,
+    default: () => "guided",
+  }),
 
   // ── Brief phase ───────────────────────────────────────────────────────────
   /**
@@ -217,6 +232,15 @@ export const WikiComposeState = Annotation.Root({
   }),
   /** 完了サマリ。`completed` ノードが書く。 */
   completion: Annotation<ComposeCompletion | null>({
+    reducer: (prev, next) => (next === undefined ? prev : next),
+    default: () => null,
+  }),
+  /**
+   * 理解支援スキャフォールド。`comprehension_aids` ノードが書き、`completed`
+   * が `completion` に同梱する。生成失敗時は null のまま。
+   * Understanding-layer scaffolds written by `comprehension_aids`.
+   */
+  comprehensionAids: Annotation<ComprehensionAids | null>({
     reducer: (prev, next) => (next === undefined ? prev : next),
     default: () => null,
   }),

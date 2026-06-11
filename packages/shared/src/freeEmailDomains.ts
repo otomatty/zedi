@@ -17,10 +17,10 @@
  * the two in sync via a CI drift detector.
  *
  * 同期義務 / Sync obligation:
- * - 本ファイルを編集したら `server/api/src/lib/freeEmailDomains.ts` も同じ値で更新する。
+ * - 本ファイルを編集したら `server/api/src/services/freeEmailDomains.ts` も同じ値で更新する。
  *   ドリフト検知テストが失敗したらどちらか片側しか更新していないので、もう片方を揃える。
  * - When this file changes, also update
- *   `server/api/src/lib/freeEmailDomains.ts`. If the drift test fails, only
+ *   `server/api/src/services/freeEmailDomains.ts`. If the drift test fails, only
  *   one side was edited — sync the other.
  */
 

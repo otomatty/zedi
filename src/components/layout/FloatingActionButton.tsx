@@ -2,13 +2,13 @@ import React, { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { cn } from "@zedi/ui";
-import { useCreateNewPage } from "@/hooks/useCreateNewPage";
+import { useCreateNewPage } from "@/hooks/pages/useCreateNewPage";
 import { FABMenu, type FABMenuOption } from "./FABMenu";
 import { WebClipperDialog } from "@/components/editor/WebClipperDialog";
 import { ImageCreateDialog } from "./ImageCreateDialog";
 import { useTranslation } from "react-i18next";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@zedi/ui";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/auth/useAuth";
 import { useFloatingActionButtonHandlers } from "./useFloatingActionButtonHandlers";
 
 /**
@@ -23,11 +23,11 @@ import { useFloatingActionButtonHandlers } from "./useFloatingActionButtonHandle
 type FloatingActionButtonProps = {
   noteId?: string;
   /**
-   * 追加で非表示にするメニュー項目。未ログイン時の `url` 非表示ロジックは
-   * 内部で自動適用されるため、重ねて渡す必要はない。
+   * 追加で非表示にするメニュー項目。未サインイン時は FAB 自体が描画されない
+   * （ページ作成はサインイン必須、Issue #1020）。
    *
-   * Additional menu options to hide. The built-in `url` hide rule for guests is
-   * applied automatically, so callers don't need to re-specify it.
+   * Additional menu options to hide. For guests the FAB renders nothing at
+   * all — page creation requires sign-in (issue #1020).
    */
   hiddenOptions?: FABMenuOption[];
 } & (
@@ -62,7 +62,23 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
 
   useEffect(() => {
     if (!isSignedIn) {
-      queueMicrotask(() => setIsWebClipperOpen(false));
+      // サインアウト遷移ではコンポーネントは unmount されず `null` を返すだけ
+      // なので、開いたままのメニュー / ダイアログ状態が残ると再サインイン時に
+      // 突然再表示される。ローカル UI 状態をここで畳む（PR #1023 CodeRabbit）。
+      // `initialClipUrl` の破棄はしない — サインイン往復（#826 の clipUrl
+      // handoff）ではセッション読込中に一時的に未サインイン判定になるため、
+      // ここで親に閉じ通知すると正規の handoff を壊してしまう。
+      // On sign-out the component stays mounted and merely renders null, so
+      // stale open-menu/dialog state would resurface on the next sign-in.
+      // Collapse the local UI state here (PR #1023 CodeRabbit review). Do NOT
+      // clear `initialClipUrl`: the sign-in round trip (#826 clipUrl handoff)
+      // passes through a transient unauthenticated state, and notifying the
+      // parent here would destroy the legitimate handoff.
+      queueMicrotask(() => {
+        setIsMenuOpen(false);
+        setIsWebClipperOpen(false);
+        setIsImageDialogOpen(false);
+      });
     }
   }, [isSignedIn]);
 
@@ -75,12 +91,16 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
     noteId,
   });
 
-  const mergedHidden: FABMenuOption[] = [
-    ...(isSignedIn ? [] : (["url"] as FABMenuOption[])),
-    ...(extraHiddenOptions ?? []),
-  ];
   const hiddenOptions: FABMenuOption[] | undefined =
-    mergedHidden.length > 0 ? mergedHidden : undefined;
+    extraHiddenOptions && extraHiddenOptions.length > 0 ? extraHiddenOptions : undefined;
+
+  // ページ作成はサインイン必須（Issue #1020 でゲストのローカル作成を廃止）。
+  // FAB のメニューは全てページ作成系のため、未サインイン時は FAB 自体を出さない。
+  // Page creation requires sign-in (guest-local creation was retired by issue
+  // #1020). Every FAB menu option creates a page, so hide the FAB for guests.
+  if (!isSignedIn) {
+    return null;
+  }
 
   const fabButton = (
     <TooltipProvider delayDuration={300}>

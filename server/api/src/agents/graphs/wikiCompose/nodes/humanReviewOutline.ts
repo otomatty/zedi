@@ -21,6 +21,15 @@ export async function humanReviewOutline(
   state: WikiComposeStateType,
   _config: LangGraphRunnableConfig,
 ): Promise<WikiComposeStateUpdate> {
+  // Instant mode: auto-approve the orchestrator's proposed outline so drafting
+  // starts without a gate. The user can still refine later from the completed
+  // article (Understanding Layer / guided re-run).
+  // 即時モードでは提案アウトラインを自動承認し、ゲートなしでドラフトへ進む。
+  if (state.mode === "instant") {
+    const approvedOutline: ApprovedOutline = { sections: state.outlineProposal };
+    return { approvedOutline, phase: "structure:completed" };
+  }
+
   const payload: WikiComposeInterruptPayload = {
     kind: "human_review_outline",
     outline: state.outlineProposal,

@@ -15,6 +15,7 @@ function createMockAdapter(overrides: Partial<StorageAdapter> = {}): StorageAdap
     getPage: vi.fn().mockResolvedValue(null),
     upsertPage: vi.fn().mockResolvedValue(undefined),
     deletePage: vi.fn().mockResolvedValue(undefined),
+    reassignNullNotePages: vi.fn().mockResolvedValue(undefined),
     getYDocState: vi.fn().mockResolvedValue(null),
     saveYDocState: vi.fn().mockResolvedValue(undefined),
     getYDocVersion: vi.fn().mockResolvedValue(0),
@@ -29,6 +30,7 @@ function createMockAdapter(overrides: Partial<StorageAdapter> = {}): StorageAdap
     setLastSyncTime: vi.fn().mockResolvedValue(undefined),
     initialize: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
+    resetDatabase: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -40,6 +42,7 @@ function createMockApi(overrides: Partial<ApiClient> = {}): ApiClient {
       pages: [],
       links: [],
       ghost_links: [],
+      default_note_id: DEFAULT_NOTE_ID,
       server_time: new Date().toISOString(),
     }),
     postSyncPages: vi.fn().mockResolvedValue({
@@ -67,6 +70,7 @@ function createMockApi(overrides: Partial<ApiClient> = {}): ApiClient {
 }
 
 const TEST_USER_ID = "user-1";
+const DEFAULT_NOTE_ID = "default-note-1";
 
 describe("syncWithApi", () => {
   beforeEach(async () => {
@@ -105,6 +109,7 @@ describe("syncWithApi", () => {
         pages: [serverPage],
         links: [],
         ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
         server_time: serverTime,
       }),
     });
@@ -122,7 +127,7 @@ describe("syncWithApi", () => {
       getPage: vi.fn().mockResolvedValue({
         id: "p1",
         ownerId: TEST_USER_ID,
-        noteId: null,
+        noteId: DEFAULT_NOTE_ID,
         sourcePageId: null,
         title: "Local Version",
         contentPreview: null,
@@ -151,6 +156,7 @@ describe("syncWithApi", () => {
         ],
         links: [],
         ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
         server_time: new Date().toISOString(),
       }),
     });
@@ -170,6 +176,7 @@ describe("syncWithApi", () => {
           { source_id: "p1", target_id: "p3", created_at: "2025-01-01T00:00:00Z" },
         ],
         ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
         server_time: new Date().toISOString(),
       }),
     });
@@ -209,6 +216,7 @@ describe("syncWithApi", () => {
         pages: [serverPage],
         links: [],
         ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
         server_time: new Date().toISOString(),
       }),
     });
@@ -262,6 +270,7 @@ describe("syncWithApi", () => {
           },
         ],
         ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
         server_time: new Date().toISOString(),
       }),
     });
@@ -309,6 +318,7 @@ describe("syncWithApi", () => {
         // ghost_links は空（この配列単独では link_type 非対応に見える）
         // ghost_links empty (looks legacy on its own)
         ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
         server_time: new Date().toISOString(),
       }),
     });
@@ -325,7 +335,7 @@ describe("syncWithApi", () => {
     const localPage: PageMetadata = {
       id: "p1",
       ownerId: TEST_USER_ID,
-      noteId: null,
+      noteId: DEFAULT_NOTE_ID,
       sourcePageId: null,
       title: "Page with thumbnail",
       contentPreview: "preview",
@@ -359,6 +369,7 @@ describe("syncWithApi", () => {
         ],
         links: [],
         ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
         server_time: new Date().toISOString(),
       }),
     });
@@ -377,7 +388,7 @@ describe("syncWithApi", () => {
     const localPage: PageMetadata = {
       id: "p1",
       ownerId: TEST_USER_ID,
-      noteId: null,
+      noteId: DEFAULT_NOTE_ID,
       sourcePageId: null,
       title: "Page",
       contentPreview: null,
@@ -411,6 +422,7 @@ describe("syncWithApi", () => {
         ],
         links: [],
         ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
         server_time: new Date().toISOString(),
       }),
     });
@@ -431,7 +443,7 @@ describe("syncWithApi", () => {
     const localPage: PageMetadata = {
       id: "local-1",
       ownerId: TEST_USER_ID,
-      noteId: null,
+      noteId: DEFAULT_NOTE_ID,
       sourcePageId: null,
       title: "Local Page",
       contentPreview: null,
@@ -458,7 +470,7 @@ describe("syncWithApi", () => {
     const manyPages: PageMetadata[] = Array.from({ length: PAGE_PUSH_CHUNK_SIZE + 1 }, (_, i) => ({
       id: `page-${i}`,
       ownerId: TEST_USER_ID,
-      noteId: null,
+      noteId: DEFAULT_NOTE_ID,
       sourcePageId: null,
       title: `Page ${i}`,
       contentPreview: null,
@@ -495,6 +507,7 @@ describe("syncWithApi", () => {
         pages: [],
         links: [],
         ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
         server_time: new Date().toISOString(),
       }),
       postSyncPages,
@@ -519,7 +532,7 @@ describe("syncWithApi", () => {
     const localPage: PageMetadata = {
       id: "p1",
       ownerId: TEST_USER_ID,
-      noteId: null,
+      noteId: DEFAULT_NOTE_ID,
       sourcePageId: null,
       title: "Local",
       contentPreview: null,
@@ -562,17 +575,17 @@ describe("syncWithApi", () => {
     );
   });
 
-  it("excludes note-native pages from push (issue #713 Phase 2 defensive filter)", async () => {
-    // ノートネイティブページ（`noteId !== null`）は POST /api/sync/pages の LWW
-    // 対象外。サーバー側でも skip されるが、フロント側でも push 前に除外することで
-    // 余計なリクエストを発生させない。Issue #713 Phase 2。
-    // Note-native rows (`noteId !== null`) are not part of personal-page sync.
-    // Filter them out client-side too so we never put them on the wire even
-    // when the server would skip them. Issue #713 Phase 2.
+  it("excludes pages outside the default note from push (issue #1020 defensive filter)", async () => {
+    // POST /api/sync/pages の LWW 対象は呼び出し元のデフォルトノート配下のみ。
+    // サーバー側でも skip されるが、フロント側でも push 前に除外することで
+    // 余計なリクエストを発生させない。Issue #823 / #1020。
+    // LWW sync only covers rows under the caller's default note. Filter
+    // foreign-note rows out client-side too so we never put them on the wire
+    // even when the server would skip them. Issues #823 / #1020.
     const personalPage: PageMetadata = {
       id: "personal-1",
       ownerId: TEST_USER_ID,
-      noteId: null,
+      noteId: DEFAULT_NOTE_ID,
       sourcePageId: null,
       title: "Personal",
       contentPreview: null,
@@ -613,13 +626,13 @@ describe("syncWithApi", () => {
     expect(pushedIds).not.toContain("note-native-1");
   });
 
-  it("propagates note_id from SyncPageItem into PageMetadata (defensive read)", async () => {
-    // GET /api/sync/pages は現状個人ページしか返さないが、将来 `note_id` が
-    // ワイヤに乗った場合に `PageMetadata.noteId` までそのまま伝わることを保証する。
-    // Issue #713 Phase 2。
-    // GET /api/sync/pages currently only returns personal pages, but if the
-    // wire ever surfaces `note_id` we want it to land on `PageMetadata.noteId`
-    // without further plumbing. Issue #713 Phase 2.
+  it("propagates note_id from SyncPageItem and falls back to default_note_id when missing (issue #1020)", async () => {
+    // GET /api/sync/pages の各行は `note_id` を持つ（Issue #1020）。万一
+    // `note_id` を欠く行（旧サーバのキャッシュ応答など）が来た場合は、同
+    // レスポンスの `default_note_id` で補い、`noteId: null` を復活させない。
+    // Every pulled row carries `note_id` (issue #1020). Rows lacking it
+    // (e.g. cached pre-#1020 payloads) fall back to the response's
+    // `default_note_id` instead of resurrecting `noteId: null`.
     const adapter = createMockAdapter();
     const api = createMockApi({
       getSyncPages: vi.fn().mockResolvedValue({
@@ -627,7 +640,6 @@ describe("syncWithApi", () => {
           {
             id: "p1",
             owner_id: TEST_USER_ID,
-            note_id: null,
             source_page_id: null,
             title: "Personal",
             content_preview: null,
@@ -653,6 +665,7 @@ describe("syncWithApi", () => {
         ],
         links: [],
         ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
         server_time: new Date().toISOString(),
       }),
     });
@@ -661,10 +674,71 @@ describe("syncWithApi", () => {
 
     const upsertMock = adapter.upsertPage as ReturnType<typeof vi.fn>;
     const upsertedById = new Map<string, PageMetadata>(
-      upsertMock.mock.calls.map(([m]: [PageMetadata]) => [m.id, m]),
+      upsertMock.mock.calls.map((call) => {
+        const m = call[0] as PageMetadata;
+        return [m.id, m] as [string, PageMetadata];
+      }),
     );
-    expect(upsertedById.get("p1")?.noteId).toBeNull();
+    expect(upsertedById.get("p1")?.noteId).toBe(DEFAULT_NOTE_ID);
     expect(upsertedById.get("p2")?.noteId).toBe("note-1");
+  });
+
+  it("reassigns legacy noteId:null rows to the default note before applying the pull (issue #1020)", async () => {
+    const callOrder: string[] = [];
+    const adapter = createMockAdapter({
+      reassignNullNotePages: vi.fn().mockImplementation(async () => {
+        callOrder.push("reassign");
+      }),
+      upsertPage: vi.fn().mockImplementation(async () => {
+        callOrder.push("upsert");
+      }),
+    });
+    const api = createMockApi({
+      getSyncPages: vi.fn().mockResolvedValue({
+        pages: [
+          {
+            id: "p1",
+            owner_id: TEST_USER_ID,
+            note_id: DEFAULT_NOTE_ID,
+            source_page_id: null,
+            title: "S",
+            content_preview: null,
+            thumbnail_url: null,
+            source_url: null,
+            created_at: "2025-01-01T00:00:00Z",
+            updated_at: "2025-05-01T00:00:00Z",
+            is_deleted: false,
+          },
+        ],
+        links: [],
+        ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
+        server_time: new Date().toISOString(),
+      }),
+    });
+
+    await syncWithApi(adapter, api, TEST_USER_ID);
+
+    expect(adapter.reassignNullNotePages).toHaveBeenCalledWith(DEFAULT_NOTE_ID);
+    expect(callOrder[0]).toBe("reassign");
+    expect(callOrder).toContain("upsert");
+    expect(callOrder.indexOf("reassign")).toBeLessThan(callOrder.indexOf("upsert"));
+  });
+
+  it("fails the sync when the response lacks default_note_id (pre-#1020 server)", async () => {
+    const adapter = createMockAdapter();
+    const api = createMockApi({
+      getSyncPages: vi.fn().mockResolvedValue({
+        pages: [],
+        links: [],
+        ghost_links: [],
+        server_time: new Date().toISOString(),
+      }),
+    });
+
+    await expect(syncWithApi(adapter, api, TEST_USER_ID)).rejects.toThrow(/default_note_id/);
+    expect(adapter.upsertPage).not.toHaveBeenCalled();
+    expect(api.postSyncPages).not.toHaveBeenCalled();
   });
 
   it("skips push on initial sync when local was empty", async () => {
@@ -689,6 +763,7 @@ describe("syncWithApi", () => {
         ],
         links: [],
         ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
         server_time: new Date().toISOString(),
       }),
     });

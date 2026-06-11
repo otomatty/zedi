@@ -18,12 +18,12 @@ import {
   useToast,
 } from "@zedi/ui";
 import { signIn } from "@/lib/auth";
-import { useAuth, useUser } from "@/hooks/useAuth";
+import { useAuth, useUser } from "@/hooks/auth/useAuth";
 import {
   useInvitation,
   useAcceptInvitation,
   useSendInvitationEmailLink,
-} from "@/hooks/useInvitation";
+} from "@/hooks/auth/useInvitation";
 import { ApiError } from "@/lib/api/apiClient";
 import type { InvitationInfoResponse } from "@/lib/api/types";
 

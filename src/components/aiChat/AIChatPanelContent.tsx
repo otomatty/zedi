@@ -8,9 +8,9 @@ import { AIChatMessages } from "./AIChatMessages";
 import { AIChatContextBar } from "./AIChatContextBar";
 import { AIChatConversationList } from "./AIChatConversationList";
 import { PromoteToWikiDialog } from "./PromoteToWikiDialog";
-import { useAIChatPanelContentLogic } from "@/hooks/useAIChatPanelContentLogic";
+import { useAIChatPanelContentLogic } from "@/hooks/aiChat/useAIChatPanelContentLogic";
 import { useAIChatContext } from "@/contexts/AIChatContext";
-import { usePromoteToWiki } from "@/hooks/usePromoteToWiki";
+import { usePromoteToWiki } from "@/hooks/wiki/usePromoteToWiki";
 import { isTauriDesktop } from "@/lib/platform";
 
 const AIChatBranchTree = lazy(() =>

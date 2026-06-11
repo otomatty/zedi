@@ -368,7 +368,16 @@ describe("TagExtension input rule", () => {
      */
     function typeAt(editor: Editor, pos: number, text: string): boolean | undefined {
       const { view } = editor;
-      return view.someProp("handleTextInput", (handler) => handler(view, pos, pos, text));
+      return view.someProp("handleTextInput", (handler) =>
+        // ProseMirror invokes `handleTextInput` with 4 args at runtime; the
+        // extra `deflt` param in its type is unused here.
+        (handler as (v: typeof view, from: number, to: number, text: string) => boolean)(
+          view,
+          pos,
+          pos,
+          text,
+        ),
+      );
     }
 
     it("applies the tag mark when `#tech ` is completed by a space", () => {
@@ -621,7 +630,10 @@ describe("Tag extension configuration", () => {
         ...extension,
         parent: undefined,
       };
-      const attrs = addAttributes.call(context) as Record<string, unknown>;
+      // Mock `this` context only needs the runtime fields the handler reads.
+      const attrs = addAttributes.call(
+        context as unknown as ThisParameterType<typeof addAttributes>,
+      ) as Record<string, unknown>;
       const targetId = attrs.targetId as ReturnType<typeof getTargetIdSpec>;
       if (!targetId) throw new Error("targetId attribute missing");
       return targetId;

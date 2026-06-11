@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
-import type { MermaidGeneratorStatus } from "@/hooks/useMermaidGenerator";
+import type { MermaidGeneratorStatus } from "@/hooks/media/useMermaidGenerator";
 import { MermaidGeneratorDialog } from "./MermaidGeneratorDialog";
 
 const mockNavigate = vi.fn();
@@ -34,7 +34,7 @@ const mockUseMermaidGenerator: {
   checkAIConfigured: vi.fn(),
 };
 
-vi.mock("@/hooks/useMermaidGenerator", () => ({
+vi.mock("@/hooks/media/useMermaidGenerator", () => ({
   useMermaidGenerator: () => mockUseMermaidGenerator,
 }));
 

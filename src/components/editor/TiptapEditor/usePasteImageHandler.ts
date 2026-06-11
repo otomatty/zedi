@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import type { Editor } from "@tiptap/core";
+import { useToast } from "@zedi/ui";
 import { transformUrl } from "../utils/urlTransform";
+import { uploadVideoFilesAndInsert } from "./uploadVideoFiles";
 
 const IMAGE_URL_PATTERN = /https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|bmp|ico)(\?[^\s]*)?/i;
 const DISALLOWED_HOSTS = new Set(["0.0.0.0", "127.0.0.1", "::1", "[::1]", "localhost"]);
@@ -68,6 +70,8 @@ function isEmbeddableImageUrl(url: string): boolean {
  * @param params - エディタとアップロードハンドラ / Editor and upload handler
  */
 export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImageHandlerParams) {
+  const { toast } = useToast();
+
   useEffect(() => {
     if (!editor) return;
 
@@ -89,6 +93,29 @@ export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImag
             .filter((file): file is File => file !== null);
           handleImageUpload(files);
           return;
+        }
+
+        // 動画ファイルのペーストは /api/media（S3 デフォルトストレージ）へ直接
+        // アップロードし、video ノードを挿入する（WebM 変換なし）。
+        // Pasted video files upload directly to default storage and insert a
+        // video node (no WebM conversion yet).
+        const videoItems = Array.from(items).filter((item) => item.type.startsWith("video/"));
+
+        if (videoItems.length > 0) {
+          const videoFiles = videoItems
+            .map((item) => item.getAsFile())
+            .filter((file): file is File => file !== null);
+          // getAsFile() が全て null だった場合は preventDefault せず、デフォルトの
+          // ペースト挙動に委ねる（サイレントに握りつぶさない）。
+          // If every getAsFile() returned null, don't preventDefault — fall back
+          // to the default paste behavior instead of silently swallowing it.
+          if (videoFiles.length > 0) {
+            event.preventDefault();
+            void uploadVideoFilesAndInsert(editor, videoFiles, (description) => {
+              toast({ title: "動画アップロード", description, variant: "destructive" });
+            });
+            return;
+          }
         }
       }
 
@@ -158,5 +185,5 @@ export function usePasteImageHandler({ editor, handleImageUpload }: UsePasteImag
     return () => {
       editorElement.removeEventListener("paste", handlePaste);
     };
-  }, [editor, handleImageUpload]);
+  }, [editor, handleImageUpload, toast]);
 }

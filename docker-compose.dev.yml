@@ -3,8 +3,10 @@
 services:
   postgres:
     image: postgres:16-bookworm
+    # Bind to loopback only: the dev default password is weak, so do not expose
+    # Postgres to the local network. ループバック限定で公開する。
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-zedi}
       POSTGRES_USER: ${POSTGRES_USER:-zedi}
@@ -20,8 +22,10 @@ services:
 
   redis:
     image: redis:7-alpine
+    # Bind to loopback only: Redis has no auth here, so do not expose it on the
+    # local network. ループバック限定で公開する（認証なしのため）。
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

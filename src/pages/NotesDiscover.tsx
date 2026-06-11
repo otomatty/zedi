@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NotesLayout } from "@/components/note/NotesLayout";
 import { NoteCard } from "@/components/note/NoteCard";
-import { usePublicNotes, mapDiscoverItemToNoteSummary } from "@/hooks/useNoteQueries";
+import { usePublicNotes, mapDiscoverItemToNoteSummary } from "@/hooks/notes/useNoteQueries";
 import type { NoteSummary } from "@/types/note";
 import { cn } from "@zedi/ui";
 

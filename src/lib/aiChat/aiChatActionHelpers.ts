@@ -1,10 +1,5 @@
 import type { PageSummary } from "@/types/page";
-import {
-  MAX_REFERENCED_PAGES,
-  type ChatMessage,
-  type CreatePageAction,
-  type ReferencedPage,
-} from "@/types/aiChat";
+import { MAX_REFERENCED_PAGES, type ChatMessage, type ReferencedPage } from "@/types/aiChat";
 import { extractWikiLinksFromContent } from "@/lib/wikiLinkUtils";
 import {
   convertMarkdownToTiptapContent,
@@ -31,14 +26,6 @@ function escapeRegExp(value: string): string {
  */
 export function normalizePageTitle(title: string): string {
   return title.toLowerCase().trim();
-}
-
-/**
- * Returns the outline string for create-page actions.
- * create-page アクションのアウトライン文字列を返す。
- */
-export function getCreatePageOutline(action: CreatePageAction): string {
-  return action.outline?.trim() ?? "";
 }
 
 /**

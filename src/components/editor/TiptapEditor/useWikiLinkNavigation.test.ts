@@ -14,7 +14,7 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   usePageByTitle: vi.fn(),
   usePagesSummary: vi.fn(() => ({ data: [], isLoading: false, isFetched: true })),
   useCreatePage: () => ({
@@ -22,7 +22,7 @@ vi.mock("@/hooks/usePageQueries", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   // issue #860 Phase 6: useNotePages → useNoteTitleIndex への移行に合わせて
   // mock 名を変更。返す shape は { id, title, isDeleted, updatedAt } 配列。
   // Issue #860 Phase 6: switched mock to `useNoteTitleIndex`; data is an
@@ -31,8 +31,8 @@ vi.mock("@/hooks/useNoteQueries", () => ({
   useNoteTitleIndex: vi.fn(() => ({ data: [], isLoading: false, isFetched: true })),
 }));
 
-import { usePageByTitle } from "@/hooks/usePageQueries";
-import { useNoteTitleIndex } from "@/hooks/useNoteQueries";
+import { usePageByTitle } from "@/hooks/pages/usePageQueries";
+import { useNoteTitleIndex } from "@/hooks/notes/useNoteQueries";
 
 // Issue #889 Phase 3: `/pages/:id` 廃止に伴い、個人スコープのナビゲーションも
 // `/notes/:noteId/:pageId` に統合された。テストの期待値も note-scoped に揃える。

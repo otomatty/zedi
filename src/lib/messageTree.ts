@@ -41,7 +41,7 @@ export function getActivePath(map: MessageMap, activeLeafId: string | null): Tre
       return [];
     }
     guard.add(current);
-    const node = map[current];
+    const node: TreeChatMessage | undefined = map[current];
     if (!node) {
       return [];
     }

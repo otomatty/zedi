@@ -7,11 +7,6 @@
     "core:default",
     "updater:default",
     "dialog:default",
-    "fs:default",
-    {
-      "identifier": "fs:allow-read-text-file",
-      "allow": [{ "path": "$HOME/.claude/**" }, { "path": "$HOME/.claude.json" }]
-    },
     {
       "identifier": "shell:allow-execute",
       "allow": [

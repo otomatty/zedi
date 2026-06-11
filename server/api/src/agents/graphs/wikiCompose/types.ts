@@ -177,6 +177,49 @@ export interface DraftedSection {
 }
 
 /**
+ * Compose run mode.
+ *
+ * - `guided` (default): the classic human-in-the-loop flow that stops at the
+ *   Brief / Research / Outline interrupts before drafting.
+ * - `instant`: zero-friction draft. The orchestrator auto-derives the Brief and
+ *   auto-approves its own outline so the article streams immediately with no
+ *   blocking gates. The Brief questions / sources / outline are still computed
+ *   and surfaced as optional, non-blocking enrichment.
+ *
+ * Compose 実行モード。`instant` はタイトルから即座に本文をストリーム生成する
+ * ストレスのない経路（ゲートで止まらない）。`guided` は従来の HITL 経路。
+ */
+export type ComposeMode = "guided" | "instant";
+
+/**
+ * 理解支援（Understanding Layer）。完成した記事から導出する、読者の理解度を
+ * 高めるためのスキャフォールド。ブロッキングせず completion に同梱して提示する。
+ *
+ * Comprehension scaffolds derived from the drafted article to raise reader
+ * understanding. Surfaced as a non-blocking layer alongside the completion:
+ * a TL;DR summary, a key-term glossary, and a few self-check questions.
+ */
+export interface ComprehensionAids {
+  /** One-paragraph TL;DR of the whole article. */
+  summary: string;
+  /** Key terms with short plain-language definitions. */
+  keyTerms: ComprehensionKeyTerm[];
+  /** Self-check comprehension questions (active recall prompts). */
+  questions: string[];
+}
+
+/**
+ * One glossary entry in {@link ComprehensionAids}.
+ * {@link ComprehensionAids} の用語集エントリ 1 件。
+ */
+export interface ComprehensionKeyTerm {
+  /** Term / concept name. */
+  term: string;
+  /** Short, plain-language definition. */
+  definition: string;
+}
+
+/**
  * Final compose output stamped onto state at the `completed` node.
  *
  * 完了時のサマリ。フロントは `/notes/:noteId/:pageId` に戻るときの最終本文を
@@ -191,6 +234,12 @@ export interface ComposeCompletion {
   citedSources: Source[];
   /** ISO timestamp at completion. */
   completedAt: string;
+  /**
+   * Understanding-layer scaffolds derived from the article. `null` when
+   * generation failed or produced nothing (kept non-fatal).
+   * 記事から導出した理解支援。生成失敗・空のときは `null`（非致命）。
+   */
+  comprehensionAids?: ComprehensionAids | null;
 }
 
 /**

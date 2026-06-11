@@ -107,7 +107,8 @@ describe("HtmlArtifactNodeView", () => {
       window.dispatchEvent(
         new MessageEvent("message", {
           data: { type: "zedi-artifact-resize", height: Number.NaN },
-          source: mockSource,
+          // mockSource stands in for the iframe's contentWindow (MessageEventSource)
+          source: mockSource as unknown as MessageEventSource,
         }),
       );
     });
@@ -129,7 +130,8 @@ describe("HtmlArtifactNodeView", () => {
       window.dispatchEvent(
         new MessageEvent("message", {
           data: { type: "zedi-artifact-resize", height: 1_000_000 },
-          source: mockSource,
+          // mockSource stands in for the iframe's contentWindow (MessageEventSource)
+          source: mockSource as unknown as MessageEventSource,
         }),
       );
     });

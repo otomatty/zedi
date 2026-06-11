@@ -15,14 +15,16 @@ vi.mock("react-i18next", () => ({
 }));
 
 const mockUseWikiLinkCandidates = vi.fn();
-vi.mock("@/hooks/useWikiLinkCandidates", () => ({
+vi.mock("@/hooks/wiki/useWikiLinkCandidates", () => ({
   useWikiLinkCandidates: (noteId: string | null) => mockUseWikiLinkCandidates(noteId),
 }));
 
 const mockCheckExistence = vi.fn();
 const mockCheckReferenced = vi.fn();
-const mockUseWikiLinkExistsChecker = vi.fn(() => ({ checkExistence: mockCheckExistence }));
-vi.mock("@/hooks/usePageQueries", () => ({
+const mockUseWikiLinkExistsChecker = vi.fn((_options: unknown) => ({
+  checkExistence: mockCheckExistence,
+}));
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useWikiLinkExistsChecker: (options: unknown) => mockUseWikiLinkExistsChecker(options),
   useCheckGhostLinkReferenced: () => ({ checkReferenced: mockCheckReferenced }),
 }));

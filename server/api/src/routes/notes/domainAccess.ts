@@ -16,8 +16,8 @@ import { HTTPException } from "hono/http-exception";
 import { and, asc, eq } from "drizzle-orm";
 import { noteDomainAccess } from "../../schema/index.js";
 import { authRequired } from "../../middleware/auth.js";
-import { recordAuditLog } from "../../lib/auditLog.js";
-import { normalizeDomainInput } from "../../lib/freeEmailDomains.js";
+import { recordAuditLog } from "../../services/auditLog.js";
+import { normalizeDomainInput } from "../../services/freeEmailDomains.js";
 import type { AppEnv } from "../../types/index.js";
 import { getNoteRole, requireNoteOwner } from "./helpers.js";
 
