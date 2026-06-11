@@ -125,4 +125,38 @@ describe("humanReviewBrief", () => {
 
     await expect(humanReviewBrief(state({}), { configurable: {} } as never)).rejects.toThrow();
   });
+
+  it("instant mode auto-derives a brief without interrupting", async () => {
+    const update = await humanReviewBrief(state({ mode: "instant" }), {
+      configurable: {},
+    } as never);
+    const brief = update.brief as BriefResult;
+
+    expect(interrupt).not.toHaveBeenCalled();
+    expect(update.phase).toBe("brief:completed");
+    expect(brief.answers).toEqual([]);
+    expect(brief.summary).toContain("Title");
+  });
+
+  it("instant mode folds the chat seed outline + conversation into the brief", async () => {
+    const update = await humanReviewBrief(
+      state({
+        mode: "instant",
+        chatSeed: {
+          outline: "- History\n- Mechanism",
+          conversationText: "User: explain photosynthesis to a 10 year old",
+          userSchema: "Always include a 'See also' section.",
+        },
+      }),
+      { configurable: {} } as never,
+    );
+    const brief = update.brief as BriefResult;
+
+    expect(interrupt).not.toHaveBeenCalled();
+    // The promoted outline / conversation / schema must reach downstream nodes
+    // via the summary (they only read `brief.summary`, not `state.chatSeed`).
+    expect(brief.summary).toContain("- History");
+    expect(brief.summary).toContain("explain photosynthesis");
+    expect(brief.summary).toContain("See also");
+  });
 });
