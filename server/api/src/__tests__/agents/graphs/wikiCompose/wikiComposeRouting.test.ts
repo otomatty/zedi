@@ -36,6 +36,8 @@ function minimalState(overrides: Partial<WikiComposeStateType> = {}): WikiCompos
     approvedOutline: null,
     draftedSections: [],
     completion: null,
+    mode: "guided",
+    comprehensionAids: null,
     ...overrides,
   };
 }

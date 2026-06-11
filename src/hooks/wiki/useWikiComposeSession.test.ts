@@ -319,7 +319,7 @@ describe("useWikiComposeSession", () => {
 
     expect(mocks.runSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: { contentLocale: "ja" },
+        body: { contentLocale: "ja", mode: "instant" },
       }),
     );
   });
@@ -401,6 +401,7 @@ describe("useWikiComposeSession", () => {
       expect.objectContaining({
         body: {
           contentLocale: "ja",
+          mode: "instant",
           chatSeed: {
             outline: "- topic",
             conversationText: "User: seed me",

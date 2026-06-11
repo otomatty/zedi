@@ -11,7 +11,7 @@
  * sources for the final compose output. No LLM call.
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
-import { dispatchComposePhase } from "./shared/dispatch.js";
+import { dispatchComposeCompletion, dispatchComposePhase } from "./shared/dispatch.js";
 import type { WikiComposeStateType, WikiComposeStateUpdate } from "../state.js";
 import type { ComposeCompletion, DraftedSection, Source } from "../types.js";
 
@@ -55,8 +55,17 @@ export async function completed(
     sections: ordered,
     citedSources,
     completedAt: new Date().toISOString(),
+    comprehensionAids: state.comprehensionAids ?? null,
   };
 
+  // Emit the full completion as a custom event so an instant-mode run (a single
+  // SSE stream with no interrupts) can deliver the final article + Understanding
+  // Layer to the client. In guided mode this runs during a non-streaming resume,
+  // where the event has no listener and is harmlessly dropped (the client reads
+  // the same completion from the resume response body).
+  // 即時モード（割り込み無しの単一 SSE）で完成記事＋理解支援をクライアントへ
+  // 届けるため、completion を custom event として発火する。
+  await dispatchComposeCompletion({ completion }, config);
   await dispatchComposePhase({ phase: "completed", status: "entered" }, config);
 
   return {
