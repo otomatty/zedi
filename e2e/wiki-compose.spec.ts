@@ -9,6 +9,14 @@
  * fully mocked SSE stream. Pins both the wire contract (the UI consumes the
  * SSE shapes correctly) and the user-facing happy path without depending on
  * a running API backend with real LLM access.
+ *
+ * バックエンド無し環境で動くよう、ページビュー到達に必要な note / page 系
+ * API も `page.route` でモックする（issue #1036）。
+ * Runs without a backend: the note/page APIs needed to reach the page view
+ * are mocked via `page.route` as well (issue #1036).
+ *
+ * waitForTimeout 新規使用禁止（issue #1036）。状態ベースの待機のみ使うこと。
+ * Do NOT add new `waitForTimeout` calls (issue #1036). Use state-based waits only.
  */
 import { test, expect } from "./auth-mock";
 import type { Page, Route } from "@playwright/test";
@@ -207,6 +215,104 @@ function eventsForRun(n: number): Array<{ type: string; payload: unknown }> {
   }
 }
 
+/** Wire-format note row for GET /api/notes/:noteId. */
+const NOTE_ROW = {
+  id: NOTE_ID,
+  slug: "compose-note",
+  title: "Compose Note",
+  description: null,
+  visibility: "private",
+  owner_id: "local-user",
+  current_user_role: "owner",
+  page_count: 1,
+  created_at: "2026-01-01T00:00:00.000Z",
+  updated_at: "2026-01-01T00:00:00.000Z",
+};
+
+/** Wire-format page row for GET /api/pages/:pageId. */
+const PAGE_ROW = {
+  id: PAGE_ID,
+  note_id: NOTE_ID,
+  owner_id: "local-user",
+  title: "Photosynthesis",
+  content_preview: "",
+  thumbnail_url: null,
+  source_url: null,
+  is_deleted: false,
+  created_at: "2026-01-01T00:00:00.000Z",
+  updated_at: "2026-01-01T00:00:00.000Z",
+};
+
+/**
+ * Install the note/page API mocks needed to render the page view without a
+ * backend (issue #1036). Must be called BEFORE `installComposeMocks` so the
+ * catch-all (registered first) is checked last by Playwright.
+ *
+ * バックエンド無しでページビューを描画するための note / page 系モック。
+ * Playwright は登録の逆順でルートを評価するため、catch-all を最後に評価
+ * させるには `installComposeMocks` より先に呼ぶこと。
+ */
+async function installPageViewMocks(page: Page): Promise<void> {
+  // Catch-all for unmocked /api/* → 404. Predicate form so Vite module URLs
+  // like /src/lib/api/... are NOT intercepted.
+  // 未モックの /api/* は 404。述語形式にして Vite のモジュール URL
+  // (/src/lib/api/...) を巻き込まない。
+  await page.route(
+    (url) => url.pathname.startsWith("/api/"),
+    async (route: Route) => {
+      await route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "not_found" }),
+      });
+    },
+  );
+
+  await page.route(
+    (url) => url.pathname === `/api/notes/${NOTE_ID}`,
+    async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(NOTE_ROW),
+      });
+    },
+  );
+
+  await page.route(
+    (url) => url.pathname === `/api/notes/${NOTE_ID}/pages`,
+    async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ items: [PAGE_ROW], total: 1 }),
+      });
+    },
+  );
+
+  await page.route(
+    (url) => url.pathname === `/api/pages/${PAGE_ID}`,
+    async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(PAGE_ROW),
+      });
+    },
+  );
+
+  await page.route(
+    (url) => url.pathname === `/api/pages/${PAGE_ID}/public-links`,
+    async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ outgoing_links: [], backlinks: [], ghost_links: [] }),
+      });
+    },
+  );
+}
+
 /** Install the Compose API mocks (create / get / run / resume / cancel). */
 async function installComposeMocks(page: Page): Promise<void> {
   runCount = 0;
@@ -270,6 +376,7 @@ test.describe("Wiki Compose P2 happy path", () => {
   test.setTimeout(60_000);
 
   test("walks Brief → Research → Outline → Draft → Completed", async ({ page }) => {
+    await installPageViewMocks(page);
     await installComposeMocks(page);
 
     await page.goto(`/notes/${NOTE_ID}/${PAGE_ID}/compose`);
