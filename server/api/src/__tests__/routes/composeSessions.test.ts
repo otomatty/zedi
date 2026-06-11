@@ -319,16 +319,28 @@ describe("GET /api/pages/:pageId/compose-sessions/:id", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 403 when caller cannot view the page", async () => {
+  it("returns 403 when caller has no role on the note (private note, non-member)", async () => {
+    const privateNote = {
+      id: NOTE_ID,
+      ownerId: OTHER_USER_ID,
+      title: "n",
+      visibility: "private" as const,
+      editPermission: "owner_only" as const,
+      isOfficial: false,
+      viewCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      isDeleted: false,
+    };
     const { app } = createComposeApp([
       [{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: NOTE_ID }],
-      [{ email: "other@example.com" }],
-      [mockNote({ ownerId: OTHER_USER_ID, visibility: "private" })],
+      [{ email: "owner@example.com" }],
+      [privateNote],
       [],
       [],
     ]);
     const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-2`, {
-      headers: authHeaders(OTHER_USER_ID),
+      headers: authHeaders(OWNER_ID),
     });
     expect(res.status).toBe(403);
   });

@@ -163,7 +163,8 @@ describe("loadComposeSessionProjection", () => {
       backend: "zedi_managed" as const,
       tier: "free" as const,
       db: {} as never,
-      contentLocale: "ja",
+      feature: "compose_projection_test",
+      contentLocale: "ja" as const,
     },
   };
 
