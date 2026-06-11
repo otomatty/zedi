@@ -57,6 +57,21 @@ const serverWorkspaces = [
 const includeServers = process.argv.includes("--with-servers");
 const targets = includeServers ? [...workspaces, ...serverWorkspaces] : workspaces;
 
+const spawnShell = process.platform === "win32";
+
+/**
+ * @param {import("node:child_process").SpawnSyncReturns<Buffer | string>} result
+ */
+function exitOnSpawnFailure(result) {
+  if (result.error) {
+    console.error(result.error);
+    process.exit(1);
+  }
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+}
+
 /**
  * @param {string} label
  * @param {string[]} command
@@ -68,10 +83,9 @@ function run(label, command, cwd) {
     cwd,
     stdio: "inherit",
     env: process.env,
+    shell: spawnShell,
   });
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
-  }
+  exitOnSpawnFailure(result);
 }
 
 for (const workspace of targets) {
@@ -82,10 +96,9 @@ for (const workspace of targets) {
       cwd,
       stdio: "inherit",
       env: process.env,
+      shell: spawnShell,
     });
-    if (install.status !== 0) {
-      process.exit(install.status ?? 1);
-    }
+    exitOnSpawnFailure(install);
   }
   run(workspace.name, workspace.args, cwd);
 }
