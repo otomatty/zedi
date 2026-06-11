@@ -52,6 +52,22 @@ export async function humanReviewBrief(
   state: WikiComposeStateType,
   _config: LangGraphRunnableConfig,
 ): Promise<WikiComposeStateUpdate> {
+  // Instant mode: never block on the Brief. Auto-derive an empty brief so the
+  // flow continues straight to structure → draft. The natural-language summary
+  // falls back to the page title so downstream prompts still have context.
+  // 即時モードでは Brief で止まらず、タイトルを要約に使った空 Brief で続行する。
+  if (state.mode === "instant") {
+    const title = state.pageSnapshot?.title?.trim();
+    const brief: BriefResult = {
+      answers: [],
+      summary: title
+        ? `Write a clear, well-structured wiki article about "${title}".`
+        : "(no brief)",
+      appendToExisting: false,
+    };
+    return { brief, phase: "brief:completed" };
+  }
+
   const payload: WikiComposeInterruptPayload = {
     kind: "human_review_brief",
     questions: state.briefQuestions,

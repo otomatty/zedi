@@ -9,6 +9,7 @@ export { humanReviewBrief } from "./humanReviewBrief.js";
 export { structureDialogue } from "./structureDialogue.js";
 export { humanReviewOutline } from "./humanReviewOutline.js";
 export { draftSections } from "./draftSections.js";
+export { comprehensionAids } from "./comprehensionAids.js";
 export { completed } from "./completed.js";
 export { skipResearch } from "./skipResearch.js";
 export { conflictResolution } from "./conflictResolution.js";

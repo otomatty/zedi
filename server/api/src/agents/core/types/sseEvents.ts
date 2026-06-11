@@ -207,6 +207,23 @@ export interface SseComposeSectionEvent {
 }
 
 /**
+ * Wiki Compose (#950) の完了通知。`completed` ノードが発火し、最終 Markdown・
+ * セクション・引用ソース・理解支援（Understanding Layer）を 1 イベントで運ぶ。
+ * 割り込みの無い instant モード実行で、単一 SSE ストリーム内に最終成果物を
+ * 届けるための経路。`completion` の shape は `ComposeCompletion`。
+ *
+ * Completion event emitted by the `completed` node. Carries the final article
+ * (markdown + sections + cited sources + comprehension aids) so an instant-mode
+ * run can deliver the full result inside a single SSE stream. The frontend
+ * validates the `completion` shape (kept `unknown` here to avoid coupling the
+ * core wire types to the orchestrator graph value types).
+ */
+export interface SseComposeCompletionEvent {
+  type: "compose_completion";
+  completion: unknown;
+}
+
+/**
  * Wire-level SSE union.
  */
 export type SseEvent =
@@ -223,7 +240,8 @@ export type SseEvent =
   | SseResearchEvaluationEvent
   | SseResearchBatchEvent
   | SseComposePhaseEvent
-  | SseComposeSectionEvent;
+  | SseComposeSectionEvent
+  | SseComposeCompletionEvent;
 
 /**
  * SSE event 名（`event:` 行に流す名前）。`SseEvent["type"]` と同値だが、
@@ -247,4 +265,5 @@ export const SSE_EVENT_NAMES = {
   researchBatch: "research_batch",
   composePhase: "compose_phase",
   composeSection: "compose_section",
+  composeCompletion: "compose_completion",
 } as const satisfies Record<string, SseEvent["type"]>;

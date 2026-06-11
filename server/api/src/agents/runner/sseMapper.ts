@@ -214,6 +214,8 @@ function mapCustomEvent(event: LangGraphRuntimeEvent): SseEvent[] {
       return mapComposePhase(data);
     case "compose_section":
       return mapComposeSection(data);
+    case "compose_completion":
+      return mapComposeCompletion(data);
     default:
       // Unknown custom event names are dropped silently; emitting them as `status`
       // would risk leaking implementation detail to the wire.
@@ -275,6 +277,15 @@ function mapComposeSection(data: Record<string, unknown>): SseComposeSectionEven
     return [];
   }
   return [{ type: "compose_section", sectionId, heading, status, index, total }];
+}
+
+function mapComposeCompletion(data: Record<string, unknown>): SseEvent[] {
+  const completion = data.completion;
+  // The completion object is validated structurally by the frontend reducer;
+  // here we only require it to be a non-null object before forwarding.
+  // completion の詳細検証はフロント側で行う。ここでは object であることだけ確認。
+  if (!completion || typeof completion !== "object" || Array.isArray(completion)) return [];
+  return [{ type: "compose_completion", completion }];
 }
 
 function mapResearchBatch(data: Record<string, unknown>): SseResearchBatchEvent[] {

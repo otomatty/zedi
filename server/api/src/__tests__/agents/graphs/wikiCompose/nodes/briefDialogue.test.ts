@@ -88,6 +88,8 @@ function state(overrides: Partial<WikiComposeStateType>): WikiComposeStateType {
     approvedOutline: null,
     draftedSections: [],
     completion: null,
+    mode: "guided",
+    comprehensionAids: null,
     chatSeed: null,
     pageSnapshot: null,
     ...overrides,

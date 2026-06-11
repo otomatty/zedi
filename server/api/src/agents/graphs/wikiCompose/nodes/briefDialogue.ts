@@ -117,6 +117,20 @@ export async function briefDialogue(
   // セッション開始時に 1 度だけ読み、以後は state を参照する。
   const snapshot = state.pageSnapshot ?? (await loadPageSnapshot(ctx.db, ctx.pageId));
 
+  // Instant mode: skip Brief question generation entirely so the article can
+  // stream immediately from the title. Zero questions routes straight to
+  // `skip_research` → structure → draft (see `routeAfterBrief`), and
+  // `human_review_brief` won't interrupt in instant mode.
+  // 即時モードでは Brief 質問生成を丸ごとスキップし、タイトルから即ドラフトへ。
+  if (state.mode === "instant") {
+    return {
+      pageSnapshot: snapshot,
+      briefQuestions: [],
+      briefDegraded: false,
+      phase: "brief:await_user",
+    };
+  }
+
   const modelId = await resolveWikiComposeModelId("orchestrator", ctx.tier, ctx.db);
   const model = await createZediChatModel({
     modelId,
