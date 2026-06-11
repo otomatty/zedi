@@ -1,6 +1,8 @@
 /**
- * E2E tests for the inline ghost completion (issue #930, parent #924 §4).
  * インラインゴースト補完の E2E テスト（issue #930、親 #924 §4）。
+ * issue #1036 でバックエンド無し環境向けに全面書き直し: 候補は
+ * support/mockBackend の page-titles モックで seed し、Hocuspocus は
+ * support/mockRealtime でモックする。
  *
  * 受け入れ条件を End-to-End で固定する:
  * - 既存ページ名の接頭辞を本文中で 2 文字以上タイプすると薄色のゴーストが
@@ -12,57 +14,66 @@
  * - 1 文字ではゴーストが出ない（≥2 文字ルール）
  * - サジェスト非アクティブ時の Tab は通常通り（リスト indent などを壊さない）
  *
+ * E2E tests for the inline ghost completion (issue #930, parent #924 §4).
+ * Rewritten for the backend-less environment (issue #1036): candidates are
+ * seeded through the mocked page-titles endpoint and Hocuspocus is mocked.
  * Locks the acceptance criteria of issue #930 against the live editor.
+ *
+ * 注意: waitForTimeout 新規使用禁止（issue #1036）。状態ベースの待機のみ使う。
+ * NOTE: adding new waitForTimeout calls is forbidden (issue #1036). Use
+ * state-based waits only.
  */
 import { test, expect, type Page } from "./auth-mock";
+import { installMockBackend } from "./support/mockBackend";
+import { mockRealtime } from "./support/mockRealtime";
 
 const GHOST_SELECTOR = ".wiki-link-ghost-completion";
 
-/**
- * Seed a single candidate page so the ghost completion has something to match.
- * ゴーストが match できるように候補ページを 1 枚作る。
- */
-async function seedCandidatePage(
-  page: Page,
-  helpers: { createNewPage: (page: Page) => Promise<{ noteId: string; pageId: string }> },
-  title: string,
-): Promise<void> {
-  await helpers.createNewPage(page);
-  await page.getByPlaceholder("タイトル").fill(title);
-  // タイトル保存（debounce 500ms + バッファ）が走るまで待つ。
-  // Wait for the debounced (500ms) title save to flush.
-  await page.waitForTimeout(1500);
-}
+const CANDIDATE_PAGE_ID = "33333333-3333-4333-8333-333333333333";
+const SOURCE_PAGE_ID = "44444444-4444-4444-8444-444444444444";
 
 /**
- * Locator for the editor (Tiptap root).
- * エディタ本体のロケータ。
+ * モック基盤を入れ、候補 "Ghost Target" を seed（任意）した上で入力対象の
+ * ページを直接 URL で開き、候補一覧の読込とエディタのマウントを待つ。
+ * Install the mocks, optionally seed the "Ghost Target" candidate, open the
+ * source page by direct URL, and wait for the candidate list to load and the
+ * editor to mount.
  */
-function editorLocator(page: Page) {
-  return page.locator(".tiptap").first();
+async function openSourcePage(
+  page: Page,
+  options: { withCandidate: boolean; sourceTitle: string },
+) {
+  await mockRealtime(page);
+  const backend = await installMockBackend(page);
+  if (options.withCandidate) {
+    backend.seedPage({ id: CANDIDATE_PAGE_ID, title: "Ghost Target" });
+  }
+  backend.seedPage({ id: SOURCE_PAGE_ID, title: options.sourceTitle });
+
+  // ゴースト補完の候補ソースは GET /api/notes/:noteId/page-titles。
+  // タイプ前に読込完了を待って決定化する。
+  // The candidate source is GET /api/notes/:noteId/page-titles; wait for it
+  // before typing so the test is deterministic.
+  const titlesLoaded = page.waitForResponse(
+    (res) => new URL(res.url()).pathname === `/api/notes/${backend.noteId}/page-titles`,
+  );
+  await page.goto(`/notes/${backend.noteId}/${SOURCE_PAGE_ID}`);
+  await titlesLoaded;
+
+  const editor = page.locator(".tiptap").first();
+  await expect(page.locator('.tiptap[contenteditable="true"]')).toBeVisible();
+  await editor.click();
+  return editor;
 }
 
 test.describe("Inline Ghost Completion (issue #930)", () => {
-  test.setTimeout(90_000);
-
-  test.beforeEach(async ({ page, helpers }) => {
-    await helpers.goToHome(page);
-  });
+  test.setTimeout(60_000);
 
   test("shows the ghost suffix when the typed word prefix-matches a candidate", async ({
     page,
-    helpers,
   }) => {
-    await seedCandidatePage(page, helpers, "Ghost Target");
+    await openSourcePage(page, { withCandidate: true, sourceTitle: "Source" });
 
-    // 新しい源ページを作って候補一覧が読み込まれるのを待つ。
-    // Open a fresh page so candidates load fresh from the cache.
-    await helpers.createNewPage(page);
-    await page.getByPlaceholder("タイトル").fill("Source");
-    await page.waitForTimeout(800);
-
-    const editor = editorLocator(page);
-    await editor.click();
     await page.keyboard.type("Gho");
 
     // Ghost suffix appears with the remainder of the title.
@@ -72,38 +83,37 @@ test.describe("Inline Ghost Completion (issue #930)", () => {
     await expect(ghost).toHaveText("st Target");
   });
 
-  test("confirms with Tab — turns the typed prefix into a wiki link", async ({ page, helpers }) => {
-    await seedCandidatePage(page, helpers, "Ghost Target");
-    await helpers.createNewPage(page);
-    await page.getByPlaceholder("タイトル").fill("Source Confirm");
-    await page.waitForTimeout(800);
+  test("confirms with Tab — turns the typed prefix into a wiki link", async ({ page }) => {
+    const editor = await openSourcePage(page, {
+      withCandidate: true,
+      sourceTitle: "Source Confirm",
+    });
 
-    const editor = editorLocator(page);
-    await editor.click();
     await page.keyboard.type("Gho");
-
     await expect(page.locator(GHOST_SELECTOR)).toBeVisible();
+
     await page.keyboard.press("Tab");
 
-    // Ghost is gone and a wiki-link mark covers the full title.
-    // ゴーストが消え、Wiki Link マークがタイトル全体を覆う。
+    // Ghost is gone and a wiki-link mark covers the full title, resolved to
+    // the seeded candidate page.
+    // ゴーストが消え、Wiki Link マークがタイトル全体を覆い、seed した候補
+    // ページに解決される。
     await expect(page.locator(GHOST_SELECTOR)).toHaveCount(0);
     const wikiLink = editor.locator('[data-wiki-link][data-title="Ghost Target"]');
     await expect(wikiLink).toBeVisible();
     await expect(wikiLink).toHaveAttribute("data-exists", "true");
+    await expect(wikiLink).toHaveAttribute("data-target-id", CANDIDATE_PAGE_ID);
   });
 
-  test("Escape dismisses the ghost but keeps the typed text", async ({ page, helpers }) => {
-    await seedCandidatePage(page, helpers, "Ghost Target");
-    await helpers.createNewPage(page);
-    await page.getByPlaceholder("タイトル").fill("Source Escape");
-    await page.waitForTimeout(800);
+  test("Escape dismisses the ghost but keeps the typed text", async ({ page }) => {
+    const editor = await openSourcePage(page, {
+      withCandidate: true,
+      sourceTitle: "Source Escape",
+    });
 
-    const editor = editorLocator(page);
-    await editor.click();
     await page.keyboard.type("Gho");
-
     await expect(page.locator(GHOST_SELECTOR)).toBeVisible();
+
     await page.keyboard.press("Escape");
     await expect(page.locator(GHOST_SELECTOR)).toHaveCount(0);
 
@@ -114,14 +124,9 @@ test.describe("Inline Ghost Completion (issue #930)", () => {
     await expect(editor.locator('[data-wiki-link][data-title="Ghost Target"]')).toHaveCount(0);
   });
 
-  test("does not fire on a single character (≥2 chars rule)", async ({ page, helpers }) => {
-    await seedCandidatePage(page, helpers, "Ghost Target");
-    await helpers.createNewPage(page);
-    await page.getByPlaceholder("タイトル").fill("Source Length");
-    await page.waitForTimeout(800);
+  test("does not fire on a single character (≥2 chars rule)", async ({ page }) => {
+    await openSourcePage(page, { withCandidate: true, sourceTitle: "Source Length" });
 
-    const editor = editorLocator(page);
-    await editor.click();
     await page.keyboard.type("G");
     await expect(page.locator(GHOST_SELECTOR)).toHaveCount(0);
 
@@ -131,17 +136,11 @@ test.describe("Inline Ghost Completion (issue #930)", () => {
     await expect(page.locator(GHOST_SELECTOR)).toBeVisible();
   });
 
-  test("does not fire inside a code block", async ({ page, helpers }) => {
-    await seedCandidatePage(page, helpers, "Ghost Target");
-    await helpers.createNewPage(page);
-    await page.getByPlaceholder("タイトル").fill("Source CodeBlock");
-    await page.waitForTimeout(800);
+  test("does not fire inside a code block", async ({ page }) => {
+    await openSourcePage(page, { withCandidate: true, sourceTitle: "Source CodeBlock" });
 
-    const editor = editorLocator(page);
-    await editor.click();
-    // Markdown shortcut for a code block (CodeBlockLowlight registers triple
-    // backtick + Enter as the input rule). After this the cursor sits inside
-    // the code block.
+    // Markdown shortcut for a code block (triple backtick + Enter). After this
+    // the cursor sits inside the code block.
     // ` ``` ` + Enter で code block に入る。以降 code block 内なのでゴースト不発火。
     await page.keyboard.type("```");
     await page.keyboard.press("Enter");
@@ -149,63 +148,52 @@ test.describe("Inline Ghost Completion (issue #930)", () => {
     await expect(page.locator(GHOST_SELECTOR)).toHaveCount(0);
   });
 
-  test("does not fire inside inline code", async ({ page, helpers }) => {
+  test("does not fire inside inline code", async ({ page }) => {
     // 受け入れ条件: インラインコード（バッククォート 1 つ）内ではゴースト不発火。
     // 内部では `wikiLink` マークが付けられない（`excludes: "code"` 相当）ため、
     // サジェストも出さない契約。
     // Acceptance: ghost must not fire inside inline code (single backticks)
     // since the WikiLink mark cannot apply there.
-    await seedCandidatePage(page, helpers, "Ghost Target");
-    await helpers.createNewPage(page);
-    await page.getByPlaceholder("タイトル").fill("Source InlineCode");
-    await page.waitForTimeout(800);
+    await openSourcePage(page, { withCandidate: true, sourceTitle: "Source InlineCode" });
 
-    const editor = editorLocator(page);
-    await editor.click();
-    // Open an inline code span via Markdown input rule: typing "`Gho`" turns
-    // the text between backticks into inline code. We type the opening
-    // backtick + the prefix first to land the caret inside the active code
-    // mark, which mirrors what users do mid-line.
     // Markdown 入力規則で「`Gho`」と打って `Gho` をインラインコードにする。
-    // 開きバッククォート + 接頭辞を打鍵した時点でキャレットは `code` マーク
-    // 内にあるので、その状態でゴーストが出ないことを確認する。
+    // キャレットをインラインコード内に戻して 1 文字追加し、抑止を確認する。
+    // Type "`Gho`" so the Markdown input rule wraps it in inline code, then
+    // move the caret back inside the span, add one more matching char, and
+    // confirm the ghost stays suppressed.
     await page.keyboard.type("`Gho`");
-    // Move the caret back inside the code span and type another matching char.
-    // キャレットをインラインコード内に戻して 1 文字追加し、再度抑止を確認する。
     await page.keyboard.press("ArrowLeft");
     await page.keyboard.type("s");
     await expect(page.locator(GHOST_SELECTOR)).toHaveCount(0);
   });
 
-  test("does not fire while the `[[` suggestion popup is active", async ({ page, helpers }) => {
-    await seedCandidatePage(page, helpers, "Ghost Target");
-    await helpers.createNewPage(page);
-    await page.getByPlaceholder("タイトル").fill("Source Brackets");
-    await page.waitForTimeout(800);
+  test("does not fire while the `[[` suggestion popup is active", async ({ page }) => {
+    await openSourcePage(page, { withCandidate: true, sourceTitle: "Source Brackets" });
 
-    const editor = editorLocator(page);
-    await editor.click();
     await page.keyboard.type("[[Gho");
+
     // The `[[` suggestion popup owns this range, the ghost must stay hidden.
-    // `[[` サジェストがこの範囲を担当しているので、ゴーストは出ない。
+    // ポップアップ表示を確認した上で（= サジェスト active が成立した上で）、
+    // ゴーストが出ていないことをアサートする。
+    // Assert the popup is actually visible (the active state is established)
+    // before asserting the ghost stays hidden.
+    await expect(page.getByTestId("wiki-link-suggestion")).toBeVisible();
     await expect(page.locator(GHOST_SELECTOR)).toHaveCount(0);
   });
 
   test("Tab still indents list items when no ghost is active (regression guard)", async ({
     page,
-    helpers,
   }) => {
-    // We are not seeding candidates so the ghost never activates; if it did,
-    // it would also suppress Tab. This test pins the "Tab passes through"
-    // contract that protects existing list indent behaviour.
+    // We seed no candidate so the ghost never activates; if it did, it would
+    // also suppress Tab. This test pins the "Tab passes through" contract
+    // that protects existing list indent behaviour.
     // 候補なしにしてゴーストを発火させない状態で Tab を打鍵し、リストの
     // ネスト動作が壊れないこと（Tab 素通し）を保証する。
-    await helpers.createNewPage(page);
-    await page.getByPlaceholder("タイトル").fill("Tab Passthrough");
-    await page.waitForTimeout(800);
+    const editor = await openSourcePage(page, {
+      withCandidate: false,
+      sourceTitle: "Tab Passthrough",
+    });
 
-    const editor = editorLocator(page);
-    await editor.click();
     // Start a bullet list.
     // 箇条書きリストを開始する。
     await page.keyboard.type("- first item");
