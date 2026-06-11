@@ -58,7 +58,7 @@ describe("ResizableHandle orientation contract", () => {
 
     // 細い縦線であること。全幅化（w-full）すると左右パネルが幅 0 に潰れる。
     // Must stay a 1px-wide line; a full-width separator collapses both panels.
-    expect(separator.className).toContain("w-px");
+    expect(effectiveClasses(separator)).toContain("w-px");
     expect(effectiveClasses(separator)).not.toContain("w-full");
   });
 
