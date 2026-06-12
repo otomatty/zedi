@@ -37,7 +37,7 @@ describe("shouldRefine", () => {
         state({
           iteration: 1,
           maxIterations: 5,
-          lastEvaluation: { score: 0.75, rationale: "ok", missingAspects: [] },
+          lastEvaluation: { score: 0.75, sufficient: true, rationale: "ok", missingAspects: [] },
         }),
       ),
     ).toBe("compile");
@@ -49,7 +49,7 @@ describe("shouldRefine", () => {
         state({
           iteration: 1,
           maxIterations: 5,
-          lastEvaluation: { score: 0.95, rationale: "great", missingAspects: [] },
+          lastEvaluation: { score: 0.95, sufficient: true, rationale: "great", missingAspects: [] },
         }),
       ),
     ).toBe("compile");
@@ -61,7 +61,12 @@ describe("shouldRefine", () => {
         state({
           iteration: 1,
           maxIterations: 3,
-          lastEvaluation: { score: 0.5, rationale: "weak", missingAspects: ["x"] },
+          lastEvaluation: {
+            score: 0.5,
+            sufficient: false,
+            rationale: "weak",
+            missingAspects: ["x"],
+          },
         }),
       ),
     ).toBe("refine");
@@ -73,7 +78,12 @@ describe("shouldRefine", () => {
         state({
           iteration: 3,
           maxIterations: 3,
-          lastEvaluation: { score: 0.4, rationale: "weak", missingAspects: ["x", "y"] },
+          lastEvaluation: {
+            score: 0.4,
+            sufficient: false,
+            rationale: "weak",
+            missingAspects: ["x", "y"],
+          },
         }),
       ),
     ).toBe("compile");
@@ -81,6 +91,18 @@ describe("shouldRefine", () => {
 
   it("compiles past the cap (defence against off-by-one)", () => {
     expect(shouldRefine(state({ iteration: 4, maxIterations: 3 }))).toBe("compile");
+  });
+
+  it("compiles when sufficient is true even if score is below threshold", () => {
+    expect(
+      shouldRefine(
+        state({
+          iteration: 1,
+          maxIterations: 5,
+          lastEvaluation: { score: 0.4, sufficient: true, rationale: "ok", missingAspects: [] },
+        }),
+      ),
+    ).toBe("compile");
   });
 
   it("refines when there's no evaluation yet and iterations remain", () => {

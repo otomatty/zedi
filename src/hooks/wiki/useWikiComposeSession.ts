@@ -64,11 +64,7 @@ export interface UseWikiComposeSessionArgs {
 /** Hook return shape. */
 export interface UseWikiComposeSessionReturn extends WikiComposeSessionState {
   start: () => Promise<void>;
-  submitBrief: (input: {
-    answers: BriefAnswer[];
-    appendToExisting?: boolean;
-    researchMaxIterations?: number;
-  }) => Promise<void>;
+  submitBrief: (input: { answers: BriefAnswer[]; appendToExisting?: boolean }) => Promise<void>;
   submitResearchApproval: (input: {
     approvedSourceIds: string[];
     rejectedSourceIds?: string[];

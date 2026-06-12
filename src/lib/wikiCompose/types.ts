@@ -234,7 +234,7 @@ export type ComposeSseEvent =
       iteration: number;
       sourceCount: number;
       score: number | null;
-      exitReason: "score_threshold" | "max_iterations";
+      exitReason: "score_threshold" | "max_iterations" | "safety_cap";
     }
   | {
       type: "compose_phase";

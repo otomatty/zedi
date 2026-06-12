@@ -2,7 +2,7 @@
  * `plan_queries` — generates the initial query set for the research loop.
  *
  * 調査ループの最初のノード。Brief / 指示メッセージから 1〜8 件の調査クエリを
- * 生成し、`maxIterations` を 1..5 にクランプする。"additional_research" 入力で
+ * 生成する。"additional_research" 入力で
  * 既存セッションの追加調査として呼ばれた場合、`iteration / lastEvaluation /
  * exitReason` をリセットし、`carryOverApprovedIds` で `pendingSources` を初期化
  * する（issue #949 の追加調査 API パス）。
@@ -52,12 +52,7 @@ const SYSTEM_PROMPT =
   "and 'web' for queries needing fresh public information. Output JSON only.";
 
 import type { AdditionalResearchRequest } from "../types.js";
-
-function clampMaxIterations(raw: unknown): number {
-  if (typeof raw !== "number" || !Number.isFinite(raw)) return 3;
-  const truncated = Math.trunc(raw);
-  return Math.min(Math.max(truncated, 1), 5);
-}
+import { resolveResearchMaxIterations } from "../constants.js";
 
 function briefFromState(
   state: ResearchLoopStateType,
@@ -97,9 +92,8 @@ export async function planQueries(
   const additional = state.additionalRequest ?? null;
   const brief = briefFromState(state, additional);
 
-  // Resolve maxIterations: input override > existing state > default(3); clamp 1..5.
-  // maxIterations は既存 state を優先しつつ 1..5 にクランプ。
-  const maxIterations = clampMaxIterations(state.maxIterations ?? 3);
+  // maxIterations: ingest uses caller cap; Wiki Compose always uses safety cap.
+  const maxIterations = resolveResearchMaxIterations(ctx.graphId, state.maxIterations);
 
   const modelId = await resolveWikiComposeModelId("orchestrator", ctx.tier, ctx.db);
   const model = await createZediChatModel({

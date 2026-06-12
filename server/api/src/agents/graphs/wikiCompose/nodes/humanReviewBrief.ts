@@ -4,13 +4,10 @@
  * Brief 質問群を `interrupt(value)` でユーザーに渡し、`PATCH .../resume` の
  * 結果を `briefResumeSchema` で検証して `brief` を state に確定する。
  * 既存本文ありで「追記」を選んだ場合は `appendToExisting=true` が立ち、Draft
- * フェーズがそれを読んで挙動を切り替える。`researchMaxIterations` (1..5) が
- * 指定されていれば、後段の Research subgraph に渡るようミラーする。
+ * フェーズがそれを読んで挙動を切り替える。
  *
  * Halts the graph at the Brief interrupt and projects the user's answers into
- * `state.brief`. The resume payload's `researchMaxIterations` (when present)
- * is mirrored to `state.researchMaxIterations` so the research subgraph node
- * picks it up via its own state slot when invoked.
+ * `state.brief`.
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { interrupt } from "@langchain/langgraph";
@@ -127,11 +124,5 @@ export async function humanReviewBrief(
     brief,
     phase: "brief:completed",
   };
-  if (parsed.researchMaxIterations !== undefined) {
-    // Mirror onto the canonical research subgraph channel name so the
-    // composed research node picks it up via shared state.
-    // research subgraph と共有する `maxIterations` チャネルに反映する。
-    update.maxIterations = parsed.researchMaxIterations;
-  }
   return update;
 }

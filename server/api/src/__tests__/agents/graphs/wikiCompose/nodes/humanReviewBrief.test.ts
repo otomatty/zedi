@@ -74,7 +74,6 @@ describe("humanReviewBrief", () => {
         },
       ],
       appendToExisting: true,
-      researchMaxIterations: 4,
     });
 
     const update = await humanReviewBrief(state({}), { configurable: {} } as never);
@@ -97,7 +96,6 @@ describe("humanReviewBrief", () => {
     ]);
     expect(brief.summary).toContain("Target audience?");
     expect(brief.summary).toContain("selected=opt-a");
-    expect(update.maxIterations).toBe(4);
   });
 
   it("accepts an empty answers array (explicit Brief skip)", async () => {
@@ -111,13 +109,6 @@ describe("humanReviewBrief", () => {
     expect(brief.answers).toEqual([]);
     expect(brief.summary).toBe("(no brief provided)");
     expect(brief.appendToExisting).toBe(false);
-    expect(update.maxIterations).toBeUndefined();
-  });
-
-  it("rejects researchMaxIterations outside 1..5", async () => {
-    interrupt.mockReturnValueOnce({ answers: [], researchMaxIterations: 9 });
-
-    await expect(humanReviewBrief(state({}), { configurable: {} } as never)).rejects.toThrow();
   });
 
   it("rejects answers missing questionId", async () => {

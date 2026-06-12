@@ -11,7 +11,7 @@
  */
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button, Card, CardContent, CardHeader, CardTitle, Slider } from "@zedi/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle } from "@zedi/ui";
 import { Sparkles, RefreshCw, ArrowRight } from "lucide-react";
 import type {
   BriefAnswer,
@@ -30,11 +30,7 @@ export interface DialogueSectionProps {
   outlineProposal: OutlineSection[];
   isStreaming: boolean;
   /** Brief submission. */
-  onSubmitBrief: (input: {
-    answers: BriefAnswer[];
-    appendToExisting?: boolean;
-    researchMaxIterations?: number;
-  }) => Promise<void>;
+  onSubmitBrief: (input: { answers: BriefAnswer[]; appendToExisting?: boolean }) => Promise<void>;
   /** Structure submission. */
   onSubmitOutline: (input: { sections: OutlineSection[] }) => Promise<void>;
 }
@@ -70,7 +66,6 @@ export const DialogueSection: React.FC<DialogueSectionProps> = ({
   const [appendToExisting, setAppendToExisting] = useState<boolean>(
     Boolean(pageSnapshot?.hasContent),
   );
-  const [maxIterations, setMaxIterations] = useState<number>(3);
   const [submitting, setSubmitting] = useState(false);
 
   const canSubmitBrief = useMemo(
@@ -139,31 +134,6 @@ export const DialogueSection: React.FC<DialogueSectionProps> = ({
           </Card>
         ) : null}
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-xs tracking-wide uppercase">
-              {t("wikiCompose.brief.researchDepthTitle")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="text-muted-foreground flex items-center justify-between text-xs">
-              <span>{t("wikiCompose.brief.researchQuick")}</span>
-              <span data-testid="research-iterations-value" className="text-foreground font-medium">
-                {t("wikiCompose.brief.iterationCount", { count: maxIterations })}
-              </span>
-              <span>{t("wikiCompose.brief.researchDeep")}</span>
-            </div>
-            <Slider
-              data-testid="research-iterations-slider"
-              min={1}
-              max={5}
-              step={1}
-              value={[maxIterations]}
-              onValueChange={(v) => setMaxIterations(v[0] ?? 3)}
-            />
-          </CardContent>
-        </Card>
-
         <div className="flex justify-end">
           <Button
             data-testid="submit-brief"
@@ -174,7 +144,6 @@ export const DialogueSection: React.FC<DialogueSectionProps> = ({
                 await onSubmitBrief({
                   answers: Object.values(answers),
                   appendToExisting,
-                  researchMaxIterations: maxIterations,
                 });
               } finally {
                 setSubmitting(false);

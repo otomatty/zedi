@@ -51,11 +51,7 @@ export interface ComposePanelProps {
 
   activity: ComposeActivity[];
 
-  onSubmitBrief: (input: {
-    answers: BriefAnswer[];
-    appendToExisting?: boolean;
-    researchMaxIterations?: number;
-  }) => Promise<void>;
+  onSubmitBrief: (input: { answers: BriefAnswer[]; appendToExisting?: boolean }) => Promise<void>;
   onSubmitResearchApproval: (input: {
     approvedSourceIds: string[];
     rejectedSourceIds?: string[];

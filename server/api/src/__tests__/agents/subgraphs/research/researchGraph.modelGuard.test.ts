@@ -138,6 +138,7 @@ describe("researchLoopSubgraph — all LLM calls go through ZediChatModel", () =
         const score = evaluateCall >= 2 ? 0.9 : 0.1;
         return fakeModel(async () => ({
           score,
+          sufficient: score >= 0.75,
           rationale: "auto",
           missingAspects: score < 0.75 ? ["x"] : [],
         }));

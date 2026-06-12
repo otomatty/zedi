@@ -164,7 +164,7 @@ export interface SseResearchBatchEvent {
   /** Last evaluation score (null only if compile fired before any evaluate). */
   score: number | null;
   /** Reason the loop exited. */
-  exitReason: "score_threshold" | "max_iterations";
+  exitReason: "score_threshold" | "max_iterations" | "safety_cap";
 }
 
 /**
