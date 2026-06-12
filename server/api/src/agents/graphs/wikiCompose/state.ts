@@ -19,6 +19,7 @@
  */
 import { Annotation } from "@langchain/langgraph";
 import { BaseState } from "../../core/state/baseState.js";
+import { RESEARCH_SAFETY_MAX_ITERATIONS } from "../../subgraphs/research/constants.js";
 import type {
   AdditionalResearchRequest,
   Evaluation,
@@ -155,10 +156,10 @@ export const WikiComposeState = Annotation.Root({
     reducer: (_prev, next) => next,
     default: () => 0,
   }),
-  /** ループ上限（Brief で 1..5 にユーザー設定可、デフォルト 3）。 */
+  /** ループ上限（自律調査の安全 cap。ingest 連携時のみ 1..5 の明示 cap あり）。 */
   maxIterations: Annotation<number>({
     reducer: (prev, next) => next ?? prev,
-    default: () => 3,
+    default: () => RESEARCH_SAFETY_MAX_ITERATIONS,
   }),
   /** Research subgraph 内の直近クエリ。 */
   queries: Annotation<PlannedQuery[]>({

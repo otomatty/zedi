@@ -167,7 +167,7 @@ export async function runSession(input: {
 /**
  * Resume a compose session from an interrupt. The `resume` payload shape is
  * graph-specific:
- * - `human_review_brief` — `{ answers, appendToExisting?, researchMaxIterations? }`
+ * - `human_review_brief` — `{ answers, appendToExisting? }`
  * - `human_review_research` — `{ approvedSourceIds, rejectedSourceIds?, note? }`
  * - `human_review_outline` — `{ sections }`
  * - `conflict_resolution` — `{ acknowledged: true, note?: string }`

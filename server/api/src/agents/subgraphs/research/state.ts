@@ -15,6 +15,7 @@
  */
 import { Annotation } from "@langchain/langgraph";
 import { BaseState } from "../../core/state/baseState.js";
+import { RESEARCH_SAFETY_MAX_ITERATIONS } from "./constants.js";
 import type {
   AdditionalResearchRequest,
   Evaluation,
@@ -61,10 +62,10 @@ export const ResearchLoopState = Annotation.Root({
     reducer: (_prev, next) => next,
     default: () => 0,
   }),
-  /** ループ回数上限（1..5、デフォルト 3）。`plan_queries` で clamp 確定。 */
+  /** ループ回数上限。ingest が 1..5 を明示した場合はその cap、それ以外は安全上限。 */
   maxIterations: Annotation<number>({
     reducer: (prev, next) => next ?? prev,
-    default: () => 3,
+    default: () => RESEARCH_SAFETY_MAX_ITERATIONS,
   }),
   /** 直近のクエリリスト。`plan_queries` / `refine_queries` が全置換する。 */
   queries: Annotation<PlannedQuery[]>({

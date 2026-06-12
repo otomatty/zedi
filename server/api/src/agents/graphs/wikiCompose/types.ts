@@ -272,8 +272,6 @@ export interface BriefResumeInput {
   answers: BriefAnswer[];
   /** True when the user chose "append to existing body" (U2). */
   appendToExisting?: boolean;
-  /** Optional override for the research loop's max iterations (1..5). */
-  researchMaxIterations?: number;
 }
 
 /** Resume payload for the outline interrupt. */

@@ -30,7 +30,7 @@ function buildUserPrompt(state: ResearchLoopStateType): string {
   const prior = state.queries.map((q) => `- ${q.query} (${q.channels.join("/")})`);
   const sourceTitles = state.pendingSources.map((s) => `- [${s.kind}] ${s.title}`);
   return [
-    `[Iteration ${state.iteration} / ${state.maxIterations}]`,
+    `[Research iteration ${state.iteration}]`,
     `Previous evaluation score: ${evaluation?.score ?? "n/a"}`,
     "",
     "[Missing aspects to address]",

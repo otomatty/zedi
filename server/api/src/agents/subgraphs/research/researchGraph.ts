@@ -5,7 +5,8 @@
  * `fetch_articles` → `evaluate_sufficiency` を 1 イテレーションとし、
  * `shouldRefine` の判定で `refine_queries` (= 次ループ) か `compile_batch` →
  * `human_review_research` (= HITL 中断) のいずれかに分岐する。終了条件:
- * `score >= 0.75` OR `iteration >= maxIterations` (default 3, clamp 1..5)。
+ * 評価 LLM が `score >= 0.75` と判断したとき、または安全上限
+ * {@link RESEARCH_SAFETY_MAX_ITERATIONS}（ingest が 1..5 を明示した場合はその cap）。
  *
  * Cyclic LangGraph with a parallel fan-out (`web_search ∥ wiki_search`) and a
  * conditional edge after `evaluate_sufficiency`. The HITL stop is implemented
@@ -78,9 +79,10 @@ export function registerResearchLoopGraph(): void {
     phase: "research",
     description:
       "Wiki Compose P1: autonomous research loop. Plans queries, runs web + wiki search, " +
-      "fetches articles, evaluates sufficiency, optionally refines and re-loops up to " +
-      "maxIterations (1..5, default 3), then interrupts at human_review_research for " +
-      "HITL source approval. Resume payload: { approvedSourceIds, rejectedSourceIds?, note? }.",
+      "fetches articles, evaluates sufficiency, optionally refines and re-loops until the " +
+      "evaluator LLM deems sources sufficient (score >= 0.75) or a safety cap is reached, " +
+      "then interrupts at human_review_research for HITL source approval. " +
+      "Resume payload: { approvedSourceIds, rejectedSourceIds?, note? }.",
     factory,
   });
 }

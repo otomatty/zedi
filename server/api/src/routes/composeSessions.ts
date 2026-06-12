@@ -16,9 +16,9 @@
  *
  * `wiki-compose-research` (#949 / P1):
  * - `POST /run` body.input shapes:
- *   - Initial run: `{ messages?: [...], maxIterations?: number }` (or any
+ *   - Initial run: `{ messages?: [...] }` (or any
  *     object; the graph reads `state.messages` set by LangGraph from
- *     `body.input`).
+ *     `body.input`). Research depth is decided autonomously by the evaluator LLM.
  *   - Additional research (re-run on a *new* session of the same graph id):
  *     `{ kind: "additional_research", instruction: string, brief?: string,
  *        carryOverApprovedIds?: string[] }`

@@ -9,6 +9,7 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { randomUUID } from "node:crypto";
 import { dispatchResearchBatch } from "./shared/dispatchSseCustom.js";
+import { RESEARCH_SUFFICIENCY_SCORE_THRESHOLD } from "../shouldRefine.js";
 import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { ExitReason, ResearchBatch } from "../types.js";
 
@@ -30,7 +31,9 @@ export async function compileBatch(
 ): Promise<ResearchLoopStateUpdate> {
   const score = state.lastEvaluation?.score ?? null;
   const exitReason: ExitReason =
-    score !== null && score >= 0.75 ? "score_threshold" : "max_iterations";
+    score !== null && score >= RESEARCH_SUFFICIENCY_SCORE_THRESHOLD
+      ? "score_threshold"
+      : "max_iterations";
   const batch: ResearchBatch = {
     id: randomUUID(),
     iteration: state.iteration,
