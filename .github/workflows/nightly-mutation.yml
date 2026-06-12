@@ -1,5 +1,7 @@
-# Nightly full mutation testing (Issue #377 Phase 3).
+# Nightly full mutation testing (Issue #377 Phase 3 / #1050).
 # 全対象で mutation を実行し、スコア推移・レポートを週次確認する用。
+# スコアでは fail させない（stryker.config.nightly.mjs: break 無効）。
+# 失敗時の原因分類は stryker.config.mjs の TSDoc を参照（timeout / score / test error）。
 name: Nightly Mutation
 
 on:
@@ -18,6 +20,8 @@ jobs:
   mutation-full:
     name: Mutation (full)
     runs-on: ubuntu-latest
+    # 完走実績は約 2.5 時間（dry run 約 5 分 + mutation 約 148 分）。余裕を持たせて 5 時間で打ち切る。
+    timeout-minutes: 300
     steps:
       - name: Checkout (with retry)
         uses: Wandalen/wretry.action@v3
@@ -29,7 +33,7 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
 
       - name: Run mutation tests (full scope)
-        run: bun run test:mutation
+        run: bun run test:mutation -- stryker.config.nightly.mjs
 
       - name: Upload mutation report
         if: always()
@@ -38,3 +42,13 @@ jobs:
           name: mutation-report-nightly
           path: reports/mutation/
           retention-days: 14
+
+      # スコア推移を artifact を開かずに確認できるよう Job Summary に要約を出す（Issue #1050）。
+      - name: Write mutation summary to job summary
+        if: always()
+        run: |
+          if [ -f reports/mutation/mutation.json ]; then
+            STRYKER_SUMMARY_MAX_SURVIVED=30 node scripts/stryker-mutation-report-summarize.mjs --stdout-only >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No \`reports/mutation/mutation.json\` — run failed before reporting (dry-run timeout or test error). See stryker.config.mjs failure triage." >> "$GITHUB_STEP_SUMMARY"
+          fi
