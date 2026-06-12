@@ -23,7 +23,7 @@ function jsonResponse(body: unknown, init: { status?: number; ok?: boolean } = {
 describe("subscriptionService", () => {
   let fetchSpy: ReturnType<typeof vi.fn>;
   let windowOpenSpy: ReturnType<typeof vi.fn>;
-  let consoleErrorSpy: ReturnType<typeof vi.SpyInstance>;
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -490,11 +490,7 @@ describe("subscriptionService", () => {
 
     it("非 OK で JSON が null のときはデフォルトメッセージを投げる / throws default portal error when error JSON is null", async () => {
       vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue({
-        status: 500,
-        ok: false,
-        json: vi.fn().mockResolvedValue(null),
-      } as unknown as Response);
+      fetchSpy.mockResolvedValue(jsonResponse(null, { status: 500, ok: false }));
 
       await expect(openCustomerPortal()).rejects.toThrow("Failed to get customer portal URL");
     });
@@ -552,11 +548,7 @@ describe("subscriptionService", () => {
 
     it("非 OK で JSON が null のときは Request failed を投げる / throws Request failed when error JSON is null", async () => {
       vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue({
-        status: 500,
-        ok: false,
-        json: vi.fn().mockResolvedValue(null),
-      } as unknown as Response);
+      fetchSpy.mockResolvedValue(jsonResponse(null, { status: 500, ok: false }));
 
       await expect(cancelSubscription()).rejects.toThrow("Request failed");
     });
