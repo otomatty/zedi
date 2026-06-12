@@ -4,18 +4,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft, Eye, PencilLine, X } from "lucide-react";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
   Button,
+  cn,
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
   useIsMobile,
 } from "@zedi/ui";
-import { useWikiComposeSession } from "@/hooks/wiki/useWikiComposeSession";
+import { useWikiComposeSession, type ComposePhase } from "@/hooks/wiki/useWikiComposeSession";
 import { COMPOSE_SEED_STATE_KEY, type ComposeNavigationSeed } from "@/lib/wikiCompose/navigation";
 import type { ComposeMode, DraftedSection } from "@/lib/wikiCompose/types";
 import { EditorPane } from "@/components/wikiCompose/EditorPane";
@@ -27,6 +28,94 @@ function indexById(items: DraftedSection[]): Record<string, DraftedSection> {
   for (const it of items) out[it.sectionId] = it;
   return out;
 }
+
+/**
+ * Which pane the mobile single-column view shows.
+ * モバイル 1 カラム表示でどちらのペインを出すか。
+ */
+type MobileComposeView = "preview" | "compose";
+
+/**
+ * Pick the most relevant mobile pane for a phase: drafting/completed favour the
+ * live preview (left), while interrupt phases need the compose controls (right).
+ *
+ * フェーズに応じて初期表示ペインを選ぶ。執筆中・完了はプレビュー（左）、入力が
+ * 必要な割込みフェーズは作成パネル（右）を出す。
+ */
+function phaseToMobileView(phase: ComposePhase): MobileComposeView {
+  switch (phase) {
+    case "draft":
+    case "completed":
+      return "preview";
+    case "brief":
+    case "research":
+    case "conflict":
+    case "structure":
+      return "compose";
+    default: {
+      const _exhaustive: never = phase;
+      return _exhaustive;
+    }
+  }
+}
+
+const MOBILE_TAB_BASE =
+  "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors";
+
+/**
+ * Mobile-only segmented control that toggles between the preview and compose
+ * panes (the desktop shows both side by side via resizable panels).
+ *
+ * モバイル専用のセグメント切替。プレビューと作成パネルを行き来する
+ * （デスクトップはリサイズ可能な分割で両方を同時表示する）。
+ */
+const ComposePaneTabs: React.FC<{
+  view: MobileComposeView;
+  onChange: (view: MobileComposeView) => void;
+}> = ({ view, onChange }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      data-testid="compose-mobile-tabs"
+      role="tablist"
+      aria-label={t("wikiCompose.page.paneSwitchAria")}
+      className="border-border bg-background/95 flex items-center gap-1 border-b px-2 py-1.5"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={view === "preview"}
+        data-testid="compose-tab-preview"
+        onClick={() => onChange("preview")}
+        className={cn(
+          MOBILE_TAB_BASE,
+          view === "preview"
+            ? "bg-muted text-foreground"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <Eye className="h-4 w-4" aria-hidden />
+        {t("wikiCompose.page.tabPreview")}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={view === "compose"}
+        data-testid="compose-tab-compose"
+        onClick={() => onChange("compose")}
+        className={cn(
+          MOBILE_TAB_BASE,
+          view === "compose"
+            ? "bg-muted text-foreground"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <PencilLine className="h-4 w-4" aria-hidden />
+        {t("wikiCompose.page.tabCompose")}
+      </button>
+    </div>
+  );
+};
 
 /** Root page for `/notes/:noteId/:pageId/compose[/:sessionId]`. */
 const WikiComposePage: React.FC = () => {
@@ -77,6 +166,23 @@ const WikiComposePage: React.FC = () => {
     initialInput,
     mode,
   });
+
+  // Mobile shows one pane at a time; auto-follow the phase so the user lands on
+  // the pane that matters (controls during interrupts, preview while drafting),
+  // while still allowing manual switching via the tab bar. The phase is adjusted
+  // during render (the "you might not need an effect" pattern) so the switch is
+  // applied without a flash and without calling setState inside an effect.
+  // モバイルは 1 ペイン表示。フェーズに追従して必要なペインへ自動で切り替えつつ、
+  // タブで手動切替もできるようにする。フェーズ変化はレンダー中に反映する
+  // （effect 内 setState を避ける React 推奨パターン）。
+  const [mobileView, setMobileView] = useState<MobileComposeView>(() =>
+    phaseToMobileView(session.phase),
+  );
+  const [trackedPhase, setTrackedPhase] = useState<ComposePhase>(session.phase);
+  if (trackedPhase !== session.phase) {
+    setTrackedPhase(session.phase);
+    setMobileView(phaseToMobileView(session.phase));
+  }
 
   useEffect(() => {
     if (!composeSeed || !location.state) return;
@@ -233,17 +339,35 @@ const WikiComposePage: React.FC = () => {
           ) : null}
         </div>
       ) : null}
-      <div className="min-h-0 flex-1">
-        <ResizablePanelGroup direction={isMobile ? "vertical" : "horizontal"} className="h-full">
-          <ResizablePanel defaultSize={55} minSize={30}>
-            {left}
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={45} minSize={25}>
-            {right}
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      </div>
+      {isMobile ? (
+        <>
+          <ComposePaneTabs view={mobileView} onChange={setMobileView} />
+          <div className="min-h-0 flex-1">
+            {/* Keep both panes mounted (toggle with `hidden`) so in-progress
+                Brief answers and outline edits survive tab switches.
+                両ペインをマウントしたまま `hidden` で切替え、入力途中の
+                Brief 回答やアウトライン編集をタブ切替で失わないようにする。 */}
+            <div className={cn("h-full", mobileView === "preview" ? "block" : "hidden")}>
+              {left}
+            </div>
+            <div className={cn("h-full", mobileView === "compose" ? "block" : "hidden")}>
+              {right}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="min-h-0 flex-1">
+          <ResizablePanelGroup direction="horizontal" className="h-full">
+            <ResizablePanel defaultSize={55} minSize={30}>
+              {left}
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={45} minSize={25}>
+              {right}
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+      )}
     </div>
   );
 };

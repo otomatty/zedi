@@ -305,7 +305,7 @@ describe("WikiComposePage", () => {
   });
 
   describe("layout direction", () => {
-    it("uses horizontal panel group on desktop", () => {
+    it("uses a horizontal panel group and no mobile tabs on desktop", () => {
       vi.mocked(useIsMobile).mockReturnValue(false);
 
       renderWikiCompose();
@@ -314,17 +314,51 @@ describe("WikiComposePage", () => {
         "data-direction",
         "horizontal",
       );
+      expect(screen.queryByTestId("compose-mobile-tabs")).not.toBeInTheDocument();
     });
 
-    it("uses vertical panel group on mobile", () => {
+    it("shows pane tabs instead of a panel group on mobile", () => {
       vi.mocked(useIsMobile).mockReturnValue(true);
 
       renderWikiCompose();
 
-      expect(screen.getByTestId("resizable-panel-group")).toHaveAttribute(
-        "data-direction",
-        "vertical",
-      );
+      expect(screen.getByTestId("compose-mobile-tabs")).toBeInTheDocument();
+      expect(screen.queryByTestId("resizable-panel-group")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("mobile pane tabs", () => {
+    beforeEach(() => {
+      vi.mocked(useIsMobile).mockReturnValue(true);
+    });
+
+    it("defaults to the compose pane during interrupt phases", () => {
+      vi.mocked(useWikiComposeSession).mockReturnValue(createMockSession({ phase: "brief" }));
+
+      renderWikiCompose();
+
+      expect(screen.getByTestId("compose-tab-compose")).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByTestId("compose-tab-preview")).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("defaults to the preview pane while drafting", () => {
+      vi.mocked(useWikiComposeSession).mockReturnValue(createMockSession({ phase: "draft" }));
+
+      renderWikiCompose();
+
+      expect(screen.getByTestId("compose-tab-preview")).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByTestId("compose-tab-compose")).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("switches the active pane when a tab is clicked", () => {
+      vi.mocked(useWikiComposeSession).mockReturnValue(createMockSession({ phase: "brief" }));
+
+      renderWikiCompose();
+
+      fireEvent.click(screen.getByTestId("compose-tab-preview"));
+
+      expect(screen.getByTestId("compose-tab-preview")).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByTestId("compose-tab-compose")).toHaveAttribute("aria-selected", "false");
     });
   });
 

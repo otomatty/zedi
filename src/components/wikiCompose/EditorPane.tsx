@@ -38,7 +38,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   return (
     <div
       data-testid="compose-editor-pane"
-      className="bg-background prose prose-sm dark:prose-invert h-full max-w-none overflow-auto px-6 py-6"
+      className="bg-background prose prose-sm dark:prose-invert h-full max-w-none overflow-auto px-4 py-4 sm:px-6 sm:py-6"
     >
       <h1 className="!mb-2">{title || t("wikiCompose.editor.untitled")}</h1>
 

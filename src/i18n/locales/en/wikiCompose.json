@@ -6,7 +6,10 @@
     "back": "Back",
     "sessionPrefix": "session:",
     "close": "Close",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "tabPreview": "Preview",
+    "tabCompose": "Compose",
+    "paneSwitchAria": "Switch between preview and compose panes"
   },
   "phase": {
     "brief": "Brief",
