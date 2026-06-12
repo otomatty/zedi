@@ -32,7 +32,8 @@ Collects paths from git, joins them as a single `--mutate` argument (comma-separ
 # Working tree vs HEAD (staged + unstaged + untracked under src/)
 bun run test:mutation:changed
 
-# Recommended for slow machines / first failure: extend initial test run timeout (default is 5 minutes)
+# Recommended for slow machines / first failure: extend initial test run timeout
+# (repo default is 20 minutes via `stryker.config.mjs` dryRunTimeoutMinutes)
 bun run test:mutation:changed -- --dryRunTimeoutMinutes 30
 
 # Optional: ignore static mutants (often much faster)
@@ -69,7 +70,7 @@ STRYKER_HTML_REPORT=0 bun run test:mutation:changed
 
 | Symptom                                                  | Likely cause                                                                            | Action                                                                                                       |
 | -------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `Initial test run timed out`                             | Default dry-run limit is **5 minutes**; Vitest + `perTest` coverage can exceed it.      | Retry with `--dryRunTimeoutMinutes 15` or `30`.                                                              |
+| `Initial test run timed out`                             | Repo dry-run limit is **20 minutes** (`stryker.config.mjs`); Vitest + `perTest` coverage can exceed it on slow machines. | Retry with `--dryRunTimeoutMinutes 30`.                                                                      |
 | `There were failed tests in the initial test run`        | Unit tests fail under Stryker.                                                          | Fix tests: `bun run test:run` until green.                                                                   |
 | `No changed files under src/`                            | Only tests / `server/` / non-`src` changed, or nothing to diff.                         | Ensure production files under `src/` exist; use `STRYKER_DIFF_BASE` for branch scope.                        |
 | Low `% Mutation score` / many `# no cov` on changed runs | **Expected** for scoped `--mutate`: many mutants are not mapped to a test in this mode. | Use the report to **review survivors**; do not compare the number to full-repo `test:mutation` expectations. |
