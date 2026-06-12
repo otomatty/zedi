@@ -7,6 +7,7 @@
  */
 import { dispatchCustomEvent } from "@langchain/core/callbacks/dispatch";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
+import type { ResearchLoopCompileExitReason } from "../../types.js";
 
 /** Payload shape for `research_iteration` custom events. */
 export interface ResearchIterationPayload {
@@ -29,7 +30,7 @@ export interface ResearchBatchPayload {
   iteration: number;
   sourceCount: number;
   score: number | null;
-  exitReason: "score_threshold" | "max_iterations" | "safety_cap";
+  exitReason: ResearchLoopCompileExitReason;
 }
 
 /**

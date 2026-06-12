@@ -13,7 +13,7 @@ import { isResearchSufficient } from "../shouldRefine.js";
 import { getGraphContext } from "./shared/getGraphContext.js";
 import { dispatchResearchBatch } from "./shared/dispatchSseCustom.js";
 import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
-import type { ExitReason, ResearchBatch } from "../types.js";
+import type { ResearchBatch, ResearchLoopCompileExitReason } from "../types.js";
 
 /**
  * Derive the loop exit reason from evaluation + graph ownership.
@@ -24,7 +24,7 @@ import type { ExitReason, ResearchBatch } from "../types.js";
 export function resolveResearchExitReason(
   state: ResearchLoopStateType,
   graphId: string,
-): ExitReason {
+): ResearchLoopCompileExitReason {
   if (isResearchSufficient(state.lastEvaluation)) return "score_threshold";
   return graphId === INGEST_RESEARCH_GRAPH_ID ? "max_iterations" : "safety_cap";
 }

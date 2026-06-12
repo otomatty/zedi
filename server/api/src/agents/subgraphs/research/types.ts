@@ -123,16 +123,24 @@ export interface ResearchBatch {
 }
 
 /**
- * ループ終了理由。`compile_batch` で確定し、HITL に渡される。
+ * Reasons the research loop exited at `compile_batch` (emitted via SSE).
  *
- * Reason the loop exited; set by `compile_batch`.
+ * `compile_batch` で確定し SSE / HITL に渡される終了理由。
  */
-export type ExitReason =
+export type ResearchLoopCompileExitReason =
   | "score_threshold"
   /** Ingest planner hit its explicit 1..5 iteration cap. */
   | "max_iterations"
   /** Autonomous Wiki Compose hit {@link RESEARCH_SAFETY_MAX_ITERATIONS}. */
-  | "safety_cap"
+  | "safety_cap";
+
+/**
+ * ループ終了理由。`compile_batch` で確定し、HITL に渡される。
+ *
+ * Reason the loop exited; set by `compile_batch` or orchestrator skip nodes.
+ */
+export type ExitReason =
+  | ResearchLoopCompileExitReason
   | "manual_stop"
   /** Orchestrator skipped the research loop after Brief (#953). */
   | "brief_skip";
