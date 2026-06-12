@@ -33,7 +33,7 @@ export const PhaseStepper: React.FC<PhaseStepperProps> = ({ phase }) => {
   const currentIndex = Math.max(0, PHASE_ORDER.indexOf(stepPhase));
   return (
     <ol
-      className="flex items-center gap-1 text-xs"
+      className="flex items-center gap-1 overflow-x-auto text-xs"
       aria-label={t("wikiCompose.phase.progressAria")}
     >
       {PHASE_ORDER.map((p, i) => {
@@ -42,7 +42,7 @@ export const PhaseStepper: React.FC<PhaseStepperProps> = ({ phase }) => {
           <React.Fragment key={p}>
             <li
               className={cn(
-                "flex items-center gap-1 rounded-md px-2 py-1",
+                "flex shrink-0 items-center gap-1 rounded-md px-2 py-1 whitespace-nowrap",
                 state === "completed" && "text-emerald-600 dark:text-emerald-400",
                 state === "active" && "text-foreground bg-muted font-medium",
                 state === "upcoming" && "text-muted-foreground",
@@ -59,7 +59,9 @@ export const PhaseStepper: React.FC<PhaseStepperProps> = ({ phase }) => {
               )}
               <span>{t(`wikiCompose.phase.${p}`)}</span>
             </li>
-            {i < PHASE_ORDER.length - 1 ? <li aria-hidden className="bg-border h-px w-3" /> : null}
+            {i < PHASE_ORDER.length - 1 ? (
+              <li aria-hidden className="bg-border h-px w-3 shrink-0" />
+            ) : null}
           </React.Fragment>
         );
       })}

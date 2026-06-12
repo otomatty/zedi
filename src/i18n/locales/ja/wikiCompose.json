@@ -6,7 +6,10 @@
     "back": "戻る",
     "sessionPrefix": "セッション:",
     "close": "閉じる",
-    "cancel": "キャンセル"
+    "cancel": "キャンセル",
+    "tabPreview": "プレビュー",
+    "tabCompose": "作成",
+    "paneSwitchAria": "プレビューと作成パネルを切り替え"
   },
   "phase": {
     "brief": "ブリーフ",

@@ -186,6 +186,22 @@ const App = () => (
                         </ProtectedRoute>
                       }
                     />
+                    {/* Wiki Compose split-screen UI (issue #950).
+                        Rendered chrome-less (outside `AppShellRoute`) so the
+                        focused authoring view owns the whole viewport — no
+                        global Header or mobile BottomNav — which keeps the
+                        split panes from being clipped on small screens.
+                        Optional `:sessionId` keeps one route element so URL
+                        persistence does not remount and abort the first SSE run.
+
+                        Wiki Compose は集中作業用の全画面ビュー。グローバル
+                        Header / モバイル BottomNav を出さないよう
+                        `AppShellRoute` の外に置き、狭い画面で分割ペインが
+                        見切れないようにする。 */}
+                    <Route
+                      path="/notes/:noteId/:pageId/compose/:sessionId?"
+                      element={<WikiComposePage />}
+                    />
 
                     {/* App shell routes: wrapped with the shared AppLayout
                         so every page gets the common Header + primary nav + user menu + AI dock.
@@ -304,13 +320,6 @@ const App = () => (
                       </Route>
                       <Route path="/notes/:noteId/members" element={<LegacyMembersRedirect />} />
                       <Route path="/notes/:noteId/:pageId" element={<NotePageView />} />
-                      {/* Wiki Compose split-screen UI (issue #950).
-                          Optional `:sessionId` keeps one route element so URL
-                          persistence does not remount and abort the first SSE run. */}
-                      <Route
-                        path="/notes/:noteId/:pageId/compose/:sessionId?"
-                        element={<WikiComposePage />}
-                      />
                       {/* Legacy path — redirect `/notes/:noteId/pages/:pageId` to
                           the shorter `/notes/:noteId/:pageId`.
                           旧パス `/notes/:noteId/pages/:pageId` を短縮形にリダイレクト。 */}
