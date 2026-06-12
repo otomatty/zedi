@@ -13,7 +13,10 @@ const API_BASE = "https://api.example.com";
 const MONTHLY_PRODUCT_ID = "prod_monthly_123";
 const YEARLY_PRODUCT_ID = "prod_yearly_456";
 
-/** Minimal Response-like object for stubbing fetch. */
+/**
+ * Minimal Response-like object for stubbing fetch.
+ * fetch スタブ用の最小限の Response 互換オブジェクト。
+ */
 function jsonResponse(body: unknown, init: { status?: number; ok?: boolean } = {}): Response {
   const status = init.status ?? 200;
   const ok = init.ok ?? (status >= 200 && status < 300);
