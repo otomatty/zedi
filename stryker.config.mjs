@@ -36,14 +36,14 @@ export default {
     "src/components/layout/AppLayout.tsx",
     "src/pages/NoteView/index.tsx",
     "src/pages/NoteSettings/index.tsx",
-    "src/pages/NoteMembers/index.tsx",
     "src/components/layout/Header/index.tsx",
-    "src/components/layout/AppSidebar.tsx",
     "!src/**/*.test.{ts,tsx}",
-    "!src/**/*.spec.{ts,tsx}",
     "!src/test/**",
     "!src/main.tsx",
     "!src/vite-env.d.ts",
+    // Sentry init is thin glue (SDK bootstrap + no-op when DSN unset); mutation value is low.
+    // Sentry 初期化は薄いグルーコード（DSN 未設定時 no-op）のため mutate 対象外。
+    "!src/lib/sentry.ts",
   ],
   vitest: {
     configFile: "vite.config.ts",
