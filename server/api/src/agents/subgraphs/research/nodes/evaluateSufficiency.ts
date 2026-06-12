@@ -15,22 +15,24 @@ import { createZediChatModel } from "../../../core/llm/modelFactory.js";
 import { resolveWikiComposeModelId } from "../../../core/llm/wikiComposeModelId.js";
 import { getGraphContext } from "./shared/getGraphContext.js";
 import { dispatchResearchEvaluation } from "./shared/dispatchSseCustom.js";
-import { RESEARCH_SUFFICIENCY_SCORE_THRESHOLD } from "../shouldRefine.js";
+import { RESEARCH_SUFFICIENCY_SCORE_THRESHOLD } from "../constants.js";
 import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { Evaluation } from "../types.js";
 
 export const evaluationSchema = z.object({
   score: z.number().min(0).max(1),
+  sufficient: z.boolean(),
   rationale: z.string().min(1).max(500),
   missingAspects: z.array(z.string().min(1)).max(5),
 });
 
 const SYSTEM_PROMPT =
   "You are evaluating whether the research sources collected so far are sufficient " +
-  "to write the requested wiki article. Autonomously decide when coverage is good " +
-  `enough to proceed — score >= ${RESEARCH_SUFFICIENCY_SCORE_THRESHOLD} means sufficient. ` +
-  "Give a short rationale and list up to 5 missing aspects that would still matter " +
-  "for the article. Output JSON only.";
+  "to write the requested wiki article. Set `sufficient` to true when coverage is " +
+  "good enough to proceed without another research pass. Also provide a 0..1 score " +
+  `(>= ${RESEARCH_SUFFICIENCY_SCORE_THRESHOLD} typically means sufficient), a short ` +
+  "rationale, and up to 5 missing aspects that would still matter for the article. " +
+  "Output JSON only.";
 
 function buildUserPrompt(state: ResearchLoopStateType): string {
   const brief = state.messages
@@ -101,6 +103,7 @@ export async function evaluateSufficiency(
   ]);
   const evaluation: Evaluation = {
     score: parsed.score,
+    sufficient: parsed.sufficient,
     rationale: parsed.rationale,
     missingAspects: parsed.missingAspects,
   };

@@ -7,13 +7,8 @@
 import { HumanMessage } from "@langchain/core/messages";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
+import { clampIngestMaxIterations } from "../../../subgraphs/research/constants.js";
 import type { IngestPlannerStateType, IngestPlannerStateUpdate } from "../state.js";
-
-function clampMaxIterations(raw: number): number {
-  if (!Number.isFinite(raw)) return 3;
-  const truncated = Math.trunc(raw);
-  return Math.min(Math.max(truncated, 1), 5);
-}
 
 /**
  * Project graph run input into ingest + research seed state.
@@ -34,7 +29,7 @@ export async function prepareIngest(
 
   const candidates = state.candidates;
   const userSchema = state.userSchema;
-  const maxIterations = clampMaxIterations(state.maxIterations);
+  const maxIterations = clampIngestMaxIterations(state.maxIterations);
 
   for (const [i, c] of candidates.entries()) {
     if (!c?.id?.trim() || typeof c.title !== "string" || !c.title.trim()) {

@@ -305,7 +305,9 @@ function mapResearchBatch(data: Record<string, unknown>): SseResearchBatchEvent[
   const sourceCount = typeof data.sourceCount === "number" ? data.sourceCount : null;
   const score = data.score === null || typeof data.score === "number" ? data.score : null;
   const exitReason =
-    data.exitReason === "score_threshold" || data.exitReason === "max_iterations"
+    data.exitReason === "score_threshold" ||
+    data.exitReason === "max_iterations" ||
+    data.exitReason === "safety_cap"
       ? data.exitReason
       : null;
   if (batchId === null || iteration === null || sourceCount === null || exitReason === null) {

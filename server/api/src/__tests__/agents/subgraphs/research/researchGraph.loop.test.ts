@@ -124,7 +124,7 @@ describe("researchLoopSubgraph — autonomous loop", () => {
     evaluateSufficiency.mockImplementation(async (state, _config) => {
       evaluatedTimes += 1;
       return {
-        lastEvaluation: { score: 0.1, rationale: "weak", missingAspects: ["x"] },
+        lastEvaluation: { score: 0.1, sufficient: false, rationale: "weak", missingAspects: ["x"] },
         iteration: state.iteration + 1,
         phase: "research:evaluated",
       };
@@ -194,7 +194,7 @@ describe("researchLoopSubgraph — autonomous loop", () => {
     wikiSearch.mockImplementation(async () => ({ pendingSources: [] }));
     fetchArticles.mockImplementation(async () => ({ pendingSources: [] }));
     evaluateSufficiency.mockImplementation(async (state, _c) => ({
-      lastEvaluation: { score: 0.9, rationale: "great", missingAspects: [] },
+      lastEvaluation: { score: 0.9, sufficient: true, rationale: "great", missingAspects: [] },
       iteration: state.iteration + 1,
       phase: "research:evaluated",
     }));

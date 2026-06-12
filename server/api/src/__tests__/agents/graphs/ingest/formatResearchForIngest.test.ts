@@ -24,7 +24,7 @@ function baseState(): IngestPlannerStateType {
         iteration: 1,
         queries: [],
         sources: [],
-        evaluation: { score: 0.9, rationale: "ok", missingAspects: [] },
+        evaluation: { score: 0.9, sufficient: true, rationale: "ok", missingAspects: [] },
         createdAt: "2026-01-01T00:00:00.000Z",
       },
     ],

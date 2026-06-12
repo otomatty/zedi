@@ -29,7 +29,7 @@ export interface ResearchBatchPayload {
   iteration: number;
   sourceCount: number;
   score: number | null;
-  exitReason: "score_threshold" | "max_iterations";
+  exitReason: "score_threshold" | "max_iterations" | "safety_cap";
 }
 
 /**

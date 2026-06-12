@@ -92,9 +92,8 @@ export async function planQueries(
   const additional = state.additionalRequest ?? null;
   const brief = briefFromState(state, additional);
 
-  // Resolve maxIterations: explicit ingest cap (1..5) or autonomous safety cap.
-  // maxIterations は ingest の明示指定 (1..5) か、自律調査の安全上限。
-  const maxIterations = resolveResearchMaxIterations(state.maxIterations);
+  // maxIterations: ingest uses caller cap; Wiki Compose always uses safety cap.
+  const maxIterations = resolveResearchMaxIterations(ctx.graphId, state.maxIterations);
 
   const modelId = await resolveWikiComposeModelId("orchestrator", ctx.tier, ctx.db);
   const model = await createZediChatModel({

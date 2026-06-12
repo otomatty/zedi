@@ -124,7 +124,7 @@ function defaultMocks() {
   wikiSearch.mockImplementation(async () => ({ pendingSources: [] }));
   fetchArticles.mockImplementation(async () => ({ pendingSources: [] }));
   evaluateSufficiency.mockImplementation(async (state: { iteration: number }) => ({
-    lastEvaluation: { score: 0.9, rationale: "ok", missingAspects: [] },
+    lastEvaluation: { score: 0.9, sufficient: true, rationale: "ok", missingAspects: [] },
     iteration: state.iteration + 1,
     phase: "research:evaluated",
   }));

@@ -82,15 +82,18 @@ export interface PlannedQuery {
 }
 
 /**
- * `evaluate_sufficiency` ノードの出力。`score >= 0.75` で `compile_batch` 側へ
+ * `evaluate_sufficiency` ノードの出力。`sufficient === true` または
+ * `score >= {@link RESEARCH_SUFFICIENCY_SCORE_THRESHOLD}` で `compile_batch` 側へ
  * 分岐する（{@link ./researchGraph.ts} の `shouldRefine`）。
  *
  * Output of `evaluate_sufficiency`. The conditional edge uses
- * `score >= 0.75` as the exit predicate.
+ * {@link Evaluation.sufficient} first, then the score threshold.
  */
 export interface Evaluation {
-  /** 0..1. ≥ 0.75 → exit; otherwise refine. */
+  /** 0..1 confidence score; used when {@link sufficient} is absent. */
   score: number;
+  /** Explicit stop signal from the evaluator LLM. */
+  sufficient: boolean;
   /** Short natural-language rationale for the score. */
   rationale: string;
   /** Up to 5 short labels for what's still missing. */
@@ -126,7 +129,10 @@ export interface ResearchBatch {
  */
 export type ExitReason =
   | "score_threshold"
+  /** Ingest planner hit its explicit 1..5 iteration cap. */
   | "max_iterations"
+  /** Autonomous Wiki Compose hit {@link RESEARCH_SAFETY_MAX_ITERATIONS}. */
+  | "safety_cap"
   | "manual_stop"
   /** Orchestrator skipped the research loop after Brief (#953). */
   | "brief_skip";
