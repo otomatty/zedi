@@ -1,13 +1,13 @@
-# Nightly full mutation testing (Issue #377 Phase 3 / #1050).
-# 全対象で mutation を実行し、スコア推移・レポートを週次確認する用。
+# Weekly full mutation testing (Issue #377 Phase 3 / #1050).
+# 全対象で mutation を実行し、スコア推移・レポートを週次確認する用（金曜夜に週 1 回）。
 # スコアでは fail させない（stryker.config.nightly.mjs: break 無効）。
 # 失敗時の原因分類は stryker.config.mjs の TSDoc を参照（timeout / score / test error）。
 name: Nightly Mutation
 
 on:
   schedule:
-    # 毎日 04:00 UTC (JST 13:00)
-    - cron: "0 4 * * *"
+    # 毎週金曜 14:00 UTC (JST 金曜 23:00)。全量実行は約 2.5 時間かかるため週 1 回で運用する。
+    - cron: "0 14 * * 5"
   workflow_dispatch:
 
 permissions:
