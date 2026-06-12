@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { jsonResponse } from "@/test/fetchTestHelpers";
 import {
   createFreeSubscriptionState,
   fetchSubscription,
@@ -13,20 +14,54 @@ const API_BASE = "https://api.example.com";
 const MONTHLY_PRODUCT_ID = "prod_monthly_123";
 const YEARLY_PRODUCT_ID = "prod_yearly_456";
 
-/**
- * Minimal Response-like object for stubbing fetch.
- * fetch スタブ用の最小限の Response 互換オブジェクト。
- */
-function jsonResponse(body: unknown, init: { status?: number; ok?: boolean } = {}): Response {
-  const status = init.status ?? 200;
-  const ok = init.ok ?? (status >= 200 && status < 300);
-  return new Response(JSON.stringify(body), { status, statusText: ok ? "OK" : "Error" });
+const JSON_HEADERS = { "Content-Type": "application/json" } as const;
+
+type SubscriptionMutationCase = {
+  label: string;
+  path: string;
+  invoke: () => Promise<{ success: boolean; message: string }>;
+  successMessage: string;
+  apiErrorMessage: string;
+  requestBody?: Record<string, unknown>;
+};
+
+const subscriptionMutationCases: SubscriptionMutationCase[] = [
+  {
+    label: "cancelSubscription",
+    path: "/cancel",
+    invoke: cancelSubscription,
+    successMessage: "Subscription will be canceled at period end",
+    apiErrorMessage: "No active subscription found",
+  },
+  {
+    label: "reactivateSubscription",
+    path: "/reactivate",
+    invoke: reactivateSubscription,
+    successMessage: "Subscription reactivated",
+    apiErrorMessage: "Failed to reactivate subscription",
+  },
+  {
+    label: "changeBillingInterval",
+    path: "/change-plan",
+    invoke: () => changeBillingInterval("yearly"),
+    successMessage: "Switched to yearly billing",
+    apiErrorMessage: "Failed to change plan",
+    requestBody: { billingInterval: "yearly" },
+  },
+];
+
+function subscriptionPostInit(body?: Record<string, unknown>): RequestInit {
+  return {
+    method: "POST",
+    credentials: "include",
+    headers: JSON_HEADERS,
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  };
 }
 
 describe("subscriptionService", () => {
   let fetchSpy: ReturnType<typeof vi.fn>;
   let windowOpenSpy: ReturnType<typeof vi.fn>;
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -34,13 +69,13 @@ describe("subscriptionService", () => {
     vi.stubGlobal("fetch", fetchSpy);
     windowOpenSpy = vi.fn();
     vi.stubGlobal("open", windowOpenSpy);
-    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
-    consoleErrorSpy.mockRestore();
+    vi.restoreAllMocks();
   });
 
   describe("createFreeSubscriptionState", () => {
@@ -108,7 +143,7 @@ describe("subscriptionService", () => {
       expect(fetchSpy).toHaveBeenCalledWith(`${API_BASE}/api/ai/subscription`, {
         method: "GET",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: JSON_HEADERS,
       });
     });
 
@@ -349,7 +384,7 @@ describe("subscriptionService", () => {
 
       await openProCheckout("monthly");
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith("API base URL not configured");
+      expect(vi.mocked(console.error)).toHaveBeenCalledWith("API base URL not configured");
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(windowOpenSpy).not.toHaveBeenCalled();
     });
@@ -360,7 +395,7 @@ describe("subscriptionService", () => {
 
       await openProCheckout("monthly");
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Polar product ID not configured");
+      expect(vi.mocked(console.error)).toHaveBeenCalledWith("Polar product ID not configured");
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(windowOpenSpy).not.toHaveBeenCalled();
     });
@@ -371,7 +406,7 @@ describe("subscriptionService", () => {
 
       await openProCheckout("yearly");
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Polar product ID not configured");
+      expect(vi.mocked(console.error)).toHaveBeenCalledWith("Polar product ID not configured");
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(windowOpenSpy).not.toHaveBeenCalled();
     });
@@ -388,7 +423,7 @@ describe("subscriptionService", () => {
       expect(fetchSpy).toHaveBeenCalledWith(`${API_BASE}/api/checkout`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: JSON_HEADERS,
         body: JSON.stringify({ productId: MONTHLY_PRODUCT_ID }),
       });
       expect(windowOpenSpy).toHaveBeenCalledWith(
@@ -405,8 +440,12 @@ describe("subscriptionService", () => {
 
       await openProCheckout("yearly");
 
-      const init = fetchSpy.mock.calls[0]?.[1] as RequestInit;
-      expect(JSON.parse(String(init.body))).toEqual({ productId: YEARLY_PRODUCT_ID });
+      expect(fetchSpy).toHaveBeenCalledWith(`${API_BASE}/api/checkout`, {
+        method: "POST",
+        credentials: "include",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ productId: YEARLY_PRODUCT_ID }),
+      });
       expect(windowOpenSpy).toHaveBeenCalledWith(
         "https://checkout.polar.sh/session/yearly",
         "_blank",
@@ -423,7 +462,7 @@ describe("subscriptionService", () => {
 
       await openProCheckout("monthly");
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Auth token not available");
+      expect(vi.mocked(console.error)).toHaveBeenCalledWith("Auth token not available");
       expect(windowOpenSpy).not.toHaveBeenCalled();
     });
 
@@ -434,7 +473,7 @@ describe("subscriptionService", () => {
 
       await openProCheckout("monthly");
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Failed to create checkout session");
+      expect(vi.mocked(console.error)).toHaveBeenCalledWith("Failed to create checkout session");
       expect(windowOpenSpy).not.toHaveBeenCalled();
     });
   });
@@ -456,7 +495,7 @@ describe("subscriptionService", () => {
       expect(fetchSpy).toHaveBeenCalledWith(`${API_BASE}/api/customer-portal`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: JSON_HEADERS,
       });
       expect(windowOpenSpy).toHaveBeenCalledWith(
         "https://polar.sh/portal/abc",
@@ -499,159 +538,59 @@ describe("subscriptionService", () => {
     });
   });
 
-  describe("cancelSubscription", () => {
-    it("API URL 未設定時は API base URL not configured を投げる / throws when API base URL is missing", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", "");
+  describe.each(subscriptionMutationCases)(
+    "$label",
+    ({ path, invoke, successMessage, apiErrorMessage, requestBody }) => {
+      it("API URL 未設定時は API base URL not configured を投げる / throws when API base URL is missing", async () => {
+        vi.stubEnv("VITE_API_BASE_URL", "");
 
-      await expect(cancelSubscription()).rejects.toThrow("API base URL not configured");
-    });
-
-    it("POST /api/subscription/cancel を credentials include で呼ぶ / posts to cancel endpoint", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue(
-        jsonResponse({ success: true, message: "Subscription will be canceled at period end" }),
-      );
-
-      const result = await cancelSubscription();
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        `${API_BASE}/api/subscription/cancel`,
-        expect.objectContaining({ method: "POST", credentials: "include" }),
-      );
-      expect(result).toEqual({
-        success: true,
-        message: "Subscription will be canceled at period end",
+        await expect(invoke()).rejects.toThrow("API base URL not configured");
       });
-    });
 
-    it("401 のとき AUTH_REQUIRED を投げる / throws AUTH_REQUIRED on 401", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue(
-        jsonResponse({ error: "unauthorized" }, { status: 401, ok: false }),
-      );
+      it("POST を credentials include で呼び成功 JSON を返す / posts endpoint and returns JSON", async () => {
+        vi.stubEnv("VITE_API_BASE_URL", API_BASE);
+        fetchSpy.mockResolvedValue(jsonResponse({ success: true, message: successMessage }));
 
-      await expect(cancelSubscription()).rejects.toThrow("AUTH_REQUIRED");
-    });
+        const result = await invoke();
 
-    it("非 OK 時はレスポンスの error を投げる / throws response error on failure", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue(
-        jsonResponse({ error: "No active subscription found" }, { status: 404, ok: false }),
-      );
-
-      await expect(cancelSubscription()).rejects.toThrow("No active subscription found");
-    });
-
-    it("非 OK で error が無いときは Request failed を投げる / throws Request failed when response has no error field", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue(jsonResponse({}, { status: 500, ok: false }));
-
-      await expect(cancelSubscription()).rejects.toThrow("Request failed");
-    });
-
-    it("非 OK で JSON が null のときは Request failed を投げる / throws Request failed when error JSON is null", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue(jsonResponse(null, { status: 500, ok: false }));
-
-      await expect(cancelSubscription()).rejects.toThrow("Request failed");
-    });
-  });
-
-  describe("reactivateSubscription", () => {
-    it("API URL 未設定時は API base URL not configured を投げる / throws when API base URL is missing", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", "");
-
-      await expect(reactivateSubscription()).rejects.toThrow("API base URL not configured");
-    });
-
-    it("POST /api/subscription/reactivate を呼び成功 JSON を返す / posts to reactivate endpoint and returns JSON", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue(
-        jsonResponse({ success: true, message: "Subscription reactivated" }),
-      );
-
-      const result = await reactivateSubscription();
-
-      expect(fetchSpy).toHaveBeenCalledWith(
-        `${API_BASE}/api/subscription/reactivate`,
-        expect.objectContaining({ method: "POST", credentials: "include" }),
-      );
-      expect(result).toEqual({ success: true, message: "Subscription reactivated" });
-    });
-
-    it("401 のとき AUTH_REQUIRED を投げる / throws AUTH_REQUIRED on 401", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue(
-        jsonResponse({ error: "unauthorized" }, { status: 401, ok: false }),
-      );
-
-      await expect(reactivateSubscription()).rejects.toThrow("AUTH_REQUIRED");
-    });
-
-    it("非 OK 時はレスポンスの error を投げる / throws response error on failure", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue(
-        jsonResponse({ error: "Failed to reactivate subscription" }, { status: 500, ok: false }),
-      );
-
-      await expect(reactivateSubscription()).rejects.toThrow("Failed to reactivate subscription");
-    });
-
-    it("非 OK で error が無いときは Request failed を投げる / throws Request failed when response has no error field", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue(jsonResponse({}, { status: 500, ok: false }));
-
-      await expect(reactivateSubscription()).rejects.toThrow("Request failed");
-    });
-  });
-
-  describe("changeBillingInterval", () => {
-    it("API URL 未設定時は API base URL not configured を投げる / throws when API base URL is missing", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", "");
-
-      await expect(changeBillingInterval("yearly")).rejects.toThrow("API base URL not configured");
-    });
-
-    it("POST /api/subscription/change-plan に billingInterval を送る / posts billingInterval to change-plan endpoint", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue(
-        jsonResponse({ success: true, message: "Switched to yearly billing" }),
-      );
-
-      const result = await changeBillingInterval("yearly");
-
-      expect(fetchSpy).toHaveBeenCalledWith(`${API_BASE}/api/subscription/change-plan`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ billingInterval: "yearly" }),
+        expect(fetchSpy).toHaveBeenCalledWith(
+          `${API_BASE}/api/subscription${path}`,
+          subscriptionPostInit(requestBody),
+        );
+        expect(result).toEqual({ success: true, message: successMessage });
       });
-      expect(result).toEqual({ success: true, message: "Switched to yearly billing" });
-    });
 
-    it("401 のとき AUTH_REQUIRED を投げる / throws AUTH_REQUIRED on 401", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue(
-        jsonResponse({ error: "unauthorized" }, { status: 401, ok: false }),
-      );
+      it("401 のとき AUTH_REQUIRED を投げる / throws AUTH_REQUIRED on 401", async () => {
+        vi.stubEnv("VITE_API_BASE_URL", API_BASE);
+        fetchSpy.mockResolvedValue(
+          jsonResponse({ error: "unauthorized" }, { status: 401, ok: false }),
+        );
 
-      await expect(changeBillingInterval("monthly")).rejects.toThrow("AUTH_REQUIRED");
-    });
+        await expect(invoke()).rejects.toThrow("AUTH_REQUIRED");
+      });
 
-    it("非 OK 時はレスポンスの error を投げる / throws response error on failure", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue(
-        jsonResponse({ error: "Failed to change plan" }, { status: 500, ok: false }),
-      );
+      it("非 OK 時はレスポンスの error を投げる / throws response error on failure", async () => {
+        vi.stubEnv("VITE_API_BASE_URL", API_BASE);
+        fetchSpy.mockResolvedValue(
+          jsonResponse({ error: apiErrorMessage }, { status: 500, ok: false }),
+        );
 
-      await expect(changeBillingInterval("monthly")).rejects.toThrow("Failed to change plan");
-    });
+        await expect(invoke()).rejects.toThrow(apiErrorMessage);
+      });
 
-    it("非 OK で error が無いときは Request failed を投げる / throws Request failed when response has no error field", async () => {
-      vi.stubEnv("VITE_API_BASE_URL", API_BASE);
-      fetchSpy.mockResolvedValue(jsonResponse({}, { status: 500, ok: false }));
+      it("非 OK で error が無いときは Request failed を投げる / throws Request failed when response has no error field", async () => {
+        vi.stubEnv("VITE_API_BASE_URL", API_BASE);
+        fetchSpy.mockResolvedValue(jsonResponse({}, { status: 500, ok: false }));
 
-      await expect(changeBillingInterval("monthly")).rejects.toThrow("Request failed");
-    });
-  });
+        await expect(invoke()).rejects.toThrow("Request failed");
+      });
+
+      it("非 OK で JSON が null のときは Request failed を投げる / throws Request failed when error JSON is null", async () => {
+        vi.stubEnv("VITE_API_BASE_URL", API_BASE);
+        fetchSpy.mockResolvedValue(jsonResponse(null, { status: 500, ok: false }));
+
+        await expect(invoke()).rejects.toThrow("Request failed");
+      });
+    },
+  );
 });
