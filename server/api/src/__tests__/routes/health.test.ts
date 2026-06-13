@@ -1,8 +1,8 @@
 /**
- * /health のテスト。認証不要、レート制限なし、現在時刻を返すだけ。
- * Tests for /health: no auth, no rate limiting, returns current timestamp.
+ * /health のテスト。認証不要、レート制限なし、現在時刻とデプロイ SHA を返す。
+ * Tests for /health: no auth, no rate limiting, returns timestamp and deploy SHA.
  */
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { Hono } from "hono";
 import type { AppEnv } from "../../types/index.js";
 import healthRoutes from "../../routes/health.js";
@@ -14,6 +14,10 @@ function createHealthApp(): Hono<AppEnv> {
 }
 
 describe("GET /health", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("returns 200 with status ok and an ISO timestamp", async () => {
     const app = createHealthApp();
 
@@ -41,5 +45,27 @@ describe("GET /health", () => {
     // Confirm 200 is returned even without auth headers.
     const res = await app.request("/health");
     expect(res.status).toBe(200);
+  });
+
+  it("returns git_commit_sha null when RAILWAY_GIT_COMMIT_SHA is unset", async () => {
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", "");
+    const app = createHealthApp();
+
+    const res = await app.request("/health");
+    const body = (await res.json()) as { git_commit_sha: string | null };
+
+    expect(res.status).toBe(200);
+    expect(body.git_commit_sha).toBeNull();
+  });
+
+  it("returns git_commit_sha from RAILWAY_GIT_COMMIT_SHA when set", async () => {
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", "abc123def456");
+    const app = createHealthApp();
+
+    const res = await app.request("/health");
+    const body = (await res.json()) as { git_commit_sha: string | null };
+
+    expect(res.status).toBe(200);
+    expect(body.git_commit_sha).toBe("abc123def456");
   });
 });
