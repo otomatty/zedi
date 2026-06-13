@@ -64,6 +64,14 @@ describe("userAiCredentials", () => {
       );
     });
 
+    it("body.message が文字列でない場合は hint + status を throw する", async () => {
+      fetchMock.mockResolvedValue(errorResponse(500, { message: 123 }));
+
+      await expect(fetchUserAiCredentialsStatus()).rejects.toThrow(
+        "fetchUserAiCredentialsStatus failed: 500",
+      );
+    });
+
     it("エラー body が JSON でない場合も hint + status を throw する", async () => {
       fetchMock.mockResolvedValue(errorResponse(502, null, true));
 
@@ -87,10 +95,18 @@ describe("userAiCredentials", () => {
       });
     });
 
-    it("エラー時は throw する", async () => {
+    it("エラー時は body.message を優先して throw する", async () => {
       fetchMock.mockResolvedValue(errorResponse(400, { message: "bad key" }));
 
       await expect(upsertUserAiCredential("openai", "x")).rejects.toThrow("bad key");
+    });
+
+    it("body に message がない場合は hint + status を throw する", async () => {
+      fetchMock.mockResolvedValue(errorResponse(400, {}));
+
+      await expect(upsertUserAiCredential("openai", "x")).rejects.toThrow(
+        "upsertUserAiCredential failed: 400",
+      );
     });
   });
 
@@ -106,10 +122,18 @@ describe("userAiCredentials", () => {
       });
     });
 
-    it("エラー時は throw する", async () => {
+    it("エラー時は body.message を優先して throw する", async () => {
       fetchMock.mockResolvedValue(errorResponse(404, { message: "not found" }));
 
       await expect(deleteUserAiCredential("google")).rejects.toThrow("not found");
+    });
+
+    it("body に message がない場合は hint + status を throw する", async () => {
+      fetchMock.mockResolvedValue(errorResponse(404, {}));
+
+      await expect(deleteUserAiCredential("google")).rejects.toThrow(
+        "deleteUserAiCredential failed: 404",
+      );
     });
   });
 });
