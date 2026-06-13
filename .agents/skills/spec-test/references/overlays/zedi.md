@@ -46,8 +46,11 @@ Rules merged by spec-test / test-inventory when `project_profile.overlay: zedi`.
 
 ## inventory P0 調整
 
-Zedi では `packages/shared` と server 側定数のドリフト検知テスト（`*.sync.test.ts`）パターンがある。
+Zedi では `packages/shared` と server 側定数のドリフト検知テスト（`*Sync.test.ts`、例: `tagCharacterClassSync.test.ts`）パターンがある。
 新規定数追加時はペア更新が必要 → backlog に `sync test` メモを付ける。
+
+Zedi uses drift-detection tests named `*Sync.test.ts` (e.g. `tagCharacterClassSync.test.ts`) to keep `packages/shared` and server-side constant copies aligned.
+When adding new shared constants, update both sides and note `sync test` in the backlog.
 
 ## コメント
 

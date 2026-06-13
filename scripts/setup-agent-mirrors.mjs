@@ -6,7 +6,6 @@
  * Run from repo root: bun run setup:agent-mirrors
  */
 
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -139,14 +138,7 @@ export function removeIfExists(p) {
  * @param {string} targetAbs
  */
 function createPlatformLink(mirrorAbs, targetAbs) {
-  if (isWindows) {
-    execFileSync("cmd.exe", ["/c", "mklink", "/J", mirrorAbs, targetAbs], {
-      stdio: "inherit",
-    });
-    return;
-  }
-
-  fs.symlinkSync(targetAbs, mirrorAbs, "dir");
+  fs.symlinkSync(targetAbs, mirrorAbs, isWindows ? "junction" : "dir");
 }
 
 /**
