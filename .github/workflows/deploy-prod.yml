@@ -46,20 +46,40 @@ jobs:
       - migrate
     runs-on: ubuntu-latest
     environment: production
-    if: ${{ vars.API_BASE_URL != '' }}
     steps:
-      # Railway deploys asynchronously after the push event, so retry the
-      # health endpoints to give the platform time to roll out the new image.
-      # Railway は push を受けてから非同期にロールアウトするため、
-      # ヘルスエンドポイントはリトライ付きで検証する。
-      - name: Wait for API /api/health
+      - name: Require API_BASE_URL
+        run: |
+          if [ -z "${{ vars.API_BASE_URL }}" ]; then
+            echo "::error::production environment variable API_BASE_URL is not set"
+            exit 1
+          fi
+      # Railway deploys asynchronously after the push event, so retry until
+      # /api/health reports the pushed commit SHA (not merely HTTP 200).
+      # Railway は push を受けてから非同期にロールアウトするため、200 だけでなく
+      # /api/health の git_commit_sha が github.sha と一致するまでリトライする。
+      - name: Verify API health and deployed commit
         uses: nick-fields/retry@v4
         with:
           max_attempts: 10
-          timeout_minutes: 2
+          timeout_minutes: 5
           retry_wait_seconds: 30
           command: |
-            curl --fail --show-error --silent "${{ vars.API_BASE_URL }}/api/health"
+            BODY=$(curl --fail --show-error --silent "${{ vars.API_BASE_URL }}/api/health")
+            STATUS=$(echo "$BODY" | jq -r '.status')
+            DEPLOYED=$(echo "$BODY" | jq -r '.git_commit_sha // empty')
+            EXPECTED="${{ github.sha }}"
+            if [ "$STATUS" != "ok" ]; then
+              echo "Unexpected health status: $STATUS"
+              exit 1
+            fi
+            if [ -z "$DEPLOYED" ]; then
+              echo "API git_commit_sha missing (stale deploy or rollout in progress)"
+              exit 1
+            fi
+            if [ "$DEPLOYED" != "$EXPECTED" ]; then
+              echo "API git_commit_sha=$DEPLOYED expected=$EXPECTED"
+              exit 1
+            fi
       - name: Wait for MCP /health
         if: ${{ vars.MCP_BASE_URL != '' }}
         uses: nick-fields/retry@v4
@@ -73,25 +93,18 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend
     # `verify-server-health` をフロント公開のゲートにする。バックエンドの
-    # ロールアウトに失敗している状態で新しい UI を本番公開すると、ユーザーが
-    # 直撃する。
+    # ロールアウト（git_commit_sha 一致）に失敗している状態で新しい UI を
+    # 本番公開すると、ユーザーが直撃する。
     #
-    # GitHub Actions は upstream が skipped の場合、downstream を既定で skip
-    # するため、`if: vars.API_BASE_URL != ''` 経由で health チェックが skip
-    # された環境では明示的に `skipped` を success と同等に扱う必要がある
-    # （参照: GitHub Docs "Using jobs in a workflow"）。
-    #
-    # Gate prod frontend rollout on backend health so a failed backend deploy
-    # cannot still publish the new UI. Explicitly allow the `skipped` result
-    # of `verify-server-health` because GitHub Actions skips downstream jobs
-    # by default when an upstream `needs` job is skipped.
+    # Gate prod frontend rollout on backend health + commit SHA match so a
+    # failed or stale backend deploy cannot still publish the new UI.
     needs:
       - migrate
       - verify-server-health
     if: |
       always()
       && needs.migrate.result == 'success'
-      && (needs.verify-server-health.result == 'success' || needs.verify-server-health.result == 'skipped')
+      && needs.verify-server-health.result == 'success'
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -139,17 +152,15 @@ jobs:
 
   deploy-admin:
     name: Deploy Admin
-    # 同様に admin の本番公開もバックエンドのヘルスチェック通過後にする。
-    # `deploy-frontend` と同じ理由で skipped を許容する `if` を明示する。
+    # 同様に admin の本番公開もバックエンドのロールアウト検証通過後にする。
     # Gate admin rollout on backend health for the same reason as `deploy-frontend`.
-    # Apply the same explicit `if` to allow the skipped result.
     needs:
       - migrate
       - verify-server-health
     if: |
       always()
       && needs.migrate.result == 'success'
-      && (needs.verify-server-health.result == 'success' || needs.verify-server-health.result == 'skipped')
+      && needs.verify-server-health.result == 'success'
     runs-on: ubuntu-latest
     environment: production
     steps:
