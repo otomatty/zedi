@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useState, useCallback } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState, useCallback, useMemo } from "react";
 import { cn } from "@zedi/ui";
 import { FileText, Plus } from "lucide-react";
 
@@ -99,8 +99,10 @@ export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkS
   ({ query, onSelect, onClose, pages }, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
 
-    // Get matching pages
-    const getItems = useCallback((): SuggestionItem[] => {
+    // Get matching pages. メモ化して query / pages が変わったときだけ再計算する。
+    // Memoized so the O(n) filter/sort only runs when query or pages change,
+    // not on every render (e.g. selectedIndex updates while navigating).
+    const items = useMemo<SuggestionItem[]>(() => {
       const normalizedQuery = query.toLowerCase().trim();
 
       // Get existing pages that match
@@ -118,20 +120,18 @@ export const WikiLinkSuggestion = forwardRef<WikiLinkSuggestionHandle, WikiLinkS
         (p) => !p.isDeleted && p.title.toLowerCase() === normalizedQuery,
       );
 
-      const items: SuggestionItem[] = [...matchingPages];
+      const nextItems: SuggestionItem[] = [...matchingPages];
 
       if (query.trim() && !exactMatch) {
-        items.push({
+        nextItems.push({
           id: "create-new",
           title: query.trim(),
           exists: false,
         });
       }
 
-      return items;
+      return nextItems;
     }, [query, pages]);
-
-    const items = getItems();
 
     // Reset selection when items change
     useEffect(() => {

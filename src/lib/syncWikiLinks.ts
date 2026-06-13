@@ -16,19 +16,19 @@ export interface WikiLinkForSync {
  * の外部候補リスト `notePages` を受け取る。
  *
  * Extra options for `syncLinksWithRepo`. Used to scope WikiLink resolution
- * (issue #713 Phase 4). `pageNoteId` identifies whether the source page is
- * personal (`null`) or note-native (`string`); `notePages` supplies an
- * external candidate list when the repository does not hold note-native
- * pages locally (IndexedDB holds only personal pages).
+ * (issues #713 Phase 4 / #1020). `pageNoteId` selects between the local
+ * (IndexedDB = default note) page set (`null`) and an explicit note
+ * (`string`); `notePages` supplies an external candidate list because the
+ * repository only holds the caller's default-note pages locally.
  */
 export interface SyncLinksOptions {
   /**
-   * リンク元ページの所属ノート ID。`null` なら個人ページとして同期し、
-   * `repo.getPagesSummary()` が返す個人ページのみを解決候補にする。
-   * 文字列値なら `notePages` に渡された候補リストだけを使う。
+   * リンク元ページの所属ノート ID。`null` ならローカル（IndexedDB＝デフォルト
+   * ノート）スコープで同期し、`repo.getPagesSummary()` の結果を解決候補に
+   * する。文字列値なら `notePages` に渡された候補リストだけを使う。
    *
-   * Note id that owns the source page. `null` → personal; the repo's
-   * personal page summaries are used. A string → note-native; callers must
+   * Note id that owns the source page. `null` → local (default-note) scope
+   * using the repo's page summaries. A string → note scope; callers must
    * supply `notePages` with the note's page list.
    */
   pageNoteId?: string | null;
@@ -64,18 +64,18 @@ export interface SyncLinksOptions {
  *
  * Extracted for unit testing with a mock repo.
  *
- * Scope (Issue #713 Phase 4):
- * - `options.pageNoteId === null`（既定）: 個人ページに対する同期。解決候補
- *   は `repo.getPagesSummary(userId)` が返す個人ページのみ。
- * - `options.pageNoteId === string`: ノートネイティブページに対する同期。
- *   解決候補は `options.notePages` のみ（呼び出し側が API から取得した
- *   ノート配下のページ一覧を渡す）。
+ * Scope (Issues #713 Phase 4 / #1020):
+ * - `options.pageNoteId === null`（既定）: ローカル（IndexedDB＝デフォルト
+ *   ノート）スコープの同期。解決候補は `repo.getPagesSummary(userId)` の結果。
+ * - `options.pageNoteId === string`: ノートスコープの同期。解決候補は
+ *   `options.notePages` のみ（呼び出し側が API から取得したノート配下の
+ *   ページ一覧を渡す）。
  *
- * - `options.pageNoteId === null` (default): sync for a personal page.
+ * - `options.pageNoteId === null` (default): local (default-note) scope.
  *   Candidates come from `repo.getPagesSummary(userId)`.
- * - `options.pageNoteId === string`: sync for a note-native page. Candidates
- *   come from `options.notePages` only (caller must pre-fetch the note's
- *   pages from the API).
+ * - `options.pageNoteId === string`: note scope. Candidates come from
+ *   `options.notePages` only (caller must pre-fetch the note's pages from
+ *   the API).
  */
 export async function syncLinksWithRepo(
   repo: IPageRepository,
@@ -85,12 +85,12 @@ export async function syncLinksWithRepo(
   options: SyncLinksOptions = {},
 ): Promise<void> {
   // `pageNoteId` は `null` / 文字列の 2 値契約。`pageNoteId ? ... : ...` は
-  // 空文字列 ("") の場合も個人スコープに倒れるため、明示的に `!== null` で
-  // 判別する。`null` なら個人 (`repo.getPagesSummary`)、文字列なら
+  // 空文字列 ("") の場合もローカルスコープに倒れるため、明示的に `!== null` で
+  // 判別する。`null` ならローカル (`repo.getPagesSummary`)、文字列なら
   // `options.notePages` を使う。
   //
   // `pageNoteId` is a null | string contract. Using truthiness would treat
-  // an empty string as personal scope; compare to `null` explicitly so the
+  // an empty string as local scope; compare to `null` explicitly so the
   // scope switch follows the documented contract.
   const pageNoteId = options.pageNoteId ?? null;
   // issue #725 Phase 1: `linkType` 省略時は `'wiki'`（既存の WikiLink 同期）。

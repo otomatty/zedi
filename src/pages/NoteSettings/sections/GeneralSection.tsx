@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Input, Label, useToast } from "@zedi/ui";
-import { useUpdateNote } from "@/hooks/useNoteQueries";
+import { useUpdateNote } from "@/hooks/notes/useNoteQueries";
 import { useNoteSettingsContext } from "../NoteSettingsContext";
 
 /**
@@ -52,7 +52,7 @@ const GeneralSection: React.FC = () => {
   };
 
   return (
-    <section className="border-border/60 rounded-lg border p-4">
+    <section className="border-border/60 rounded-lg border p-3 sm:p-4">
       <header className="mb-4 space-y-1">
         <h2 className="text-base font-semibold">{t("notes.settingsNav.general")}</h2>
         <p className="text-muted-foreground text-xs">{t("notes.generalSectionDescription")}</p>
@@ -71,8 +71,12 @@ const GeneralSection: React.FC = () => {
       </div>
 
       {canManage ? (
-        <div className="mt-4 flex justify-end">
-          <Button onClick={handleSave} disabled={updateNoteMutation.isPending || !isDirty}>
+        <div className="mt-4 flex sm:justify-end">
+          <Button
+            className="w-full sm:w-auto"
+            onClick={handleSave}
+            disabled={updateNoteMutation.isPending || !isDirty}
+          >
             {updateNoteMutation.isPending ? t("common.saving") : t("common.save")}
           </Button>
         </div>

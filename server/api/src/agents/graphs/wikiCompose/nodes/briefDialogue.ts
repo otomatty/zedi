@@ -14,11 +14,12 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { composeContentLocaleInstruction } from "../../../core/composeLocale.js";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
-import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
+import { resolveWikiComposeModelId } from "../../../core/llm/wikiComposeModelId.js";
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
 import { loadPageSnapshot } from "./shared/loadPageSnapshot.js";
-import { dispatchComposePhase } from "./shared/dispatch.js";
+import { dispatchComposePhase, dispatchComposeSnapshot } from "./shared/dispatch.js";
 import type { WikiComposeStateType, WikiComposeStateUpdate } from "../state.js";
 import type { BriefQuestion } from "../types.js";
 
@@ -116,7 +117,26 @@ export async function briefDialogue(
   // セッション開始時に 1 度だけ読み、以後は state を参照する。
   const snapshot = state.pageSnapshot ?? (await loadPageSnapshot(ctx.db, ctx.pageId));
 
-  const modelId = await resolveComposeModelId("orchestrator", ctx.backend, ctx.tier, ctx.db);
+  // Surface the page title/body to the client early (both modes). In instant
+  // mode there is no Brief interrupt to carry the snapshot, so the editor would
+  // otherwise show "untitled" until completion.
+  await dispatchComposeSnapshot({ pageSnapshot: snapshot }, config);
+
+  // Instant mode: skip Brief question generation entirely so the article can
+  // stream immediately from the title. Zero questions routes straight to
+  // `skip_research` → structure → draft (see `routeAfterBrief`), and
+  // `human_review_brief` won't interrupt in instant mode.
+  // 即時モードでは Brief 質問生成を丸ごとスキップし、タイトルから即ドラフトへ。
+  if (state.mode === "instant") {
+    return {
+      pageSnapshot: snapshot,
+      briefQuestions: [],
+      briefDegraded: false,
+      phase: "brief:await_user",
+    };
+  }
+
+  const modelId = await resolveWikiComposeModelId("orchestrator", ctx.tier, ctx.db);
   const model = await createZediChatModel({
     modelId,
     userId: ctx.userId,
@@ -135,7 +155,10 @@ export async function briefDialogue(
   let briefDegraded = false;
   try {
     raw = await structured.invoke([
-      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "system",
+        content: SYSTEM_PROMPT + composeContentLocaleInstruction(ctx.contentLocale),
+      },
       {
         role: "user",
         content: buildUserPrompt(snapshot.title, snapshot.body, state.chatSeed),

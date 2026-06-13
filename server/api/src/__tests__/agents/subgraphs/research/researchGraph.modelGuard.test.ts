@@ -15,6 +15,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { createZediChatModel } = vi.hoisted(() => ({ createZediChatModel: vi.fn() }));
 
+vi.mock("../../../../agents/core/llm/wikiComposeModelId.js", () => ({
+  WIKI_COMPOSE_MODEL_ID: "google:gemini-3.5-flash",
+  resolveWikiComposeModelId: vi.fn(async () => "google:gemini-3.5-flash"),
+}));
+
 vi.mock("../../../../agents/core/llm/modelFactory.js", async () => {
   const actual = await vi.importActual<
     typeof import("../../../../agents/core/llm/modelFactory.js")
@@ -91,6 +96,7 @@ function fakeContext(): GraphContext {
     db: {} as Database,
     feature: "wiki_compose:research",
     userEmail: null,
+    contentLocale: "ja",
   };
 }
 
@@ -132,6 +138,7 @@ describe("researchLoopSubgraph — all LLM calls go through ZediChatModel", () =
         const score = evaluateCall >= 2 ? 0.9 : 0.1;
         return fakeModel(async () => ({
           score,
+          sufficient: score >= 0.75,
           rationale: "auto",
           missingAspects: score < 0.75 ? ["x"] : [],
         }));

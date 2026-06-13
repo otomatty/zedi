@@ -16,13 +16,11 @@ import { z } from "zod";
  *
  * - `answers` — 必須。空配列でも可（Brief をスキップしたケース）。
  * - `appendToExisting` — 本文ありページで「追記」を選んだ場合 true。
- * - `researchMaxIterations` — Brief 内で 1..5 にユーザーが調整した場合のみ。
  *
  * Validates the resume payload at the Brief interrupt. `answers` is required
  * even when empty (the user may explicitly skip Brief by submitting an empty
  * array). Default for `appendToExisting` is `false` (replace-mode is the
- * historical Wiki Compose behaviour); `researchMaxIterations` is clamped to
- * 1..5 by the schema so the graph never sees an out-of-range value.
+ * historical Wiki Compose behaviour).
  */
 export const briefResumeSchema = z.object({
   answers: z
@@ -35,7 +33,6 @@ export const briefResumeSchema = z.object({
     )
     .default([]),
   appendToExisting: z.boolean().optional().default(false),
-  researchMaxIterations: z.number().int().min(1).max(5).optional(),
 });
 
 export type BriefResumeParsed = z.infer<typeof briefResumeSchema>;

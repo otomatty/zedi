@@ -10,7 +10,8 @@
  * handlers come from the parent (`WikiComposePage` → `useWikiComposeSession`).
  */
 import React, { useMemo, useState } from "react";
-import { Button, Card, CardContent, CardHeader, CardTitle, Slider } from "@zedi/ui";
+import { useTranslation } from "react-i18next";
+import { Button, Card, CardContent, CardHeader, CardTitle } from "@zedi/ui";
 import { Sparkles, RefreshCw, ArrowRight } from "lucide-react";
 import type {
   BriefAnswer,
@@ -20,7 +21,7 @@ import type {
 } from "@/lib/wikiCompose/types";
 import { BriefQuestionCard } from "./BriefQuestionCard";
 import { OutlineEditor } from "./OutlineEditor";
-import type { ComposePhase } from "@/hooks/useWikiComposeSession";
+import type { ComposePhase } from "@/hooks/wiki/useWikiComposeSession";
 
 export interface DialogueSectionProps {
   phase: ComposePhase;
@@ -29,11 +30,7 @@ export interface DialogueSectionProps {
   outlineProposal: OutlineSection[];
   isStreaming: boolean;
   /** Brief submission. */
-  onSubmitBrief: (input: {
-    answers: BriefAnswer[];
-    appendToExisting?: boolean;
-    researchMaxIterations?: number;
-  }) => Promise<void>;
+  onSubmitBrief: (input: { answers: BriefAnswer[]; appendToExisting?: boolean }) => Promise<void>;
   /** Structure submission. */
   onSubmitOutline: (input: { sections: OutlineSection[] }) => Promise<void>;
 }
@@ -64,11 +61,11 @@ export const DialogueSection: React.FC<DialogueSectionProps> = ({
   onSubmitBrief,
   onSubmitOutline,
 }) => {
+  const { t } = useTranslation();
   const [answers, setAnswers] = useState<Record<string, BriefAnswer>>({});
   const [appendToExisting, setAppendToExisting] = useState<boolean>(
     Boolean(pageSnapshot?.hasContent),
   );
-  const [maxIterations, setMaxIterations] = useState<number>(3);
   const [submitting, setSubmitting] = useState(false);
 
   const canSubmitBrief = useMemo(
@@ -81,19 +78,19 @@ export const DialogueSection: React.FC<DialogueSectionProps> = ({
       <section data-testid="dialogue-brief" className="space-y-3">
         <header className="flex items-center justify-between gap-2">
           <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-            <Sparkles className="h-4 w-4" aria-hidden /> Brief
+            <Sparkles className="h-4 w-4" aria-hidden /> {t("wikiCompose.brief.title")}
           </h2>
           <span className="text-muted-foreground text-xs">
             {briefQuestions.length === 0
-              ? "No questions — proceed to research"
-              : `${briefQuestions.length} question${briefQuestions.length > 1 ? "s" : ""}`}
+              ? t("wikiCompose.brief.noQuestions")
+              : t("wikiCompose.brief.questionCount", { count: briefQuestions.length })}
           </span>
         </header>
 
         {briefQuestions.length === 0 && isStreaming ? (
           <Card>
             <CardContent className="text-muted-foreground py-6 text-center text-xs">
-              Preparing Brief questions…
+              {t("wikiCompose.brief.preparing")}
             </CardContent>
           </Card>
         ) : null}
@@ -111,7 +108,7 @@ export const DialogueSection: React.FC<DialogueSectionProps> = ({
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-muted-foreground text-xs tracking-wide uppercase">
-                Page already has content
+                {t("wikiCompose.brief.existingContentTitle")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -122,7 +119,7 @@ export const DialogueSection: React.FC<DialogueSectionProps> = ({
                   checked={appendToExisting}
                   onChange={() => setAppendToExisting(true)}
                 />
-                Append to existing content
+                {t("wikiCompose.brief.append")}
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -131,36 +128,11 @@ export const DialogueSection: React.FC<DialogueSectionProps> = ({
                   checked={!appendToExisting}
                   onChange={() => setAppendToExisting(false)}
                 />
-                Replace existing content
+                {t("wikiCompose.brief.replace")}
               </label>
             </CardContent>
           </Card>
         ) : null}
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-muted-foreground text-xs tracking-wide uppercase">
-              Research depth
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="text-muted-foreground flex items-center justify-between text-xs">
-              <span>1 (quick)</span>
-              <span data-testid="research-iterations-value" className="text-foreground font-medium">
-                {maxIterations} iteration{maxIterations > 1 ? "s" : ""}
-              </span>
-              <span>5 (deep)</span>
-            </div>
-            <Slider
-              data-testid="research-iterations-slider"
-              min={1}
-              max={5}
-              step={1}
-              value={[maxIterations]}
-              onValueChange={(v) => setMaxIterations(v[0] ?? 3)}
-            />
-          </CardContent>
-        </Card>
 
         <div className="flex justify-end">
           <Button
@@ -172,7 +144,6 @@ export const DialogueSection: React.FC<DialogueSectionProps> = ({
                 await onSubmitBrief({
                   answers: Object.values(answers),
                   appendToExisting,
-                  researchMaxIterations: maxIterations,
                 });
               } finally {
                 setSubmitting(false);
@@ -184,7 +155,7 @@ export const DialogueSection: React.FC<DialogueSectionProps> = ({
             ) : (
               <ArrowRight className="mr-1 h-4 w-4" />
             )}
-            Start research
+            {t("wikiCompose.brief.startResearch")}
           </Button>
         </div>
       </section>
@@ -195,9 +166,9 @@ export const DialogueSection: React.FC<DialogueSectionProps> = ({
     return (
       <section data-testid="dialogue-structure" className="space-y-3">
         <header className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">Outline</h2>
+          <h2 className="text-sm font-semibold">{t("wikiCompose.structure.title")}</h2>
           <span className="text-muted-foreground text-xs">
-            {outlineProposal.length} section{outlineProposal.length === 1 ? "" : "s"}
+            {t("wikiCompose.structure.sectionCount", { count: outlineProposal.length })}
           </span>
         </header>
         <OutlineEditor
@@ -221,12 +192,14 @@ export const DialogueSection: React.FC<DialogueSectionProps> = ({
       <section data-testid="dialogue-draft" className="space-y-3">
         <header>
           <h2 className="text-sm font-semibold">
-            {phase === "completed" ? "Completed" : "Drafting"}
+            {phase === "completed"
+              ? t("wikiCompose.draft.completed")
+              : t("wikiCompose.draft.drafting")}
           </h2>
           <p className="text-muted-foreground text-xs">
             {phase === "completed"
-              ? "Article ready. Return to the page to review and save."
-              : "Sections are being drafted. Watch the editor on the left for live updates."}
+              ? t("wikiCompose.draft.completedHint")
+              : t("wikiCompose.draft.draftingHint")}
           </p>
         </header>
       </section>

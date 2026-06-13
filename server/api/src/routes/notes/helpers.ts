@@ -3,12 +3,12 @@
  * マッパー、DB クエリ、権限チェック
  */
 import { HTTPException } from "hono/http-exception";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, sql, inArray, getTableColumns } from "drizzle-orm";
 import { notes, noteMembers, noteDomainAccess, pages, users } from "../../schema/index.js";
 import type { Note } from "../../schema/index.js";
 import type { Database } from "../../types/index.js";
 import type { NoteApiFields, NoteRole, NoteMemberRole } from "./types.js";
-import { extractEmailDomain } from "../../lib/freeEmailDomains.js";
+import { extractEmailDomain } from "../../services/freeEmailDomains.js";
 
 // ── Mappers ─────────────────────────────────────────────────────────────────
 
@@ -169,70 +169,87 @@ export async function getNoteRole(
   userEmail: string | undefined,
   db: Database,
 ): Promise<{ role: NoteRole; note: Note | null }> {
-  const note = await findActiveNoteById(db, noteId);
-  if (!note) return { role: null, note: null };
-
-  if (userId && note.ownerId === userId) return { role: "owner", note };
-
   const normalizedEmail = typeof userEmail === "string" ? userEmail.trim().toLowerCase() : "";
+  const domain = normalizedEmail.length > 0 ? extractEmailDomain(normalizedEmail) : null;
 
-  if (normalizedEmail.length > 0) {
-    // メンバーは大文字小文字を区別せずに突合する。schema 側では lower-case で
-    // 保存する運用だが、古い行や手動挿入の取りこぼしを避けるため `LOWER(...)`
-    // で比較する。ヒットした場合はドメインルールより強い（= メンバー昇格済み）。
-    //
-    // Match members case-insensitively. Rows should already be lower-cased by
-    // `members.ts`, but compare via `LOWER(...)` to cover legacy / manual data.
-    // A member match outranks any domain rule (they were explicitly upgraded).
-    const member = await db
-      .select({ role: noteMembers.role })
-      .from(noteMembers)
-      .where(
-        and(
-          eq(noteMembers.noteId, noteId),
-          sql`LOWER(${noteMembers.memberEmail}) = ${normalizedEmail}`,
-          eq(noteMembers.isDeleted, false),
-          eq(noteMembers.status, "accepted"),
-        ),
-      )
-      .limit(1);
+  // note 行・メンバーロール・ドメインロールを 1 往復で取得する。member / domain は
+  // 行の多重化を避けるため相関サブクエリで解決し、ドメインは最強ロール
+  // (editor > viewer) を SQL 側で集約する。優先順位 (#663) は JS 側で適用する。
+  //
+  // Fetch the note row plus the caller's member/domain roles in a single round
+  // trip. Member/domain are resolved via correlated subqueries to avoid row
+  // multiplication, and the domain subquery aggregates the strongest role
+  // (editor > viewer) in SQL. Resolution order (#663) is applied in JS below.
+  //
+  // メンバーは大文字小文字を区別せず突合する（古い行や手動挿入を取りこぼさない）。
+  // email が無い場合は member サブクエリを実行せず NULL を返す。これにより
+  // `member_email = ''` の空メール行への偶発的一致で匿名アクセスが付与される
+  // のを防ぎ（旧実装は email 無し時に member/domain チェックを丸ごとスキップ
+  // していた）、不要なサブクエリ実行も避ける。domain も同様に抽出できなければ
+  // 実行しない。
+  //
+  // Members match case-insensitively (covers legacy/manual rows). When there is
+  // no email we emit a literal NULL instead of running the member subquery: this
+  // prevents an empty-string match against a blank `member_email` row from
+  // granting anonymous access (the previous implementation skipped member/domain
+  // checks entirely when the email was empty) and avoids a needless subquery.
+  // The domain subquery is likewise skipped when no domain can be extracted.
+  const memberRoleExpr =
+    normalizedEmail.length > 0
+      ? sql<NoteMemberRole | null>`(
+        SELECT ${noteMembers.role} FROM ${noteMembers}
+        WHERE ${noteMembers.noteId} = ${noteId}
+          AND LOWER(${noteMembers.memberEmail}) = ${normalizedEmail}
+          AND ${noteMembers.isDeleted} = false
+          AND ${noteMembers.status} = 'accepted'
+        LIMIT 1
+      )`
+      : sql<NoteMemberRole | null>`NULL`;
 
-    const firstMember = member[0];
-    if (firstMember) {
-      return { role: firstMember.role as NoteMemberRole, note };
-    }
+  const domainRoleExpr = domain
+    ? sql<NoteMemberRole | null>`(
+        SELECT CASE
+          WHEN bool_or(${noteDomainAccess.role} = 'editor') THEN 'editor'
+          WHEN count(*) > 0 THEN 'viewer'
+          ELSE NULL
+        END
+        FROM ${noteDomainAccess}
+        WHERE ${noteDomainAccess.noteId} = ${noteId}
+          AND ${noteDomainAccess.domain} = ${domain}
+          AND ${noteDomainAccess.isDeleted} = false
+      )`
+    : sql<NoteMemberRole | null>`NULL`;
 
-    // ドメイン招待ルール: `user@EXAMPLE.com` のドメイン部 `example.com` で一致
-    // した最強ロールを返す（editor > viewer）。該当ルール削除は即反映するため
-    // キャッシュせず DB を都度引く。
-    //
-    // Domain rule: pick the strongest role (editor beats viewer) among active
-    // rules matching the caller's email domain. We always query live so that
-    // revoking a rule takes effect immediately.
-    const domain = extractEmailDomain(normalizedEmail);
-    if (domain) {
-      const rules = await db
-        .select({ role: noteDomainAccess.role })
-        .from(noteDomainAccess)
-        .where(
-          and(
-            eq(noteDomainAccess.noteId, noteId),
-            eq(noteDomainAccess.domain, domain),
-            eq(noteDomainAccess.isDeleted, false),
-          ),
-        );
+  const rows = await db
+    .select({
+      ...getTableColumns(notes),
+      memberRole: memberRoleExpr,
+      domainRole: domainRoleExpr,
+    })
+    .from(notes)
+    .where(and(eq(notes.id, noteId), eq(notes.isDeleted, false)))
+    .limit(1);
 
-      if (rules.length > 0) {
-        const hasEditor = rules.some((r) => r.role === "editor");
-        return { role: hasEditor ? "editor" : "viewer", note };
-      }
-    }
-  }
+  const row = rows[0];
+  if (!row) return { role: null, note: null };
 
+  const { memberRole, domainRole, ...note } = row;
+
+  // 1. owner
+  if (userId && note.ownerId === userId) return { role: "owner", note };
+  // 2. member（domain より強い: 明示的に昇格済み）/ member outranks domain
+  //    email が無い呼び出しでは member ロールを採用しない（多層防御。SQL 側でも
+  //    サブクエリを実行しないが、空メール行による偶発的な権限付与を二重に防ぐ）。
+  //    Never honor a member role for an email-less caller (defense in depth: the
+  //    SQL also skips the subquery, but this double-guards against blank rows).
+  if (normalizedEmail.length > 0 && memberRole) return { role: memberRole, note };
+  // 3. domain access（editor > viewer は SQL 側で集約済み）/ domain rule
+  if (domain && domainRole) return { role: domainRole, note };
+  // 4. visibility
   if (note.visibility === "public" || note.visibility === "unlisted") {
     return { role: "guest", note };
   }
-
+  // 5. none
   return { role: null, note };
 }
 

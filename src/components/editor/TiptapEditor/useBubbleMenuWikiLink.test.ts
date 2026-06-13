@@ -4,7 +4,7 @@ import { useBubbleMenuWikiLink } from "./useBubbleMenuWikiLink";
 import type { Editor } from "@tiptap/core";
 
 const mockCheckExistence = vi.fn();
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useWikiLinkExistsChecker: () => ({ checkExistence: mockCheckExistence }),
 }));
 

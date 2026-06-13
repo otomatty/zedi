@@ -37,7 +37,6 @@ function throwIfAborted(signal?: AbortSignal): void {
  */
 export class S3Provider implements StorageProviderInterface {
   readonly name = "デフォルトストレージ";
-  private readonly getToken: () => Promise<string | null>;
   private readonly baseUrl: string;
 
   /**
@@ -47,7 +46,6 @@ export class S3Provider implements StorageProviderInterface {
     if (!context.getToken) {
       throw new Error("S3Provider requires getToken in context");
     }
-    this.getToken = context.getToken;
     this.baseUrl = context.baseUrl ?? getDefaultBaseUrl();
   }
 

@@ -20,6 +20,7 @@ interface AiModelRowProps {
   onDisplayNameBlur: (value: string) => void;
   onTierChange: (tier: "free" | "pro") => void;
   onToggleActive: () => void;
+  onSetSystemDefault: () => void;
   onDragStart: (e: React.DragEvent, id: string) => void;
   onDragOver: (e: React.DragEvent, id: string) => void;
   onDragLeave: () => void;
@@ -39,6 +40,7 @@ export function AiModelRow({
   onDisplayNameBlur,
   onTierChange,
   onToggleActive,
+  onSetSystemDefault,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -101,6 +103,23 @@ export function AiModelRow({
         >
           {m.isActive ? "ON" : "OFF"}
         </Button>
+      </TableCell>
+      <TableCell className="px-3 py-2">
+        {m.isSystemDefault ? (
+          <span className="text-primary text-xs font-medium">
+            {t("aiModels.systemDefaultBadge")}
+          </span>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!m.isActive}
+            onClick={onSetSystemDefault}
+          >
+            {t("aiModels.setSystemDefault")}
+          </Button>
+        )}
       </TableCell>
       <TableCell className="text-muted-foreground px-3 py-2">{m.sortOrder}</TableCell>
     </TableRow>

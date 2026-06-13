@@ -1,35 +1,16 @@
 /**
  * `WikiComposePage` — Wiki Compose split-screen UI (#950).
- *
- * `/notes/:noteId/:pageId/compose` (および `compose/:sessionId`) のルート要素。
- * 左ペイン = `EditorPane` (タイトル + 進捗中の本文プレビュー)、右ペイン =
- * `ComposePanel` (PhaseStepper + Dialogue + Research + Activity)。
- * モバイルでは縦分割、デスクトップでは横分割で表示する。Compose 完了 / 中断
- * 時はノートページに戻れる。
- *
- * Compose UI shell. The page reads the `useWikiComposeSession` hook for state
- * and routes user submissions back through the hook's mutator methods.
  */
 import React, { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, X } from "lucide-react";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  Button,
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-  useIsMobile,
-} from "@zedi/ui";
-import { useWikiComposeSession } from "@/hooks/useWikiComposeSession";
+import { ArrowLeft, Eye, PencilLine, X } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle, Button, cn, useIsMobile } from "@zedi/ui";
+import { useWikiComposeSession, type ComposePhase } from "@/hooks/wiki/useWikiComposeSession";
 import { COMPOSE_SEED_STATE_KEY, type ComposeNavigationSeed } from "@/lib/wikiCompose/navigation";
-import type { DraftedSection } from "@/lib/wikiCompose/types";
+import type { ComposeMode, DraftedSection } from "@/lib/wikiCompose/types";
 import { EditorPane } from "@/components/wikiCompose/EditorPane";
 import { ComposePanel } from "@/components/wikiCompose/ComposePanel";
-import { ComposeBackendSelector } from "@/components/wikiCompose/ComposeBackendSelector";
-import type { ComposeExecutionBackend } from "@/lib/wikiCompose/backends";
 
 /** Map drafted section list to a quick lookup. */
 function indexById(items: DraftedSection[]): Record<string, DraftedSection> {
@@ -38,8 +19,101 @@ function indexById(items: DraftedSection[]): Record<string, DraftedSection> {
   return out;
 }
 
+/**
+ * Which pane the mobile single-column view shows.
+ * モバイル 1 カラム表示でどちらのペインを出すか。
+ */
+type MobileComposeView = "preview" | "compose";
+
+/**
+ * Pick the most relevant mobile pane for a phase: drafting/completed favour the
+ * live preview (left), while interrupt phases need the compose controls (right).
+ *
+ * フェーズに応じて初期表示ペインを選ぶ。執筆中・完了はプレビュー（左）、入力が
+ * 必要な割込みフェーズは作成パネル（右）を出す。
+ */
+function phaseToMobileView(phase: ComposePhase): MobileComposeView {
+  switch (phase) {
+    case "draft":
+    case "completed":
+      return "preview";
+    case "brief":
+    case "research":
+    case "conflict":
+    case "structure":
+      return "compose";
+    default: {
+      const _exhaustive: never = phase;
+      return _exhaustive;
+    }
+  }
+}
+
+const MOBILE_TAB_BASE =
+  "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors";
+
+/**
+ * Mobile-only segmented control that toggles between the preview and compose
+ * panes (the desktop shows both side by side via resizable panels).
+ *
+ * モバイル専用のセグメント切替。プレビューと作成パネルを行き来する
+ * （デスクトップはリサイズ可能な分割で両方を同時表示する）。
+ */
+const ComposePaneTabs: React.FC<{
+  view: MobileComposeView;
+  onChange: (view: MobileComposeView) => void;
+  className?: string;
+}> = ({ view, onChange, className }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      data-testid="compose-mobile-tabs"
+      role="tablist"
+      aria-label={t("wikiCompose.page.paneSwitchAria")}
+      className={cn(
+        "border-border bg-background/95 flex items-center gap-1 border-b px-2 py-1.5",
+        className,
+      )}
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={view === "preview"}
+        data-testid="compose-tab-preview"
+        onClick={() => onChange("preview")}
+        className={cn(
+          MOBILE_TAB_BASE,
+          view === "preview"
+            ? "bg-muted text-foreground"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <Eye className="h-4 w-4" aria-hidden />
+        {t("wikiCompose.page.tabPreview")}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={view === "compose"}
+        data-testid="compose-tab-compose"
+        onClick={() => onChange("compose")}
+        className={cn(
+          MOBILE_TAB_BASE,
+          view === "compose"
+            ? "bg-muted text-foreground"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <PencilLine className="h-4 w-4" aria-hidden />
+        {t("wikiCompose.page.tabCompose")}
+      </button>
+    </div>
+  );
+};
+
 /** Root page for `/notes/:noteId/:pageId/compose[/:sessionId]`. */
 const WikiComposePage: React.FC = () => {
+  const { t } = useTranslation();
   const params = useParams<{ noteId: string; pageId: string; sessionId?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -48,10 +122,13 @@ const WikiComposePage: React.FC = () => {
   const noteId = params.noteId ?? "";
   const pageId = params.pageId ?? "";
   const sessionId = params.sessionId ?? null;
-  const [composeBackend, setComposeBackend] = useState<ComposeExecutionBackend>("zedi_managed");
 
-  // チャット seed は mount 時に 1 回だけ保持。`location.state` を消しても hook 側に残す。
-  // Capture chat seed once on mount; survives clearing `location.state` for the hook.
+  // Default to the zero-friction instant draft; `?mode=guided` opts into the
+  // classic human-in-the-loop flow (Brief → Research → Outline gates).
+  // 既定は即時ドラフト。`?mode=guided` で従来の対話フローに切り替える。
+  const mode: ComposeMode =
+    new URLSearchParams(location.search).get("mode") === "guided" ? "guided" : "instant";
+
   const [composeSeed] = useState((): ComposeNavigationSeed | undefined => {
     const raw = (location.state as Record<string, unknown> | null)?.[COMPOSE_SEED_STATE_KEY];
     if (!raw || typeof raw !== "object") return undefined;
@@ -78,19 +155,29 @@ const WikiComposePage: React.FC = () => {
   const session = useWikiComposeSession({
     pageId,
     sessionId,
-    // Fresh compose: user picks backend then clicks Start (#951).
-    autoStart: Boolean(sessionId && pageId),
+    startPolicy: sessionId ? "on-mount" : "when-backend-ready",
     composeSeed,
     initialInput,
-    backend: composeBackend,
+    mode,
   });
 
-  const awaitingComposeStart =
-    !sessionId && session.status === "idle" && !session.session && !session.isStreaming;
-  const showBackendSelector = awaitingComposeStart;
+  // Mobile shows one pane at a time; auto-follow the phase so the user lands on
+  // the pane that matters (controls during interrupts, preview while drafting),
+  // while still allowing manual switching via the tab bar. The phase is adjusted
+  // during render (the "you might not need an effect" pattern) so the switch is
+  // applied without a flash and without calling setState inside an effect.
+  // モバイルは 1 ペイン表示。フェーズに追従して必要なペインへ自動で切り替えつつ、
+  // タブで手動切替もできるようにする。フェーズ変化はレンダー中に反映する
+  // （effect 内 setState を避ける React 推奨パターン）。
+  const [mobileView, setMobileView] = useState<MobileComposeView>(() =>
+    phaseToMobileView(session.phase),
+  );
+  const [trackedPhase, setTrackedPhase] = useState<ComposePhase>(session.phase);
+  if (trackedPhase !== session.phase) {
+    setTrackedPhase(session.phase);
+    setMobileView(phaseToMobileView(session.phase));
+  }
 
-  // Clear history seed only after the session row left `pending` (first run claimed).
-  // `pending` のまま state を消すと失敗時リロードで chatSeed が届かなくなる (#950)。
   useEffect(() => {
     if (!composeSeed || !location.state) return;
     if (session.status === "idle" || session.status === "pending") return;
@@ -108,7 +195,6 @@ const WikiComposePage: React.FC = () => {
     session.status,
   ]);
 
-  // Persist the session id in the URL so refresh re-opens the same row.
   useEffect(() => {
     const id = session.session?.id;
     if (!id || sessionId || !noteId || !pageId) return;
@@ -119,14 +205,6 @@ const WikiComposePage: React.FC = () => {
     () => indexById(Object.values(session.draftedSections)),
     [session.draftedSections],
   );
-
-  // The displayed outline switches sources as the user progresses through
-  // phases: proposal during structure → final approved outline once approved.
-  // (For the editor pane preview, both are acceptable since they share `id`.)
-  const outlineForPreview =
-    session.phase === "completed" || session.phase === "draft"
-      ? session.outlineProposal
-      : session.outlineProposal;
 
   const handleBack = () => {
     if (noteId && pageId) {
@@ -141,14 +219,18 @@ const WikiComposePage: React.FC = () => {
     handleBack();
   };
 
+  const phaseLabel = (() => {
+    const key = `wikiCompose.phaseDisplay.${session.phase}` as const;
+    const translated = t(key);
+    return translated === key ? session.phase : translated;
+  })();
+
   if (!pageId) {
     return (
       <div className="p-6">
         <Alert variant="destructive">
-          <AlertTitle>Missing page id</AlertTitle>
-          <AlertDescription>
-            This URL is missing a page id. Use the Compose button on a wiki page to start.
-          </AlertDescription>
+          <AlertTitle>{t("wikiCompose.page.missingPageIdTitle")}</AlertTitle>
+          <AlertDescription>{t("wikiCompose.page.missingPageIdDescription")}</AlertDescription>
         </Alert>
       </div>
     );
@@ -168,19 +250,19 @@ const WikiComposePage: React.FC = () => {
           data-testid="compose-back"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
-          Back
+          {t("wikiCompose.page.back")}
         </Button>
         <span className="truncate text-sm font-medium">
-          {session.pageSnapshot?.title || "Wiki Compose"}
+          {session.pageSnapshot?.title || t("wikiCompose.page.titleFallback")}
         </span>
         <span className="text-muted-foreground text-[11px] tracking-wide uppercase">
-          {session.phase}
+          {phaseLabel}
         </span>
       </div>
       <div className="flex items-center gap-2">
         {session.session ? (
           <span className="text-muted-foreground hidden text-[11px] sm:inline">
-            session: {session.session.id.slice(0, 8)}…
+            {t("wikiCompose.page.sessionPrefix")} {session.session.id.slice(0, 8)}…
           </span>
         ) : null}
         <Button
@@ -192,7 +274,9 @@ const WikiComposePage: React.FC = () => {
           disabled={session.status === "completed" || session.status === "cancelled"}
         >
           <X className="mr-1 h-4 w-4" />
-          {session.status === "completed" ? "Close" : "Cancel"}
+          {session.status === "completed"
+            ? t("wikiCompose.page.close")
+            : t("wikiCompose.page.cancel")}
         </Button>
       </div>
     </header>
@@ -201,7 +285,7 @@ const WikiComposePage: React.FC = () => {
   const left = (
     <EditorPane
       title={session.pageSnapshot?.title ?? ""}
-      outline={outlineForPreview}
+      outline={session.outlineProposal}
       draftedSections={draftedSectionsById}
       sectionBuffers={session.sectionBuffers}
       streamingSectionId={session.streamingSectionId}
@@ -220,12 +304,12 @@ const WikiComposePage: React.FC = () => {
       approvedSources={session.approvedSources}
       researchConflictSummary={session.researchConflictSummary}
       outlineProposal={session.outlineProposal}
+      comprehensionAids={session.comprehensionAids}
       activity={session.activity}
       onSubmitBrief={session.submitBrief}
       onSubmitResearchApproval={session.submitResearchApproval}
       onSubmitConflictAck={session.submitConflictAck}
       onSubmitOutline={session.submitOutline}
-      onSubmitConflictAck={session.submitConflictAck}
     />
   );
 
@@ -233,36 +317,69 @@ const WikiComposePage: React.FC = () => {
     <div className="flex h-[100dvh] w-full flex-col">
       {header}
       {session.error ? (
-        <div className="bg-destructive/10 text-destructive px-4 py-2 text-xs">{session.error}</div>
-      ) : null}
-      {showBackendSelector ? (
-        <div className="border-border space-y-3 border-b px-4 py-3">
-          <ComposeBackendSelector
-            value={composeBackend}
-            onChange={setComposeBackend}
-            disabled={session.isStreaming}
-          />
-          <Button
-            type="button"
-            size="sm"
-            data-testid="compose-start"
-            onClick={() => void session.start()}
-            disabled={session.isStreaming}
-          >
-            Start compose
-          </Button>
+        <div className="bg-destructive/10 text-destructive flex items-center justify-between gap-2 px-4 py-2 text-xs">
+          <span className="min-w-0 flex-1">{session.error}</span>
+          {session.canRetryStart ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 shrink-0 px-2"
+              data-testid="compose-retry"
+              onClick={() => void session.start()}
+            >
+              {t("common:retry")}
+            </Button>
+          ) : null}
         </div>
       ) : null}
-      <div className="min-h-0 flex-1">
-        <ResizablePanelGroup direction={isMobile ? "vertical" : "horizontal"} className="h-full">
-          <ResizablePanel defaultSize={55} minSize={30}>
-            {left}
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={45} minSize={25}>
-            {right}
-          </ResizablePanel>
-        </ResizablePanelGroup>
+      {/* Keep the tab bar in the tree (hidden on desktop) so toggling
+          `useIsMobile` does not shift the pane shell's sibling index and
+          remount in-progress form state.
+          デスクトップでは非表示にしつつ DOM 上の位置を固定し、ブレークポイント
+          切替でペインが再マウントされないようにする。 */}
+      <ComposePaneTabs
+        view={mobileView}
+        onChange={setMobileView}
+        className={cn(!isMobile && "hidden")}
+      />
+      <div
+        className={cn(
+          "min-h-0 flex-1",
+          isMobile ? "relative" : "grid grid-cols-[minmax(0,55fr)_minmax(0,45fr)]",
+        )}
+      >
+        {/* Keep a single stable wrapper tree for both breakpoints so
+            `useIsMobile` flips (e.g. phone rotation past 768px) do not
+            remount `EditorPane` / `ComposePanel` and wipe in-progress Brief
+            answers or outline edits. Mobile uses full-bleed overlays; desktop
+            uses a fixed split grid with optional drag resize below.
+            ブレークポイントをまたいでも同一ラッパー木を維持し、回転などで
+            `useIsMobile` が切り替わっても入力途中の状態を失わない。 */}
+        <div
+          className={cn(
+            "h-full min-h-0 overflow-hidden",
+            isMobile &&
+              cn(
+                "absolute inset-0",
+                mobileView === "preview" ? "visible z-10" : "pointer-events-none invisible z-0",
+              ),
+          )}
+        >
+          {left}
+        </div>
+        <div
+          className={cn(
+            "h-full min-h-0 overflow-hidden",
+            isMobile &&
+              cn(
+                "absolute inset-0",
+                mobileView === "compose" ? "visible z-10" : "pointer-events-none invisible z-0",
+              ),
+          )}
+        >
+          {right}
+        </div>
       </div>
     </div>
   );

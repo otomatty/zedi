@@ -25,8 +25,8 @@ import { rateLimit } from "../middleware/rateLimit.js";
 import { sources } from "../schema/sources.js";
 import { pageSources } from "../schema/pageSources.js";
 import { eq, and } from "drizzle-orm";
-import { extractArticleFromUrl } from "../lib/articleExtractor.js";
-import { validateModelAccessOrThrow } from "../lib/aiAccessHelpers.js";
+import { extractArticleFromUrl } from "../services/articleExtractor.js";
+import { validateModelAccessOrThrow } from "../services/aiAccessHelpers.js";
 import { callProvider, getProviderApiKeyName } from "../services/aiProviders.js";
 import { getUserTier } from "../services/subscriptionService.js";
 import { checkUsage, calculateCost, recordUsage } from "../services/usageService.js";
@@ -37,6 +37,7 @@ import {
   IngestPlanParseError,
   type CandidatePage,
 } from "../services/ingestPlanner.js";
+import { resolveComposeContentLocale } from "../agents/core/composeLocale.js";
 import { pages } from "../schema/pages.js";
 import { pageContents } from "../schema/pageContents.js";
 import { recordActivity } from "../services/activityLogService.js";
@@ -519,6 +520,7 @@ app.post("/graph/run", authRequired, rateLimit(), async (c) => {
         tier,
         db,
         feature: "ingest_graph:run",
+        contentLocale: resolveComposeContentLocale(null, c.req.header("accept-language"), "ja"),
       },
     },
     {
@@ -619,6 +621,7 @@ app.post("/graph/resume", authRequired, rateLimit(), async (c) => {
         tier,
         db,
         feature: "ingest_graph:resume",
+        contentLocale: resolveComposeContentLocale(null, c.req.header("accept-language"), "ja"),
       },
     },
     body.resume,

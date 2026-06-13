@@ -5,9 +5,9 @@ import { useTranslation } from "react-i18next";
 import { formatDistanceToNow } from "date-fns";
 import { enUS, ja } from "date-fns/locale";
 import Container from "@/components/layout/Container";
-import { AIChatInput } from "@/components/ai-chat/AIChatInput";
-import { AIChatConversationListRow } from "@/components/ai-chat/AIChatConversationListRow";
-import { useAIChatConversations } from "@/hooks/useAIChatConversations";
+import { AIChatInput } from "@/components/aiChat/AIChatInput";
+import { AIChatConversationListRow } from "@/components/aiChat/AIChatConversationListRow";
+import { useAIChatConversations } from "@/hooks/aiChat/useAIChatConversations";
 import { useAIChatStore } from "@/stores/aiChatStore";
 import type { AIChatDetailLocationState, ReferencedPage } from "@/types/aiChat";
 import {

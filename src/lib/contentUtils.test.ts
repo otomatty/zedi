@@ -257,6 +257,26 @@ describe("sanitizeTiptapContent", () => {
     expect(parsed.content[0].attrs.title).toBe("My Artifact");
   });
 
+  it("should preserve video nodes through save/reload sanitization", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "video",
+          attrs: { src: "https://example.com/clip.webm", alt: "Demo" },
+        },
+      ],
+    });
+
+    const result = sanitizeTiptapContent(content);
+    expect(result.hadErrors).toBe(false);
+    expect(result.removedNodeTypes).toEqual([]);
+
+    const parsed = JSON.parse(result.content);
+    expect(parsed.content[0].type).toBe("video");
+    expect(parsed.content[0].attrs.src).toBe("https://example.com/clip.webm");
+  });
+
   it("should support task list nodes", () => {
     const content = JSON.stringify({
       type: "doc",

@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route, Navigate } from "react-router-dom";
 import NoteSettings from "./index";
-import { useNote } from "@/hooks/useNoteQueries";
+import { useNote } from "@/hooks/notes/useNoteQueries";
 import type { Note, NoteAccess, NoteAccessRole } from "@/types/note";
 
 vi.mock("react-i18next", () => ({
@@ -25,7 +25,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   useNote: vi.fn(),
 }));
 
@@ -199,6 +199,13 @@ describe("NoteSettings layout", () => {
     expect(screen.queryByRole("link", { name: /settingsNav\.danger/i })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /settingsNav\.visibility/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /settingsNav\.members/i })).toBeInTheDocument();
+  });
+
+  it("renders the settings nav as a horizontal scroll strip below md breakpoint", () => {
+    renderSettings("/notes/note-1/settings/general");
+    const nav = screen.getByRole("navigation", { name: /settingsNav\.ariaLabel/i });
+    expect(nav).toHaveClass("overflow-x-auto");
+    expect(nav).toHaveClass("md:flex-col");
   });
 
   it("shows only the Visibility entry for viewers", () => {

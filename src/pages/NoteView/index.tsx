@@ -2,21 +2,21 @@ import React, { useCallback } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Container from "@/components/layout/Container";
 import FloatingActionButton from "@/components/layout/FloatingActionButton";
-import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
+import { ContentWithAIChat } from "@/components/aiChat/ContentWithAIChat";
 import { NoteShareUrlCopyButton } from "@/components/note/NoteShareUrlCopyButton";
 import { NoteTitleSwitcher } from "@/components/note/NoteTitleSwitcher";
 import { NoteVisibilityBadge } from "@/components/note/NoteVisibilityBadge";
 import { Badge } from "@zedi/ui";
-import { useNote } from "@/hooks/useNoteQueries";
+import { useNote } from "@/hooks/notes/useNoteQueries";
 import { useTranslation } from "react-i18next";
 import { getNoteViewPermissions } from "./noteViewHelpers";
 import { PageLoadingOrDenied } from "@/components/layout/PageLoadingOrDenied";
 import { NoteViewHeaderActions } from "./NoteViewHeaderActions";
 import PageGrid from "@/components/page/PageGrid";
 import { TagFilterBar } from "@/components/tagFilterBar";
-import { useNoteTagAggregation } from "@/hooks/useNoteTagAggregation";
-import { useTagFilterBarPreference } from "@/hooks/useTagFilterBarPreference";
-import { useURLTagFilter } from "@/hooks/useURLTagFilter";
+import { useNoteTagAggregation } from "@/hooks/notes/useNoteTagAggregation";
+import { useTagFilterBarPreference } from "@/hooks/tags/useTagFilterBarPreference";
+import { useURLTagFilter } from "@/hooks/tags/useURLTagFilter";
 import type { PageSummary } from "@/types/page";
 import { isClipUrlAllowed } from "@/lib/webClipper";
 
@@ -52,7 +52,10 @@ const NoteView: React.FC = () => {
   } = useNote(noteId ?? "", { allowRemote: true });
 
   const noteSource = source === "remote" ? "remote" : "local";
-  const { canView, canEdit, canManageMembers } = getNoteViewPermissions(access, noteSource);
+  const { canView, canEdit, canManageMembers } = getNoteViewPermissions(
+    access ?? undefined,
+    noteSource,
+  );
   const isLoading = isNoteLoading;
   const isNotFound = !note || !access?.canView;
 
@@ -123,13 +126,15 @@ const NoteView: React.FC = () => {
       floatingAction={
         canEdit ? (
           <div className="mr-4 mb-4 flex flex-col items-end gap-2">
-            <FloatingActionButton
-              noteId={note.id}
-              initialClipUrl={validClipUrl ?? undefined}
-              onClipDialogClosedWithInitialUrl={
-                validClipUrl ? handleClipDialogClosedWithInitialUrl : undefined
-              }
-            />
+            {validClipUrl ? (
+              <FloatingActionButton
+                noteId={note.id}
+                initialClipUrl={validClipUrl}
+                onClipDialogClosedWithInitialUrl={handleClipDialogClosedWithInitialUrl}
+              />
+            ) : (
+              <FloatingActionButton noteId={note.id} />
+            )}
           </div>
         ) : undefined
       }

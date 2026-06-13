@@ -66,7 +66,7 @@ export const ExecutableCodeBlockNodeView: React.FC<NodeViewProps> = ({
       />
 
       <pre className="m-0 overflow-x-auto px-3 py-2 text-sm" spellCheck={false}>
-        <NodeViewContent
+        <NodeViewContent<"code">
           as="code"
           className={cn(
             language ? `language-${language}` : "",

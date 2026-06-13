@@ -26,6 +26,7 @@ import type { PdfSourceMetadata } from "../schema/sources.js";
 import { pageSources } from "../schema/pageSources.js";
 import { pages } from "../schema/pages.js";
 import { ensureDefaultNote } from "../services/defaultNoteService.js";
+import { canEdit, getNoteRole } from "./notes/helpers.js";
 import type { AppEnv } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -468,10 +469,21 @@ app.post(
         ? body.contentPreview.slice(0, 240)
         : highlightRow.text.slice(0, 240);
 
-    // ノート所属を解決（default に寄せる）。ノート権限の細かなチェックは
-    // /api/pages POST と同等のロジックを将来 import で共有してもよい。
-    // Resolve note membership; default to the user's default note.
-    const resolvedNoteId: string = requestedNoteId ?? (await ensureDefaultNote(db, userId)).id;
+    // ノート所属を解決（default に寄せる）。明示的な noteId は POST /api/pages と
+    // 同様に編集権限を検証する（他ユーザーのノートへのページ注入を防ぐ）。
+    // Resolve note membership; when noteId is explicit, require edit access like POST /api/pages.
+    let resolvedNoteId: string;
+    if (requestedNoteId) {
+      const userEmail = c.get("userEmail");
+      const { role, note } = await getNoteRole(requestedNoteId, userId, userEmail, db);
+      if (!note) throw new HTTPException(404, { message: "Note not found" });
+      if (!role || !canEdit(role, note)) {
+        throw new HTTPException(403, { message: "Forbidden" });
+      }
+      resolvedNoteId = requestedNoteId;
+    } else {
+      resolvedNoteId = (await ensureDefaultNote(db, userId)).id;
+    }
 
     const sectionAnchor = `pdf:v1:${highlightRow.id}`;
 

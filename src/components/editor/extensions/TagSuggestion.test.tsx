@@ -17,7 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { createRef, type RefObject } from "react";
 import { TagSuggestion, type TagSuggestionHandle } from "./TagSuggestion";
-import type { TagSuggestionCandidate } from "@/hooks/useTagCandidates";
+import type { TagSuggestionCandidate } from "@/hooks/tags/useTagCandidates";
 
 /**
  * 矢印キーの状態更新後に ref.current を最新の handle に追従させるためのヘルパー。

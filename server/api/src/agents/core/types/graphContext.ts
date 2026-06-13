@@ -10,6 +10,7 @@
  * identifiers required by `ZediChatModel` for usage attribution.
  */
 import type { Database, UserTier } from "../../../types/index.js";
+import type { ComposeContentLocale } from "../composeLocale.js";
 import type { ExecutionBackend } from "./executionBackend.js";
 
 /**
@@ -31,6 +32,8 @@ import type { ExecutionBackend } from "./executionBackend.js";
  *                     Executing user's email; used by `wikiSearchService` to
  *                     apply the `note_domain_access` predicate without an
  *                     extra DB roundtrip per tool call.
+ * @property contentLocale 生成テキストの言語（`ja` | `en`）。UI / Accept-Language から解決。
+ *                     Language for LLM-generated user-facing text (`ja` | `en`).
  */
 export interface GraphContext {
   threadId: string;
@@ -43,6 +46,7 @@ export interface GraphContext {
   db: Database;
   feature: string;
   userEmail: string | null;
+  contentLocale: ComposeContentLocale;
 }
 
 /**

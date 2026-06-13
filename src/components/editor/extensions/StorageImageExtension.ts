@@ -29,9 +29,13 @@ export interface StorageImageOptions extends ImageOptions {
  * Image node extending Tiptap's Image extension with storage-provider integration and Gyazo permalink input rules.
  */
 export const StorageImage = Image.extend<StorageImageOptions>({
-  addOptions() {
+  addOptions(): StorageImageOptions {
+    // `this.parent` is always defined for an extended extension at runtime, so
+    // the spread supplies the required `ImageOptions` fields (inline / allowBase64
+    // / resize). Cast narrows the optional-chained `... | undefined` away.
+    const parentOptions = this.parent?.() as StorageImageOptions;
     return {
-      ...this.parent?.(),
+      ...parentOptions,
       HTMLAttributes: {},
       getProviderLabel: undefined,
       canDeleteFromStorage: undefined,

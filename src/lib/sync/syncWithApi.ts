@@ -22,17 +22,17 @@ function normalizeWireLinkType(value: "wiki" | "tag" | undefined | null): LinkTy
   return value === "tag" ? "tag" : "wiki";
 }
 
-function syncPageToMetadata(row: SyncPageItem): PageMetadata {
+function syncPageToMetadata(row: SyncPageItem, defaultNoteId: string): PageMetadata {
   return {
     id: row.id,
     ownerId: row.owner_id,
-    // GET /api/sync/pages は個人ページ (`note_id IS NULL`) のみを返すため
-    // 実運用では常に `null`。将来 `note_id` がワイヤに乗る場合に備えて値が
-    // 来たらそのまま採用する。Issue #713。
-    // GET /api/sync/pages only returns personal pages (`note_id IS NULL`),
-    // so this is effectively always `null`. We still honor an explicit value
-    // if the wire format ever carries one. Issue #713.
-    noteId: row.note_id ?? null,
+    // GET /api/sync/pages は呼び出し元のデフォルトノート配下のページのみを
+    // 返す（Issue #823 / #1020）。`note_id` を返さない旧サーバ応答（キャッシュ
+    // 等）に備え、欠落時は同レスポンスの `default_note_id` で補う。
+    // GET /api/sync/pages only returns pages under the caller's default note
+    // (issues #823 / #1020). Fall back to the response's `default_note_id`
+    // for stale/cached payloads that predate the per-row `note_id`.
+    noteId: row.note_id ?? defaultNoteId,
     sourcePageId: row.source_page_id ?? null,
     title: row.title ?? null,
     contentPreview: row.content_preview ?? null,
@@ -182,6 +182,7 @@ function normalizeSyncResponse(raw: unknown): {
   pages: SyncPageItem[];
   links: SyncLinkItem[];
   ghost_links: SyncGhostLinkItem[];
+  default_note_id: string;
   server_time?: string;
 } {
   const candidate = unwrapEnvelope(raw);
@@ -192,13 +193,28 @@ function normalizeSyncResponse(raw: unknown): {
   const links = obj?.links ?? [];
   const ghostLinks = obj?.ghost_links ?? [];
   const serverTime = obj?.server_time ?? obj?.synced_at;
+  const defaultNoteId = obj?.default_note_id;
 
   validateSyncArrays(obj, pages, links, ghostLinks);
+
+  // Issue #1020: `default_note_id` はページ行への noteId 付与とレガシー
+  // `noteId: null` 行の移行に必須。欠落＝旧サーバ応答なので、黙って null を
+  // 復活させるより同期失敗（リトライ）に倒す。
+  // Issue #1020: `default_note_id` is required to stamp noteId on rows and
+  // migrate legacy `noteId: null` rows. A missing field means a pre-#1020
+  // server payload; fail the sync (and retry later) instead of silently
+  // resurrecting null.
+  if (typeof defaultNoteId !== "string" || defaultNoteId.length === 0) {
+    throw new TypeError(
+      "[Sync/API] Invalid sync payload: missing default_note_id (server predates issue #1020?)",
+    );
+  }
 
   return {
     pages: pages as SyncPageItem[],
     links: links as SyncLinkItem[],
     ghost_links: ghostLinks as SyncGhostLinkItem[],
+    default_note_id: defaultNoteId,
     server_time: typeof serverTime === "string" ? serverTime : undefined,
   };
 }
@@ -270,12 +286,21 @@ async function applyPull(
     pages: SyncPageItem[];
     links: SyncLinkItem[];
     ghost_links: SyncGhostLinkItem[];
+    default_note_id: string;
   },
 ): Promise<void> {
+  // Issue #1020: 旧個人ページ時代の `noteId: null` 行をデフォルトノートへ
+  // 付け替えてから pull を適用する。差分 pull（since 指定）は古い行を再送
+  // しないため、ここで移行しないとレガシー行が読めないまま残る。
+  // Issue #1020: adopt legacy `noteId: null` rows into the default note
+  // before applying the pull. Incremental pulls never resend old rows, so
+  // skipping this would leave legacy rows permanently unreadable.
+  await adapter.reassignNullNotePages(res.default_note_id);
+
   const pulledPageIds = new Set(res.pages.map((p) => p.id));
 
   for (const row of res.pages) {
-    const meta = syncPageToMetadata(row);
+    const meta = syncPageToMetadata(row, res.default_note_id);
     const local = await adapter.getPage(meta.id);
     if (local && local.updatedAt > meta.updatedAt) continue;
     // thumbnailUrl はクライアント側で extractFirstImage から生成されるため、
@@ -355,20 +380,60 @@ async function applyPull(
   );
 }
 
+/**
+ * On full / initial pull (`since` omitted), {@link getPagesForPush} returns every
+ * default-note row in IndexedDB, including pages just pulled from the server.
+ * Drop rows whose local metadata is not newer than the pulled copy so we only
+ * POST local-only legacy rows or offline edits (issue #1020).
+ *
+ * フル / 初回 pull では pull 直後のサーバー行も push 候補に含まれるため、サーバー版と
+ * 同じか古い行を除外し、ローカル専用・オフライン編集のみ upload する。
+ */
+function filterRedundantInitialPushPages(
+  pagesForPush: PageMetadata[],
+  pulledPages: SyncPageItem[],
+): PageMetadata[] {
+  if (pagesForPush.length === 0 || pulledPages.length === 0) {
+    return pagesForPush;
+  }
+
+  const serverUpdatedAtById = new Map<string, number>();
+  for (const row of pulledPages) {
+    serverUpdatedAtById.set(
+      row.id,
+      typeof row.updated_at === "string" ? new Date(row.updated_at).getTime() : row.updated_at,
+    );
+  }
+
+  return pagesForPush.filter((page) => {
+    const serverUpdatedAt = serverUpdatedAtById.get(page.id);
+    if (serverUpdatedAt === undefined) return true;
+    return page.updatedAt > serverUpdatedAt;
+  });
+}
+
 function getPagesForPush(
   lastSync: number | null,
   allLocalPages: PageMetadata[],
   pulledPageIds: Set<string>,
+  defaultNoteId: string,
+  isInitialSync: boolean,
 ): PageMetadata[] {
-  // ノートネイティブページ（issue #713）は POST /api/sync/pages では LWW
-  // 対象外。サーバー側でも skip されるが、誤って IndexedDB に入った場合に
-  // 余計なリクエストを発生させないよう、push 前にも除外する。
-  // Drop note-native rows (issue #713) before push — the server skips them
-  // anyway, but filtering here avoids needless wire traffic if any sneak in.
-  const personalOnly = allLocalPages.filter((p) => (p.noteId ?? null) === null);
-  return lastSync
-    ? personalOnly.filter((p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id))
-    : personalOnly;
+  // POST /api/sync/pages の LWW 対象は呼び出し元のデフォルトノート配下のみ
+  // （Issue #823 / #1020）。サーバー側でも skip されるが、他ノートの行が誤って
+  // IndexedDB に入った場合に余計なリクエストを発生させないよう push 前にも除外する。
+  // LWW sync only covers rows under the caller's default note (issues #823 /
+  // #1020). The server skips anything else anyway, but filtering here avoids
+  // needless wire traffic if foreign-note rows ever sneak into IndexedDB.
+  const defaultNoteOnly = allLocalPages.filter((p) => p.noteId === defaultNoteId);
+  // Full / initial pull (`since` omitted): consider every default-note row, then
+  // let {@link filterRedundantInitialPushPages} drop server echoes. Covers legacy
+  // `noteId: null` rows revealed by `reassignNullNotePages` (issue #1020) even
+  // when `lastSync` is already set — e.g. `forceFullSyncWhenLocalEmpty` recovery.
+  if (!lastSync || isInitialSync) {
+    return defaultNoteOnly;
+  }
+  return defaultNoteOnly.filter((p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id));
 }
 
 async function finishSyncNoPush(
@@ -384,12 +449,9 @@ async function finishSyncNoPush(
 function finishSyncIfNoPushNeeded(
   adapter: StorageAdapter,
   res: { server_time?: string },
-  isInitialSync: boolean,
-  localPageCount: number,
   pagesForPush: PageMetadata[],
 ): Promise<boolean> {
-  const noPush = (isInitialSync && localPageCount === 0) || pagesForPush.length === 0;
-  if (!noPush) return Promise.resolve(false);
+  if (pagesForPush.length > 0) return Promise.resolve(false);
   return finishSyncNoPush(adapter, res).then(() => true);
 }
 
@@ -462,9 +524,18 @@ export async function syncWithApi(
 
     const pulledPageIds = new Set(res.pages.map((r) => r.id));
     const allLocalPages = await adapter.getAllPages();
-    const pagesForPush = getPagesForPush(lastSync, allLocalPages, pulledPageIds);
+    let pagesForPush = getPagesForPush(
+      lastSync,
+      allLocalPages,
+      pulledPageIds,
+      res.default_note_id,
+      isInitialSync,
+    );
+    if (!lastSync || isInitialSync) {
+      pagesForPush = filterRedundantInitialPushPages(pagesForPush, res.pages);
+    }
 
-    if (await finishSyncIfNoPushNeeded(adapter, res, isInitialSync, localPageCount, pagesForPush)) {
+    if (await finishSyncIfNoPushNeeded(adapter, res, pagesForPush)) {
       return;
     }
 

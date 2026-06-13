@@ -4,7 +4,6 @@
  */
 
 import type { TFunction } from "i18next";
-import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { Input } from "@zedi/ui";

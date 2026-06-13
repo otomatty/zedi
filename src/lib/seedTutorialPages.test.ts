@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import type { TFunction } from "i18next";
 import { buildSeedTutorialPages } from "./seedTutorialPages";
 
 /**
@@ -31,9 +32,12 @@ function jaT(key: string): string {
   return table[key] ?? key;
 }
 
+// Minimal key→string mock; buildSeedTutorialPages only invokes t(key).
+const jaTFn = jaT as unknown as TFunction;
+
 describe("buildSeedTutorialPages", () => {
   it("returns three pages with parseable Tiptap JSON", () => {
-    const pages = buildSeedTutorialPages(jaT);
+    const pages = buildSeedTutorialPages(jaTFn);
     expect(pages).toHaveLength(3);
     for (const p of pages) {
       const doc = JSON.parse(p.content) as { type: string; content: unknown[] };
@@ -43,7 +47,7 @@ describe("buildSeedTutorialPages", () => {
   });
 
   it("uses first heading text from t", () => {
-    const [first] = buildSeedTutorialPages(jaT);
+    const [first] = buildSeedTutorialPages(jaTFn);
     const doc = JSON.parse(first.content) as {
       content: Array<{ type: string; content?: unknown[] }>;
     };

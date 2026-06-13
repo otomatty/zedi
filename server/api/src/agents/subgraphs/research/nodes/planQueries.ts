@@ -2,7 +2,7 @@
  * `plan_queries` — generates the initial query set for the research loop.
  *
  * 調査ループの最初のノード。Brief / 指示メッセージから 1〜8 件の調査クエリを
- * 生成し、`maxIterations` を 1..5 にクランプする。"additional_research" 入力で
+ * 生成する。"additional_research" 入力で
  * 既存セッションの追加調査として呼ばれた場合、`iteration / lastEvaluation /
  * exitReason` をリセットし、`carryOverApprovedIds` で `pendingSources` を初期化
  * する（issue #949 の追加調査 API パス）。
@@ -14,15 +14,17 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { composeContentLocaleInstruction } from "../../../core/composeLocale.js";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
-import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
+import { resolveWikiComposeModelId } from "../../../core/llm/wikiComposeModelId.js";
 import { getGraphContext } from "./shared/getGraphContext.js";
 import { dispatchResearchIteration } from "./shared/dispatchSseCustom.js";
 import type { ResearchLoopStateType, ResearchLoopStateUpdate } from "../state.js";
 import type { PlannedQuery, Source } from "../types.js";
 
 /**
- * @deprecated Use {@link resolveComposeModelId} with graph context. Kept for tests importing the symbol.
+ * @deprecated Use {@link resolveWikiComposeModelId} for Wiki Compose graphs; kept for ingest planner BYOK preflight ({@link getComposeModelIdsForGraph}).
+ * Wiki Compose では {@link resolveWikiComposeModelId} を使う。ingest BYOK 事前検証用。
  */
 export function getOrchestratorModelId(): string {
   return process.env.WIKI_COMPOSE_ORCHESTRATOR_MODEL_ID?.trim() || "claude-3-5-haiku";
@@ -50,12 +52,7 @@ const SYSTEM_PROMPT =
   "and 'web' for queries needing fresh public information. Output JSON only.";
 
 import type { AdditionalResearchRequest } from "../types.js";
-
-function clampMaxIterations(raw: unknown): number {
-  if (typeof raw !== "number" || !Number.isFinite(raw)) return 3;
-  const truncated = Math.trunc(raw);
-  return Math.min(Math.max(truncated, 1), 5);
-}
+import { resolveResearchMaxIterations } from "../constants.js";
 
 function briefFromState(
   state: ResearchLoopStateType,
@@ -95,11 +92,10 @@ export async function planQueries(
   const additional = state.additionalRequest ?? null;
   const brief = briefFromState(state, additional);
 
-  // Resolve maxIterations: input override > existing state > default(3); clamp 1..5.
-  // maxIterations は既存 state を優先しつつ 1..5 にクランプ。
-  const maxIterations = clampMaxIterations(state.maxIterations ?? 3);
+  // maxIterations: ingest uses caller cap; Wiki Compose always uses safety cap.
+  const maxIterations = resolveResearchMaxIterations(ctx.graphId, state.maxIterations);
 
-  const modelId = await resolveComposeModelId("orchestrator", ctx.backend, ctx.tier, ctx.db);
+  const modelId = await resolveWikiComposeModelId("orchestrator", ctx.tier, ctx.db);
   const model = await createZediChatModel({
     modelId,
     userId: ctx.userId,
@@ -112,7 +108,10 @@ export async function planQueries(
   });
   const structured = model.withStructuredOutput(planQueriesSchema, { name: "plan_queries" });
   const planned = await structured.invoke([
-    { role: "system", content: SYSTEM_PROMPT },
+    {
+      role: "system",
+      content: SYSTEM_PROMPT + composeContentLocaleInstruction(ctx.contentLocale),
+    },
     { role: "user", content: brief || "(no brief provided; produce 2 broad coverage queries)" },
   ]);
 

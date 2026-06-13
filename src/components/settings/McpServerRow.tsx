@@ -3,7 +3,6 @@
  * Single row in the MCP server list (Issue #463).
  */
 
-import React from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { Badge } from "@zedi/ui";

@@ -137,8 +137,15 @@ describe("assertPageEditAccess (issue #823)", () => {
     const { db } = createMockDb([
       [{ id: PAGE_ID, ownerId: OTHER_USER_ID, noteId: NOTE_ID }],
       [{ email: USER_EMAIL }],
-      [noteRow(OTHER_USER_ID, { editPermission: "members_editors" })],
-      [{ role: "editor" }],
+      // getNoteRole: 1 クエリで note 列 + memberRole/domainRole を返す。
+      // getNoteRole resolves the note row + member/domain roles in one query.
+      [
+        {
+          ...noteRow(OTHER_USER_ID, { editPermission: "members_editors" }),
+          memberRole: "editor",
+          domainRole: null,
+        },
+      ],
     ]);
     await expect(assertPageEditAccess(asDb(db), PAGE_ID, USER_ID)).resolves.toBeUndefined();
   });

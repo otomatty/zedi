@@ -13,8 +13,9 @@
  * paint into the EditorPane.
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
+import { composeContentLocaleInstruction } from "../../../core/composeLocale.js";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
-import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
+import { resolveWikiComposeModelId } from "../../../core/llm/wikiComposeModelId.js";
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
 import { dispatchComposePhase, dispatchComposeSection } from "./shared/dispatch.js";
 import type { WikiComposeStateType, WikiComposeStateUpdate } from "../state.js";
@@ -126,7 +127,7 @@ export async function draftSections(
     return { draftedSections: [], phase: "draft:completed" };
   }
 
-  const modelId = await resolveComposeModelId("draft", ctx.backend, ctx.tier, ctx.db);
+  const modelId = await resolveWikiComposeModelId("draft", ctx.tier, ctx.db);
   const model = await createZediChatModel({
     modelId,
     userId: ctx.userId,
@@ -158,7 +159,10 @@ export async function draftSections(
     let body = "";
     try {
       const stream = await model.stream([
-        { role: "system", content: SECTION_SYSTEM_PROMPT },
+        {
+          role: "system",
+          content: SECTION_SYSTEM_PROMPT + composeContentLocaleInstruction(ctx.contentLocale),
+        },
         {
           role: "user",
           content: buildSectionPrompt({
@@ -174,12 +178,13 @@ export async function draftSections(
         body += chunkContent(chunk);
       }
     } catch (err) {
-      // Per-section failure must not abort the whole Draft. Surface the
-      // failure as an inline note inside the section body so the user sees
-      // what happened without losing earlier sections.
-      // セクション 1 件の失敗で Draft 全体を止めない。エラーは本文に追記。
-      const message = err instanceof Error ? err.message : String(err);
-      body = body || `*(Section draft failed: ${message})*`;
+      // Per-section failure must not abort the whole Draft. Surface a generic
+      // inline note so the user knows the section failed without leaking
+      // provider error details into persisted content (#976).
+      // セクション 1 件の失敗で Draft 全体を止めない。詳細はログのみ。
+      console.error("[draftSections] per-section draft error:", err);
+      const fallback = "*(Section draft failed. Please retry drafting this section.)*";
+      body = body ? `${body.trim()}\n\n${fallback}` : fallback;
     }
 
     const citedIds = collectCitedSourceIds(body, state.approvedResearch, section.sourceIds);

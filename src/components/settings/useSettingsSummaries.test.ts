@@ -39,16 +39,16 @@ const mockStorage = {
 };
 const mockProfile = { displayName: "Test User" };
 
-vi.mock("@/hooks/useGeneralSettings", () => ({
+vi.mock("@/hooks/settings/useGeneralSettings", () => ({
   useGeneralSettings: () => mockGeneral,
 }));
-vi.mock("@/hooks/useAISettings", () => ({
+vi.mock("@/hooks/aiChat/useAISettings", () => ({
   useAISettings: () => mockAi,
 }));
-vi.mock("@/hooks/useStorageSettings", () => ({
+vi.mock("@/hooks/settings/useStorageSettings", () => ({
   useStorageSettings: () => mockStorage,
 }));
-vi.mock("@/hooks/useProfile", () => ({
+vi.mock("@/hooks/auth/useProfile", () => ({
   useProfile: () => ({ displayName: mockProfile.displayName }),
 }));
 

@@ -36,6 +36,7 @@ function fakeContext(threadId: string): GraphContext {
     db: {} as Database,
     feature: "wiki_maintenance:test",
     userEmail: null,
+    contentLocale: "ja",
   };
 }
 

@@ -114,6 +114,7 @@ export interface CachedModels {
 export interface CachedServerModels {
   models: AIModel[];
   tier: UserTier;
+  systemDefaultModelId?: string | null;
   cachedAt: number;
 }
 

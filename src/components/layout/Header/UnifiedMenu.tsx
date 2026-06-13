@@ -11,8 +11,8 @@ import {
 } from "@zedi/ui";
 import { Sheet, SheetContent, SheetTitle } from "@zedi/ui";
 import { Avatar, AvatarFallback, AvatarImage } from "@zedi/ui";
-import { SignedIn, SignedOut, useAuth, useUser } from "@/hooks/useAuth";
-import { useProfile } from "@/hooks/useProfile";
+import { SignedIn, SignedOut, useAuth, useUser } from "@/hooks/auth/useAuth";
+import { useProfile } from "@/hooks/auth/useProfile";
 import { useTranslation } from "react-i18next";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { cn } from "@zedi/ui";

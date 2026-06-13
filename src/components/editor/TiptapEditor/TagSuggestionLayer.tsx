@@ -6,13 +6,13 @@ import {
   type TagSuggestionItem,
   type TagSuggestionHandle,
 } from "../extensions/TagSuggestion";
-import { useTagCandidates } from "@/hooks/useTagCandidates";
+import { useTagCandidates } from "@/hooks/tags/useTagCandidates";
 
 interface TagSuggestionLayerProps {
   editor: Editor | null;
   suggestionState: TagSuggestionState | null;
   position: { top: number; left: number } | null;
-  suggestionRef: React.RefObject<TagSuggestionHandle>;
+  suggestionRef: React.RefObject<TagSuggestionHandle | null>;
   onSelect: (item: TagSuggestionItem) => void;
   onClose: () => void;
   /**

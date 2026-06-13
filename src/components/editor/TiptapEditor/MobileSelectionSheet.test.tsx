@@ -12,7 +12,7 @@ vi.mock("react-i18next", () => ({
 // テストの主目的（表示/非表示・ボタン配線）に集中する。
 // Stub out wiki-link existence checking so we can focus on visibility and
 // the button wiring without spinning up the page-queries hook.
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useWikiLinkExistsChecker: () => ({
     checkExistence: vi.fn().mockResolvedValue({
       pageTitles: new Set(),

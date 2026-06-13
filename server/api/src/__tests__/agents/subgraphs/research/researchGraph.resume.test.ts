@@ -66,6 +66,7 @@ function fakeContext(): GraphContext {
     db: {} as Database,
     feature: "wiki_compose:research",
     userEmail: null,
+    contentLocale: "ja",
   };
 }
 
@@ -104,7 +105,7 @@ describe("researchLoopSubgraph — resume projects approvedResearch", () => {
     wikiSearch.mockImplementation(async () => ({ pendingSources: pending.slice(2) }));
     fetchArticles.mockImplementation(async () => ({ pendingSources: [] }));
     evaluateSufficiency.mockImplementation(async (state, _c) => ({
-      lastEvaluation: { score: 0.9, rationale: "ok", missingAspects: [] },
+      lastEvaluation: { score: 0.9, sufficient: true, rationale: "ok", missingAspects: [] },
       iteration: state.iteration + 1,
       phase: "research:evaluated",
     }));
@@ -188,7 +189,7 @@ describe("researchLoopSubgraph — resume projects approvedResearch", () => {
     wikiSearch.mockImplementation(async () => ({ pendingSources: [] }));
     fetchArticles.mockImplementation(async () => ({ pendingSources: [] }));
     evaluateSufficiency.mockImplementation(async (state, _c) => ({
-      lastEvaluation: { score: 0.9, rationale: "ok", missingAspects: [] },
+      lastEvaluation: { score: 0.9, sufficient: true, rationale: "ok", missingAspects: [] },
       iteration: state.iteration + 1,
       phase: "research:evaluated",
     }));

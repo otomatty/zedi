@@ -3,7 +3,7 @@
  * Claude Code スラッシュ実行中のオーバーレイ。
  */
 
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 
 interface SlashAgentLoadingOverlayProps {

@@ -8,18 +8,24 @@
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { interrupt } from "@langchain/langgraph";
+import {
+  composeConflictRationale,
+  type ComposeContentLocale,
+} from "../../../core/composeLocale.js";
+import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
 import { conflictResumeSchema } from "../resumeSchemas.js";
 import type { WikiComposeStateType, WikiComposeStateUpdate } from "../state.js";
 import type { ResearchConflictSummary, WikiComposeInterruptPayload } from "../types.js";
 import { shouldResolveResearchConflicts } from "../routing.js";
 
-function buildConflictSummary(state: WikiComposeStateType): ResearchConflictSummary {
+function buildConflictSummary(
+  state: WikiComposeStateType,
+  locale: ComposeContentLocale,
+): ResearchConflictSummary {
   return {
     approved: state.approvedResearch.map((s) => ({ id: s.id, title: s.title })),
     rejected: state.rejectedResearch.map((s) => ({ id: s.id, title: s.title })),
-    rationale:
-      "Multiple sources were rejected while others were kept. Confirm you want to proceed " +
-      "with the approved set before generating the outline.",
+    rationale: composeConflictRationale(locale),
   };
 }
 
@@ -29,15 +35,16 @@ function buildConflictSummary(state: WikiComposeStateType): ResearchConflictSumm
  */
 export async function conflictResolution(
   state: WikiComposeStateType,
-  _config: LangGraphRunnableConfig,
+  config: LangGraphRunnableConfig,
 ): Promise<WikiComposeStateUpdate> {
   if (!shouldResolveResearchConflicts(state)) {
     return { phase: "conflict:skipped" };
   }
 
+  const ctx = getGraphContext(config);
   const payload: WikiComposeInterruptPayload = {
     kind: "conflict_resolution",
-    conflicts: buildConflictSummary(state),
+    conflicts: buildConflictSummary(state, ctx.contentLocale),
   };
   const resumeValue: unknown = interrupt(payload);
   conflictResumeSchema.parse(resumeValue);

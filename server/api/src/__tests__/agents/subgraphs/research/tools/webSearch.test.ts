@@ -1,33 +1,30 @@
 /**
- * `webSearchTool` unit tests. Covers:
- * - Missing graph context → JSON envelope `{ ok:false, error:"missing_graph_context" }`.
- * - No OpenAI/Google model configured → `{ ok:true, results:[], note:"web_search_unavailable" }`
- *   (the Anthropic-fallback path documented in the tool's JSDoc).
- *
- * We don't fully exercise the LLM path here — `researchGraph.modelGuard.test.ts`
- * already verifies that the tool routes through `createZediChatModel`, and the
- * structured-output shape is covered indirectly by the loop test. Adding a
- * full network mock would be brittle for marginal value.
+ * `webSearchTool` unit tests (#1033).
+ * Mocks only LLM (`createZediChatModel`) and DB boundaries — not internal helpers.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { WIKI_COMPOSE_MODEL_ID } from "../../../../../agents/core/llm/wikiComposeModelId.js";
+import { createMockDb } from "../../../../createMockDb.js";
 
-const { resolveWebSearchModelId } = vi.hoisted(() => ({ resolveWebSearchModelId: vi.fn() }));
+const { createZediChatModel } = vi.hoisted(() => ({ createZediChatModel: vi.fn() }));
 
-vi.mock("../../../../../agents/core/tools/resolveWebSearchModel.js", () => ({
-  resolveWebSearchModelId: (...args: unknown[]) =>
-    resolveWebSearchModelId(
-      ...(args as Parameters<
-        typeof import("../../../../../agents/core/tools/resolveWebSearchModel.js").resolveWebSearchModelId
-      >),
-    ),
-}));
+vi.mock("../../../../../agents/core/llm/modelFactory.js", async () => {
+  const actual = await vi.importActual<
+    typeof import("../../../../../agents/core/llm/modelFactory.js")
+  >("../../../../../agents/core/llm/modelFactory.js");
+  return {
+    ...actual,
+    createZediChatModel: (...args: unknown[]) =>
+      createZediChatModel(...(args as Parameters<typeof actual.createZediChatModel>)),
+  };
+});
 
 import { webSearchTool } from "../../../../../agents/core/tools/webSearch.js";
 import { GRAPH_CONTEXT_CONFIG_KEY } from "../../../../../agents/core/types/graphContext.js";
 import type { GraphContext } from "../../../../../agents/core/types/graphContext.js";
 import type { Database } from "../../../../../types/index.js";
 
-function ctxConfig(): { configurable: Record<string, unknown> } {
+function ctxConfig(db: Database): { configurable: Record<string, unknown> } {
   return {
     configurable: {
       [GRAPH_CONTEXT_CONFIG_KEY]: {
@@ -38,19 +35,28 @@ function ctxConfig(): { configurable: Record<string, unknown> } {
         graphId: "wiki-compose-research",
         backend: "zedi_managed",
         tier: "free",
-        db: {} as Database,
+        db,
         feature: "wiki_compose:research",
         userEmail: null,
+        contentLocale: "ja",
       } satisfies GraphContext,
     },
   };
 }
 
+function fakeStructuredModel(results: { title: string; url: string; snippet?: string }[]) {
+  return {
+    withStructuredOutput: vi.fn(() => ({
+      invoke: vi.fn(async () => ({ results })),
+    })),
+  };
+}
+
 beforeEach(() => {
-  resolveWebSearchModelId.mockReset();
+  createZediChatModel.mockReset();
 });
 afterEach(() => {
-  resolveWebSearchModelId.mockReset();
+  createZediChatModel.mockReset();
 });
 
 describe("webSearchTool", () => {
@@ -62,8 +68,11 @@ describe("webSearchTool", () => {
   });
 
   it("returns the documented fallback when no managed web-search model is configured", async () => {
-    resolveWebSearchModelId.mockResolvedValueOnce(null);
-    const raw = await webSearchTool.invoke({ query: "ripgrep" }, ctxConfig());
+    const { db } = createMockDb([[], []]);
+    const raw = await webSearchTool.invoke(
+      { query: "ripgrep" },
+      ctxConfig(db as unknown as Database),
+    );
     const parsed = JSON.parse(raw as string) as {
       ok: boolean;
       results: unknown[];
@@ -74,11 +83,61 @@ describe("webSearchTool", () => {
     expect(parsed.note).toBe("web_search_unavailable");
   });
 
-  it("returns an error envelope when model resolution itself throws", async () => {
-    resolveWebSearchModelId.mockRejectedValueOnce(new Error("db unreachable"));
-    const raw = await webSearchTool.invoke({ query: "x" }, ctxConfig());
+  it("returns an error envelope when model resolution DB throws", async () => {
+    const db = {
+      select: vi.fn(() => {
+        throw new Error("db unreachable");
+      }),
+    };
+    const raw = await webSearchTool.invoke({ query: "x" }, ctxConfig(db as unknown as Database));
     const parsed = JSON.parse(raw as string) as { ok: boolean; error?: string };
     expect(parsed.ok).toBe(false);
     expect(parsed.error).toMatch(/web_search_model_resolution_failed:db unreachable/);
+  });
+
+  it("returns structured web hits with stable src ids when LLM succeeds", async () => {
+    const { db } = createMockDb([[{ id: WIKI_COMPOSE_MODEL_ID }], [{ provider: "openai" }]]);
+    createZediChatModel.mockResolvedValue(
+      fakeStructuredModel([
+        {
+          title: "Ripgrep docs",
+          url: "https://example.com/rg",
+          snippet: "Fast search",
+        },
+      ]),
+    );
+
+    const raw = await webSearchTool.invoke(
+      { query: "ripgrep", limit: 3 },
+      ctxConfig(db as unknown as Database),
+    );
+    const parsed = JSON.parse(raw as string) as {
+      ok: boolean;
+      results: Array<{ id: string; kind: string; title: string; url: string; snippet?: string }>;
+    };
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.results).toHaveLength(1);
+    expect(parsed.results[0]?.kind).toBe("web");
+    expect(parsed.results[0]?.title).toBe("Ripgrep docs");
+    expect(parsed.results[0]?.url).toBe("https://example.com/rg");
+    expect(parsed.results[0]?.id).toMatch(/^src:[a-f0-9]{64}$/);
+  });
+
+  it("wraps LLM failures in a non-throwing error envelope", async () => {
+    const { db } = createMockDb([[{ id: WIKI_COMPOSE_MODEL_ID }], [{ provider: "google" }]]);
+    createZediChatModel.mockResolvedValue({
+      withStructuredOutput: vi.fn(() => ({
+        invoke: vi.fn(async () => {
+          throw new Error("structured output failed");
+        }),
+      })),
+    });
+
+    const raw = await webSearchTool.invoke({ query: "x" }, ctxConfig(db as unknown as Database));
+    const parsed = JSON.parse(raw as string) as { ok: boolean; error?: string; results: unknown[] };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toBe("structured output failed");
+    expect(parsed.results).toEqual([]);
   });
 });

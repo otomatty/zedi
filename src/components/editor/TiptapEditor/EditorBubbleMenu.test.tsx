@@ -41,7 +41,7 @@ vi.mock("@tiptap/react/menus", () => ({
   },
 }));
 
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useWikiLinkExistsChecker: () =>
     ({
       checkExistence: vi.fn().mockResolvedValue({

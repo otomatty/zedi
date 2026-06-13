@@ -1,5 +1,6 @@
 import { Server as HocuspocusServer } from "@hocuspocus/server";
 import { IncomingMessage, ServerResponse } from "http";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { Redis } from "@hocuspocus/extension-redis";
 import { Pool, PoolClient } from "pg";
 import * as Y from "yjs";
@@ -19,6 +20,7 @@ import {
 } from "./pageEditPermission.js";
 import { maybeCreateSnapshot } from "./snapshotUtils.js";
 import { applyWikiLinkMarksToYDoc } from "./ydocWikiLinkNormalizer.js";
+import { coalescePerKey } from "./coalescePerKey.js";
 
 const PORT = parseInt(process.env.PORT || "1234", 10);
 const REDIS_URL = process.env.REDIS_URL;
@@ -78,7 +80,14 @@ function getPool(): Pool {
 
 function isAuthorizedInternalRequest(req: IncomingMessage): boolean {
   if (!INTERNAL_SECRET) return false;
-  return req.headers["x-internal-secret"] === INTERNAL_SECRET;
+  const provided = req.headers["x-internal-secret"];
+  if (typeof provided !== "string") return false;
+  // Constant-time compare via fixed-length SHA-256 digests so response timing
+  // leaks neither the length nor the contents of the secret.
+  // 固定長 SHA-256 ダイジェストで定数時間比較し、長さも内容も漏らさない。
+  const a = createHash("sha256").update(provided).digest();
+  const b = createHash("sha256").update(INTERNAL_SECRET).digest();
+  return timingSafeEqual(a, b);
 }
 
 async function verifySession(
@@ -406,7 +415,7 @@ async function saveDocumentToDb(pageId: string, document: Y.Doc): Promise<void> 
   // Issue #880 Phase C: rebuild outgoing edges (links / ghost_links) via the
   // API's internal endpoint after persisting the document. Best-effort — a
   // failure does not roll back the content save.
-  void triggerGraphSync(pageId).catch((error) => {
+  void triggerGraphSyncCoalesced(pageId).catch((error) => {
     console.error(`[GraphSync] Failed to trigger graph sync for page ${pageId}:`, error);
   });
 }
@@ -472,6 +481,16 @@ async function triggerGraphSync(pageId: string): Promise<void> {
     console.warn(`[GraphSync] Request failed for page ${pageId}:`, error);
   }
 }
+
+/**
+ * ページ単位でコアレッシングしたグラフ同期トリガ。連続保存で in-flight が
+ * 重なっても、1 ページあたり「実行中 1 + 待機 1」に収束させて重複 HTTP を抑える。
+ *
+ * Per-page coalesced graph-sync trigger so overlapping saves collapse to at
+ * most one in-flight + one queued request per page instead of spawning a new
+ * HTTP call on every save.
+ */
+const triggerGraphSyncCoalesced = coalescePerKey(triggerGraphSync);
 
 function parseRedisOptions(redisUrl: string): Record<string, unknown> {
   const parsed = new URL(redisUrl);

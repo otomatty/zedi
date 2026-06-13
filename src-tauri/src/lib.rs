@@ -1,3 +1,4 @@
+mod claude_config;
 mod claude_sidecar;
 mod pdf_sources;
 mod workspace_paths;
@@ -12,7 +13,6 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(claude_sidecar::ClaudeSidecarState::new())
@@ -22,6 +22,7 @@ pub fn run() {
             claude_sidecar::claude_status,
             claude_sidecar::check_claude_installation,
             claude_sidecar::claude_list_models,
+            claude_config::read_claude_mcp_servers,
             workspace_paths::list_workspace_directory_entries,
             workspace_paths::register_note_workspace_root,
             workspace_paths::clear_note_workspace_root,

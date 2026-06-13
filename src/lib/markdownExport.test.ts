@@ -245,6 +245,56 @@ describe("tiptapToMarkdown", () => {
     expect(md).toContain("![Photo](https://example.com/img.png)");
   });
 
+  it("handles video nodes as an HTML <video> tag", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "video",
+          attrs: { src: "https://example.com/clip.webm", alt: "Demo" },
+        },
+      ],
+    });
+    const md = tiptapToMarkdown(content);
+    expect(md).toContain('<video src="https://example.com/clip.webm" controls>Demo</video>');
+  });
+
+  it("HTML-escapes video src and alt to prevent attribute breakout (XSS)", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "video",
+          attrs: {
+            src: 'https://example.com/x.mp4"><script>alert(1)</script>',
+            alt: '"><img onerror=alert(1)>',
+          },
+        },
+      ],
+    });
+    const md = tiptapToMarkdown(content);
+    expect(md).not.toContain("<script>");
+    expect(md).not.toContain("<img");
+    expect(md).toContain("&lt;script&gt;");
+    expect(md).toContain("&quot;&gt;");
+  });
+
+  it("drops a video node whose src uses an unsafe scheme", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "video", attrs: { src: "javascript:alert(1)", alt: "x" } }],
+    });
+    expect(tiptapToMarkdown(content)).toBe("");
+  });
+
+  it("emits nothing for a video node without src", () => {
+    const content = JSON.stringify({
+      type: "doc",
+      content: [{ type: "video", attrs: { alt: "no source" } }],
+    });
+    expect(tiptapToMarkdown(content)).toBe("");
+  });
+
   it("returns empty string for empty input", () => {
     expect(tiptapToMarkdown("")).toBe("");
   });

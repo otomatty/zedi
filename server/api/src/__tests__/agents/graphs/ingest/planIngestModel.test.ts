@@ -48,6 +48,7 @@ describe("planIngest model resolution", () => {
       sessionId: "t1",
       userId: "user-1",
       userEmail: null,
+      contentLocale: "ja",
       pageId: "",
       graphId: "ingest-planner",
       backend: "user_openai",

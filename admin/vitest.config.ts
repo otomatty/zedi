@@ -1,5 +1,6 @@
 import path from "path";
 import { defineConfig } from "vitest/config";
+import { createCoverageConfig } from "../vitest.coverage.shared";
 
 export default defineConfig({
   // Anchor `include` / `setupFiles` to admin/ so the config also works when
@@ -21,5 +22,9 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: [path.resolve(__dirname, "src/test/setup.ts")],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    coverage: createCoverageConfig({
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/main.tsx", "src/App.tsx", "src/vite-env.d.ts", "src/i18n/locales/**"],
+    }),
   },
 });

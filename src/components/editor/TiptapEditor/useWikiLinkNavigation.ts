@@ -1,19 +1,20 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePageByTitle, usePagesSummary, useCreatePage } from "@/hooks/usePageQueries";
-import { useNoteTitleIndex } from "@/hooks/useNoteQueries";
+import { usePageByTitle, usePagesSummary, useCreatePage } from "@/hooks/pages/usePageQueries";
+import { useNoteTitleIndex } from "@/hooks/notes/useNoteQueries";
 
 interface UseWikiLinkNavigationOptions {
   /**
-   * 編集中ページの noteId。`null` はレガシー個人ページ呼び出しの fallback で、
-   * Issue #889 Phase 3 で `/pages/:id` ルートが廃止された後は、解決された
-   * `foundPage.noteId` を使って `/notes/:noteId/:pageId` に統合的に遷移する。
-   * 通常はノート ID を渡す（Issue #713 Phase 4 / #889 Phase 3）。
+   * 編集中ページの noteId。`null` はノートコンテキスト外（AI チャット等）からの
+   * 呼び出しを表し、ローカル（IndexedDB＝デフォルトノート）のページ集合で解決
+   * する。遷移は常に解決された `foundPage.noteId` を使って
+   * `/notes/:noteId/:pageId` に着地する（Issue #889 Phase 3 / #1020）。
    *
-   * Owning note ID of the page being edited. `null` is kept for legacy
-   * personal-page callers, but Issue #889 Phase 3 retired `/pages/:id` so
-   * navigation always lands on `/notes/:noteId/:pageId` using the resolved
-   * `foundPage.noteId`. Callers normally pass the owning note id.
+   * Owning note ID of the page being edited. `null` means the caller has no
+   * note context (e.g. AI chat) and resolution runs against the local
+   * IndexedDB set (the default note). Navigation always lands on
+   * `/notes/:noteId/:pageId` via the resolved `foundPage.noteId`
+   * (issues #889 Phase 3 / #1020).
    */
   pageNoteId: string | null;
 }
@@ -44,11 +45,12 @@ interface UseWikiLinkNavigationReturn {
  * or shows a dialog to create a new page.
  *
  * WikiLink クリック時、`pageNoteId` に応じて候補スコープを切り替える。
- * - `pageNoteId === null` → 個人ページのみを検索し、`/pages/:id` に遷移。
+ * - `pageNoteId === null` → ローカル（IndexedDB＝デフォルトノート）の
+ *   ページ集合を検索し、解決ページの noteId で `/notes/:noteId/:id` に遷移。
  * - `pageNoteId !== null` → そのノート内のページのみを検索し、
  *   canonical ルート `/notes/:pageNoteId/:id` に遷移。
  *
- * Issue #713 Phase 4。
+ * Issue #713 Phase 4 / #1020。
  */
 export function useWikiLinkNavigation(
   options: UseWikiLinkNavigationOptions = { pageNoteId: null },

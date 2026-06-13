@@ -8,8 +8,9 @@
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { randomUUID } from "node:crypto";
+import { composeContentLocaleInstruction } from "../../../core/composeLocale.js";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
-import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
+import { resolveWikiComposeModelId } from "../../../core/llm/wikiComposeModelId.js";
 import { getGraphContext } from "./shared/getGraphContext.js";
 import { dispatchResearchIteration } from "./shared/dispatchSseCustom.js";
 import { planQueriesSchema } from "./planQueries.js";
@@ -29,7 +30,7 @@ function buildUserPrompt(state: ResearchLoopStateType): string {
   const prior = state.queries.map((q) => `- ${q.query} (${q.channels.join("/")})`);
   const sourceTitles = state.pendingSources.map((s) => `- [${s.kind}] ${s.title}`);
   return [
-    `[Iteration ${state.iteration} / ${state.maxIterations}]`,
+    `[Research iteration ${state.iteration}]`,
     `Previous evaluation score: ${evaluation?.score ?? "n/a"}`,
     "",
     "[Missing aspects to address]",
@@ -61,7 +62,7 @@ export async function refineQueries(
 ): Promise<ResearchLoopStateUpdate> {
   const ctx = getGraphContext(config);
 
-  const modelId = await resolveComposeModelId("orchestrator", ctx.backend, ctx.tier, ctx.db);
+  const modelId = await resolveWikiComposeModelId("orchestrator", ctx.tier, ctx.db);
   const model = await createZediChatModel({
     modelId,
     userId: ctx.userId,
@@ -74,7 +75,10 @@ export async function refineQueries(
   });
   const structured = model.withStructuredOutput(planQueriesSchema, { name: "refine_queries" });
   const planned = await structured.invoke([
-    { role: "system", content: SYSTEM_PROMPT },
+    {
+      role: "system",
+      content: SYSTEM_PROMPT + composeContentLocaleInstruction(ctx.contentLocale),
+    },
     { role: "user", content: buildUserPrompt(state) },
   ]);
   const queries: PlannedQuery[] = planned.queries.map((q) => ({

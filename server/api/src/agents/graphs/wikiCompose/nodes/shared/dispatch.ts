@@ -8,6 +8,7 @@
  */
 import { dispatchCustomEvent } from "@langchain/core/callbacks/dispatch";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
+import type { ComposeCompletion, PageSnapshot } from "../../types.js";
 
 /** Payload shape for `compose_phase` custom events. */
 export interface ComposePhasePayload {
@@ -38,4 +39,38 @@ export async function dispatchComposeSection(
   config: LangGraphRunnableConfig,
 ): Promise<void> {
   await dispatchCustomEvent("compose_section", payload, config);
+}
+
+/** Payload shape for `compose_snapshot` custom events. */
+export interface ComposeSnapshotPayload {
+  pageSnapshot: PageSnapshot;
+}
+
+/**
+ * Dispatch a `compose_snapshot` SSE custom event so the client learns the page
+ * title/body early — in instant mode there is no Brief interrupt to carry it.
+ * 即時モードでは Brief 割り込みが無いため、タイトル等を早期に届ける。
+ */
+export async function dispatchComposeSnapshot(
+  payload: ComposeSnapshotPayload,
+  config: LangGraphRunnableConfig,
+): Promise<void> {
+  await dispatchCustomEvent("compose_snapshot", payload, config);
+}
+
+/** Payload shape for `compose_completion` custom events. */
+export interface ComposeCompletionPayload {
+  completion: ComposeCompletion;
+}
+
+/**
+ * Dispatch a `compose_completion` SSE custom event carrying the full final
+ * completion (markdown + sections + comprehension aids). Used by instant-mode
+ * runs to deliver the article in a single SSE stream.
+ */
+export async function dispatchComposeCompletion(
+  payload: ComposeCompletionPayload,
+  config: LangGraphRunnableConfig,
+): Promise<void> {
+  await dispatchCustomEvent("compose_completion", payload, config);
 }

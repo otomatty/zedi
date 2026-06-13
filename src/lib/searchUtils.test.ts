@@ -16,7 +16,7 @@ function createTestPage(id: string, title: string, content: string, options?: Pa
   return {
     id,
     ownerUserId: "test-user",
-    noteId: null,
+    noteId: "note-default",
     title,
     content,
     createdAt: now,

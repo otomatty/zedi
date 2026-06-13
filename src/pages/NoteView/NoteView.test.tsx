@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import NoteView from "./index";
-import { useNote } from "@/hooks/useNoteQueries";
+import { useNote } from "@/hooks/notes/useNoteQueries";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -22,7 +22,7 @@ vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => undefined },
 }));
 
-vi.mock("@/hooks/useNoteQueries", () => ({
+vi.mock("@/hooks/notes/useNoteQueries", () => ({
   useNote: vi.fn(),
   useNoteApi: () => ({
     api: { getNoteTags: vi.fn().mockResolvedValue({ items: [], none_count: 0, total_pages: 0 }) },
@@ -38,7 +38,7 @@ vi.mock("@/hooks/useNoteQueries", () => ({
 // `useNoteTagAggregation` calls `useNoteApi` internally; we already stub the
 // API there so the hook resolves with an empty aggregation. Mock it directly
 // to keep the test independent of React Query setup.
-vi.mock("@/hooks/useNoteTagAggregation", () => ({
+vi.mock("@/hooks/notes/useNoteTagAggregation", () => ({
   useNoteTagAggregation: () => ({
     items: [],
     noneCount: 0,
@@ -52,7 +52,7 @@ vi.mock("@/hooks/useNoteTagAggregation", () => ({
 // `useTagFilterBarPreference` resolves to disabled by default so the bar does
 // not render in the existing NoteView test fixtures (the note shell does not
 // declare `showTagFilterBar: true`).
-vi.mock("@/hooks/useTagFilterBarPreference", () => ({
+vi.mock("@/hooks/tags/useTagFilterBarPreference", () => ({
   useTagFilterBarPreference: () => ({
     enabled: false,
     noteDefault: false,
@@ -61,7 +61,7 @@ vi.mock("@/hooks/useTagFilterBarPreference", () => ({
   }),
 }));
 
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   usePagesSummary: () => ({ data: [] }),
 }));
 
@@ -78,7 +78,7 @@ vi.mock("@/components/layout/AppLayout", () => ({
     <div data-testid="app-layout">{children}</div>
   ),
 }));
-vi.mock("@/components/ai-chat/ContentWithAIChat", () => ({
+vi.mock("@/components/aiChat/ContentWithAIChat", () => ({
   ContentWithAIChat: ({
     children,
     floatingAction,

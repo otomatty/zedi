@@ -1,13 +1,15 @@
 /**
- * BottomNav: 4 tabs (My Note / Notes / AI / Me), aria-current on active tab,
- * safe-area padding, and Me tab opens a Sheet with the account menu content.
+ * BottomNav: 4 tabs (My Note / Notes / AI / Account), aria-current on the
+ * active tab, safe-area padding, and the Account tab navigates to
+ * `/account` as a real link (no Sheet).
  *
- * ボトムナビ: 4 タブ（マイノート / ノート / AI / Me）、アクティブタブの aria-current、
- * safe-area padding、Me タブの Sheet 表示を検証する。
+ * ボトムナビ: 4 タブ（マイノート / ノート / AI / アカウント）、アクティブタブの
+ * aria-current、safe-area padding、アカウントタブが `/account` への通常リンクと
+ * してレンダリングされること（Sheet を開かない）を検証する。
  */
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { BottomNav } from "./index";
 
@@ -42,18 +44,18 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useAuth", () => ({
+vi.mock("@/hooks/auth/useAuth", () => ({
   useAuth: vi.fn(() => ({ ...signedInAuth })),
   SignedIn: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SignedOut: () => null,
   useUser: () => ({ user: null }),
 }));
 
-vi.mock("@/hooks/useProfile", () => ({
+vi.mock("@/hooks/auth/useProfile", () => ({
   useProfile: () => ({ displayName: "", avatarUrl: "" }),
 }));
 
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useSyncStatus: () => "idle",
   useSync: () => ({ sync: () => {}, isSyncing: false }),
 }));
@@ -71,14 +73,14 @@ describe("BottomNav", () => {
     vi.clearAllMocks();
   });
 
-  it("renders four tabs: My Note, Notes, AI, Me", () => {
+  it("renders four tabs: My Note, Notes, AI, Account", () => {
     renderAt("/notes/me");
     expect(screen.getByRole("link", { name: /my note/i })).toBeInTheDocument();
     // 「Notes」と「My Note」が両方含まれるため、`/^notes$/i` で完全一致させる。
     // Use exact match for "Notes" since "My Note" also contains "Note".
     expect(screen.getByRole("link", { name: /^notes$/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /^ai$/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /account/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /account/i })).toBeInTheDocument();
   });
 
   it("marks the My Note tab as aria-current when on /notes/me", () => {
@@ -124,10 +126,21 @@ describe("BottomNav", () => {
     expect(nav?.getAttribute("style") ?? "").toContain("env(safe-area-inset-bottom)");
   });
 
-  it("opens the Me sheet when the Me tab is clicked", async () => {
+  it("renders the Account tab as a link to /account (no Sheet)", () => {
     renderAt("/notes/me");
-    const meButton = screen.getByRole("button", { name: /account/i });
-    fireEvent.click(meButton);
-    expect(await screen.findByTestId("bottom-nav-me-content")).toBeInTheDocument();
+    const accountLink = screen.getByRole("link", { name: /account/i });
+    expect(accountLink).toHaveAttribute("href", "/account");
+    // 旧実装ではボタンクリックで Sheet を開いていた。Sheet を撤去したので
+    // 自身が dialog を開くトリガーではないことを確認する。
+    // The old implementation opened a Sheet on click. Now the tab is a
+    // plain link; verify it does not advertise itself as a dialog trigger.
+    expect(accountLink).not.toHaveAttribute("aria-haspopup", "dialog");
+    expect(accountLink).not.toHaveAttribute("aria-expanded");
+  });
+
+  it("marks the Account tab as aria-current when on /account", () => {
+    renderAt("/account");
+    const accountLink = screen.getByRole("link", { name: /account/i });
+    expect(accountLink).toHaveAttribute("aria-current", "page");
   });
 });

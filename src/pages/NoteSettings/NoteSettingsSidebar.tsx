@@ -120,7 +120,7 @@ export const NoteSettingsSidebar: React.FC<NoteSettingsSidebarProps> = ({
   return (
     <nav
       aria-label={t("notes.settingsNav.ariaLabel")}
-      className="-mx-2 flex gap-1 overflow-x-auto px-2 py-1 md:mx-0 md:flex-col md:gap-0.5 md:overflow-visible md:px-0 md:py-0"
+      className="flex gap-1 overflow-x-auto overscroll-x-contain py-1 [-ms-overflow-style:none] [scrollbar-width:none] md:flex-col md:gap-0.5 md:overflow-visible md:py-0 [&::-webkit-scrollbar]:hidden"
     >
       {visible.map(({ key, labelI18nKey, Icon, variant }) => (
         <NavLink

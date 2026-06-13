@@ -7,7 +7,7 @@ import {
   useRemoveNoteMember,
   useResendInvitation,
   useUpdateNoteMemberRole,
-} from "@/hooks/useNoteQueries";
+} from "@/hooks/notes/useNoteQueries";
 import type { NoteMember, NoteMemberRole } from "@/types/note";
 import { memberRoleKeys } from "./noteMembersConfig";
 

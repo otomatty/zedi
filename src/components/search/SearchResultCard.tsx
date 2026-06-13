@@ -3,7 +3,7 @@ import { HighlightedSnippet } from "@/components/search/HighlightedSnippet";
 import { MatchTypeBadge } from "@/components/search/MatchTypeBadge";
 import type { MatchType } from "@/lib/searchUtils";
 import { cn } from "@zedi/ui";
-import { useAuthenticatedImageUrl } from "@/hooks/useAuthenticatedImageUrl";
+import { useAuthenticatedImageUrl } from "@/hooks/media/useAuthenticatedImageUrl";
 
 /**
  * 検索結果カードの表示用アイテム。判別可能 union で `kind` が `"page"` と
@@ -38,11 +38,20 @@ export interface SearchResultCardPageItem extends SearchResultCardBase {
   kind: "page";
   pageId: string;
   /**
-   * 所属ノート ID。Issue #889 Phase 3 で `/pages/:id` を廃止し、全ページ結果が
-   * `/notes/:noteId/:pageId` に統合された。Issue #825 で型も non-null。
-   * Owning note id; required after Issue #889 Phase 3 / #825.
+   * 所属ノート ID。`/notes/:noteId/:pageId` 遷移用（Issue #889 Phase 3）。
+   * Issue #1020 以降は常に非 null。
+   * Owning note id used for `/notes/:noteId/:pageId` routing (Issue #889
+   * Phase 3). Always non-null since issue #1020.
    */
   noteId: string;
+  /**
+   * 共有検索（参加ノート横断の API 検索）由来の行か。「共有」バッジの表示に使う。
+   * `noteId` の有無では判定できない（Issue #1020 で全ページが noteId を持つため）。
+   * Whether the row came from the shared (cross-note API) search; drives the
+   * "共有" badge. Cannot be derived from `noteId` anymore — every page carries
+   * one since issue #1020.
+   */
+  isShared: boolean;
   sourceUrl?: string;
 }
 
@@ -99,7 +108,7 @@ export function SearchResultCard({ item, onClick }: SearchResultCardProps) {
   );
 
   const isPdf = item.kind === "pdf_highlight";
-  const isShared = item.kind === "page" && Boolean(item.noteId);
+  const isShared = item.kind === "page" && item.isShared;
   const hasSourceUrl = item.kind === "page" && Boolean(item.sourceUrl);
 
   return (

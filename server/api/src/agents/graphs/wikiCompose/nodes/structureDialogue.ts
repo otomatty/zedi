@@ -14,8 +14,12 @@
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import {
+  composeContentLocaleInstruction,
+  structureDialogueFallbackOutline,
+} from "../../../core/composeLocale.js";
 import { createZediChatModel } from "../../../core/llm/modelFactory.js";
-import { resolveComposeModelId } from "../../../core/llm/resolveComposeModelId.js";
+import { resolveWikiComposeModelId } from "../../../core/llm/wikiComposeModelId.js";
 import { getGraphContext } from "../../../subgraphs/research/nodes/shared/getGraphContext.js";
 import { dispatchComposePhase } from "./shared/dispatch.js";
 import type { WikiComposeStateType, WikiComposeStateUpdate } from "../state.js";
@@ -79,7 +83,7 @@ export async function structureDialogue(
 
   await dispatchComposePhase({ phase: "structure", status: "entered" }, config);
 
-  const modelId = await resolveComposeModelId("orchestrator", ctx.backend, ctx.tier, ctx.db);
+  const modelId = await resolveWikiComposeModelId("orchestrator", ctx.tier, ctx.db);
   const model = await createZediChatModel({
     modelId,
     userId: ctx.userId,
@@ -99,7 +103,10 @@ export async function structureDialogue(
   let raw: z.input<typeof outlineProposalSchema>;
   try {
     raw = await structured.invoke([
-      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "system",
+        content: SYSTEM_PROMPT + composeContentLocaleInstruction(ctx.contentLocale),
+      },
       { role: "user", content: buildUserPrompt(state) },
     ]);
   } catch {
@@ -107,13 +114,7 @@ export async function structureDialogue(
     // edit-rather-than-blank-out when the LLM fails (rare). Heading text
     // intentionally generic so the user is prompted to rename.
     // LLM 失敗時は 3 セクションの仮アウトラインを返してフローを止めない。
-    raw = {
-      sections: [
-        { heading: "Overview", depth: 1, intent: "Brief introduction to the topic." },
-        { heading: "Key points", depth: 1, intent: "Main facts and context." },
-        { heading: "References", depth: 1, intent: "Sources and further reading." },
-      ],
-    };
+    raw = { sections: structureDialogueFallbackOutline(ctx.contentLocale) };
   }
 
   const outline: OutlineSection[] = raw.sections.map((s) => ({

@@ -10,6 +10,7 @@
  * button. The user submits via the dedicated button at the bottom.
  */
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ArrowDown, ArrowUp, Trash2, Plus, Check } from "lucide-react";
 import { Button, Card, CardContent, Input, Textarea } from "@zedi/ui";
 import { cn } from "@zedi/ui";
@@ -33,6 +34,7 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
   disabled = false,
   onSubmit,
 }) => {
+  const { t } = useTranslation();
   const [sections, setSections] = useState<OutlineSection[]>(initialSections);
   const [submitting, setSubmitting] = useState(false);
 
@@ -59,7 +61,7 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
   const add = () =>
     setSections((prev) => [
       ...prev,
-      { id: makeLocalId(), heading: "New section", depth: 1, intent: "" },
+      { id: makeLocalId(), heading: t("wikiCompose.structure.newSection"), depth: 1, intent: "" },
     ]);
 
   const update = (id: string, patch: Partial<OutlineSection>) =>
@@ -73,63 +75,70 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
         <Card
           key={section.id}
           data-testid={`outline-row-${section.id}`}
-          className={cn("transition-colors", section.depth > 1 && "ml-6")}
+          className={cn("transition-colors", section.depth > 1 && "ml-3 sm:ml-6")}
         >
           <CardContent className="space-y-2 pt-4">
-            <div className="flex items-center gap-2">
+            {/* Heading input on its own row on narrow screens; the control
+                cluster wraps below it so the input never gets crushed. On
+                `sm`+ they share a single row as before.
+                狭幅では見出し入力を 1 行目に、操作ボタン群を下段へ折り返す。
+                sm 以上では従来どおり横並び。 */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Input
                 value={section.heading}
                 data-testid={`outline-heading-${section.id}`}
                 onChange={(e) => update(section.id, { heading: e.target.value })}
-                placeholder="Section heading"
+                placeholder={t("wikiCompose.structure.headingPlaceholder")}
                 disabled={disabled}
               />
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                title="Toggle depth"
-                onClick={() => update(section.id, { depth: section.depth === 1 ? 2 : 1 })}
-                disabled={disabled}
-              >
-                H{section.depth + 1}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                title="Move up"
-                onClick={() => move(i, -1)}
-                disabled={disabled || i === 0}
-              >
-                <ArrowUp className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                title="Move down"
-                onClick={() => move(i, +1)}
-                disabled={disabled || i === sections.length - 1}
-              >
-                <ArrowDown className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                title="Remove section"
-                onClick={() => remove(section.id)}
-                disabled={disabled}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <div className="flex shrink-0 items-center justify-end gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  title={t("wikiCompose.structure.toggleDepth")}
+                  onClick={() => update(section.id, { depth: section.depth === 1 ? 2 : 1 })}
+                  disabled={disabled}
+                >
+                  H{section.depth + 1}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  title={t("wikiCompose.structure.moveUp")}
+                  onClick={() => move(i, -1)}
+                  disabled={disabled || i === 0}
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  title={t("wikiCompose.structure.moveDown")}
+                  onClick={() => move(i, +1)}
+                  disabled={disabled || i === sections.length - 1}
+                >
+                  <ArrowDown className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  title={t("wikiCompose.structure.removeSection")}
+                  onClick={() => remove(section.id)}
+                  disabled={disabled}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <Textarea
               value={section.intent}
               data-testid={`outline-intent-${section.id}`}
               onChange={(e) => update(section.id, { intent: e.target.value })}
-              placeholder="What should this section cover?"
+              placeholder={t("wikiCompose.structure.intentPlaceholder")}
               rows={2}
               disabled={disabled}
               className="text-xs"
@@ -147,7 +156,7 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
           disabled={disabled}
           data-testid="outline-add"
         >
-          <Plus className="mr-1 h-4 w-4" /> Add section
+          <Plus className="mr-1 h-4 w-4" /> {t("wikiCompose.structure.addSection")}
         </Button>
         <Button
           type="button"
@@ -162,7 +171,7 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
             }
           }}
         >
-          <Check className="mr-1 h-4 w-4" /> Approve outline
+          <Check className="mr-1 h-4 w-4" /> {t("wikiCompose.structure.approveOutline")}
         </Button>
       </div>
     </div>

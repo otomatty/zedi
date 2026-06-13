@@ -70,16 +70,23 @@ const TEST_USER_ID = "user-test-123";
 const ATTACKER_ID = "attacker-456";
 const OBJECT_ID = "thumb-uuid-001";
 
-function createServeApp() {
-  const mockDb = createMockDb([]);
+function createServeApp(dbResults: unknown[] = []) {
+  const mockDb = createMockDb(dbResults);
   const app = new Hono<AppEnv>();
   app.use("*", async (c, next) => {
     c.set("db", mockDb.db as unknown as AppEnv["Variables"]["db"]);
     await next();
   });
   app.route("/api/thumbnail/serve", serveRoutes);
-  return { app };
+  return { app, chains: mockDb.chains };
 }
+
+const THUMB_ROW = {
+  id: OBJECT_ID,
+  userId: TEST_USER_ID,
+  s3Key: "thumbnails/user-test-123/thumb-uuid-001.png",
+  createdAt: new Date(),
+};
 
 beforeEach(() => {
   mockS3Send.mockReset();
@@ -145,5 +152,82 @@ describe("DELETE /api/thumbnail/serve/:id", () => {
 
     expect(res.status).toBe(401);
     expect(mockDeleteThumbnailObject).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/thumbnail/serve/:id", () => {
+  it("returns 401 without auth", async () => {
+    const { app } = createServeApp([[THUMB_ROW]]);
+    const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`);
+    expect(res.status).toBe(401);
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when thumbnail row is not found for caller", async () => {
+    const { app } = createServeApp([[]]);
+    const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
+      headers: { "x-test-user-id": ATTACKER_ID },
+    });
+    expect(res.status).toBe(404);
+    expect(mockS3Send).not.toHaveBeenCalled();
+  });
+
+  it("scopes GET lookup by caller userId so foreign-owned rows are not served", async () => {
+    // Proxy DB returns [] when userId does not match (row may exist for another user).
+    const { app, chains } = createServeApp([[]]);
+    const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
+      headers: { "x-test-user-id": ATTACKER_ID },
+    });
+    expect(res.status).toBe(404);
+    expect(mockS3Send).not.toHaveBeenCalled();
+    const selectChain = chains.find((c) => c.startMethod === "select");
+    expect(selectChain?.ops.some((op) => op.method === "where")).toBe(true);
+    expect(selectChain?.ops.some((op) => op.method === "limit")).toBe(true);
+  });
+
+  it("streams image bytes when owned row exists", async () => {
+    const imageBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    mockS3Send.mockResolvedValueOnce({
+      Body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(imageBytes);
+          controller.close();
+        },
+      }),
+    });
+    const { app } = createServeApp([[THUMB_ROW]]);
+    const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/png");
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    const buf = new Uint8Array(await res.arrayBuffer());
+    expect(buf).toEqual(imageBytes);
+    expect(mockS3Send).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 404 when S3 object is missing", async () => {
+    const err = Object.assign(new Error("NoSuchKey"), {
+      name: "NoSuchKey",
+      $metadata: { httpStatusCode: 404 },
+    });
+    mockS3Send.mockRejectedValueOnce(err);
+    const { app } = createServeApp([[THUMB_ROW]]);
+    const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 502 when S3 retrieval fails unexpectedly", async () => {
+    mockS3Send.mockRejectedValueOnce(new Error("network down"));
+    const { app } = createServeApp([[THUMB_ROW]]);
+    const res = await app.request(`/api/thumbnail/serve/${OBJECT_ID}`, {
+      headers: { "x-test-user-id": TEST_USER_ID },
+    });
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/retrieve/i);
   });
 });

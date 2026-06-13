@@ -23,7 +23,8 @@ export function getStorageProvider(
   const { provider, config } = settings;
 
   // Legacy: cloudflare-r2 is no longer supported; use default storage
-  const effectiveProvider = provider === "cloudflare-r2" ? "s3" : (provider as StorageProviderType);
+  const effectiveProvider =
+    (provider as string) === "cloudflare-r2" ? "s3" : (provider as StorageProviderType);
 
   switch (effectiveProvider) {
     case "s3":

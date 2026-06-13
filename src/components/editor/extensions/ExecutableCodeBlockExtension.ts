@@ -16,11 +16,13 @@ export interface ExecutableCodeBlockOptions {
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
-    /**
-     * Inserts an executable code block (Claude Code / Bash).
-     * 実行可能コードブロック（Claude Code / Bash）を挿入する。
-     */
-    insertExecutableCodeBlock: (attrs?: { language?: string }) => ReturnType;
+    executableCodeBlock: {
+      /**
+       * Inserts an executable code block (Claude Code / Bash).
+       * 実行可能コードブロック（Claude Code / Bash）を挿入する。
+       */
+      insertExecutableCodeBlock: (attrs?: { language?: string }) => ReturnType;
+    };
   }
 }
 

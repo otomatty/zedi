@@ -1,14 +1,38 @@
 /**
  * Wiki Compose P2 happy-path E2E (issue #950).
  *
- * Compose の入口 → brief → 調査確認 → 構成 → 執筆 → 完了の流れを Playwright で
+ * Compose の入口 → brief → 調査確認 → 構成 → 完了の流れを Playwright で
  * 検証する。実 LLM / 実 API は使わず、`page.route` で `/api/pages/.../compose-sessions`
- * 系を全てモックして wire 形式 (SSE) を再生する。
+ * 系を全てモックする。
  *
  * Drives the Compose split-screen UI through every interrupt point using a
- * fully mocked SSE stream. Pins both the wire contract (the UI consumes the
- * SSE shapes correctly) and the user-facing happy path without depending on
- * a running API backend with real LLM access.
+ * fully mocked backend. Pins both the wire contract and the user-facing happy
+ * path without depending on a running API backend with real LLM access.
+ *
+ * Wire contract (spec-extractor confirmed against the server implementation):
+ * - SSE is replayed ONLY for the initial `POST .../run`. Each SSE record is a
+ *   `data: <JSON>\n\n` line whose JSON carries a mandatory `type` field
+ *   (`event:` lines are ignored by the client).
+ * - Phase transitions after the first interrupt are driven by the JSON body of
+ *   `PATCH .../resume`: `output.__interrupt__` is an ARRAY whose `[0].value`
+ *   holds the interrupt payload (discriminated by `value.kind`). The final
+ *   resume returns `status: "completed"` with `output.completion` directly —
+ *   no Draft token streaming happens on the resume path.
+ * - `run` is only legal while the session status is `pending` / `failed`; a
+ *   second run against an `interrupted` session gets 409 from the real server,
+ *   so the mock answers 409 too (catching contract violations).
+ *
+ * フェーズ遷移のトリガーは `PATCH .../resume` の JSON 応答ボディであり、
+ * SSE は初回 run の 1 回のみ。resume 経路では Draft のトークンストリーミングは
+ * 発生せず、outline 承認の応答で直接 Completed に遷移する。
+ *
+ * バックエンド無し環境で動くよう、ページビュー到達に必要な note / page 系
+ * API も `page.route` でモックする（issue #1036）。
+ * Runs without a backend: the note/page APIs needed to reach the page view
+ * are mocked via `page.route` as well (issue #1036).
+ *
+ * waitForTimeout 新規使用禁止（issue #1036）。状態ベースの待機のみ使うこと。
+ * Do NOT add new `waitForTimeout` calls (issue #1036). Use state-based waits only.
  */
 import { test, expect } from "./auth-mock";
 import type { Page, Route } from "@playwright/test";
@@ -29,254 +53,355 @@ const BRIEF_OPTION_ID = "oid-1";
 const SOURCE_ID = "src:demo";
 const SECTION_ID = "sec-overview";
 
+/** Source row shared by the research interrupt and the outline approval. */
+const DEMO_SOURCE = {
+  id: SOURCE_ID,
+  kind: "web",
+  title: "Photosynthesis — Britannica",
+  url: "https://example.com/photosynthesis",
+  snippet: "Photosynthesis converts light energy…",
+};
+
+/** Outline section shared by the outline interrupt and the final completion. */
+const OUTLINE_SECTION = {
+  id: SECTION_ID,
+  heading: "Overview",
+  depth: 1,
+  intent: "Brief introduction",
+};
+
+/** Wire-format session row (camelCase, wrapped in `{ session }` by callers). */
+function sessionRow(status: string): Record<string, unknown> {
+  return {
+    id: SESSION_ID,
+    pageId: PAGE_ID,
+    userId: "user-1",
+    graphId: "wiki-compose",
+    backend: "zedi_managed",
+    phase: "init",
+    status,
+    metadata: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
 /**
- * Encode a sequence of SSE-formatted events as a Uint8Array body. Each event
- * gets `event:` + `data:` lines and a blank-line terminator.
+ * Encode SSE records as `data: <JSON>\n\n`. The JSON itself must carry the
+ * `type` discriminator — `event:` lines are ignored by the client, so we do
+ * not emit them.
+ *
+ * SSE レコードは `data: <JSON>\n\n` 形式。`type` は JSON 内に必須で、
+ * `event:` 行はクライアントに無視されるため出力しない。
  */
-function sseBody(events: Array<{ type: string; payload: unknown }>): Uint8Array {
-  const parts = events.map(
-    ({ type, payload }) => `event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`,
-  );
-  return new TextEncoder().encode(parts.join(""));
+function sseBody(records: Array<Record<string, unknown>>): Buffer {
+  const parts = records.map((record) => `data: ${JSON.stringify(record)}\n\n`);
+  return Buffer.from(new TextEncoder().encode(parts.join("")));
 }
 
-let runCount = 0;
+/** Initial-run SSE: started → Brief interrupt → done(interrupted). */
+const INITIAL_RUN_RECORDS: Array<Record<string, unknown>> = [
+  { type: "started", sessionId: SESSION_ID, graphId: "wiki-compose" },
+  {
+    type: "interrupt",
+    payload: {
+      kind: "human_review_brief",
+      questions: [
+        {
+          id: BRIEF_QUESTION_ID,
+          question: "What's the audience for this article?",
+          rationale: "Helps the agent calibrate depth.",
+          required: false,
+          options: [
+            { id: BRIEF_OPTION_ID, label: "General readers" },
+            { id: "oid-2", label: "Specialists" },
+          ],
+        },
+      ],
+      pageSnapshot: PAGE_SNAPSHOT,
+    },
+  },
+  { type: "done", status: "interrupted" },
+];
 
-/** Per-run event sequences served by the mocked SSE endpoint. */
-function eventsForRun(n: number): Array<{ type: string; payload: unknown }> {
-  // Run 1: initial run → halt at Brief interrupt.
-  // Run 2: after Brief resume → halt at Research interrupt.
-  // Run 3: after Research resume → halt at Outline interrupt.
-  // Run 4: after Outline resume → stream Draft and complete.
-  switch (n) {
-    case 1:
-      return [
+/**
+ * Resume responses in submission order: Brief → Research interrupt,
+ * Research → Outline interrupt, Outline → Completed (with completion payload).
+ *
+ * `output.__interrupt__` は配列で、`[0].value` に interrupt ペイロード
+ * （判別キー `value.kind`）を入れる。最後の resume は completion を直接返す。
+ */
+const RESUME_RESPONSES: Array<Record<string, unknown>> = [
+  // 1) Brief answers submitted → halt at Research interrupt.
+  {
+    status: "interrupted",
+    output: {
+      __interrupt__: [
         {
-          type: "started",
-          payload: { type: "started", sessionId: SESSION_ID, graphId: "wiki-compose" },
-        },
-        {
-          type: "compose_phase",
-          payload: { type: "compose_phase", phase: "brief", status: "entered" },
-        },
-        {
-          type: "interrupt",
-          payload: {
-            type: "interrupt",
-            payload: {
-              kind: "human_review_brief",
-              questions: [
-                {
-                  id: BRIEF_QUESTION_ID,
-                  question: "What's the audience for this article?",
-                  rationale: "Helps the agent calibrate depth.",
-                  required: false,
-                  options: [
-                    { id: BRIEF_OPTION_ID, label: "General readers" },
-                    { id: "oid-2", label: "Specialists" },
-                  ],
-                },
-              ],
-              pageSnapshot: PAGE_SNAPSHOT,
+          value: {
+            kind: "human_review_research",
+            batch: {
+              id: "b1",
+              iteration: 1,
+              sources: [],
+              createdAt: "2026-01-01T00:00:00.000Z",
             },
+            pendingSources: [DEMO_SOURCE],
           },
         },
-        { type: "done", payload: { type: "done", status: "interrupted" } },
-      ];
-    case 2:
-      return [
+      ],
+    },
+  },
+  // 2) Research approval submitted → halt at Outline interrupt.
+  {
+    status: "interrupted",
+    output: {
+      __interrupt__: [
         {
-          type: "started",
-          payload: { type: "started", sessionId: SESSION_ID, graphId: "wiki-compose" },
-        },
-        {
-          type: "compose_phase",
-          payload: { type: "compose_phase", phase: "research", status: "entered" },
-        },
-        {
-          type: "interrupt",
-          payload: {
-            type: "interrupt",
-            payload: {
-              kind: "human_review_research",
-              batch: {
-                id: "batch-1",
-                iteration: 0,
-                queries: [],
-                sources: [],
-                evaluation: null,
-                createdAt: new Date().toISOString(),
-              },
-              pendingSources: [
-                {
-                  id: SOURCE_ID,
-                  kind: "web",
-                  title: "Photosynthesis — Britannica",
-                  url: "https://example.com/photosynthesis",
-                  snippet: "Photosynthesis converts light energy…",
-                },
-              ],
-            },
+          value: {
+            kind: "human_review_outline",
+            outline: [OUTLINE_SECTION],
+            approvedSources: [DEMO_SOURCE],
           },
         },
-        { type: "done", payload: { type: "done", status: "interrupted" } },
-      ];
-    case 3:
-      return [
-        {
-          type: "started",
-          payload: { type: "started", sessionId: SESSION_ID, graphId: "wiki-compose" },
-        },
-        {
-          type: "compose_phase",
-          payload: { type: "compose_phase", phase: "structure", status: "entered" },
-        },
-        {
-          type: "interrupt",
-          payload: {
-            type: "interrupt",
-            payload: {
-              kind: "human_review_outline",
-              outline: [
-                {
-                  id: SECTION_ID,
-                  heading: "Overview",
-                  depth: 1,
-                  intent: "Brief introduction",
-                },
-              ],
-              approvedSources: [
-                {
-                  id: SOURCE_ID,
-                  kind: "web",
-                  title: "Photosynthesis — Britannica",
-                  url: "https://example.com/photosynthesis",
-                  snippet: "Photosynthesis converts light energy…",
-                },
-              ],
-            },
-          },
-        },
-        { type: "done", payload: { type: "done", status: "interrupted" } },
-      ];
-    case 4:
-      return [
-        {
-          type: "started",
-          payload: { type: "started", sessionId: SESSION_ID, graphId: "wiki-compose" },
-        },
-        {
-          type: "compose_phase",
-          payload: { type: "compose_phase", phase: "draft", status: "entered" },
-        },
-        {
-          type: "compose_section",
-          payload: {
-            type: "compose_section",
+      ],
+    },
+  },
+  // 3) Outline approval submitted → completed with the drafted sections.
+  //    No Draft token streaming on the resume path (see header comment).
+  {
+    status: "completed",
+    output: {
+      completion: {
+        markdown: "## Overview\n\nPhotosynthesis.",
+        sections: [
+          {
             sectionId: SECTION_ID,
             heading: "Overview",
-            status: "started",
-            index: 1,
-            total: 1,
+            body: "Photosynthesis.",
+            citedSourceIds: [],
+            completedAt: "2026-01-01T00:00:00.000Z",
           },
-        },
-        { type: "token", payload: { type: "token", node: "draft_sections", content: "Photo" } },
-        {
-          type: "token",
-          payload: { type: "token", node: "draft_sections", content: "synthesis." },
-        },
-        {
-          type: "compose_section",
-          payload: {
-            type: "compose_section",
-            sectionId: SECTION_ID,
-            heading: "Overview",
-            status: "completed",
-            index: 1,
-            total: 1,
-          },
-        },
-        {
-          type: "compose_phase",
-          payload: { type: "compose_phase", phase: "completed", status: "entered" },
-        },
-        { type: "done", payload: { type: "done", status: "completed" } },
-      ];
-    default:
-      return [{ type: "done", payload: { type: "done", status: "completed" } }];
-  }
-}
+        ],
+      },
+      approvedOutline: { sections: [OUTLINE_SECTION] },
+    },
+  },
+];
 
-/** Install the Compose API mocks (create / get / run / resume / cancel). */
-async function installComposeMocks(page: Page): Promise<void> {
-  runCount = 0;
+/** Wire-format note row for GET /api/notes/:noteId. */
+const NOTE_ROW = {
+  id: NOTE_ID,
+  slug: "compose-note",
+  title: "Compose Note",
+  description: null,
+  visibility: "private",
+  owner_id: "local-user",
+  current_user_role: "owner",
+  page_count: 1,
+  created_at: "2026-01-01T00:00:00.000Z",
+  updated_at: "2026-01-01T00:00:00.000Z",
+};
 
-  // POST /compose-sessions — create.
-  await page.route(`**/api/pages/${PAGE_ID}/compose-sessions`, async (route: Route) => {
-    if (route.request().method() === "POST") {
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({
-          session: {
-            id: SESSION_ID,
-            pageId: PAGE_ID,
-            userId: "user-1",
-            graphId: "wiki-compose",
-            backend: "zedi_managed",
-            phase: "init",
-            status: "pending",
-            metadata: null,
-            lastError: null,
-            closedAt: null,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-        }),
-      });
-      return;
-    }
-    await route.fallback();
-  });
+/** Wire-format page row for GET /api/pages/:pageId. */
+const PAGE_ROW = {
+  id: PAGE_ID,
+  note_id: NOTE_ID,
+  owner_id: "local-user",
+  title: "Photosynthesis",
+  content_preview: "",
+  thumbnail_url: null,
+  source_url: null,
+  is_deleted: false,
+  created_at: "2026-01-01T00:00:00.000Z",
+  updated_at: "2026-01-01T00:00:00.000Z",
+};
 
-  // POST /compose-sessions/:id/run — SSE.
+/**
+ * Install the note/page API mocks needed to render the page view without a
+ * backend (issue #1036). Must be called BEFORE `installComposeMocks` so the
+ * catch-all (registered first) is checked last by Playwright.
+ *
+ * バックエンド無しでページビューを描画するための note / page 系モック。
+ * Playwright は登録の逆順でルートを評価するため、catch-all を最後に評価
+ * させるには `installComposeMocks` より先に呼ぶこと。
+ */
+async function installPageViewMocks(page: Page): Promise<void> {
+  // Catch-all for unmocked /api/* → 404. Predicate form so Vite module URLs
+  // like /src/lib/api/... are NOT intercepted.
+  // 未モックの /api/* は 404。述語形式にして Vite のモジュール URL
+  // (/src/lib/api/...) を巻き込まない。
   await page.route(
-    `**/api/pages/${PAGE_ID}/compose-sessions/${SESSION_ID}/run`,
+    (url) => url.pathname.startsWith("/api/"),
+    async (route: Route) => {
+      await route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "not_found" }),
+      });
+    },
+  );
+
+  await page.route(
+    (url) => url.pathname === `/api/notes/${NOTE_ID}`,
+    async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(NOTE_ROW),
+      });
+    },
+  );
+
+  await page.route(
+    (url) => url.pathname === `/api/notes/${NOTE_ID}/pages`,
+    async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ items: [PAGE_ROW], total: 1 }),
+      });
+    },
+  );
+
+  await page.route(
+    (url) => url.pathname === `/api/pages/${PAGE_ID}`,
+    async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(PAGE_ROW),
+      });
+    },
+  );
+
+  await page.route(
+    (url) => url.pathname === `/api/pages/${PAGE_ID}/public-links`,
+    async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ outgoing_links: [], backlinks: [], ghost_links: [] }),
+      });
+    },
+  );
+}
+
+/**
+ * Install the Compose API mocks (create / get / run / resume).
+ * Returns the captured `PATCH .../resume` request bodies (in submission order)
+ * so the test can assert the client actually sends the user's selections —
+ * without this the mock would accept ANY body and the test would be
+ * self-satisfying (issue #1036 assertion-strength review).
+ *
+ * resume の受信ボディを提出順に捕捉して返す。モックは送信内容を無視して
+ * 次フェーズを返すため、ボディを検証しないとクライアントが空・誤値を
+ * 送っても green になる（issue #1036 アサーション強度レビュー対応）。
+ */
+async function installComposeMocks(page: Page): Promise<{ resumeBodies: unknown[] }> {
+  let runCount = 0;
+  let resumeCount = 0;
+  const resumeBodies: unknown[] = [];
+
+  // POST /compose-sessions — create (201, wrapped in { session }).
+  await page.route(
+    (url) => url.pathname === `/api/pages/${PAGE_ID}/compose-sessions`,
+    async (route: Route) => {
+      if (route.request().method() === "POST") {
+        await route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify({ session: sessionRow("pending") }),
+        });
+        return;
+      }
+      await route.fallback();
+    },
+  );
+
+  // GET /compose-sessions/:id — served on route remount after the URL is
+  // replaced to `/compose/:sessionId`. Returning `interrupted` guarantees the
+  // client does NOT re-issue `run`.
+  // URL が `/compose/:sessionId` に replace された後の再マウントで呼ばれる。
+  // `interrupted` を返せば run は再発行されない。
+  await page.route(
+    (url) => url.pathname === `/api/pages/${PAGE_ID}/compose-sessions/${SESSION_ID}`,
+    async (route: Route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ session: sessionRow("interrupted"), projection: null }),
+        });
+        return;
+      }
+      await route.fallback();
+    },
+  );
+
+  // POST /compose-sessions/:id/run — SSE, first call only. The real server
+  // rejects run on an `interrupted` session with 409, so any second call is a
+  // contract violation and gets the faithful 409.
+  // run は初回のみ SSE。`interrupted` 中の再 run は実サーバ同様 409（契約違反検知）。
+  await page.route(
+    (url) => url.pathname === `/api/pages/${PAGE_ID}/compose-sessions/${SESSION_ID}/run`,
     async (route: Route) => {
       runCount += 1;
-      const body = sseBody(eventsForRun(runCount));
+      if (runCount > 1) {
+        await route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "session_not_runnable" }),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
-        body: Buffer.from(body),
+        body: sseBody(INITIAL_RUN_RECORDS),
       });
     },
   );
 
-  // PATCH /compose-sessions/:id/resume.
+  // PATCH /compose-sessions/:id/resume — phase transitions are driven by this
+  // JSON response body (NOT by replayed SSE).
+  // フェーズ遷移はこの JSON 応答ボディで駆動される（SSE 再生ではない）。
   await page.route(
-    `**/api/pages/${PAGE_ID}/compose-sessions/${SESSION_ID}/resume`,
+    (url) => url.pathname === `/api/pages/${PAGE_ID}/compose-sessions/${SESSION_ID}/resume`,
     async (route: Route) => {
+      resumeBodies.push(route.request().postDataJSON());
+      const response = RESUME_RESPONSES[resumeCount];
+      resumeCount += 1;
+      if (!response) {
+        // 4th+ resume is a contract violation — fail loudly instead of looping.
+        await route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "session_not_resumable" }),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ status: "interrupted", output: null }),
+        body: JSON.stringify(response),
       });
     },
   );
+
+  return { resumeBodies };
 }
 
 test.describe("Wiki Compose P2 happy path", () => {
   test.setTimeout(60_000);
 
-  test("walks Brief → Research → Outline → Draft → Completed", async ({ page }) => {
-    await installComposeMocks(page);
+  test("walks Brief → Research → Outline → Completed", async ({ page }) => {
+    await installPageViewMocks(page);
+    const { resumeBodies } = await installComposeMocks(page);
 
     await page.goto(`/notes/${NOTE_ID}/${PAGE_ID}/compose`);
 
-    await page.getByTestId("compose-start").click();
-
-    // Brief interrupt — question card appears.
+    // Brief interrupt — question card appears (compose auto-starts from AI settings).
     const briefCard = page.getByTestId(`brief-card-${BRIEF_QUESTION_ID}`);
     await expect(briefCard).toBeVisible();
     await expect(page.getByText("What's the audience for this article?")).toBeVisible();
@@ -285,25 +410,54 @@ test.describe("Wiki Compose P2 happy path", () => {
     await page.getByTestId(`brief-option-${BRIEF_OPTION_ID}`).click();
     await page.getByTestId("submit-brief").click();
 
-    // Research interrupt — source review card appears.
+    // Research interrupt — source review card appears (driven by the resume body).
     const sourceRow = page.getByTestId(`source-row-${SOURCE_ID}`);
     await expect(sourceRow).toBeVisible({ timeout: 10000 });
+
+    // Wire contract: the brief resume body carries the picked option id inside
+    // `resume.answers`. Only the presence of the selected id is pinned — the
+    // exact answer shape is not part of the confirmed spec (do not over-pin).
+    // ワイヤ契約: brief の resume ボディは `resume.answers` に選択した選択肢 id
+    // を運ぶ。確定仕様は「選択 id が含まれること」のみなので全形は固定しない。
+    expect(resumeBodies).toHaveLength(1);
+    const briefBody = resumeBodies[0] as { resume?: { answers?: unknown } };
+    expect(Array.isArray(briefBody?.resume?.answers)).toBe(true);
+    expect(JSON.stringify(briefBody?.resume?.answers)).toContain(`"${BRIEF_OPTION_ID}"`);
 
     // Approve all sources and continue.
     await page.getByTestId("research-submit").click();
 
-    // Outline interrupt — outline row appears.
+    // Outline interrupt — outline row appears (driven by the resume body).
     const outlineRow = page.getByTestId(`outline-row-${SECTION_ID}`);
     await expect(outlineRow).toBeVisible({ timeout: 10000 });
 
-    // Approve outline and continue.
+    // Wire contract: the research resume body lists the approved source ids in
+    // `resume.approvedSourceIds` (approve-all → the demo source id).
+    // ワイヤ契約: research の resume ボディは `resume.approvedSourceIds` に
+    // 承認済みソース id を含む（全承認なのでデモソース id が入る）。
+    expect(resumeBodies).toHaveLength(2);
+    const researchBody = resumeBodies[1] as { resume?: { approvedSourceIds?: unknown } };
+    expect(researchBody?.resume?.approvedSourceIds).toContain(SOURCE_ID);
+
+    // Approve outline and continue. The final resume responds with
+    // `status: "completed"` + completion payload — no Draft token streaming.
     await page.getByTestId("outline-submit").click();
 
-    // Draft phase — phase stepper advances to completed and the editor pane
-    // renders the streamed body.
+    // Completed — phase stepper advances and the editor pane renders the
+    // drafted body from `completion.sections`.
     await expect(page.getByTestId("phase-step-completed")).toHaveAttribute("aria-current", "step", {
       timeout: 10000,
     });
+
+    // Wire contract: the outline resume body carries the approved sections as
+    // an array in `resume.sections`, including the demo section id. Only the
+    // section id presence is pinned (exact section shape is unconfirmed).
+    // ワイヤ契約: outline の resume ボディは `resume.sections` 配列に承認済み
+    // セクションを含む。確定しているのはセクション id の包含のみ。
+    expect(resumeBodies).toHaveLength(3);
+    const outlineBody = resumeBodies[2] as { resume?: { sections?: unknown } };
+    expect(Array.isArray(outlineBody?.resume?.sections)).toBe(true);
+    expect(JSON.stringify(outlineBody?.resume?.sections)).toContain(`"${SECTION_ID}"`);
     await expect(page.getByTestId(`editor-section-${SECTION_ID}`)).toContainText(
       "Photosynthesis.",
       { timeout: 10000 },

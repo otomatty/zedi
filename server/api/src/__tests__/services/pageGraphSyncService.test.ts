@@ -13,7 +13,13 @@
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
-import { __test_only } from "../../services/pageGraphSyncService.js";
+import {
+  __test_only,
+  syncPageGraphFromStoredYDoc,
+  syncPageGraphFromYDoc,
+} from "../../services/pageGraphSyncService.js";
+import { createMockDb } from "../createMockDb.js";
+import type { Database } from "../../types/index.js";
 
 const { extractRefsFromYDoc, planBucket } = __test_only;
 
@@ -285,5 +291,257 @@ describe("planBucket", () => {
     const plan = planBucket(SOURCE_ID, [ref("foo", "Foo"), ref("foo", "FOO")], scope());
     expect(plan.ghostTexts.size).toBe(1);
     expect(plan.ghostTexts.get("foo")).toBe("Foo");
+  });
+});
+
+// ── DB トランザクションを通すラッパーのテスト ──────────────────────────────
+// Tests for the DB-transaction wrappers. The mock DB resolves queries in the
+// order they are issued: [lockSourcePage, (ydocState?), buildResolvedScope].
+// DELETE / INSERT calls in `replaceBucket` resolve to undefined (unused).
+
+const SRC = "11111111-1111-1111-1111-111111111111";
+
+/**
+ * 1 段落に wikiLink / tag マーク付きセグメントを並べた Y.Doc を作る。
+ * Builds a Y.Doc whose single paragraph carries the given marked segments.
+ */
+function buildMarkedDoc(
+  segments: Array<{ insert: string; attributes?: Record<string, unknown> }>,
+): Y.Doc {
+  const doc = new Y.Doc();
+  const fragment = doc.getXmlFragment("default");
+  const paragraph = new Y.XmlElement("paragraph");
+  fragment.insert(0, [paragraph]);
+  const text = new Y.XmlText();
+  paragraph.insert(0, [text]);
+  for (const seg of segments) {
+    text.insert(text.length, seg.insert, seg.attributes);
+  }
+  return doc;
+}
+
+function wikiSeg(title: string, targetId?: string) {
+  return {
+    insert: title,
+    attributes: { wikiLink: { title, exists: false, referenced: false, targetId } },
+  };
+}
+
+function tagSeg(name: string) {
+  return { insert: name, attributes: { tag: { name, exists: false, referenced: false } } };
+}
+
+/** Finds the INSERT chain targeting the given drizzle table object. */
+function insertedRows(
+  chains: ReturnType<typeof createMockDb>["chains"],
+  table: unknown,
+): unknown[] | undefined {
+  const chain = chains.find((c) => c.startMethod === "insert" && c.startArgs[0] === table);
+  const valuesOp = chain?.ops.find((o) => o.method === "values");
+  return valuesOp?.args[0] as unknown[] | undefined;
+}
+
+describe("syncPageGraphFromYDoc", () => {
+  it("ソースページが存在しなければ no-op を返す / returns a no-op when the source page is missing", async () => {
+    const { db } = createMockDb([[]]); // lockSourcePage → no rows
+    const doc = buildMarkedDoc([wikiSeg("Target")]);
+
+    const result = await syncPageGraphFromYDoc(db as unknown as Database, SRC, doc);
+
+    expect(result).toEqual({
+      wikiLinksInserted: 0,
+      wikiGhostsInserted: 0,
+      tagLinksInserted: 0,
+      tagGhostsInserted: 0,
+      skippedSourceNotFound: true,
+    });
+  });
+
+  it("ソースページが削除済みなら no-op を返す / returns a no-op when the source page is soft-deleted", async () => {
+    const { db } = createMockDb([[{ noteId: "note-1", isDeleted: true }]]);
+    const doc = buildMarkedDoc([wikiSeg("Target")]);
+
+    const result = await syncPageGraphFromYDoc(db as unknown as Database, SRC, doc);
+
+    expect(result.skippedSourceNotFound).toBe(true);
+    expect(result.wikiLinksInserted).toBe(0);
+  });
+
+  it("タイトル一致の WikiLink を links に挿入する / inserts a title-resolved WikiLink edge", async () => {
+    const { db, chains } = createMockDb([
+      [{ noteId: "note-1", isDeleted: false }], // lockSourcePage
+      [
+        { id: "target-id", title: "Target", isDeleted: false },
+        { id: SRC, title: "Source", isDeleted: false },
+      ], // buildResolvedScope
+    ]);
+    const doc = buildMarkedDoc([wikiSeg("Target")]);
+
+    const result = await syncPageGraphFromYDoc(db as unknown as Database, SRC, doc);
+
+    expect(result).toEqual({
+      wikiLinksInserted: 1,
+      wikiGhostsInserted: 0,
+      tagLinksInserted: 0,
+      tagGhostsInserted: 0,
+      skippedSourceNotFound: false,
+    });
+    // 挿入された links 行は (source, target, wiki)。
+    // The inserted link row is (source, target, wiki).
+    const { links } = await import("../../schema/index.js");
+    expect(insertedRows(chains, links)).toEqual([
+      { sourceId: SRC, targetId: "target-id", linkType: "wiki" },
+    ]);
+  });
+
+  it("mark.targetId が有効なら id 解決を優先する / id resolution wins when the mark's targetId is valid", async () => {
+    const { db, chains } = createMockDb([
+      [{ noteId: "note-1", isDeleted: false }],
+      [
+        // タイトルは古い ("Old") が、targetId が同ノートの有効ページを指す。
+        // Stale title but the targetId points to a valid in-scope page.
+        { id: "tgt-id", title: "Renamed", isDeleted: false },
+        { id: SRC, title: "Source", isDeleted: false },
+      ],
+    ]);
+    const doc = buildMarkedDoc([wikiSeg("Old Title", "tgt-id")]);
+
+    const result = await syncPageGraphFromYDoc(db as unknown as Database, SRC, doc);
+
+    expect(result.wikiLinksInserted).toBe(1);
+    const { links } = await import("../../schema/index.js");
+    expect(insertedRows(chains, links)).toEqual([
+      { sourceId: SRC, targetId: "tgt-id", linkType: "wiki" },
+    ]);
+  });
+
+  it("解決できない WikiLink は ghost_links に倒す / unresolved WikiLinks become ghost rows", async () => {
+    const { db, chains } = createMockDb([
+      [{ noteId: "note-1", isDeleted: false }],
+      [{ id: SRC, title: "Source", isDeleted: false }], // no matching page in scope
+    ]);
+    const doc = buildMarkedDoc([wikiSeg("Ghosty")]);
+
+    const result = await syncPageGraphFromYDoc(db as unknown as Database, SRC, doc);
+
+    expect(result.wikiLinksInserted).toBe(0);
+    expect(result.wikiGhostsInserted).toBe(1);
+    const { ghostLinks } = await import("../../schema/index.js");
+    expect(insertedRows(chains, ghostLinks)).toEqual([
+      { linkText: "Ghosty", sourcePageId: SRC, linkType: "wiki" },
+    ]);
+  });
+
+  it("wiki と tag を別バケットで集計する / counts wiki and tag buckets independently", async () => {
+    const { db } = createMockDb([
+      [{ noteId: "note-1", isDeleted: false }],
+      [
+        { id: "target-id", title: "Target", isDeleted: false },
+        { id: "tech-id", title: "tech", isDeleted: false },
+        { id: SRC, title: "Source", isDeleted: false },
+      ],
+    ]);
+    const doc = buildMarkedDoc([wikiSeg("Target"), tagSeg("tech"), wikiSeg("Ghosty")]);
+
+    const result = await syncPageGraphFromYDoc(db as unknown as Database, SRC, doc);
+
+    expect(result).toEqual({
+      wikiLinksInserted: 1,
+      wikiGhostsInserted: 1,
+      tagLinksInserted: 1,
+      tagGhostsInserted: 0,
+      skippedSourceNotFound: false,
+    });
+  });
+
+  it("ノート外の targetId は弾いて ghost に倒す / a targetId outside the note scope falls back to a ghost", async () => {
+    const { db } = createMockDb([
+      [{ noteId: "note-1", isDeleted: false }],
+      [{ id: SRC, title: "Source", isDeleted: false }], // foreign-id page not in scope
+    ]);
+    const doc = buildMarkedDoc([wikiSeg("Foreign", "outside-note-id")]);
+
+    const result = await syncPageGraphFromYDoc(db as unknown as Database, SRC, doc);
+
+    expect(result.wikiLinksInserted).toBe(0);
+    expect(result.wikiGhostsInserted).toBe(1);
+  });
+});
+
+describe("syncPageGraphFromStoredYDoc", () => {
+  /** Encodes a Y.Doc as a stored update Buffer (page_contents.ydoc_state). */
+  function encodeDoc(doc: Y.Doc): Buffer {
+    return Buffer.from(Y.encodeStateAsUpdate(doc));
+  }
+
+  it("ソースページが無ければ null を返す / returns null when the source page is missing", async () => {
+    const { db } = createMockDb([[]]); // lockSourcePage → no rows
+
+    const result = await syncPageGraphFromStoredYDoc(db as unknown as Database, SRC);
+
+    expect(result).toBeNull();
+  });
+
+  it("ソースページが削除済みなら skippedSourceNotFound を返す / returns skipped result when soft-deleted", async () => {
+    const { db } = createMockDb([[{ noteId: "note-1", isDeleted: true }]]);
+
+    const result = await syncPageGraphFromStoredYDoc(db as unknown as Database, SRC);
+
+    expect(result).toEqual({
+      wikiLinksInserted: 0,
+      wikiGhostsInserted: 0,
+      tagLinksInserted: 0,
+      tagGhostsInserted: 0,
+      skippedSourceNotFound: true,
+    });
+  });
+
+  it("保存された ydoc_state が無ければ null を返す / returns null when no stored ydoc_state exists", async () => {
+    const { db } = createMockDb([
+      [{ noteId: "note-1", isDeleted: false }], // lock
+      [], // pageContents → no rows
+    ]);
+
+    const result = await syncPageGraphFromStoredYDoc(db as unknown as Database, SRC);
+
+    expect(result).toBeNull();
+  });
+
+  it("保存済み Y.Doc を復元してグラフを再構築する / hydrates the stored Y.Doc and rebuilds the graph", async () => {
+    const doc = buildMarkedDoc([wikiSeg("Target")]);
+    const { db } = createMockDb([
+      [{ noteId: "note-1", isDeleted: false }], // lock
+      [{ ydocState: encodeDoc(doc) }], // pageContents
+      [
+        { id: "target-id", title: "Target", isDeleted: false },
+        { id: SRC, title: "Source", isDeleted: false },
+      ], // buildResolvedScope
+    ]);
+
+    const result = await syncPageGraphFromStoredYDoc(db as unknown as Database, SRC);
+
+    expect(result).toEqual({
+      wikiLinksInserted: 1,
+      wikiGhostsInserted: 0,
+      tagLinksInserted: 0,
+      tagGhostsInserted: 0,
+      skippedSourceNotFound: false,
+    });
+  });
+
+  it("base64 文字列で保存された ydoc_state も復元できる / hydrates a base64-string ydoc_state", async () => {
+    // 一部のドライバ構成では ydoc_state が base64 文字列で返るため、その経路も検証。
+    // Some driver configs hand back the bytes as a base64 string; cover that path.
+    const doc = buildMarkedDoc([wikiSeg("Ghosty")]);
+    const base64 = encodeDoc(doc).toString("base64");
+    const { db } = createMockDb([
+      [{ noteId: "note-1", isDeleted: false }],
+      [{ ydocState: base64 }],
+      [{ id: SRC, title: "Source", isDeleted: false }],
+    ]);
+
+    const result = await syncPageGraphFromStoredYDoc(db as unknown as Database, SRC);
+
+    expect(result?.wikiGhostsInserted).toBe(1);
   });
 });

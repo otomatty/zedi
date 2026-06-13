@@ -42,12 +42,32 @@ cd zedi
 ### 3. Setup
 
 ```bash
-# Recommended: run setup script
-bash scripts/setup.sh
+# Recommended
+bun run init
 
 # Or manually
 bun install
+bun run setup:agent-mirrors
 ```
+
+Re-run without lint/build (mirrors or deps only):
+
+```bash
+SKIP_BUILD=1 bun run init
+# or: bun run init --skip-build
+```
+
+#### Agent skills migration (existing clones)
+
+If you cloned before `.agents/` became canonical, you may still have **real directories** at `.claude/skills/` or `.cursor/skills/` instead of junctions/symlinks. `bun run init` / `bun run setup:agent-mirrors` stops with migration instructions until you remove them:
+
+```bash
+git pull
+rm -rf .claude/skills .claude/agents .cursor/skills .cursor/agents
+bun run setup:agent-mirrors
+```
+
+Canonical skills live in `.agents/` (tracked in git). `.claude/` remains local-only for Claude Code settings; only the mirror subpaths above are regenerated.
 
 ### 4. Configure upstream
 
@@ -115,6 +135,11 @@ bun run dev
    # Format check (same as CI)
    bun run format:check
    ```
+
+   > **E2E policy (issue #1036):** never use `page.waitForTimeout()` in Playwright specs.
+   > Wait on state instead — `expect(...).toBeVisible()`, `waitForURL`, `waitForRequest` /
+   > `waitForResponse`. Fixed sleeps are the primary source of flaky E2E runs.
+   > （Playwright spec での `page.waitForTimeout()` は新規使用禁止。状態ベースの待機を使うこと。）
 
    > **Note:** [husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/lint-staged/lint-staged) run lint and format on commit.
    > Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) ([commitlint](https://commitlint.js.org/) validates them).

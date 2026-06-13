@@ -164,7 +164,7 @@ export interface SseResearchBatchEvent {
   /** Last evaluation score (null only if compile fired before any evaluate). */
   score: number | null;
   /** Reason the loop exited. */
-  exitReason: "score_threshold" | "max_iterations";
+  exitReason: "score_threshold" | "max_iterations" | "safety_cap";
 }
 
 /**
@@ -207,6 +207,38 @@ export interface SseComposeSectionEvent {
 }
 
 /**
+ * Wiki Compose のページスナップショット通知。`brief_dialogue` がセッション開始
+ * 直後に発火し、クライアントへページのタイトル/本文を早期に伝える。instant
+ * モードでは Brief 割り込みが無いため、これが無いとエディタが「無題」のまま
+ * になる。`pageSnapshot` の shape は `PageSnapshot`。
+ *
+ * Page snapshot event emitted by `brief_dialogue` at session start so the client
+ * shows the real title/body immediately (instant mode has no Brief interrupt to
+ * carry it). Kept `unknown` here to avoid coupling core wire types to the graph.
+ */
+export interface SseComposeSnapshotEvent {
+  type: "compose_snapshot";
+  pageSnapshot: unknown;
+}
+
+/**
+ * Wiki Compose (#950) の完了通知。`completed` ノードが発火し、最終 Markdown・
+ * セクション・引用ソース・理解支援（Understanding Layer）を 1 イベントで運ぶ。
+ * 割り込みの無い instant モード実行で、単一 SSE ストリーム内に最終成果物を
+ * 届けるための経路。`completion` の shape は `ComposeCompletion`。
+ *
+ * Completion event emitted by the `completed` node. Carries the final article
+ * (markdown + sections + cited sources + comprehension aids) so an instant-mode
+ * run can deliver the full result inside a single SSE stream. The frontend
+ * validates the `completion` shape (kept `unknown` here to avoid coupling the
+ * core wire types to the orchestrator graph value types).
+ */
+export interface SseComposeCompletionEvent {
+  type: "compose_completion";
+  completion: unknown;
+}
+
+/**
  * Wire-level SSE union.
  */
 export type SseEvent =
@@ -223,7 +255,9 @@ export type SseEvent =
   | SseResearchEvaluationEvent
   | SseResearchBatchEvent
   | SseComposePhaseEvent
-  | SseComposeSectionEvent;
+  | SseComposeSectionEvent
+  | SseComposeSnapshotEvent
+  | SseComposeCompletionEvent;
 
 /**
  * SSE event 名（`event:` 行に流す名前）。`SseEvent["type"]` と同値だが、
@@ -247,4 +281,6 @@ export const SSE_EVENT_NAMES = {
   researchBatch: "research_batch",
   composePhase: "compose_phase",
   composeSection: "compose_section",
+  composeSnapshot: "compose_snapshot",
+  composeCompletion: "compose_completion",
 } as const satisfies Record<string, SseEvent["type"]>;

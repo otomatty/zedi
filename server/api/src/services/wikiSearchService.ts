@@ -19,7 +19,7 @@
  */
 import { sql } from "drizzle-orm";
 import type { Database } from "../types/index.js";
-import { extractEmailDomain } from "../lib/freeEmailDomains.js";
+import { extractEmailDomain } from "./freeEmailDomains.js";
 import { getDefaultNoteOrNull } from "./defaultNoteService.js";
 
 /**

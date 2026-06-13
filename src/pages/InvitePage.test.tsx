@@ -41,7 +41,7 @@ vi.mock("@/lib/auth", () => ({
 const userEmail = "alice@gmail.com";
 const invitedEmail = "alice@example.com";
 
-vi.mock("@/hooks/useAuth", () => ({
+vi.mock("@/hooks/auth/useAuth", () => ({
   useAuth: () => ({ isLoaded: true, isSignedIn: true, signOut: vi.fn() }),
   useUser: () => ({
     user: { primaryEmailAddress: { emailAddress: userEmail } },
@@ -56,7 +56,7 @@ const sendMagicLinkMock = vi.fn<(vars: { token: string }) => Promise<unknown>>(a
   retryAfterSec: 300,
 }));
 
-vi.mock("@/hooks/useInvitation", () => ({
+vi.mock("@/hooks/auth/useInvitation", () => ({
   useInvitation: () => ({
     data: {
       noteId: "note-1",

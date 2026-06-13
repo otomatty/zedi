@@ -165,10 +165,15 @@ describe("GET /api/pages/:id/snapshots", () => {
 
   it("allows access for note member", async () => {
     const pageRow = { id: PAGE_ID, ownerId: OWNER_ID, noteId: NOTE_ID };
+    // getNoteRole は 1 クエリで note 列 + memberRole/domainRole を返すため、
+    // member ロールは note 行に埋め込む（prefix の note スロットを差し替える）。
+    // getNoteRole resolves note + member/domain roles in one query, so embed the
+    // member role into the note row instead of a separate member-lookup slot.
     const app = createSnapshotsApp([
-      ...viewAccessPrefix("member@example.com", OWNER_ID, pageRow),
-      [{ role: "viewer" }],
-      [],
+      [pageRow], // page lookup
+      [{ email: "member@example.com" }], // user email lookup
+      [{ ...mockNote(OWNER_ID), memberRole: "viewer", domainRole: null }], // getNoteRole
+      [], // snapshots query
     ]);
 
     const res = await app.request(`/api/pages/${PAGE_ID}/snapshots`, {

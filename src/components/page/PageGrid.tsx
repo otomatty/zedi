@@ -1,10 +1,10 @@
 import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/auth/useAuth";
 import { useContainerColumns } from "@/hooks/useContainerColumns";
-import { usePagesSummary, useSyncStatus } from "@/hooks/usePageQueries";
-import { useInfiniteNotePages } from "@/hooks/useNoteQueries";
-import { useNotePageEvents } from "@/hooks/useNotePageEvents";
+import { usePagesSummary, useSyncStatus } from "@/hooks/pages/usePageQueries";
+import { useInfiniteNotePages } from "@/hooks/notes/useNoteQueries";
+import { useNotePageEvents } from "@/hooks/notes/useNotePageEvents";
 import PageCard from "./PageCard";
 import EmptyState from "./EmptyState";
 import { cn, Skeleton } from "@zedi/ui";

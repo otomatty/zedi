@@ -20,7 +20,7 @@ const mockConversations = vi.hoisted(() =>
   vi.fn(() => [] as import("@/types/aiChat").Conversation[]),
 );
 
-vi.mock("@/hooks/useAIChatConversations", () => ({
+vi.mock("@/hooks/aiChat/useAIChatConversations", () => ({
   useAIChatConversations: () => ({
     conversations: mockConversations(),
     createConversation: vi.fn(),
@@ -54,7 +54,7 @@ vi.mock("@/components/layout/AppLayout", () => ({
   ),
 }));
 
-vi.mock("@/components/ai-chat/ContentWithAIChat", () => ({
+vi.mock("@/components/aiChat/ContentWithAIChat", () => ({
   ContentWithAIChat: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="content-with-ai">{children}</div>
   ),

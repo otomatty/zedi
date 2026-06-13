@@ -9,22 +9,25 @@
  * actual interaction logic lives in each section component; this is just a
  * layout wrapper.
  */
-import React from "react";
+import React, { useState } from "react";
+import { useVirtualKeyboardOffset } from "@/hooks/useVirtualKeyboardOffset";
 import { PhaseStepper } from "./PhaseStepper";
 import { DialogueSection } from "./DialogueSection";
 import { ResearchSection } from "./ResearchSection";
 import { ConflictResolutionSection } from "./ConflictResolutionSection";
+import { ComprehensionSection } from "./ComprehensionSection";
 import { ActivitySection } from "./ActivitySection";
 import type {
   BriefAnswer,
   BriefQuestion,
+  ComprehensionAids,
   OutlineSection,
   PageSnapshot,
   ResearchBatch,
   ResearchConflictSummary,
   ResearchSource,
 } from "@/lib/wikiCompose/types";
-import type { ComposeActivity, ComposePhase } from "@/hooks/useWikiComposeSession";
+import type { ComposeActivity, ComposePhase } from "@/hooks/wiki/useWikiComposeSession";
 
 export interface ComposePanelProps {
   phase: ComposePhase;
@@ -40,13 +43,15 @@ export interface ComposePanelProps {
 
   outlineProposal: OutlineSection[];
 
+  /**
+   * Understanding Layer scaffolds, shown once the article completes.
+   * 記事完成後に表示する理解支援スキャフォールド。
+   */
+  comprehensionAids: ComprehensionAids | null;
+
   activity: ComposeActivity[];
 
-  onSubmitBrief: (input: {
-    answers: BriefAnswer[];
-    appendToExisting?: boolean;
-    researchMaxIterations?: number;
-  }) => Promise<void>;
+  onSubmitBrief: (input: { answers: BriefAnswer[]; appendToExisting?: boolean }) => Promise<void>;
   onSubmitResearchApproval: (input: {
     approvedSourceIds: string[];
     rejectedSourceIds?: string[];
@@ -68,6 +73,7 @@ export const ComposePanel: React.FC<ComposePanelProps> = (props) => {
     approvedSources,
     researchConflictSummary,
     outlineProposal,
+    comprehensionAids,
     activity,
     onSubmitBrief,
     onSubmitResearchApproval,
@@ -75,16 +81,29 @@ export const ComposePanel: React.FC<ComposePanelProps> = (props) => {
     onSubmitConflictAck,
   } = props;
 
+  // While a field inside the panel is focused, reserve space for the on-screen
+  // keyboard so the submit buttons can scroll above it on mobile (issue #927
+  // pattern). On desktop the offset stays 0 and this is a no-op.
+  // パネル内の入力にフォーカスがある間だけ仮想キーボード分の余白を確保し、
+  // モバイルで送信ボタンがキーボードに隠れないようにする（desktop では 0）。
+  const [inputActive, setInputActive] = useState(false);
+  const keyboardOffset = useVirtualKeyboardOffset(inputActive);
+
   return (
     <aside
       data-testid="compose-panel"
-      className="bg-card border-border flex h-full flex-col border-l"
+      className="bg-card border-border flex h-full flex-col md:border-l"
     >
       <header className="border-border border-b px-4 py-3">
         <PhaseStepper phase={phase} />
       </header>
 
-      <div className="flex-1 space-y-4 overflow-auto px-4 py-4">
+      <div
+        className="flex-1 space-y-4 overflow-auto px-4 py-4"
+        onFocus={() => setInputActive(true)}
+        onBlur={() => setInputActive(false)}
+        style={keyboardOffset > 0 ? { paddingBottom: keyboardOffset } : undefined}
+      >
         {/* Phase-specific dialogue: Brief / Structure / Draft. */}
         <DialogueSection
           phase={phase}
@@ -117,6 +136,9 @@ export const ComposePanel: React.FC<ComposePanelProps> = (props) => {
             onSubmit={onSubmitResearchApproval}
           />
         ) : null}
+
+        {/* Understanding Layer — non-blocking, shown once aids are available. */}
+        {comprehensionAids ? <ComprehensionSection aids={comprehensionAids} /> : null}
 
         <ActivitySection activity={activity} isStreaming={isStreaming} />
       </div>

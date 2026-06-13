@@ -24,7 +24,7 @@ interface AuditLogParams {
 const { auditLogSpy } = vi.hoisted(() => ({
   auditLogSpy: vi.fn(async (_c: unknown, _db: unknown, _params: AuditLogParams) => {}),
 }));
-vi.mock("../../../lib/auditLog.js", () => ({
+vi.mock("../../../services/auditLog.js", () => ({
   recordAuditLog: (c: unknown, db: unknown, params: AuditLogParams) => auditLogSpy(c, db, params),
   extractClientIp: () => null,
 }));

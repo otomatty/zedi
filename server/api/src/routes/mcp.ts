@@ -24,8 +24,8 @@ import {
   verifyPKCE,
   MCP_SCOPE_READ,
   MCP_SCOPE_WRITE,
-} from "../lib/mcpAuth.js";
-import { clipAndCreate } from "../lib/clipAndCreate.js";
+} from "../services/mcpAuth.js";
+import { clipAndCreate } from "../services/clipAndCreate.js";
 import { isClipUrlAllowed, isClipUrlAllowedAfterDns } from "../lib/clipUrlPolicy.js";
 import type { AppEnv } from "../types/index.js";
 

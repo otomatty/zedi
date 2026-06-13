@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast as sonnerToast } from "@zedi/ui/components/sonner";
 import { useToast } from "@zedi/ui";
-import { useStorageSettings } from "@/hooks/useStorageSettings";
+import { useStorageSettings } from "@/hooks/settings/useStorageSettings";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import type { StorageSettings } from "@/types/storage";
 

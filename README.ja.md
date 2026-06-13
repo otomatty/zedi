@@ -117,8 +117,8 @@ Demo screenshots: place assets under public/ when available. Tracked prose lives
 git clone https://github.com/otomatty/zedi.git
 cd zedi
 
-# セットアップスクリプトを実行（依存関係インストール + Git hooks 設定 + 検証）
-bash scripts/setup.sh
+# 初回セットアップ（依存関係 + Git hooks + 検証 + エージェントミラー）
+bun run init
 
 # 開発サーバーを起動
 bun run dev
@@ -129,7 +129,7 @@ bun run dev
 ```bash
 git clone https://github.com/otomatty/zedi.git
 cd zedi
-bun install
+bun run init
 bun run dev
 ```
 

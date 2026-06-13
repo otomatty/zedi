@@ -4,7 +4,7 @@ import { cn } from "@zedi/ui";
 
 interface BottomNavTabProps {
   to: string;
-  icon: React.FC<{ className?: string }>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   label: string;
   active: boolean;
 }

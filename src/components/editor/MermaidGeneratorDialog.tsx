@@ -9,7 +9,7 @@ import {
   DialogDescription,
 } from "@zedi/ui";
 import { Button } from "@zedi/ui";
-import { useMermaidGenerator } from "@/hooks/useMermaidGenerator";
+import { useMermaidGenerator } from "@/hooks/media/useMermaidGenerator";
 import { MermaidDiagramType } from "@/lib/mermaidGenerator";
 import { MermaidGeneratorNotConfiguredView } from "./MermaidGeneratorNotConfiguredView";
 import { MermaidGeneratorFormFields } from "./MermaidGeneratorFormFields";

@@ -1,9 +1,9 @@
 import { useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import Container from "@/components/layout/Container";
-import { ContentWithAIChat } from "@/components/ai-chat/ContentWithAIChat";
-import { AIChatConversationListRow } from "@/components/ai-chat/AIChatConversationListRow";
-import { useAIChatConversations } from "@/hooks/useAIChatConversations";
+import { ContentWithAIChat } from "@/components/aiChat/ContentWithAIChat";
+import { AIChatConversationListRow } from "@/components/aiChat/AIChatConversationListRow";
+import { useAIChatConversations } from "@/hooks/aiChat/useAIChatConversations";
 import { useAIChatStore } from "@/stores/aiChatStore";
 import { aiChatConversationPath } from "@/constants/aiChatSidebar";
 import { useTranslation } from "react-i18next";

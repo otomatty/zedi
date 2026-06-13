@@ -3,8 +3,8 @@ import { Search } from "lucide-react";
 import { Popover, PopoverAnchor } from "@zedi/ui";
 import { Input } from "@zedi/ui";
 import { useGlobalSearchContext } from "@/contexts/GlobalSearchContext";
-import type { GlobalSearchResultItem } from "@/hooks/useGlobalSearch";
-import { useGlobalSearchShortcut } from "@/hooks/useGlobalSearchShortcut";
+import type { GlobalSearchResultItem } from "@/hooks/search/useGlobalSearch";
+import { useGlobalSearchShortcut } from "@/hooks/search/useGlobalSearchShortcut";
 import { HeaderSearchDropdownContent } from "./HeaderSearchDropdownContent";
 import { cn } from "@zedi/ui";
 
@@ -88,7 +88,6 @@ export function HeaderSearchBar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
   const footerRef = useRef<HTMLButtonElement>(null);
 
   const handleShortcutFocus = useCallback(() => {
@@ -111,13 +110,15 @@ export function HeaderSearchBar() {
     queueMicrotask(() => setActiveIndex(-1));
   }, [query]);
 
+  // footer 行のスクロール追従のみ親で担当する。結果リストは仮想化済みで
+  // off-screen 行が DOM に無いため、リスト側の追従は HeaderSearchDropdownContent
+  // が `virtualizer.scrollToIndex` で行う。
+  // The parent only scrolls the footer row into view. The result list is
+  // virtualized (off-screen rows are not in the DOM), so its scroll-into-view
+  // is handled inside HeaderSearchDropdownContent via `scrollToIndex`.
   useEffect(() => {
-    if (activeIndex === -1) return;
     if (activeIndex === itemCount) {
       footerRef.current?.scrollIntoView({ block: "nearest" });
-    } else {
-      const items = listRef.current?.querySelectorAll("[role='option']");
-      items?.[activeIndex]?.scrollIntoView({ block: "nearest" });
     }
   }, [activeIndex, itemCount]);
 
@@ -195,7 +196,6 @@ export function HeaderSearchBar() {
         activeIndex={activeIndex}
         query={query}
         hasQuery={hasQuery}
-        listRef={listRef}
         footerRef={footerRef}
         getOptionId={getOptionId}
         onSelectItem={onSelectItem}

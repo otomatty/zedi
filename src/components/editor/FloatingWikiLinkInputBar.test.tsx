@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, screen, fireEvent } from "@testing-library/react";
 
@@ -8,11 +7,11 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-vi.mock("@/hooks/useWikiLinkCandidates", () => ({
+vi.mock("@/hooks/wiki/useWikiLinkCandidates", () => ({
   useWikiLinkCandidates: () => ({ pages: [], isLoading: false }),
 }));
 
-vi.mock("@/hooks/usePageQueries", () => ({
+vi.mock("@/hooks/pages/usePageQueries", () => ({
   useWikiLinkExistsChecker: () => ({
     checkExistence: vi.fn().mockResolvedValue({
       pageTitles: new Set(),

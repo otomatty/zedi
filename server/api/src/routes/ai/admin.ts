@@ -12,6 +12,7 @@ import { adminRequired } from "../../middleware/adminAuth.js";
 import { aiModels, type NewAiModel } from "../../schema/index.js";
 import { users } from "../../schema/users.js";
 import { syncAiModels, previewSyncAiModels } from "../../services/syncAiModels.js";
+import { setSystemDefaultModel } from "../../services/modelResolverService.js";
 import type { AppEnv } from "../../types/index.js";
 
 const SYNC_SECRET = process.env.SYNC_AI_MODELS_SECRET ?? "";
@@ -44,6 +45,7 @@ adminApp.get("/models", async (c) => {
       inputCostUnits: m.inputCostUnits,
       outputCostUnits: m.outputCostUnits,
       isActive: m.isActive,
+      isSystemDefault: m.isSystemDefault,
       sortOrder: m.sortOrder,
       createdAt: m.createdAt,
     })),
@@ -61,6 +63,7 @@ adminApp.patch("/models/:id", async (c) => {
     inputCostUnits: number;
     outputCostUnits: number;
     isActive: boolean;
+    isSystemDefault: boolean;
     sortOrder: number;
   }> = {};
 
@@ -88,11 +91,35 @@ adminApp.patch("/models/:id", async (c) => {
     if (typeof body.isActive !== "boolean")
       return c.json({ error: "isActive must be a boolean" }, 400);
     updates.isActive = body.isActive;
+    if (body.isActive === false) {
+      updates.isSystemDefault = false;
+    }
   }
   if (body.sortOrder !== undefined) {
     if (typeof body.sortOrder !== "number")
       return c.json({ error: "sortOrder must be a number" }, 400);
     updates.sortOrder = body.sortOrder;
+  }
+
+  if (body.isSystemDefault !== undefined) {
+    if (typeof body.isSystemDefault !== "boolean")
+      return c.json({ error: "isSystemDefault must be a boolean" }, 400);
+    if (body.isSystemDefault) {
+      if (Object.keys(updates).length > 0) {
+        return c.json({ error: "isSystemDefault=true cannot be combined with other fields" }, 400);
+      }
+      try {
+        const model = await setSystemDefaultModel(id, db);
+        return c.json({ model });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg === "NOT_FOUND") return c.json({ error: "Not found", id }, 404);
+        if (msg === "INACTIVE")
+          return c.json({ error: "Cannot set inactive model as system default" }, 400);
+        throw e;
+      }
+    }
+    updates.isSystemDefault = false;
   }
 
   if (Object.keys(updates).length === 0) {

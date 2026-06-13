@@ -61,7 +61,7 @@ export class FetchServerModelsError extends Error {
 
 async function fetchModelsFromApi(
   apiBaseUrl: string,
-): Promise<{ models: AIModel[]; tier: UserTier }> {
+): Promise<{ models: AIModel[]; tier: UserTier; systemDefaultModelId: string | null }> {
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl}/api/ai/models`, {
@@ -111,9 +111,13 @@ async function fetchModelsFromApi(
     throw err;
   }
 
-  let data: { models?: unknown[]; tier?: UserTier };
+  let data: { models?: unknown[]; tier?: UserTier; systemDefaultModelId?: string | null };
   try {
-    data = JSON.parse(bodyText) as { models?: unknown[]; tier?: UserTier };
+    data = JSON.parse(bodyText) as {
+      models?: unknown[];
+      tier?: UserTier;
+      systemDefaultModelId?: string | null;
+    };
   } catch (_e) {
     const err = new FetchServerModelsError(
       i18n.t("errors.apiResponseNotJson"),
@@ -140,7 +144,9 @@ async function fetchModelsFromApi(
 
   const models = data.models.map((m) => normalizeToAIModel((m as Record<string, unknown>) ?? {}));
   const tier: UserTier = data.tier === "pro" ? "pro" : "free";
-  return { models, tier };
+  const systemDefaultModelId =
+    typeof data.systemDefaultModelId === "string" ? data.systemDefaultModelId : null;
+  return { models, tier, systemDefaultModelId };
 }
 
 /**
@@ -151,6 +157,7 @@ async function fetchModelsFromApi(
 export async function fetchServerModels(forceRefresh = false): Promise<{
   models: AIModel[];
   tier: UserTier;
+  systemDefaultModelId: string | null;
 }> {
   if (!forceRefresh) {
     try {
@@ -163,11 +170,14 @@ export async function fetchServerModels(forceRefresh = false): Promise<{
           );
           const rawTier = parsed.tier as string;
           const cachedTier: UserTier = rawTier === "pro" ? "pro" : "free";
+          const systemDefaultModelId =
+            typeof parsed.systemDefaultModelId === "string" ? parsed.systemDefaultModelId : null;
           console.debug("[fetchServerModels] cache hit", {
             count: models.length,
             tier: cachedTier,
+            systemDefaultModelId,
           });
-          return { models, tier: cachedTier };
+          return { models, tier: cachedTier, systemDefaultModelId };
         }
       }
     } catch (e) {
@@ -190,6 +200,7 @@ export async function fetchServerModels(forceRefresh = false): Promise<{
   console.debug("[fetchServerModels] API response", {
     count: result.models.length,
     tier: result.tier,
+    systemDefaultModelId: result.systemDefaultModelId,
   });
 
   try {
@@ -198,6 +209,7 @@ export async function fetchServerModels(forceRefresh = false): Promise<{
       JSON.stringify({
         models: result.models,
         tier: result.tier as UserTier,
+        systemDefaultModelId: result.systemDefaultModelId,
         cachedAt: Date.now(),
       } satisfies CachedServerModels),
     );

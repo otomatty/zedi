@@ -1,7 +1,7 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { useGlobalSearch } from "@/hooks/useGlobalSearch";
-import type { GlobalSearchResultItem } from "@/hooks/useGlobalSearch";
+import { useGlobalSearch } from "@/hooks/search/useGlobalSearch";
+import type { GlobalSearchResultItem } from "@/hooks/search/useGlobalSearch";
 
 interface GlobalSearchContextValue {
   query: string;
@@ -87,18 +87,35 @@ export function GlobalSearchProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const value: GlobalSearchContextValue = {
-    query,
-    setQuery,
-    searchResults,
-    hasQuery,
-    handleSelect,
-    handleSearchSubmit,
-    focusSearchInput,
-    isOpen,
-    open,
-    close,
-  };
+  // value をメモ化し、検索状態が変わったときだけ参照を更新する。
+  // Memoize so consumers re-render only when the underlying search state
+  // changes, not on every Provider render (callbacks are already stable).
+  const value = useMemo<GlobalSearchContextValue>(
+    () => ({
+      query,
+      setQuery,
+      searchResults,
+      hasQuery,
+      handleSelect,
+      handleSearchSubmit,
+      focusSearchInput,
+      isOpen,
+      open,
+      close,
+    }),
+    [
+      query,
+      setQuery,
+      searchResults,
+      hasQuery,
+      handleSelect,
+      handleSearchSubmit,
+      focusSearchInput,
+      isOpen,
+      open,
+      close,
+    ],
+  );
 
   return <GlobalSearchContext.Provider value={value}>{children}</GlobalSearchContext.Provider>;
 }

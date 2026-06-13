@@ -144,7 +144,7 @@ export async function fetchSubscription(): Promise<SubscriptionState> {
     billingInterval,
     currentPeriodStart: currentPeriodStart != null ? String(currentPeriodStart) : null,
     currentPeriodEnd: currentPeriodEnd != null ? String(currentPeriodEnd) : null,
-    externalId,
+    externalId: externalId != null ? String(externalId) : null,
     usage: { consumedUnits, budgetUnits, remainingUnits, usagePercent },
   };
 }

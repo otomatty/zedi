@@ -7,9 +7,9 @@ import type { WikiLinkGhostCompletionCandidate } from "../extensions/wikiLinkGho
 import type { WikiLinkSuggestionHandle } from "../extensions/WikiLinkSuggestion";
 import type { TagSuggestionHandle } from "../extensions/TagSuggestion";
 import type { SlashSuggestionHandle } from "./SlashSuggestionLayer";
-import { useAuth } from "@/hooks/useAuth";
-import { useGeneralSettings } from "@/hooks/useGeneralSettings";
-import { useWikiLinkCandidates } from "@/hooks/useWikiLinkCandidates";
+import { useAuth } from "@/hooks/auth/useAuth";
+import { useGeneralSettings } from "@/hooks/settings/useGeneralSettings";
+import { useWikiLinkCandidates } from "@/hooks/wiki/useWikiLinkCandidates";
 import { useWikiLinkNavigation } from "./useWikiLinkNavigation";
 import { useEditorSetup } from "./useEditorSetup";
 import { useSuggestionEffects } from "./useSuggestionEffects";
@@ -60,7 +60,7 @@ function useEditorControllers(args: {
   tagSuggestionRef: RefObject<TagSuggestionHandle | null>;
   handleInsertImageClick: () => void;
   handleInsertCameraImageClick: () => void;
-  handleImageUpload: (files: File[]) => Promise<void>;
+  handleImageUpload: (files: FileList | File[]) => void;
   /** Note-linked workspace root for `@file:` (Issue #461). */
   workspaceRoot: string | null;
   /** Note id for Tauri workspace registry (Issue #461). */
@@ -233,7 +233,7 @@ export function useTiptapEditorController({
   const editorControllers = useEditorControllers({
     content,
     onChange,
-    placeholder,
+    placeholder: placeholder ?? "",
     autoFocus,
     pageId: pageId ?? "",
     isReadOnly,

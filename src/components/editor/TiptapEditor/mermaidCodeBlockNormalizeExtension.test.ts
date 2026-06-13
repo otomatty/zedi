@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { Editor } from "@tiptap/core";
+import { Editor, type Content } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { Mermaid } from "../extensions/MermaidExtension";
 import { MermaidCodeBlockNormalize } from "./mermaidCodeBlockNormalizeExtension";
@@ -29,7 +29,7 @@ describe("MermaidCodeBlockNormalize", () => {
    * Mermaid node (the real NodeView relies on React rendering inside the DOM,
    * which isn't needed for these unit tests).
    */
-  function createEditor(content: unknown): Editor {
+  function createEditor(content: Content): Editor {
     const el = document.createElement("div");
     const editor = new Editor({
       element: el,

@@ -11,8 +11,8 @@ import {
   PricingFaq,
   SubscriptionActions,
 } from "@/components/pricing";
-import { useSubscription } from "@/hooks/useSubscription";
-import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/settings/useSubscription";
+import { useAuth } from "@/hooks/auth/useAuth";
 import { openProCheckout, type BillingInterval } from "@/lib/subscriptionService";
 
 /**

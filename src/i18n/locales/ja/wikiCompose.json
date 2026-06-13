@@ -1,4 +1,118 @@
 {
+  "page": {
+    "titleFallback": "Wiki Compose",
+    "missingPageIdTitle": "ページ ID がありません",
+    "missingPageIdDescription": "この URL にはページ ID がありません。Wiki ページの Compose ボタンから開始してください。",
+    "back": "戻る",
+    "sessionPrefix": "セッション:",
+    "close": "閉じる",
+    "cancel": "キャンセル",
+    "tabPreview": "プレビュー",
+    "tabCompose": "作成",
+    "paneSwitchAria": "プレビューと作成パネルを切り替え"
+  },
+  "phase": {
+    "brief": "ブリーフ",
+    "research": "調査",
+    "structure": "構成",
+    "draft": "執筆",
+    "completed": "完了",
+    "progressAria": "Compose フェーズの進捗"
+  },
+  "phaseDisplay": {
+    "brief": "ブリーフ",
+    "research": "調査",
+    "structure": "構成",
+    "draft": "執筆",
+    "conflict": "矛盾解消",
+    "completed": "完了"
+  },
+  "brief": {
+    "title": "ブリーフ",
+    "noQuestions": "質問はありません — 調査に進みます",
+    "questionCount_one": "質問 {{count}} 件",
+    "questionCount_other": "質問 {{count}} 件",
+    "preparing": "ブリーフの質問を準備しています…",
+    "existingContentTitle": "ページに既存の本文があります",
+    "append": "既存の本文に追記する",
+    "replace": "既存の本文を置き換える",
+    "startResearch": "調査を開始",
+    "required": "必須",
+    "answerOptionsAria": "回答の選択肢",
+    "freeTextWithOptions": "メモを追加（任意）…",
+    "freeTextOnly": "回答を入力…"
+  },
+  "structure": {
+    "title": "アウトライン",
+    "sectionCount_one": "セクション {{count}} 件",
+    "sectionCount_other": "セクション {{count}} 件",
+    "headingPlaceholder": "セクション見出し",
+    "intentPlaceholder": "このセクションで書く内容",
+    "toggleDepth": "見出しレベルを切り替え",
+    "moveUp": "上へ",
+    "moveDown": "下へ",
+    "removeSection": "セクションを削除",
+    "newSection": "新しいセクション",
+    "addSection": "セクションを追加",
+    "approveOutline": "アウトラインを承認"
+  },
+  "draft": {
+    "drafting": "執筆中",
+    "completed": "完了",
+    "draftingHint": "セクションを執筆しています。左のエディタで進捗を確認できます。",
+    "completedHint": "記事の下書きができました。ページに戻って内容を確認・保存してください。"
+  },
+  "research": {
+    "web": "Web",
+    "wiki": "Wiki",
+    "article": "記事",
+    "noneApproved": "採用された調査ソースはありません。",
+    "approvedBadge": "採用 {{count}} 件",
+    "inProgress": "調査中です — ソースが揃い次第表示されます。",
+    "empty": "レビューする調査ソースがありません。",
+    "reviewTitle": "調査結果の確認",
+    "iterationBadge": "イテレーション {{count}}",
+    "approvedOf": "採用 {{approved}} / {{total}}",
+    "approve": "採用",
+    "reject": "除外",
+    "continue": "選択内容で続行"
+  },
+  "conflict": {
+    "title": "矛盾を解消",
+    "cardTitle": "調査の矛盾",
+    "approved": "採用 ({{count}})",
+    "rejected": "除外 ({{count}})",
+    "continue": "採用ソースで続行"
+  },
+  "editor": {
+    "untitled": "無題のページ",
+    "emptyHint": "エージェントが執筆を始めると、ここに記事が表示されます。",
+    "streaming": "ストリーミング中…",
+    "finalMarkdown": "完成 Markdown"
+  },
+  "comprehension": {
+    "title": "理解を深める",
+    "summary": "要点（TL;DR）",
+    "keyTerms": "キーワード",
+    "selfCheck": "理解度チェック"
+  },
+  "activity": {
+    "title": "アクティビティ",
+    "live": "ライブ",
+    "empty": "まだアクティビティはありません。",
+    "runStarted": "実行を開始",
+    "phase": "フェーズ: {{phase}}",
+    "toolStarted": "ツール: {{tool}}",
+    "toolDone": "ツール: {{tool}}",
+    "researchIteration": "調査イテレーション {{count}}",
+    "sufficiency": "充足度: {{score}}",
+    "researchBatch": "調査バッチ (#{{iteration}})",
+    "drafting": "執筆中: {{heading}}",
+    "drafted": "執筆完了: {{heading}}",
+    "runStatus": "実行 {{status}}",
+    "error": "エラー",
+    "usage": "使用量"
+  },
   "backend": {
     "label": "実行バックエンド",
     "zediManaged": "Zedi 管理",

@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
-import { useGeneralSettings } from "@/hooks/useGeneralSettings";
-import { useAISettings } from "@/hooks/useAISettings";
-import { useStorageSettings } from "@/hooks/useStorageSettings";
-import { useProfile } from "@/hooks/useProfile";
+import { useGeneralSettings } from "@/hooks/settings/useGeneralSettings";
+import { useAISettings } from "@/hooks/aiChat/useAISettings";
+import { useStorageSettings } from "@/hooks/settings/useStorageSettings";
+import { useProfile } from "@/hooks/auth/useProfile";
 import type { StorageProviderType } from "@/types/storage";
 import type { SettingsSectionId } from "./SettingsSection";
 
@@ -18,7 +18,7 @@ function effectiveStorageProviderId(provider: string): StorageProviderType {
  * 各設定セクションカード向けの 1 行サマリーを生成する。
  */
 export function useSettingsSummaries(): Record<SettingsSectionId, string> {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const general = useGeneralSettings();
   const ai = useAISettings();
   const storage = useStorageSettings();

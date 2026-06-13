@@ -5,13 +5,14 @@
  * `useGoogleSearch` for Google) を呼ぶため、Anthropic-only な選択では成立しない。
  * 本ヘルパは次の優先順で model を選ぶ:
  *
- * 1. `process.env.WIKI_COMPOSE_WEB_SEARCH_MODEL_ID` (explicit override; `ai_models.id`)
+ * 1. {@link WIKI_COMPOSE_MODEL_ID} when active and tier-accessible
+ * 2. `process.env.WIKI_COMPOSE_WEB_SEARCH_MODEL_ID` (explicit override; `ai_models.id`)
  *    — 必ず active かつ tier 通過することを DB 側で確認する（coderabbit review #956:
  *    不正な override で `createZediChatModel` が失敗してエラー envelope になる
  *    のを防ぐ）。
- * 2. `ai_models` の active な OpenAI モデルで最安 (`input_cost_units` ASC, `output_cost_units` ASC)
- * 3. `ai_models` の active な Google モデルで最安
- * 4. 何も無ければ `null` を返す（ツール側は empty result + note を返す）。
+ * 3. `ai_models` の active な OpenAI モデルで最安 (`input_cost_units` ASC, `output_cost_units` ASC)
+ * 4. `ai_models` の active な Google モデルで最安
+ * 5. 何も無ければ `null` を返す（ツール側は empty result + note を返す）。
  *
  * Returns the `ai_models.id` so `createZediChatModel({ modelId })` can validate
  * tier access and resolve the API key uniformly. Centralising the choice in one
@@ -25,6 +26,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { aiModels } from "../../../schema/index.js";
 import type { Database, UserTier } from "../../../types/index.js";
+import { resolveActiveWikiComposeModelId } from "../llm/wikiComposeModelId.js";
 
 const ENV_OVERRIDE = "WIKI_COMPOSE_WEB_SEARCH_MODEL_ID";
 
@@ -48,6 +50,9 @@ export async function resolveWebSearchModelId(
   db: Database,
   tier: UserTier,
 ): Promise<string | null> {
+  const fixedId = await resolveActiveWikiComposeModelId(db, tier);
+  if (fixedId) return fixedId;
+
   const override = process.env[ENV_OVERRIDE]?.trim();
   if (override) {
     // Validate the override before returning: it must be active and

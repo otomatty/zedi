@@ -182,4 +182,52 @@ describe("mapLangGraphEvent", () => {
       },
     ]);
   });
+
+  it("maps on_custom_event compose_completion to a typed compose_completion event", () => {
+    const completion = {
+      markdown: "## Overview\n\nBody.",
+      sections: [{ sectionId: "sec-1", heading: "Overview", body: "Body.", citedSourceIds: [] }],
+      citedSources: [],
+      completedAt: "2026-01-01T00:00:00.000Z",
+      comprehensionAids: {
+        summary: "TL;DR",
+        keyTerms: [{ term: "T", definition: "D" }],
+        questions: ["Q?"],
+      },
+    };
+    const ev: LangGraphRuntimeEvent = {
+      event: "on_custom_event",
+      name: "compose_completion",
+      data: { completion },
+    };
+    expect(mapLangGraphEvent(ev)).toEqual([{ type: "compose_completion", completion }]);
+  });
+
+  it("drops compose_completion when the completion payload is not an object", () => {
+    const ev: LangGraphRuntimeEvent = {
+      event: "on_custom_event",
+      name: "compose_completion",
+      data: { completion: "nope" },
+    };
+    expect(mapLangGraphEvent(ev)).toEqual([]);
+  });
+
+  it("maps on_custom_event compose_snapshot to a typed compose_snapshot event", () => {
+    const pageSnapshot = { pageId: "page-1", title: "Photosynthesis", body: "", hasContent: false };
+    const ev: LangGraphRuntimeEvent = {
+      event: "on_custom_event",
+      name: "compose_snapshot",
+      data: { pageSnapshot },
+    };
+    expect(mapLangGraphEvent(ev)).toEqual([{ type: "compose_snapshot", pageSnapshot }]);
+  });
+
+  it("drops compose_snapshot when the snapshot has no string title", () => {
+    const ev: LangGraphRuntimeEvent = {
+      event: "on_custom_event",
+      name: "compose_snapshot",
+      data: { pageSnapshot: { pageId: "page-1" } },
+    };
+    expect(mapLangGraphEvent(ev)).toEqual([]);
+  });
 });

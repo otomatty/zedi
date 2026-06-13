@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { FolderOpen, FolderTree, Trash2 } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@zedi/ui";
 import { useTranslation } from "react-i18next";

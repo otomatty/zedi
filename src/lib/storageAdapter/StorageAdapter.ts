@@ -22,6 +22,18 @@ export interface StorageAdapter {
   upsertPage(page: PageMetadata): Promise<void>;
   deletePage(pageId: string): Promise<void>;
 
+  /**
+   * 旧クライアント（個人ページ時代）が `noteId: null` で残した行を、指定ノート
+   * （呼び出し元のデフォルトノート）へ付け替える。同期エンジンがサーバから
+   * `default_note_id` を受け取った直後に呼ぶ（Issue #1020）。
+   *
+   * Reassign legacy rows persisted with `noteId: null` (the retired
+   * "personal page" model) to the given note — the caller's default note.
+   * Invoked by the sync engine right after the server reports
+   * `default_note_id` (issue #1020).
+   */
+  reassignNullNotePages(noteId: string): Promise<void>;
+
   // ── Y.Doc ──
   getYDocState(pageId: string): Promise<Uint8Array | null>;
   saveYDocState(pageId: string, state: Uint8Array, version: number): Promise<void>;

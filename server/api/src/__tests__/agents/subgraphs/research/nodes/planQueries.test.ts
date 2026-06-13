@@ -8,6 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { createZediChatModel } = vi.hoisted(() => ({ createZediChatModel: vi.fn() }));
 
+vi.mock("../../../../../agents/core/llm/wikiComposeModelId.js", () => ({
+  WIKI_COMPOSE_MODEL_ID: "google:gemini-3.5-flash",
+  resolveWikiComposeModelId: vi.fn(async () => "google:gemini-3.5-flash"),
+}));
+
 vi.mock("../../../../../agents/core/llm/modelFactory.js", async () => {
   const actual = await vi.importActual<
     typeof import("../../../../../agents/core/llm/modelFactory.js")
@@ -27,6 +32,11 @@ vi.mock("../../../../../agents/subgraphs/research/nodes/shared/dispatchSseCustom
 }));
 
 import { planQueries } from "../../../../../agents/subgraphs/research/nodes/planQueries.js";
+import {
+  INGEST_RESEARCH_GRAPH_ID,
+  RESEARCH_SAFETY_MAX_ITERATIONS,
+} from "../../../../../agents/subgraphs/research/constants.js";
+import { WIKI_COMPOSE_GRAPH_ID } from "../../../../../agents/graphs/wikiCompose/index.js";
 import { GRAPH_CONTEXT_CONFIG_KEY } from "../../../../../agents/core/types/graphContext.js";
 import type { GraphContext } from "../../../../../agents/core/types/graphContext.js";
 import type { Database } from "../../../../../types/index.js";
@@ -44,6 +54,7 @@ function fakeContext(): GraphContext {
     db: {} as Database,
     feature: "wiki_compose:research",
     userEmail: null,
+    contentLocale: "ja",
   };
 }
 
@@ -87,9 +98,25 @@ afterEach(() => {
 describe("planQueries — additional research detection", () => {
   const config = { configurable: { [GRAPH_CONTEXT_CONFIG_KEY]: fakeContext() } };
 
-  it("clamps maxIterations to 1..5 (default 3)", async () => {
+  it("uses the safety cap for Wiki Compose even when legacy state has maxIterations: 3", async () => {
+    const ctx = fakeContext();
+    ctx.graphId = WIKI_COMPOSE_GRAPH_ID;
+    const wikiConfig = { configurable: { [GRAPH_CONTEXT_CONFIG_KEY]: ctx } };
+    const update = await planQueries(state({ maxIterations: 3 }), wikiConfig as never);
+    expect(update.maxIterations).toBe(RESEARCH_SAFETY_MAX_ITERATIONS);
+  });
+
+  it("uses the safety cap when graph is standalone research", async () => {
     const update = await planQueries(state({ maxIterations: 99 }), config as never);
-    expect(update.maxIterations).toBe(5);
+    expect(update.maxIterations).toBe(RESEARCH_SAFETY_MAX_ITERATIONS);
+  });
+
+  it("honours ingest graph caps from state", async () => {
+    const ctx = fakeContext();
+    ctx.graphId = INGEST_RESEARCH_GRAPH_ID;
+    const ingestConfig = { configurable: { [GRAPH_CONTEXT_CONFIG_KEY]: ctx } };
+    const update = await planQueries(state({ maxIterations: 4 }), ingestConfig as never);
+    expect(update.maxIterations).toBe(4);
   });
 
   it("consumes state.additionalRequest and seeds carried-over sources", async () => {

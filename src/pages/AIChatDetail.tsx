@@ -1,22 +1,22 @@
 import { Suspense, lazy, useCallback, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import Container from "@/components/layout/Container";
-import { AIChatMessages } from "@/components/ai-chat/AIChatMessages";
-import { AIChatInput } from "@/components/ai-chat/AIChatInput";
-import { AIChatViewTabs, type AIChatViewTab } from "@/components/ai-chat/AIChatViewTabs";
-import { PromoteToWikiDialog } from "@/components/ai-chat/PromoteToWikiDialog";
-import { usePromoteToWiki } from "@/hooks/usePromoteToWiki";
+import { AIChatMessages } from "@/components/aiChat/AIChatMessages";
+import { AIChatInput } from "@/components/aiChat/AIChatInput";
+import { AIChatViewTabs, type AIChatViewTab } from "@/components/aiChat/AIChatViewTabs";
+import { PromoteToWikiDialog } from "@/components/aiChat/PromoteToWikiDialog";
+import { usePromoteToWiki } from "@/hooks/wiki/usePromoteToWiki";
 
 const AIChatBranchTree = lazy(() =>
-  import("@/components/ai-chat/AIChatBranchTree").then((m) => ({ default: m.AIChatBranchTree })),
+  import("@/components/aiChat/AIChatBranchTree").then((m) => ({ default: m.AIChatBranchTree })),
 );
-import { useAIChatConversations } from "@/hooks/useAIChatConversations";
+import { useAIChatConversations } from "@/hooks/aiChat/useAIChatConversations";
 import { useAIChatStore } from "@/stores/aiChatStore";
-import { useAIChat } from "@/hooks/useAIChat";
-import { useAIChatActions } from "@/hooks/useAIChatActions";
-import { usePagesSummary } from "@/hooks/usePageQueries";
+import { useAIChat } from "@/hooks/aiChat/useAIChat";
+import { useAIChatActions } from "@/hooks/aiChat/useAIChatActions";
+import { usePagesSummary } from "@/hooks/pages/usePageQueries";
 import type { ReferencedPage } from "@/types/aiChat";
-import { useAIChatDetailLifecycle } from "./useAIChatDetailLifecycle";
+import { useAIChatDetailLifecycle } from "@/hooks/aiChat/useAIChatDetailLifecycle";
 
 /**
  * Full-page AI chat for a single conversation (`/ai/:conversationId`).

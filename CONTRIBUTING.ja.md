@@ -63,11 +63,31 @@ cd zedi
 
 ```bash
 # セットアップスクリプトを実行（推奨）
-bash scripts/setup.sh
+bun run init
 
 # または手動で
 bun install
+bun run setup:agent-mirrors
 ```
+
+lint/build を省略して再実行する場合（ミラーや依存関係のみ）:
+
+```bash
+SKIP_BUILD=1 bun run init
+# または: bun run init --skip-build
+```
+
+#### エージェントスキル移行（既存クローン）
+
+`.agents/` 正本化以前にクローンした環境では、`.claude/skills/` や `.cursor/skills/` が junction/symlink ではなく **実ディレクトリ** のまま残っていることがあります。`bun run init` / `bun run setup:agent-mirrors` は、削除するまで移行手順を表示して停止します:
+
+```bash
+git pull
+rm -rf .claude/skills .claude/agents .cursor/skills .cursor/agents
+bun run setup:agent-mirrors
+```
+
+正本は `.agents/`（Git 追跡）です。`.claude/` は Claude Code 設定用のローカル専用で、上記ミラーパスだけが再生成されます。
 
 ### 4. upstream を設定
 

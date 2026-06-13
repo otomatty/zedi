@@ -29,6 +29,7 @@ const baseModel: AiModelAdmin = {
   inputCostUnits: 100,
   outputCostUnits: 100,
   isActive: true,
+  isSystemDefault: false,
   sortOrder: 0,
   createdAt: "2026-01-01T00:00:00Z",
 };
@@ -279,5 +280,142 @@ describe("useAiModelActions.handleTierChange", () => {
     });
 
     expect(patchAiModel).toHaveBeenCalledWith(baseModel.id, { tierRequired: "free" });
+  });
+});
+
+describe("useAiModelActions.handleSetSystemDefault", () => {
+  beforeEach(() => {
+    vi.mocked(patchAiModel).mockReset();
+  });
+
+  it("成功時: 対象モデルを system default にし originalModelsRef を更新する / sets system default on success", async () => {
+    vi.mocked(patchAiModel).mockResolvedValueOnce({ ...baseModel, isSystemDefault: true });
+    const otherModel: AiModelAdmin = {
+      ...baseModel,
+      id: "openai:gpt-4o",
+      modelId: "gpt-4o",
+      displayName: "GPT-4o",
+      isSystemDefault: true,
+    };
+    const refs = createRefs([otherModel, baseModel]);
+    const { result } = renderHook(() =>
+      useAiModelActions({
+        setModels: refs.setModels as never,
+        setError: refs.setError as never,
+        isMountedRef: refs.isMountedRef as never,
+        originalModelsRef: refs.originalModelsRef as never,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleSetSystemDefault(baseModel);
+    });
+
+    expect(patchAiModel).toHaveBeenCalledWith(baseModel.id, { isSystemDefault: true });
+    expect(refs.models.find((m) => m.id === baseModel.id)?.isSystemDefault).toBe(true);
+    expect(refs.models.find((m) => m.id === otherModel.id)?.isSystemDefault).toBe(false);
+    expect(refs.originalModelsRef.current.find((m) => m.id === baseModel.id)?.isSystemDefault).toBe(
+      true,
+    );
+  });
+
+  it("失敗時: originalModelsRef へ rollback し setError する / rollbacks on failure", async () => {
+    vi.mocked(patchAiModel).mockRejectedValueOnce(new Error("default failed"));
+    const otherModel: AiModelAdmin = {
+      ...baseModel,
+      id: "openai:gpt-4o",
+      modelId: "gpt-4o",
+      displayName: "GPT-4o",
+      isSystemDefault: true,
+    };
+    const refs = createRefs([otherModel, baseModel]);
+    const { result } = renderHook(() =>
+      useAiModelActions({
+        setModels: refs.setModels as never,
+        setError: refs.setError as never,
+        isMountedRef: refs.isMountedRef as never,
+        originalModelsRef: refs.originalModelsRef as never,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleSetSystemDefault(baseModel);
+    });
+
+    expect(refs.models.find((m) => m.id === otherModel.id)?.isSystemDefault).toBe(true);
+    expect(refs.models.find((m) => m.id === baseModel.id)?.isSystemDefault).toBe(false);
+    expect(refs.setError).toHaveBeenLastCalledWith("default failed");
+  });
+
+  it("既に system default なら no-op / skips when already default", async () => {
+    const defaultModel = { ...baseModel, isSystemDefault: true };
+    const refs = createRefs([defaultModel]);
+    const { result } = renderHook(() =>
+      useAiModelActions({
+        setModels: refs.setModels as never,
+        setError: refs.setError as never,
+        isMountedRef: refs.isMountedRef as never,
+        originalModelsRef: refs.originalModelsRef as never,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleSetSystemDefault(defaultModel);
+    });
+
+    expect(patchAiModel).not.toHaveBeenCalled();
+    expect(refs.setModels).not.toHaveBeenCalled();
+  });
+
+  it("非アクティブモデルなら no-op / skips when model is inactive", async () => {
+    const inactiveModel = { ...baseModel, isActive: false };
+    const refs = createRefs([inactiveModel]);
+    const { result } = renderHook(() =>
+      useAiModelActions({
+        setModels: refs.setModels as never,
+        setError: refs.setError as never,
+        isMountedRef: refs.isMountedRef as never,
+        originalModelsRef: refs.originalModelsRef as never,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleSetSystemDefault(inactiveModel);
+    });
+
+    expect(patchAiModel).not.toHaveBeenCalled();
+  });
+
+  it("設定中は二重呼び出しを無視する / ignores concurrent calls while setting", async () => {
+    let resolvePatch: (() => void) | null = null;
+    vi.mocked(patchAiModel).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePatch = () => resolve({ ...baseModel, isSystemDefault: true });
+      }) as never,
+    );
+    const refs = createRefs([baseModel]);
+    const { result } = renderHook(() =>
+      useAiModelActions({
+        setModels: refs.setModels as never,
+        setError: refs.setError as never,
+        isMountedRef: refs.isMountedRef as never,
+        originalModelsRef: refs.originalModelsRef as never,
+      }),
+    );
+
+    let first = Promise.resolve();
+    let second = Promise.resolve();
+    await act(async () => {
+      first = result.current.handleSetSystemDefault(baseModel);
+      second = result.current.handleSetSystemDefault(baseModel);
+    });
+
+    expect(patchAiModel).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolvePatch?.();
+      await first;
+      await second;
+    });
   });
 });

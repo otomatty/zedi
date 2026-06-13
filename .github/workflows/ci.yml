@@ -23,9 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -46,9 +46,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -63,18 +63,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
       - uses: ./.github/actions/setup-toolchain
 
-      - run: bunx tsc --noEmit
+      # ルート `tsconfig.json` は `files: []` + project references のため、
+      # `bunx tsc --noEmit`（`-b` なし）はメインフロントエンド `src/` を一切
+      # 型チェックしない（参照プロジェクトは `-b` でしか処理されない）。Issue
+      # #1011 で `tsconfig.app.json` を `strict: true` 化したのに合わせ、`-p` で
+      # 明示してフロントの型エラーを PR で確実に検出する。
+      #
+      # The root `tsconfig.json` uses `files: []` + project references, so a bare
+      # `bunx tsc --noEmit` (without `-b`) type-checks none of the main frontend
+      # `src/` (referenced projects are only processed with `-b`). After Issue
+      # #1011 enabled `strict: true` in `tsconfig.app.json`, point `-p` at it so
+      # frontend type errors are actually caught in PRs.
+      - run: bunx tsc --noEmit -p tsconfig.app.json
 
-      # `bunx tsc --noEmit` 単独はルートの tsconfig（`src/` のみ）しか見ない
-      # ため、workspace パッケージ `@zedi/ui` を別途型チェックする。これを
+      # `tsc --noEmit -p tsconfig.app.json` はルートの tsconfig（`src/` のみ）しか
+      # 見ないため、workspace パッケージ `@zedi/ui` を別途型チェックする。これを
       # 怠ると `packages/ui` だけで起きる型エラー（例: Issue #913 の
       # react-day-picker v10 互換問題）が deploy 時まで気付かれない。
       #
@@ -91,42 +102,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
       - uses: ./.github/actions/setup-toolchain
 
-      - run: bun run test:coverage
-
-      # Workspace package tests are not picked up by the root vitest config,
-      # so run their dedicated configs explicitly. Keep this list in sync with
-      # the `test:run` script in root package.json. server/mcp has its own job
-      # (`mcp-test`); server/hocuspocus is invoked only via `test:run` and not
-      # duplicated here.
-      # ルートの vitest 設定はワークスペース配下のテストを含まないため、
-      # 各パッケージの vitest.config を明示的に実行する。server/mcp は別 job
-      # （`mcp-test`）で動かすためここには含めない。
-      - name: Run admin tests
-        run: bunx vitest run --config admin/vitest.config.ts
-
-      - name: Run @zedi/shared tests
-        run: bunx vitest run --config packages/shared/vitest.config.ts
-
-      - name: Run @zedi/ui tests
-        run: bunx vitest run --config packages/ui/vitest.config.ts
-
-      - name: Run @zedi/claude-sidecar tests
-        run: bunx vitest run --config packages/claude-sidecar/vitest.config.ts
+      # Root workspaces only; standalone server/* jobs run their own coverage below.
+      # ルート配下のワークスペースのみ。server/* は各専用 job で coverage を計測する。
+      - run: node scripts/run-workspace-coverage.mjs
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coverage-report
-          path: coverage/
+          path: |
+            coverage/
+            admin/coverage/
+            packages/shared/coverage/
+            packages/ui/coverage/
+            packages/claude-sidecar/coverage/
           retention-days: 7
 
   build:
@@ -135,9 +133,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -177,45 +175,91 @@ jobs:
 
   e2e-web:
     name: E2E (web)
-    # PDF 知識化フローの Web (非 Tauri) 側を Playwright で守るための job。
-    # 現状は issue #863 で追加した `pdf-knowledge.spec.ts` のみを実行する。
-    # 既存の他 spec (web-clipper, page-editor, ...) は CI 未通過のものが
-    # 混ざっている可能性が高いため、別 PR で順次取り込む。
+    # Web (非 Tauri) 側の Playwright E2E をすべて実行する job (issue #1036)。
+    # 各 spec はバックエンドを起動せず、REST は `page.route`、Hocuspocus は
+    # `page.routeWebSocket`（e2e/support/ 配下のモック基盤）で決定化している。
+    # 管理画面 SPA の spec (admin/e2e) も別ポート (30001) で本 job 内で実行する。
     #
     # Phase 2 (issue #863 follow-up): Tauri デスクトップ E2E は `tauri-driver`
     # を要するため、本 job ではなく専用の job (`e2e-tauri`) として追加予定。
     #
-    # Playwright job guarding the web-side (non-Tauri) of the PDF knowledge
-    # ingestion flow added by #863. Limited to the new `pdf-knowledge.spec.ts`
-    # for now; the existing e2e specs (web-clipper, page-editor, …) have not
-    # been wired into CI before and may regress separately — they are queued
-    # for a follow-up PR rather than risking a noisy first integration.
+    # Runs the full web-side (non-Tauri) Playwright suite (issue #1036). Specs
+    # never talk to a real backend: REST goes through `page.route` and the
+    # Hocuspocus realtime sync through `page.routeWebSocket` (see e2e/support/).
+    # The admin SPA spec (admin/e2e) runs in this job too, on its own port.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
+    # ブラウザ DL / apt が CI ネットワークの不調で停滞しても既定の 6h 待たずに
+    # 失敗させ、install ステップのリトライへ倒すためジョブ全体に上限を設ける。
+    # Cap the whole job so a stalled browser/apt download fails fast (letting the
+    # install step's retry kick in) instead of hanging for the default 6h.
+    timeout-minutes: 20
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
       - uses: ./.github/actions/setup-toolchain
 
-      # Playwright のブラウザバイナリ + 必要な OS 依存を入れる。
-      # Install Playwright's browser binaries plus the matching OS deps.
-      - name: Install Playwright browsers
-        run: bunx playwright install --with-deps chromium
+      # Playwright のブラウザバイナリと OS 依存を入れる。
+      #
+      # Issue #1017: Playwright < 1.60 は Node 24.16+ 上で zip 展開（yauzl）が無限
+      # ハングする既知バグ（microsoft/playwright#40724）を持つ。GitHub ランナー
+      # 画像の Node が 24.16+ に上がった 5 月末以降、本ジョブの install が
+      # `extracting archive` で停止し timeout(exit 124) で恒常的に失敗していた
+      # （ワークフロー自体は不変）。切り分けで、同じ zip はシステムの `unzip` だと
+      # ~3s で展開でき（環境・ディスク・ネットワークは健全）、Playwright の JS 展開
+      # のみが停止することを確認済み。恒久対応は @playwright/test を 1.60 へ更新する
+      # こと（package.json / bun.lock）。本ワークフローはバージョン更新で直る。
+      # 展開を含む install は修正が検証済みの Node(`npx`)で実行する。apt 取得や
+      # 一過性のネットワーク停滞に備え、`--with-deps` ごと timeout + wretry で最大
+      # 3 回リトライする（checkout と同じ wretry.action。apt も retry 対象に含める）。
+      #
+      # Playwright <1.60 hangs forever unzipping (yauzl) on Node 24.16+
+      # (microsoft/playwright#40724). When the GitHub runner image moved to Node
+      # 24.16+ in late May, this job's install began stalling at `extracting
+      # archive` and failing with exit 124 — the workflow itself never changed.
+      # Isolation confirmed the same zip extracts in ~3s with the system `unzip`
+      # (env/disk/network all healthy); only Playwright's JS extraction hangs.
+      # The permanent fix is bumping @playwright/test to 1.60 (package.json /
+      # bun.lock). Run the install (which does the extraction) under Node via
+      # npx; keep apt deps inside `--with-deps` so the whole step (apt + browser
+      # download/extract) stays under wretry's bounded retry on transient stalls.
+      - name: Install Playwright browsers (with retry)
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
+        with:
+          command: timeout 300 npx playwright install --with-deps chromium
+          attempt_limit: 3
+          attempt_delay: 10000
 
-      - name: Run PDF knowledge E2E
-        run: bunx playwright test e2e/pdf-knowledge.spec.ts
+      - name: Run web E2E
+        run: bunx playwright test
+
+      - name: Run admin E2E
+        # 管理画面はルートとは別の Vite サーバ (ポート 30001) を webServer として
+        # 起動するため、web 側と直列でも衝突しない。
+        # The admin config boots its own Vite server on port 30001, so it can
+        # run after the web suite without port conflicts.
+        if: always()
+        run: bunx playwright test --config admin/playwright.config.ts
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: playwright-report-pdf-knowledge
+          name: playwright-report-web
           path: playwright-report/
+          retention-days: 7
+
+      - name: Upload admin Playwright report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-report-admin
+          path: admin/playwright-report/
           retention-days: 7
 
   api-typecheck:
@@ -224,9 +268,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -241,6 +285,44 @@ jobs:
       - name: Type check
         working-directory: server/api
         run: bunx tsc --noEmit
+
+  api-test:
+    name: API Tests
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
+        with:
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          # server/api 配下で個別に install するため、ルートの install は不要。
+          # The job installs deps inside server/api instead of the root.
+          install-deps: "false"
+
+      # server/api はルートの Bun workspace に含まれないため、テストの前に
+      # ローカルで依存関係をインストールする (api-typecheck / mcp-test と同じ構成)。
+      # server/api is not part of the root Bun workspace; install its
+      # dependencies locally before running the vitest suite.
+      - name: Install API dependencies
+        working-directory: server/api
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        working-directory: server/api
+        run: bunx vitest run --coverage
+
+      - name: Upload API coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-report-api
+          path: server/api/coverage/
+          retention-days: 7
 
   drizzle-migration-check:
     name: Drizzle Migration Check
@@ -258,9 +340,9 @@ jobs:
       # PR ベースとの diff を取るため履歴を全部取得する。
       # Need full history so the script can diff against the PR base.
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           with: |
             fetch-depth: 0
           attempt_limit: 3
@@ -295,9 +377,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -319,9 +401,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -345,7 +427,53 @@ jobs:
 
       - name: Run tests
         working-directory: server/mcp
-        run: bun run test
+        run: bun run test:coverage
+
+      - name: Upload MCP coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-report-mcp
+          path: server/mcp/coverage/
+          retention-days: 7
+
+  hocuspocus-test:
+    name: Hocuspocus Server Tests
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
+        with:
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+          attempt_limit: 3
+          attempt_delay: 5000
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          # server/hocuspocus 配下で個別に install するため、ルートの install は不要。
+          # The job installs deps inside server/hocuspocus instead of the root.
+          install-deps: "false"
+
+      # server/hocuspocus はルートの Bun workspace に含まれないため、
+      # テストの前にローカルで依存関係をインストールする。
+      # server/hocuspocus is not part of the root Bun workspace; install its
+      # dependencies locally before running the vitest suite.
+      - name: Install Hocuspocus dependencies
+        working-directory: server/hocuspocus
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        working-directory: server/hocuspocus
+        run: bun run test:coverage
+
+      - name: Upload Hocuspocus coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-report-hocuspocus
+          path: server/hocuspocus/coverage/
+          retention-days: 7
 
   mutation-light:
     name: Mutation (light)
@@ -357,9 +485,9 @@ jobs:
         run: echo "MUTATION_START=$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -377,7 +505,7 @@ jobs:
 
       - name: Upload mutation report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: mutation-report
           path: reports/mutation/
@@ -397,9 +525,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
           with: |
             fetch-depth: 0
           attempt_limit: 3
@@ -416,6 +544,6 @@ jobs:
       # Detect accidentally committed secrets (API keys, private keys, tokens).
       # 誤ってコミットされた秘密情報（API キー、秘密鍵、トークン）を検出する。
       - name: Detect secrets (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

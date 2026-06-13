@@ -66,6 +66,7 @@ function fakeContext(): GraphContext {
     db: {} as Database,
     feature: "wiki_compose:research",
     userEmail: null,
+    contentLocale: "ja",
   };
 }
 
@@ -100,7 +101,7 @@ describe("researchLoopSubgraph — interrupt at human_review_research", () => {
     wikiSearch.mockImplementation(async () => ({ pendingSources: [] }));
     fetchArticles.mockImplementation(async () => ({ pendingSources: [] }));
     evaluateSufficiency.mockImplementation(async (state, _c) => ({
-      lastEvaluation: { score: 0.9, rationale: "ok", missingAspects: [] },
+      lastEvaluation: { score: 0.9, sufficient: true, rationale: "ok", missingAspects: [] },
       iteration: state.iteration + 1,
       phase: "research:evaluated",
     }));

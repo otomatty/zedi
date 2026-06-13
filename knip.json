@@ -98,7 +98,6 @@
     "aws-jwt-verify",
     "ioredis",
     "@types/sql.js",
-    "@types/uuid",
     "@vitejs/plugin-react",
     "wrangler",
     "@tauri-apps/plugin-shell",
@@ -106,7 +105,8 @@
     "@tauri-apps/plugin-updater",
     "@langchain/openai",
     "@langchain/anthropic",
-    "@langchain/google-genai"
+    "@langchain/google-genai",
+    "@vitest/coverage-v8"
   ],
   "ignoreExportsUsedInFile": {
     "interface": true,

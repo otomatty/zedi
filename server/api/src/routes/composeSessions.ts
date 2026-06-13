@@ -16,9 +16,9 @@
  *
  * `wiki-compose-research` (#949 / P1):
  * - `POST /run` body.input shapes:
- *   - Initial run: `{ messages?: [...], maxIterations?: number }` (or any
+ *   - Initial run: `{ messages?: [...] }` (or any
  *     object; the graph reads `state.messages` set by LangGraph from
- *     `body.input`).
+ *     `body.input`). Research depth is decided autonomously by the evaluator LLM.
  *   - Additional research (re-run on a *new* session of the same graph id):
  *     `{ kind: "additional_research", instruction: string, brief?: string,
  *        carryOverApprovedIds?: string[] }`
@@ -57,13 +57,21 @@ import {
 import { assertComposeBackendReady } from "../agents/core/composeBackendValidation.js";
 import { SSE_EVENT_NAMES, type SseEvent } from "../agents/core/types/sseEvents.js";
 import { GRAPH_CONTEXT_CONFIG_KEY } from "../agents/core/types/graphContext.js";
-import { resolveCheckpointerForRun } from "../agents/core/checkpoint/index.js";
+import {
+  clearComposeThreadCheckpoint,
+  resolveCheckpointerForRun,
+} from "../agents/core/checkpoint/index.js";
 import { RESEARCH_GRAPH_ID } from "../agents/subgraphs/research/index.js";
 import { WIKI_COMPOSE_GRAPH_ID } from "../agents/graphs/wikiCompose/index.js";
 import { WIKI_MAINTENANCE_GRAPH_ID } from "../agents/graphs/wikiMaintenance/index.js";
+import type { ComposeContentLocale } from "../agents/core/composeLocale.js";
 import type { AppEnv } from "../types/index.js";
 import { persistOutcomeIfStillRunning } from "./composeSessionPersistence.js";
 import { loadComposeSessionProjection } from "./composeSessionProjection.js";
+import {
+  prepareComposeRunFromRequest,
+  resolveComposeSessionContentLocale,
+} from "./composeSessionRunLocale.js";
 
 /**
  * Translate the documented `body.input.kind === "additional_research"` shape
@@ -112,6 +120,33 @@ function recursionLimitFor(graphId: string): number | undefined {
   if (graphId === WIKI_COMPOSE_GRAPH_ID) return 120;
   if (graphId === WIKI_MAINTENANCE_GRAPH_ID) return 40;
   return undefined;
+}
+
+/** Build {@link GraphContext} for a compose session run / projection. */
+function buildComposeGraphContext(args: {
+  sessionId: string;
+  userId: string;
+  userEmail: string | null;
+  pageId: string;
+  graphId: string;
+  backend: ReturnType<typeof assertSupportedComposeBackend>;
+  tier: Awaited<ReturnType<typeof getUserTier>>;
+  db: AppEnv["Variables"]["db"];
+  contentLocale: ComposeContentLocale;
+}): import("../agents/core/types/graphContext.js").GraphContext {
+  return {
+    threadId: args.sessionId,
+    sessionId: args.sessionId,
+    userId: args.userId,
+    userEmail: args.userEmail,
+    pageId: args.pageId,
+    graphId: args.graphId,
+    backend: args.backend,
+    tier: args.tier,
+    db: args.db,
+    feature: `wiki_compose:${args.graphId}`,
+    contentLocale: args.contentLocale,
+  };
 }
 
 const app = new Hono<AppEnv>();
@@ -218,6 +253,12 @@ app.get("/:pageId/compose-sessions/:id", authRequired, async (c) => {
   if (!row) throw new HTTPException(404, { message: "Session not found" });
 
   const tier = await getUserTier(userId, db);
+  const contentLocale = resolveComposeSessionContentLocale(
+    row.metadata,
+    null,
+    c.req.header("accept-language"),
+    "ja",
+  );
 
   // Stale / unsupported backend rows must still be readable; skip projection
   // instead of turning GET into a 500 (CodeRabbit P1 on reload path).
@@ -231,8 +272,7 @@ app.get("/:pageId/compose-sessions/:id", authRequired, async (c) => {
       graphId: row.graphId,
       status: row.status,
       phase: row.phase,
-      context: {
-        threadId: row.id,
+      context: buildComposeGraphContext({
         sessionId: row.id,
         userId,
         userEmail: c.get("userEmail") ?? null,
@@ -241,8 +281,8 @@ app.get("/:pageId/compose-sessions/:id", authRequired, async (c) => {
         backend,
         tier,
         db,
-        feature: `wiki_compose:${row.graphId}`,
-      },
+        contentLocale,
+      }),
     });
   } catch (err) {
     if (!(err instanceof UnsupportedBackendError)) {
@@ -305,11 +345,27 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
     throw err;
   }
 
-  // Atomically claim the session so concurrent POST /run cannot both pass a
-  // read-then-write race and double-bill LLM usage.
+  const {
+    contentLocale,
+    graphInput,
+    metadataUpdate: metadataWithLocale,
+  } = prepareComposeRunFromRequest(
+    session.metadata,
+    body.input,
+    c.req.header("accept-language"),
+    "ja",
+  );
+
+  // Atomically claim the session (and persist `contentLocale` when needed) so
+  // concurrent POST /run cannot double-bill and a failed follow-up write cannot
+  // leave the row stuck in `running` without metadata.
   const [claimed] = await db
     .update(wikiComposeSessions)
-    .set({ status: "running" satisfies WikiComposeSessionStatus, updatedAt: new Date() })
+    .set({
+      status: "running" satisfies WikiComposeSessionStatus,
+      updatedAt: new Date(),
+      ...(metadataWithLocale ? { metadata: metadataWithLocale } : {}),
+    })
     .where(
       and(
         eq(wikiComposeSessions.id, id),
@@ -359,6 +415,9 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
     // checkpoint 保存・再開を有効化する。テスト / CI では未設定なので `false`
     // を返し、LangGraph の checkpoint 機構を無効化したまま smoke-test で走る。
     const checkpointer = await resolveCheckpointerForRun();
+    if (session.status === "failed") {
+      await clearComposeThreadCheckpoint(id, checkpointer);
+    }
 
     try {
       await send(startedEvent(id, session.graphId, session.phase));
@@ -369,8 +428,7 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
           graphId: session.graphId,
           checkpointer,
           ...(recursionLimit !== undefined ? { recursionLimit } : {}),
-          context: {
-            threadId: id,
+          context: buildComposeGraphContext({
             sessionId: id,
             userId,
             userEmail,
@@ -379,10 +437,10 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
             backend: assertSupportedComposeBackend(session.backend),
             tier,
             db,
-            feature: `wiki_compose:${session.graphId}`,
-          },
+            contentLocale,
+          }),
         },
-        { kind: "input", value: translateGraphInput(session.graphId, body.input ?? {}) },
+        { kind: "input", value: translateGraphInput(session.graphId, graphInput) },
       );
 
       for await (const raw of events) {
@@ -494,6 +552,12 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
   // Resume relies on the checkpointer to fetch the suspended thread; production
   // routes load `PostgresSaver` here, tests/smoke runs get `false`.
   const checkpointer = await resolveCheckpointerForRun();
+  const contentLocale = resolveComposeSessionContentLocale(
+    session.metadata,
+    null,
+    c.req.header("accept-language"),
+    "ja",
+  );
 
   let result;
   try {
@@ -503,8 +567,7 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
         graphId: session.graphId,
         checkpointer,
         ...(recursionLimit !== undefined ? { recursionLimit } : {}),
-        context: {
-          threadId: id,
+        context: buildComposeGraphContext({
           sessionId: id,
           userId,
           userEmail,
@@ -513,8 +576,8 @@ app.patch("/:pageId/compose-sessions/:id/resume", authRequired, rateLimit(), asy
           backend: assertSupportedComposeBackend(session.backend),
           tier,
           db,
-          feature: `wiki_compose:${session.graphId}`,
-        },
+          contentLocale,
+        }),
       },
       body.resume,
     );
