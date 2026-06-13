@@ -63,11 +63,32 @@ describe("GoogleDriveProvider", () => {
 
       expect(url).toBe("https://drive.google.com/uc?export=view&id=file-1");
       const [uploadUrl, uploadOpts] = fetchMock.mock.calls[0];
-      expect(uploadUrl).toContain("uploadType=multipart");
+      expect(uploadUrl).toBe(
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink",
+      );
+      expect(uploadOpts.method).toBe("POST");
       expect(uploadOpts.headers.Authorization).toBe("Bearer access-token");
-      expect(uploadOpts.body).toContain('"name":"pic.png"');
-      // 2回目は permissions エンドポイント
-      expect(fetchMock.mock.calls[1][0]).toContain("/permissions");
+      expect(uploadOpts.headers["Content-Type"]).toBe(
+        "multipart/related; boundary=zedi_upload_boundary",
+      );
+      // マルチパートボディの構造（区切り・Content-Type・base64・終端）
+      const body = uploadOpts.body as string;
+      expect(body).toContain("\r\n--zedi_upload_boundary\r\n");
+      expect(body).toContain("Content-Type: application/json; charset=UTF-8");
+      expect(body).toContain('"name":"pic.png"');
+      expect(body).toContain('"mimeType":"image/png"');
+      expect(body).toContain("Content-Type: image/png");
+      expect(body).toContain("Content-Transfer-Encoding: base64");
+      expect(body).toContain("AQID"); // btoa of bytes [1,2,3]
+      expect(body.endsWith("\r\n--zedi_upload_boundary--")).toBe(true);
+
+      // 2回目: ファイルを公開する permissions リクエスト
+      const [permUrl, permOpts] = fetchMock.mock.calls[1];
+      expect(permUrl).toBe("https://www.googleapis.com/drive/v3/files/file-1/permissions");
+      expect(permOpts.method).toBe("POST");
+      expect(permOpts.headers.Authorization).toBe("Bearer access-token");
+      expect(permOpts.headers["Content-Type"]).toBe("application/json");
+      expect(JSON.parse(permOpts.body)).toEqual({ role: "reader", type: "anyone" });
     });
 
     it("folderId が指定されると metadata.parents に反映される", async () => {
@@ -93,8 +114,28 @@ describe("GoogleDriveProvider", () => {
 
       expect(url).toBe("https://drive.google.com/uc?export=view&id=file-3");
       expect(fetchMock).toHaveBeenCalledTimes(4);
+      // 2回目: トークンリフレッシュのリクエスト内容
+      const [refreshUrl, refreshOpts] = fetchMock.mock.calls[1];
+      expect(refreshUrl).toBe("https://oauth2.googleapis.com/token");
+      expect(refreshOpts.method).toBe("POST");
+      const refreshBody = refreshOpts.body.toString();
+      expect(refreshBody).toContain("grant_type=refresh_token");
+      expect(refreshBody).toContain("client_id=client-id");
+      expect(refreshBody).toContain("client_secret=client-secret");
+      expect(refreshBody).toContain("refresh_token=refresh-token");
       // リフレッシュ後の再試行は新トークンを使う
       expect(fetchMock.mock.calls[2][1].headers.Authorization).toBe("Bearer new-token");
+    });
+
+    it("401 後のトークンリフレッシュに失敗した場合はエラーを throw する", async () => {
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse({}, { ok: false, status: 401 })) // upload -> 401
+        .mockResolvedValueOnce(jsonResponse({}, { ok: false, status: 400 })); // refresh fails
+      const provider = new GoogleDriveProvider(config);
+
+      await expect(provider.uploadImage(file, { fileName: "pic.png" })).rejects.toThrow(
+        "Failed to refresh access token",
+      );
     });
 
     it("リフレッシュトークンが無く 401 の場合はエラーを throw する", async () => {
@@ -126,7 +167,7 @@ describe("GoogleDriveProvider", () => {
 
       await expect(
         provider.uploadImage(file, { fileName: "pic.png", signal: controller.signal }),
-      ).rejects.toMatchObject({ name: "AbortError" });
+      ).rejects.toMatchObject({ name: "AbortError", message: "Image upload aborted" });
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });
@@ -149,6 +190,7 @@ describe("GoogleDriveProvider", () => {
       const [delUrl, delOpts] = fetchMock.mock.calls[0];
       expect(delUrl).toBe("https://www.googleapis.com/drive/v3/files/file-9");
       expect(delOpts.method).toBe("DELETE");
+      expect(delOpts.headers.Authorization).toBe("Bearer access-token");
     });
 
     it("404 は成功扱いで throw しない", async () => {
@@ -179,6 +221,19 @@ describe("GoogleDriveProvider", () => {
 
       expect(result.success).toBe(true);
       expect(result.message).toContain("me@example.com");
+      expect(fetchMock.mock.calls[0][0]).toBe(
+        "https://www.googleapis.com/drive/v3/about?fields=user",
+      );
+      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer access-token");
+    });
+
+    it("ok だが user 情報が無い場合も成功を返す（optional chaining）", async () => {
+      fetchMock.mockResolvedValue(jsonResponse({}));
+      const provider = new GoogleDriveProvider(config);
+
+      const result = await provider.testConnection();
+
+      expect(result.success).toBe(true);
     });
 
     it("401 かつ refreshToken ありでリフレッシュ成功なら成功を返す", async () => {
@@ -230,13 +285,16 @@ describe("GoogleDriveProvider", () => {
     it("getAuthUrl は必要なパラメータを含む", () => {
       const url = GoogleDriveProvider.getAuthUrl("cid", "https://app/cb");
 
+      expect(url.startsWith("https://accounts.google.com/o/oauth2/v2/auth?")).toBe(true);
       expect(url).toContain("client_id=cid");
       expect(url).toContain("redirect_uri=https%3A%2F%2Fapp%2Fcb");
+      expect(url).toContain("response_type=code");
+      expect(url).toContain("scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fdrive.file");
       expect(url).toContain("access_type=offline");
       expect(url).toContain("prompt=consent");
     });
 
-    it("exchangeCodeForTokens は成功時にトークンを返す", async () => {
+    it("exchangeCodeForTokens は成功時にトークンを返し、正しい body を送る", async () => {
       fetchMock.mockResolvedValue(jsonResponse({ access_token: "at", refresh_token: "rt" }));
 
       const tokens = await GoogleDriveProvider.exchangeCodeForTokens(
@@ -247,6 +305,13 @@ describe("GoogleDriveProvider", () => {
       );
 
       expect(tokens).toEqual({ accessToken: "at", refreshToken: "rt" });
+      const [tokenUrl, tokenOpts] = fetchMock.mock.calls[0];
+      expect(tokenUrl).toBe("https://oauth2.googleapis.com/token");
+      const tokenBody = tokenOpts.body.toString();
+      expect(tokenBody).toContain("grant_type=authorization_code");
+      expect(tokenBody).toContain("code=code");
+      expect(tokenBody).toContain("client_id=cid");
+      expect(tokenBody).toContain("redirect_uri=https%3A%2F%2Fapp%2Fcb");
     });
 
     it("exchangeCodeForTokens は失敗時に throw する", async () => {
