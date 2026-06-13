@@ -57,7 +57,10 @@ import {
 import { assertComposeBackendReady } from "../agents/core/composeBackendValidation.js";
 import { SSE_EVENT_NAMES, type SseEvent } from "../agents/core/types/sseEvents.js";
 import { GRAPH_CONTEXT_CONFIG_KEY } from "../agents/core/types/graphContext.js";
-import { resolveCheckpointerForRun } from "../agents/core/checkpoint/index.js";
+import {
+  clearComposeThreadCheckpoint,
+  resolveCheckpointerForRun,
+} from "../agents/core/checkpoint/index.js";
 import { RESEARCH_GRAPH_ID } from "../agents/subgraphs/research/index.js";
 import { WIKI_COMPOSE_GRAPH_ID } from "../agents/graphs/wikiCompose/index.js";
 import { WIKI_MAINTENANCE_GRAPH_ID } from "../agents/graphs/wikiMaintenance/index.js";
@@ -412,6 +415,9 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
     // checkpoint 保存・再開を有効化する。テスト / CI では未設定なので `false`
     // を返し、LangGraph の checkpoint 機構を無効化したまま smoke-test で走る。
     const checkpointer = await resolveCheckpointerForRun();
+    if (session.status === "failed") {
+      await clearComposeThreadCheckpoint(id, checkpointer);
+    }
 
     try {
       await send(startedEvent(id, session.graphId, session.phase));
