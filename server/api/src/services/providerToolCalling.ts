@@ -146,42 +146,59 @@ export function parseAnthropicToolCalls(
   return parsed;
 }
 
+/** Options for {@link buildGoogleToolRequest}. */
+export interface GoogleToolRequestOptions {
+  /** When true, include Gemini built-in `googleSearch` alongside function tools. */
+  useGoogleSearch?: boolean;
+}
+
 /**
  * Build Gemini `generateContent` tool fields.
  *
  * @param tools - Normalized function tools.
  * @param toolChoice - Optional tool-choice hint.
+ * @param options - Optional built-in tool flags (e.g. `useGoogleSearch`).
  */
 export function buildGoogleToolRequest(
   tools: NormalizedFunctionTool[],
   toolChoice?: ZediToolChoice,
+  options?: GoogleToolRequestOptions,
 ): Record<string, unknown> {
   if (tools.length === 0) return {};
+  const googleTools: Record<string, unknown>[] = [
+    {
+      functionDeclarations: tools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters,
+      })),
+    },
+  ];
+  if (options?.useGoogleSearch) {
+    googleTools.push({ googleSearch: {} });
+  }
+
   const payload: Record<string, unknown> = {
-    tools: [
-      {
-        functionDeclarations: tools.map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.parameters,
-        })),
-      },
-    ],
+    tools: googleTools,
   };
+
+  const toolConfig: Record<string, unknown> = {};
   if (typeof toolChoice === "object" && toolChoice.type === "function") {
-    payload.toolConfig = {
-      functionCallingConfig: {
-        mode: "ANY",
-        allowedFunctionNames: [toolChoice.function.name],
-      },
+    toolConfig.functionCallingConfig = {
+      mode: "ANY",
+      allowedFunctionNames: [toolChoice.function.name],
     };
   } else if (toolChoice === "required") {
-    payload.toolConfig = {
-      functionCallingConfig: {
-        mode: "ANY",
-        allowedFunctionNames: tools.map((tool) => tool.name),
-      },
+    toolConfig.functionCallingConfig = {
+      mode: "ANY",
+      allowedFunctionNames: tools.map((tool) => tool.name),
     };
+  }
+  if (options?.useGoogleSearch) {
+    toolConfig.includeServerSideToolInvocations = true;
+  }
+  if (Object.keys(toolConfig).length > 0) {
+    payload.toolConfig = toolConfig;
   }
   return payload;
 }

@@ -99,4 +99,25 @@ describe("buildGoogleToolRequest", () => {
       },
     });
   });
+
+  it("keeps googleSearch when function tools and useGoogleSearch are both set", () => {
+    const payload = buildGoogleToolRequest(normalizeFunctionTools(sampleTools), undefined, {
+      useGoogleSearch: true,
+    });
+    expect(payload.tools).toEqual([
+      {
+        functionDeclarations: [
+          {
+            name: "structure_dialogue",
+            description: "Propose an outline",
+            parameters: sampleTools[0]?.function.parameters,
+          },
+        ],
+      },
+      { googleSearch: {} },
+    ]);
+    expect(payload.toolConfig).toEqual({
+      includeServerSideToolInvocations: true,
+    });
+  });
 });

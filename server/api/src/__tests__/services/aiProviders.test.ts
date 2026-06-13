@@ -332,6 +332,59 @@ describe("callGoogle", () => {
     });
   });
 
+  it("keeps googleSearch when structured-output function tools are also set", async () => {
+    fetchSpy.mockResolvedValue(
+      okJson({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  functionCall: {
+                    name: "web_search_results",
+                    args: {
+                      results: [{ title: "Example", url: "https://example.com" }],
+                    },
+                  },
+                },
+              ],
+            },
+            finishReason: "STOP",
+          },
+        ],
+        usageMetadata: { promptTokenCount: 4, candidatesTokenCount: 6 },
+      }),
+    );
+
+    await callGoogle("k", "gemini-2.0", messages, {
+      useGoogleSearch: true,
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "web_search_results",
+            description: "Web search hits",
+            parameters: { type: "object", properties: {} },
+          },
+        },
+      ],
+    });
+
+    const body = JSON.parse(String((fetchSpy.mock.calls[0]?.[1] as RequestInit).body)) as {
+      tools?: unknown[];
+      toolConfig?: { includeServerSideToolInvocations?: boolean };
+    };
+    expect(body.tools).toEqual([
+      {
+        functionDeclarations: [
+          expect.objectContaining({ name: "web_search_results" }),
+        ],
+      },
+      { googleSearch: {} },
+    ]);
+    expect(body.toolConfig?.includeServerSideToolInvocations).toBe(true);
+  });
+
   it("throws on non-200", async () => {
     fetchSpy.mockResolvedValue(new Response("oops", { status: 503 }));
     await expect(callGoogle("k", "gemini-2.0", messages)).rejects.toThrow(/503/);
