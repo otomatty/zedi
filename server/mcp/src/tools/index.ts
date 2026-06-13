@@ -225,7 +225,9 @@ export function registerAllTools(server: McpServer, client: ZediClient): void {
     {
       title: "Remove page from note",
       description:
-        "Removes a page from a note. The page itself is not deleted, only the linkage is removed.",
+        "Soft-deletes a page that belongs to the note (same as DELETE /api/notes/:noteId/pages/:pageId). " +
+        "There is no unlink-only mode after issue #823 — the page is marked deleted. " +
+        "Use zedi_delete_page when you intend to delete a page by id.",
       inputSchema: { note_id: z.string().min(1), page_id: z.string().min(1) },
     },
     async (args) =>
