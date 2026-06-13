@@ -117,6 +117,52 @@ describe("callOpenAI", () => {
     await expect(callOpenAI("k", "gpt-4o", messages)).rejects.toThrow(/429/);
   });
 
+  it("sends tools and parses tool_calls from the response", async () => {
+    fetchSpy.mockResolvedValue(
+      okJson({
+        choices: [
+          {
+            message: {
+              content: "",
+              tool_calls: [
+                {
+                  id: "call_1",
+                  function: {
+                    name: "brief_dialogue",
+                    arguments: JSON.stringify({ questions: [] }),
+                  },
+                },
+              ],
+            },
+            finish_reason: "tool_calls",
+          },
+        ],
+        usage: { prompt_tokens: 5, completion_tokens: 7 },
+      }),
+    );
+
+    const result = await callOpenAI("k", "gpt-4o", messages, {
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "brief_dialogue",
+            description: "Ask brief questions",
+            parameters: { type: "object", properties: {} },
+          },
+        },
+      ],
+    });
+
+    const body = JSON.parse(String((fetchSpy.mock.calls[0]?.[1] as RequestInit).body)) as {
+      tools?: unknown[];
+    };
+    expect(body.tools).toHaveLength(1);
+    expect(result.toolCalls).toEqual([
+      { id: "call_1", name: "brief_dialogue", args: { questions: [] } },
+    ]);
+  });
+
   it("returns empty content / 0 tokens when fields are missing", async () => {
     fetchSpy.mockResolvedValue(okJson({ choices: [], usage: undefined }));
     const result = await callOpenAI("k", "gpt-4o", messages);
@@ -237,6 +283,53 @@ describe("callGoogle", () => {
       tools?: unknown[];
     };
     expect(body.tools).toEqual([{ googleSearch: {} }]);
+  });
+
+  it("sends functionDeclarations and parses functionCall parts", async () => {
+    fetchSpy.mockResolvedValue(
+      okJson({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  functionCall: {
+                    name: "structure_dialogue",
+                    args: {
+                      sections: [{ heading: "A", intent: "B", depth: 1 }],
+                    },
+                  },
+                },
+              ],
+            },
+            finishReason: "STOP",
+          },
+        ],
+        usageMetadata: { promptTokenCount: 8, candidatesTokenCount: 12 },
+      }),
+    );
+
+    const result = await callGoogle("k", "gemini-2.0", messages, {
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "structure_dialogue",
+            description: "Outline",
+            parameters: { type: "object", properties: {} },
+          },
+        },
+      ],
+    });
+
+    const body = JSON.parse(String((fetchSpy.mock.calls[0]?.[1] as RequestInit).body)) as {
+      tools?: Array<{ functionDeclarations?: unknown[] }>;
+    };
+    expect(body.tools?.[0]?.functionDeclarations).toHaveLength(1);
+    expect(result.toolCalls?.[0]?.name).toBe("structure_dialogue");
+    expect(result.toolCalls?.[0]?.args).toEqual({
+      sections: [{ heading: "A", intent: "B", depth: 1 }],
+    });
   });
 
   it("throws on non-200", async () => {
