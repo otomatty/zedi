@@ -5,17 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Eye, PencilLine, X } from "lucide-react";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  Button,
-  cn,
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-  useIsMobile,
-} from "@zedi/ui";
+import { Alert, AlertDescription, AlertTitle, Button, cn, useIsMobile } from "@zedi/ui";
 import { useWikiComposeSession, type ComposePhase } from "@/hooks/wiki/useWikiComposeSession";
 import { COMPOSE_SEED_STATE_KEY, type ComposeNavigationSeed } from "@/lib/wikiCompose/navigation";
 import type { ComposeMode, DraftedSection } from "@/lib/wikiCompose/types";
@@ -72,14 +62,18 @@ const MOBILE_TAB_BASE =
 const ComposePaneTabs: React.FC<{
   view: MobileComposeView;
   onChange: (view: MobileComposeView) => void;
-}> = ({ view, onChange }) => {
+  className?: string;
+}> = ({ view, onChange, className }) => {
   const { t } = useTranslation();
   return (
     <div
       data-testid="compose-mobile-tabs"
       role="tablist"
       aria-label={t("wikiCompose.page.paneSwitchAria")}
-      className="border-border bg-background/95 flex items-center gap-1 border-b px-2 py-1.5"
+      className={cn(
+        "border-border bg-background/95 flex items-center gap-1 border-b px-2 py-1.5",
+        className,
+      )}
     >
       <button
         type="button"
@@ -339,35 +333,54 @@ const WikiComposePage: React.FC = () => {
           ) : null}
         </div>
       ) : null}
-      {isMobile ? (
-        <>
-          <ComposePaneTabs view={mobileView} onChange={setMobileView} />
-          <div className="min-h-0 flex-1">
-            {/* Keep both panes mounted (toggle with `hidden`) so in-progress
-                Brief answers and outline edits survive tab switches.
-                両ペインをマウントしたまま `hidden` で切替え、入力途中の
-                Brief 回答やアウトライン編集をタブ切替で失わないようにする。 */}
-            <div className={cn("h-full", mobileView === "preview" ? "block" : "hidden")}>
-              {left}
-            </div>
-            <div className={cn("h-full", mobileView === "compose" ? "block" : "hidden")}>
-              {right}
-            </div>
-          </div>
-        </>
-      ) : (
-        <div className="min-h-0 flex-1">
-          <ResizablePanelGroup direction="horizontal" className="h-full">
-            <ResizablePanel defaultSize={55} minSize={30}>
-              {left}
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={45} minSize={25}>
-              {right}
-            </ResizablePanel>
-          </ResizablePanelGroup>
+      {/* Keep the tab bar in the tree (hidden on desktop) so toggling
+          `useIsMobile` does not shift the pane shell's sibling index and
+          remount in-progress form state.
+          デスクトップでは非表示にしつつ DOM 上の位置を固定し、ブレークポイント
+          切替でペインが再マウントされないようにする。 */}
+      <ComposePaneTabs
+        view={mobileView}
+        onChange={setMobileView}
+        className={cn(!isMobile && "hidden")}
+      />
+      <div
+        className={cn(
+          "min-h-0 flex-1",
+          isMobile ? "relative" : "grid grid-cols-[minmax(0,55fr)_minmax(0,45fr)]",
+        )}
+      >
+        {/* Keep a single stable wrapper tree for both breakpoints so
+            `useIsMobile` flips (e.g. phone rotation past 768px) do not
+            remount `EditorPane` / `ComposePanel` and wipe in-progress Brief
+            answers or outline edits. Mobile uses full-bleed overlays; desktop
+            uses a fixed split grid with optional drag resize below.
+            ブレークポイントをまたいでも同一ラッパー木を維持し、回転などで
+            `useIsMobile` が切り替わっても入力途中の状態を失わない。 */}
+        <div
+          className={cn(
+            "h-full min-h-0 overflow-hidden",
+            isMobile &&
+              cn(
+                "absolute inset-0",
+                mobileView === "preview" ? "visible z-10" : "pointer-events-none invisible z-0",
+              ),
+          )}
+        >
+          {left}
         </div>
-      )}
+        <div
+          className={cn(
+            "h-full min-h-0 overflow-hidden",
+            isMobile &&
+              cn(
+                "absolute inset-0",
+                mobileView === "compose" ? "visible z-10" : "pointer-events-none invisible z-0",
+              ),
+          )}
+        >
+          {right}
+        </div>
+      </div>
     </div>
   );
 };

@@ -2,7 +2,7 @@
  * WikiComposePage: route wiring, header actions, session error retry, layout direction.
  * WikiComposePage: ルート配線、ヘッダー操作、セッションエラー再試行、レイアウト方向。
  */
-import React from "react";
+import React, { useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -92,19 +92,57 @@ vi.mock("@zedi/ui", async (importOriginal) => {
   };
 });
 
+const paneMountCounts = vi.hoisted(() => ({ editor: 0, compose: 0 }));
+
+function CountingPane({
+  pane,
+  testId,
+  label,
+}: {
+  pane: "editor" | "compose";
+  testId: string;
+  label: string;
+}) {
+  React.useEffect(() => {
+    paneMountCounts[pane] += 1;
+  }, [pane]);
+  return <div data-testid={testId}>{label}</div>;
+}
+
 vi.mock("@/components/wikiCompose/EditorPane", () => ({
-  EditorPane: () => <div data-testid="editor-pane">EditorPane</div>,
+  EditorPane: () => <CountingPane pane="editor" testId="editor-pane" label="EditorPane" />,
 }));
 
 vi.mock("@/components/wikiCompose/ComposePanel", () => ({
-  ComposePanel: () => <div data-testid="compose-panel">ComposePanel</div>,
+  ComposePanel: () => <CountingPane pane="compose" testId="compose-panel" label="ComposePanel" />,
 }));
 
-function renderWikiCompose(initialPath = "/notes/note-1/page-1/compose") {
+function WikiComposeHarness({ isMobile }: { isMobile: boolean }) {
+  vi.mocked(useIsMobile).mockReturnValue(isMobile);
+  return <WikiComposePage />;
+}
+
+function MobileFlipHarness() {
+  const [isMobile, setIsMobile] = useState(true);
+  vi.mocked(useIsMobile).mockReturnValue(isMobile);
+  return (
+    <>
+      <button type="button" data-testid="flip-mobile" onClick={() => setIsMobile(false)}>
+        desktop
+      </button>
+      <WikiComposePage />
+    </>
+  );
+}
+
+function renderWikiCompose(initialPath = "/notes/note-1/page-1/compose", isMobile = false) {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
-        <Route path="/notes/:noteId/:pageId/compose/:sessionId?" element={<WikiComposePage />} />
+        <Route
+          path="/notes/:noteId/:pageId/compose/:sessionId?"
+          element={<WikiComposeHarness isMobile={isMobile} />}
+        />
       </Routes>
     </MemoryRouter>,
   );
@@ -113,6 +151,8 @@ function renderWikiCompose(initialPath = "/notes/note-1/page-1/compose") {
 describe("WikiComposePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    paneMountCounts.editor = 0;
+    paneMountCounts.compose = 0;
     mockUseParams.mockReturnValue({
       noteId: "note-1",
       pageId: "page-1",
@@ -305,37 +345,52 @@ describe("WikiComposePage", () => {
   });
 
   describe("layout direction", () => {
-    it("uses a horizontal panel group and no mobile tabs on desktop", () => {
+    it("shows both panes and no mobile tabs on desktop", () => {
       vi.mocked(useIsMobile).mockReturnValue(false);
 
       renderWikiCompose();
 
-      expect(screen.getByTestId("resizable-panel-group")).toHaveAttribute(
-        "data-direction",
-        "horizontal",
-      );
-      expect(screen.queryByTestId("compose-mobile-tabs")).not.toBeInTheDocument();
+      expect(screen.getByTestId("editor-pane")).toBeInTheDocument();
+      expect(screen.getByTestId("compose-panel")).toBeInTheDocument();
+      expect(screen.getByTestId("compose-mobile-tabs")).toHaveClass("hidden");
     });
 
-    it("shows pane tabs instead of a panel group on mobile", () => {
-      vi.mocked(useIsMobile).mockReturnValue(true);
-
-      renderWikiCompose();
+    it("shows pane tabs on mobile", () => {
+      renderWikiCompose("/notes/note-1/page-1/compose", true);
 
       expect(screen.getByTestId("compose-mobile-tabs")).toBeInTheDocument();
-      expect(screen.queryByTestId("resizable-panel-group")).not.toBeInTheDocument();
+    });
+
+    it("does not remount panes when the mobile breakpoint flips", () => {
+      render(
+        <MemoryRouter initialEntries={["/notes/note-1/page-1/compose"]}>
+          <Routes>
+            <Route
+              path="/notes/:noteId/:pageId/compose/:sessionId?"
+              element={<MobileFlipHarness />}
+            />
+          </Routes>
+        </MemoryRouter>,
+      );
+
+      expect(paneMountCounts.editor).toBe(1);
+      expect(paneMountCounts.compose).toBe(1);
+
+      fireEvent.click(screen.getByTestId("flip-mobile"));
+
+      expect(paneMountCounts.editor).toBe(1);
+      expect(paneMountCounts.compose).toBe(1);
+      expect(screen.getByTestId("editor-pane")).toBeInTheDocument();
+      expect(screen.getByTestId("compose-panel")).toBeInTheDocument();
+      expect(screen.getByTestId("compose-mobile-tabs")).toHaveClass("hidden");
     });
   });
 
   describe("mobile pane tabs", () => {
-    beforeEach(() => {
-      vi.mocked(useIsMobile).mockReturnValue(true);
-    });
-
     it("defaults to the compose pane during interrupt phases", () => {
       vi.mocked(useWikiComposeSession).mockReturnValue(createMockSession({ phase: "brief" }));
 
-      renderWikiCompose();
+      renderWikiCompose("/notes/note-1/page-1/compose", true);
 
       expect(screen.getByTestId("compose-tab-compose")).toHaveAttribute("aria-selected", "true");
       expect(screen.getByTestId("compose-tab-preview")).toHaveAttribute("aria-selected", "false");
@@ -344,7 +399,7 @@ describe("WikiComposePage", () => {
     it("defaults to the preview pane while drafting", () => {
       vi.mocked(useWikiComposeSession).mockReturnValue(createMockSession({ phase: "draft" }));
 
-      renderWikiCompose();
+      renderWikiCompose("/notes/note-1/page-1/compose", true);
 
       expect(screen.getByTestId("compose-tab-preview")).toHaveAttribute("aria-selected", "true");
       expect(screen.getByTestId("compose-tab-compose")).toHaveAttribute("aria-selected", "false");
@@ -353,7 +408,7 @@ describe("WikiComposePage", () => {
     it("switches the active pane when a tab is clicked", () => {
       vi.mocked(useWikiComposeSession).mockReturnValue(createMockSession({ phase: "brief" }));
 
-      renderWikiCompose();
+      renderWikiCompose("/notes/note-1/page-1/compose", true);
 
       fireEvent.click(screen.getByTestId("compose-tab-preview"));
 
