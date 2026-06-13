@@ -32,6 +32,12 @@ bun run init
 
 （`init` に含まれる。ミラーだけ再生成する場合は `bun run setup:agent-mirrors`）
 
+再実行で lint/build を省略: `SKIP_BUILD=1 bun run init` または `bun run init --skip-build`
+
+## 既存クローンからの移行
+
+`.agents/` 正本化前に作った `.claude/skills` 等が **実ディレクトリ** のまま残っていると、ミラー作成は停止して手順を表示します。正本は `.agents/` にあることを確認し、レガシーディレクトリを削除してから `bun run setup:agent-mirrors` を再実行してください。詳細は CONTRIBUTING.md の「Agent skills migration」を参照。
+
 ## テスト導入パイプライン
 
 ```

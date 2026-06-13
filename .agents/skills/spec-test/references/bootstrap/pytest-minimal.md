@@ -19,7 +19,7 @@ python_files = ["test_*.py", "*_test.py"]
 
 ## 3. ディレクトリ
 
-```
+```text
 project/
   src/myapp/
   tests/

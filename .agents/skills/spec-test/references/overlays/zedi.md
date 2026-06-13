@@ -1,11 +1,12 @@
-# Zedi overlay
+# Zedi overlay / Zedi オーバーレイ
 
+Rules merged by spec-test / test-inventory when `project_profile.overlay: zedi`.
 `project_profile.overlay: zedi` のとき spec-test / test-inventory がマージする規約。
 
-## 検出
+## Detection / 検出
 
-- リポジトリルートに `AGENTS.md` と `bun.lock` / `bun.lockb` がある
-- またはユーザーが `overlay: zedi` を指定
+- Repository root contains `AGENTS.md` and `bun.lock` / `bun.lockb`, or set `overlay: zedi`
+- リポジトリルートに `AGENTS.md` と `bun.lock` / `bun.lockb` がある、または `overlay: zedi` を指定
 
 ## test_placement
 

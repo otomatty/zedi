@@ -4,14 +4,17 @@
  * フロント開発向けの初回セットアップ（依存・hooks・.env・検証・エージェントミラー）。
  *
  * Usage: bun run init
+ * Skip lint/build on re-runs: SKIP_BUILD=1 bun run init  (or --skip-build)
  */
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { linkAgentMirrors } from "./setup-agent-mirrors.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const skipBuild = process.env.SKIP_BUILD === "1" || process.argv.includes("--skip-build");
 
 /**
  * @param {string} label
@@ -42,7 +45,10 @@ function run(label, cmd, args, opts = {}) {
 function hasCommand(cmd) {
   const which = process.platform === "win32" ? "where" : "command";
   const whichArg = process.platform === "win32" ? [cmd] : ["-v", cmd];
-  const result = spawnSync(which, whichArg, { stdio: "ignore", shell: true });
+  const result = spawnSync(which, whichArg, {
+    stdio: "ignore",
+    shell: process.platform === "win32",
+  });
   return result.status === 0;
 }
 
@@ -78,6 +84,10 @@ const envDevelopment = path.join(repoRoot, ".env.development");
 const envExample = path.join(repoRoot, ".env.example");
 
 if (!fs.existsSync(envLocal) && !fs.existsSync(envDevelopment)) {
+  if (!fs.existsSync(envExample)) {
+    console.error("[ERROR] .env.example is missing. Cannot create .env.local.");
+    process.exit(1);
+  }
   console.log("\n[INFO] Creating .env.local from .env.example...");
   fs.copyFileSync(envExample, envLocal);
   console.warn("[WARN] Update .env.local if you need API/auth/AI keys.");
@@ -86,11 +96,22 @@ if (!fs.existsSync(envLocal) && !fs.existsSync(envDevelopment)) {
   console.log("\n[INFO] .env file already exists, skipping.");
 }
 
-console.log("\n[INFO] Verifying setup...");
-run("Lint", "bun", ["run", "lint", "--quiet"], { optional: true });
-run("Build", "bun", ["run", "build"]);
+if (skipBuild) {
+  console.log("\n[INFO] Skipping lint/build (SKIP_BUILD=1 or --skip-build).");
+} else {
+  console.log("\n[INFO] Verifying setup...");
+  run("Lint", "bun", ["run", "lint", "--quiet"], { optional: true });
+  run("Build", "bun", ["run", "build"]);
+}
 
-run("Linking agent mirrors (.agents → .claude / .cursor)", "bun", ["run", "setup:agent-mirrors"]);
+console.log("\n[INFO] Linking agent mirrors (.agents → .claude / .cursor)");
+try {
+  linkAgentMirrors(repoRoot);
+} catch (err) {
+  const message = err instanceof Error ? err.message : "Failed to link agent mirrors.";
+  console.error(`[ERROR] ${message}`);
+  process.exit(1);
+}
 
 console.log("");
 console.log("===============================");

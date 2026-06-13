@@ -1,7 +1,7 @@
 # project-profile スキーマ
 
 `test-inventory` が出力し、`spec-test` Phase 0 が消費するフィールド定義。
-[../test-inventory/references/project-detection.md](../test-inventory/references/project-detection.md) §9 と同期。
+[../../test-inventory/references/project-detection.md](../../test-inventory/references/project-detection.md) §9 と同期。
 
 ## 必須フィールド
 
