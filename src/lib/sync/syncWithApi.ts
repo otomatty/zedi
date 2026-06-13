@@ -385,6 +385,7 @@ function getPagesForPush(
   allLocalPages: PageMetadata[],
   pulledPageIds: Set<string>,
   defaultNoteId: string,
+  isInitialSync: boolean,
 ): PageMetadata[] {
   // POST /api/sync/pages の LWW 対象は呼び出し元のデフォルトノート配下のみ
   // （Issue #823 / #1020）。サーバー側でも skip されるが、他ノートの行が誤って
@@ -393,9 +394,14 @@ function getPagesForPush(
   // #1020). The server skips anything else anyway, but filtering here avoids
   // needless wire traffic if foreign-note rows ever sneak into IndexedDB.
   const defaultNoteOnly = allLocalPages.filter((p) => p.noteId === defaultNoteId);
-  return lastSync
-    ? defaultNoteOnly.filter((p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id))
-    : defaultNoteOnly;
+  // Full / initial pull (`since` omitted): push every local default-note row the
+  // server did not just return. This covers legacy `noteId: null` rows revealed
+  // by `reassignNullNotePages` (issue #1020) even when `lastSync` is already
+  // set — e.g. `forceFullSyncWhenLocalEmpty` recovery from a pre-#1061 skip.
+  if (!lastSync || isInitialSync) {
+    return defaultNoteOnly.filter((p) => !pulledPageIds.has(p.id));
+  }
+  return defaultNoteOnly.filter((p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id));
 }
 
 async function finishSyncNoPush(
@@ -411,22 +417,9 @@ async function finishSyncNoPush(
 function finishSyncIfNoPushNeeded(
   adapter: StorageAdapter,
   res: { server_time?: string },
-  isInitialSync: boolean,
-  localPageCount: number,
-  pulledPageIds: Set<string>,
   pagesForPush: PageMetadata[],
 ): Promise<boolean> {
-  // Issue #1020: `getAllPages()` hides legacy `noteId: null` rows until
-  // `reassignNullNotePages` runs in `applyPull`, so `localPageCount` can be 0
-  // while local-only pages still exist. Only skip push on initial sync when
-  // every row we would push was just pulled from the server (redundant echo).
-  const onlyEchoingPulledPages =
-    isInitialSync &&
-    localPageCount === 0 &&
-    pagesForPush.length > 0 &&
-    pagesForPush.every((p) => pulledPageIds.has(p.id));
-  const noPush = pagesForPush.length === 0 || onlyEchoingPulledPages;
-  if (!noPush) return Promise.resolve(false);
+  if (pagesForPush.length > 0) return Promise.resolve(false);
   return finishSyncNoPush(adapter, res).then(() => true);
 }
 
@@ -504,18 +497,10 @@ export async function syncWithApi(
       allLocalPages,
       pulledPageIds,
       res.default_note_id,
+      isInitialSync,
     );
 
-    if (
-      await finishSyncIfNoPushNeeded(
-        adapter,
-        res,
-        isInitialSync,
-        localPageCount,
-        pulledPageIds,
-        pagesForPush,
-      )
-    ) {
+    if (await finishSyncIfNoPushNeeded(adapter, res, pagesForPush)) {
       return;
     }
 
