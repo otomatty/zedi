@@ -210,14 +210,26 @@ export class ZediChatModel extends BaseChatModel<ZediChatModelCallOptions, AIMes
 
   /**
    * Bind OpenAI-shaped function tools for structured output / tool calling.
+   * When a single tool is bound without tool_choice, force that function so
+   * withStructuredOutput always receives tool_calls from providers.
    * 構造化出力・tool calling 向けに OpenAI 形式の function tools を束ねる。
+   * tool_choice 未指定で 1 件だけ束ねるときは schema function を強制する。
    */
   bindTools(
     tools: ZediChatTool[],
     kwargs?: Partial<ZediChatModelCallOptions>,
   ): Runnable<BaseLanguageModelInput, AIMessageChunk, ZediChatModelCallOptions> {
+    const singleToolName =
+      kwargs?.tool_choice === undefined && tools.length === 1
+        ? tools[0]?.function?.name
+        : undefined;
+    const defaultToolChoice: ZediToolChoice | undefined = singleToolName
+      ? { type: "function", function: { name: singleToolName } }
+      : undefined;
+
     return this.withConfig({
       tools,
+      ...(defaultToolChoice ? { tool_choice: defaultToolChoice } : {}),
       ...kwargs,
     } as Partial<ZediChatModelCallOptions>);
   }

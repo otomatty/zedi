@@ -22,36 +22,36 @@ export interface AIMessage {
   content: string;
 }
 
-/** OpenAI-style function tool definition passed to provider APIs. */
+/** OpenAI-style function tool definition passed to provider APIs. / プロバイダ API に渡す OpenAI 形式の function 定義。 */
 export interface ZediFunctionDefinition {
   name: string;
   description?: string;
   parameters?: Record<string, unknown>;
 }
 
-/** LangChain `bindTools` / OpenAI-compatible tool entry. */
+/** LangChain `bindTools` / OpenAI-compatible tool entry. / LangChain bindTools 向けの OpenAI 互換 tool エントリ。 */
 export interface ZediChatTool {
   type: "function";
   function: ZediFunctionDefinition;
 }
 
-/** Force a specific function tool (OpenAI-compatible shape). */
+/** Force a specific function tool (OpenAI-compatible shape). / 特定 function を強制する OpenAI 互換 tool_choice。 */
 export interface ZediToolChoiceFunction {
   type: "function";
   function: { name: string };
 }
 
-/** Provider tool-choice hint for non-streaming calls. */
+/** Provider tool-choice hint for non-streaming calls. / 非ストリーミング呼び出し向けの tool-choice ヒント。 */
 export type ZediToolChoice = "auto" | "none" | "required" | ZediToolChoiceFunction;
 
-/** Parsed tool call returned by `callProvider` when the model selects a tool. */
+/** Parsed tool call returned by `callProvider` when the model selects a tool. / モデルが tool を選択したとき callProvider が返す解析済み tool call。 */
 export interface ZediToolCall {
   id: string;
   name: string;
   args: Record<string, unknown>;
 }
 
-/** Standard non-streaming provider response from `callOpenAI` / `callAnthropic` / `callGoogle`. */
+/** Standard non-streaming provider response from `callOpenAI` / `callAnthropic` / `callGoogle`. / callOpenAI / callAnthropic / callGoogle の標準非ストリーミング応答。 */
 export interface AIProviderCallResult {
   content: string;
   usage: TokenUsage;
@@ -67,9 +67,9 @@ export interface AIChatOptions {
   webSearchOptions?: { search_context_size: "medium" | "low" | "high" };
   useWebSearch?: boolean;
   useGoogleSearch?: boolean;
-  /** Function tools for structured output / tool calling (non-streaming). */
+  /** Function tools for structured output / tool calling (non-streaming). / 構造化出力・tool calling 用の function tools（非ストリーミング）。 */
   tools?: ZediChatTool[];
-  /** Optional tool-choice hint; defaults to provider-specific auto behaviour. */
+  /** Optional tool-choice hint; defaults to provider-specific auto behaviour. / 任意の tool-choice ヒント。未指定時はプロバイダ既定の auto 挙動。 */
   toolChoice?: ZediToolChoice;
 }
 

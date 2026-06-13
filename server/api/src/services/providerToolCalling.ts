@@ -118,8 +118,10 @@ export function buildAnthropicToolRequest(
   };
   if (toolChoice === "none") {
     payload.tool_choice = { type: "none" };
-  } else if (toolChoice === "required" || toolChoice === "auto") {
+  } else if (toolChoice === "required") {
     payload.tool_choice = { type: "any" };
+  } else if (toolChoice === "auto") {
+    payload.tool_choice = { type: "auto" };
   } else if (typeof toolChoice === "object" && toolChoice.type === "function") {
     payload.tool_choice = { type: "tool", name: toolChoice.function.name };
   }
@@ -136,7 +138,7 @@ export function parseAnthropicToolCalls(
 ): ZediToolCall[] {
   const parsed: ZediToolCall[] = [];
   for (const block of content) {
-    if (block.type !== "tool_use" || !block.name) continue;
+    if (!block || block.type !== "tool_use" || !block.name) continue;
     parsed.push({
       id: block.id ?? randomUUID(),
       name: block.name,
@@ -182,6 +184,18 @@ export function buildGoogleToolRequest(
         allowedFunctionNames: tools.map((tool) => tool.name),
       },
     };
+  } else if (toolChoice === "none") {
+    payload.toolConfig = {
+      functionCallingConfig: {
+        mode: "NONE",
+      },
+    };
+  } else if (toolChoice === "auto") {
+    payload.toolConfig = {
+      functionCallingConfig: {
+        mode: "AUTO",
+      },
+    };
   }
   return payload;
 }
@@ -196,7 +210,7 @@ export function parseGoogleToolCalls(
 ): ZediToolCall[] {
   const parsed: ZediToolCall[] = [];
   for (const part of parts) {
-    const fn = part.functionCall;
+    const fn = part?.functionCall;
     if (!fn?.name) continue;
     parsed.push({
       id: randomUUID(),

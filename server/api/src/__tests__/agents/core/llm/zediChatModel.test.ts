@@ -362,6 +362,10 @@ describe("ZediChatModel.bindTools", () => {
         function: expect.objectContaining({ name: "structure_dialogue" }),
       }),
     ]);
+    expect(spy.calls[0]?.options.toolChoice).toEqual({
+      type: "function",
+      function: { name: "structure_dialogue" },
+    });
     expect(chains.length).toBe(2);
   });
 });

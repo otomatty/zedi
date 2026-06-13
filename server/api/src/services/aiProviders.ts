@@ -178,10 +178,12 @@ export async function callAnthropic(
     usage: { input_tokens: number; output_tokens: number };
   };
 
-  const toolCalls = parseAnthropicToolCalls(data.content);
-  const textContent = data.content
+  const contentBlocks = data.content ?? [];
+  const toolCalls = parseAnthropicToolCalls(contentBlocks);
+  const textContent = contentBlocks
     .filter(
       (block) =>
+        block &&
         block.type !== "tool_use" &&
         typeof block.text === "string" &&
         (block.type === "text" || block.type === undefined),

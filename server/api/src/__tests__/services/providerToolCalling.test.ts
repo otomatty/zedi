@@ -3,9 +3,11 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  buildAnthropicToolRequest,
   buildGoogleToolRequest,
   buildOpenAiToolRequest,
   normalizeFunctionTools,
+  parseAnthropicToolCalls,
   parseGoogleToolCalls,
   parseOpenAiToolCalls,
 } from "../../services/providerToolCalling.js";
@@ -98,5 +100,44 @@ describe("buildGoogleToolRequest", () => {
         allowedFunctionNames: ["structure_dialogue"],
       },
     });
+  });
+
+  it("maps auto and none tool choices explicitly", () => {
+    const normalized = normalizeFunctionTools(sampleTools);
+    expect(buildGoogleToolRequest(normalized, "auto").toolConfig).toEqual({
+      functionCallingConfig: { mode: "AUTO" },
+    });
+    expect(buildGoogleToolRequest(normalized, "none").toolConfig).toEqual({
+      functionCallingConfig: { mode: "NONE" },
+    });
+  });
+});
+
+describe("buildAnthropicToolRequest", () => {
+  it("maps auto and required tool choices separately", () => {
+    const normalized = normalizeFunctionTools(sampleTools);
+    expect(buildAnthropicToolRequest(normalized, "auto").tool_choice).toEqual({ type: "auto" });
+    expect(buildAnthropicToolRequest(normalized, "required").tool_choice).toEqual({ type: "any" });
+  });
+});
+
+describe("parseAnthropicToolCalls", () => {
+  it("maps tool_use blocks and skips null entries", () => {
+    const calls = parseAnthropicToolCalls([
+      null as unknown as { type?: string },
+      {
+        type: "tool_use",
+        id: "toolu_1",
+        name: "structure_dialogue",
+        input: { sections: [{ heading: "Intro" }] },
+      },
+    ]);
+    expect(calls).toEqual([
+      {
+        id: "toolu_1",
+        name: "structure_dialogue",
+        args: { sections: [{ heading: "Intro" }] },
+      },
+    ]);
   });
 });
