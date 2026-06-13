@@ -117,8 +117,8 @@ Demo screenshots: place assets under public/ when available. Tracked prose lives
 git clone https://github.com/otomatty/zedi.git
 cd zedi
 
-# Run setup (install deps + Git hooks + verification)
-bash scripts/setup.sh
+# First-time setup (deps, hooks, .env, build verify, agent mirrors)
+bun run init
 
 # Start the dev server
 bun run dev
@@ -129,7 +129,7 @@ bun run dev
 ```bash
 git clone https://github.com/otomatty/zedi.git
 cd zedi
-bun install
+bun run init
 bun run dev
 ```
 

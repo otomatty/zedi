@@ -42,12 +42,32 @@ cd zedi
 ### 3. Setup
 
 ```bash
-# Recommended: run setup script
-bash scripts/setup.sh
+# Recommended
+bun run init
 
 # Or manually
 bun install
+bun run setup:agent-mirrors
 ```
+
+Re-run without lint/build (mirrors or deps only):
+
+```bash
+SKIP_BUILD=1 bun run init
+# or: bun run init --skip-build
+```
+
+#### Agent skills migration (existing clones)
+
+If you cloned before `.agents/` became canonical, you may still have **real directories** at `.claude/skills/` or `.cursor/skills/` instead of junctions/symlinks. `bun run init` / `bun run setup:agent-mirrors` stops with migration instructions until you remove them:
+
+```bash
+git pull
+rm -rf .claude/skills .claude/agents .cursor/skills .cursor/agents
+bun run setup:agent-mirrors
+```
+
+Canonical skills live in `.agents/` (tracked in git). `.claude/` remains local-only for Claude Code settings; only the mirror subpaths above are regenerated.
 
 ### 4. Configure upstream
 

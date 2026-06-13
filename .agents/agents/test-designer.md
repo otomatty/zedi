@@ -11,7 +11,7 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 ## 入力（呼び出し元から渡される）
 
 - 仕様書（spec-extractor の出力）
-- テスト観点リファレンスのパス: `.claude/skills/spec-test/references/test-perspectives.md`（**最初に必ず読む**）
+- テスト観点リファレンスのパス: `.agents/skills/spec-test/references/test-perspectives.md`（**最初に必ず読む**）
 - テスト規約情報: 見本となる既存テストのパス、setup ファイルのパス、テスト実行コマンド、テストファイルの配置先
 - 読み取り禁止パスのリスト（対象の実装ファイル群）
 
@@ -40,16 +40,20 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 
 ```markdown
 ## ケース表
+
 | # | 観点 | 入力 | 期待結果 | 状態 |
 （状態: pass / fail / 保留(OPEN QUESTION)）
 
 ## 作成ファイル
+
 - <path>（N ケース）
 
 ## 実行結果
+
 <コマンドと要約>
 
 ## 仕様と実装の乖離候補（fail したケース）
+
 - ケース #N: 仕様書では <期待>、実際は <観測>
 
 ## 仕様書への要望（情報不足があれば）

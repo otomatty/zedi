@@ -30,7 +30,7 @@ bun run test:mutation:changed
 ### 2-B. スコープ外: アサーション強度レビューで代替
 
 テストファイルを読み、観点リファレンス
-`.claude/skills/spec-test/references/test-perspectives.md` の §5 を基準に弱いアサーションを洗い出す:
+`.agents/skills/spec-test/references/test-perspectives.md` の §5 を基準に弱いアサーションを洗い出す:
 
 - `toHaveBeenCalled()`（引数未検証）/ `toBeTruthy` / `toBeDefined` / `length > 0` 系
 - 戻り値・表示・副作用のいずれも検証していないテスト
@@ -44,14 +44,14 @@ bun run test:mutation:changed
 
 報告は実装コードの貼り付けではなく、観点の言葉で行う（test-designer は実装を読めない）:
 
-| ミュータント種別 | 翻訳する観点 |
-| --- | --- |
+| ミュータント種別                         | 翻訳する観点                                          |
+| ---------------------------------------- | ----------------------------------------------------- |
 | EqualityOperator / ConditionalExpression | 境界の**両側**のケースが無い（閾値ちょうど / 1 つ外） |
-| ArithmeticOperator | 結果を具体値で検証していない |
-| StringLiteral | メッセージ・ラベルの完全一致を検証していない |
-| BooleanLiteral / LogicalOperator | フラグの true / false 両方のケースが無い |
-| BlockStatement（処理の空化） | その処理の副作用・戻り値をどのテストも検証していない |
-| OptionalChaining / Nullish | null / undefined 入力のケースが無い |
+| ArithmeticOperator                       | 結果を具体値で検証していない                          |
+| StringLiteral                            | メッセージ・ラベルの完全一致を検証していない          |
+| BooleanLiteral / LogicalOperator         | フラグの true / false 両方のケースが無い              |
+| BlockStatement（処理の空化）             | その処理の副作用・戻り値をどのテストも検証していない  |
+| OptionalChaining / Nullish               | null / undefined 入力のケースが無い                   |
 
 ## 鉄則
 
@@ -65,9 +65,11 @@ bun run test:mutation:changed
 ## 検証方法: Stryker / アサーション強度レビュー（スコープ外のため）
 
 ## スコア
+
 - Mutation スコア: NN%（killed X / survived Y / no coverage Z）目標: 85 以上
 
 ## 不足観点（test-designer への依頼リスト）
+
 | # | 位置（ファイル:行） | ミュータント種別 | 追加すべきテスト観点 |
 
 ## 等価ミュータント疑い・備考

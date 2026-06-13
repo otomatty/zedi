@@ -287,7 +287,7 @@ Phase 2 で収集した情報を以下の観点で分析する。
 | 変更 5 ファイル以下 & Critical 0 件 | コンパクト |
 | それ以外                            | フル       |
 
-レポート生成時に **`.cursor/skills/review-local-changes/template.md` を Read ツールで読み込み**、該当する形式を使用する。再レビュー時の追加セクションもテンプレートに定義されている。
+レポート生成時に **`.agents/skills/review-local-changes/template.md` を Read ツールで読み込み**、該当する形式を使用する。再レビュー時の追加セクションもテンプレートに定義されている。
 
 ### 3-3. 事後アクション
 
