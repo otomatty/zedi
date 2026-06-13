@@ -381,12 +381,12 @@ async function applyPull(
 }
 
 /**
- * On first sync (`lastSync == null` / `0`), {@link getPagesForPush} returns every
+ * On full / initial pull (`since` omitted), {@link getPagesForPush} returns every
  * default-note row in IndexedDB, including pages just pulled from the server.
  * Drop rows whose local metadata is not newer than the pulled copy so we only
  * POST local-only legacy rows or offline edits (issue #1020).
  *
- * 初回同期では pull 直後のサーバー行も push 候補に含まれるため、サーバー版と
+ * フル / 初回 pull では pull 直後のサーバー行も push 候補に含まれるため、サーバー版と
  * 同じか古い行を除外し、ローカル専用・オフライン編集のみ upload する。
  */
 function filterRedundantInitialPushPages(
@@ -417,6 +417,7 @@ function getPagesForPush(
   allLocalPages: PageMetadata[],
   pulledPageIds: Set<string>,
   defaultNoteId: string,
+  isInitialSync: boolean,
 ): PageMetadata[] {
   // POST /api/sync/pages の LWW 対象は呼び出し元のデフォルトノート配下のみ
   // （Issue #823 / #1020）。サーバー側でも skip されるが、他ノートの行が誤って
@@ -425,9 +426,14 @@ function getPagesForPush(
   // #1020). The server skips anything else anyway, but filtering here avoids
   // needless wire traffic if foreign-note rows ever sneak into IndexedDB.
   const defaultNoteOnly = allLocalPages.filter((p) => p.noteId === defaultNoteId);
-  return lastSync
-    ? defaultNoteOnly.filter((p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id))
-    : defaultNoteOnly;
+  // Full / initial pull (`since` omitted): consider every default-note row, then
+  // let {@link filterRedundantInitialPushPages} drop server echoes. Covers legacy
+  // `noteId: null` rows revealed by `reassignNullNotePages` (issue #1020) even
+  // when `lastSync` is already set — e.g. `forceFullSyncWhenLocalEmpty` recovery.
+  if (!lastSync || isInitialSync) {
+    return defaultNoteOnly;
+  }
+  return defaultNoteOnly.filter((p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id));
 }
 
 async function finishSyncNoPush(
@@ -511,14 +517,21 @@ export async function syncWithApi(
     const allPages = await adapter.getAllPages();
     const localPageCount = allPages.length;
     const since = computeSince(options, lastSync, localPageCount);
+    const isInitialSync = since === undefined;
 
     const res = normalizeSyncResponse(await api.getSyncPages(since));
     await applyPull(adapter, res);
 
     const pulledPageIds = new Set(res.pages.map((r) => r.id));
     const allLocalPages = await adapter.getAllPages();
-    let pagesForPush = getPagesForPush(lastSync, allLocalPages, pulledPageIds, res.default_note_id);
-    if (!lastSync) {
+    let pagesForPush = getPagesForPush(
+      lastSync,
+      allLocalPages,
+      pulledPageIds,
+      res.default_note_id,
+      isInitialSync,
+    );
+    if (!lastSync || isInitialSync) {
       pagesForPush = filterRedundantInitialPushPages(pagesForPush, res.pages);
     }
 

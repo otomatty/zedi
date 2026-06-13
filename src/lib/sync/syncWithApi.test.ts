@@ -968,6 +968,112 @@ describe("syncWithApi", () => {
     );
   });
 
+  it("pushes legacy pages on forceFullSyncWhenLocalEmpty even when lastSync is set (issue #1020)", async () => {
+    const lastSync = 1_000_000;
+    const legacyLocalPage: PageMetadata = {
+      id: "legacy-force-full",
+      ownerId: TEST_USER_ID,
+      noteId: DEFAULT_NOTE_ID,
+      sourcePageId: null,
+      title: "Offline draft",
+      contentPreview: null,
+      thumbnailUrl: null,
+      sourceUrl: null,
+      createdAt: 100,
+      updatedAt: 100,
+      isDeleted: false,
+    };
+    const adapter = createMockAdapter({
+      getLastSyncTime: vi.fn().mockResolvedValue(lastSync),
+      getAllPages: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([legacyLocalPage]),
+      reassignNullNotePages: vi.fn().mockImplementation(async () => {
+        const getAllPages = adapter.getAllPages as ReturnType<typeof vi.fn>;
+        getAllPages.mockResolvedValueOnce([legacyLocalPage]);
+      }),
+    });
+    const api = createMockApi({
+      getSyncPages: vi.fn().mockResolvedValue({
+        pages: [],
+        links: [],
+        ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
+        server_time: new Date().toISOString(),
+      }),
+    });
+
+    await syncWithApi(adapter, api, TEST_USER_ID, { forceFullSyncWhenLocalEmpty: true });
+
+    expect(api.postSyncPages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pages: [expect.objectContaining({ id: legacyLocalPage.id })],
+      }),
+    );
+  });
+
+  it("pushes locally-newer shared pages on forceFullSyncWhenLocalEmpty (issue #1020)", async () => {
+    const lastSync = 1_000_000;
+    const serverUpdatedAt = new Date("2025-05-01T00:00:00Z").getTime();
+    const newerLocalUpdatedAt = serverUpdatedAt + 60_000;
+    const sharedId = "shared-force-full";
+    const legacyLocalPage: PageMetadata = {
+      id: sharedId,
+      ownerId: TEST_USER_ID,
+      noteId: DEFAULT_NOTE_ID,
+      sourcePageId: null,
+      title: "Offline edit",
+      contentPreview: null,
+      thumbnailUrl: null,
+      sourceUrl: null,
+      createdAt: 100,
+      updatedAt: newerLocalUpdatedAt,
+      isDeleted: false,
+    };
+    const adapter = createMockAdapter({
+      getLastSyncTime: vi.fn().mockResolvedValue(lastSync),
+      getAllPages: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([legacyLocalPage]),
+      getPage: vi.fn().mockResolvedValue(legacyLocalPage),
+      reassignNullNotePages: vi.fn().mockImplementation(async () => {
+        const getAllPages = adapter.getAllPages as ReturnType<typeof vi.fn>;
+        getAllPages.mockResolvedValueOnce([legacyLocalPage]);
+      }),
+    });
+    const postSyncPages = vi
+      .fn()
+      .mockResolvedValue({ server_time: new Date().toISOString(), conflicts: [] });
+    const api = createMockApi({
+      getSyncPages: vi.fn().mockResolvedValue({
+        pages: [
+          {
+            id: sharedId,
+            owner_id: TEST_USER_ID,
+            note_id: DEFAULT_NOTE_ID,
+            source_page_id: null,
+            title: "Server title",
+            content_preview: null,
+            thumbnail_url: null,
+            source_url: null,
+            created_at: "2025-01-01T00:00:00Z",
+            updated_at: new Date(serverUpdatedAt).toISOString(),
+            is_deleted: false,
+          },
+        ],
+        links: [],
+        ghost_links: [],
+        default_note_id: DEFAULT_NOTE_ID,
+        server_time: new Date().toISOString(),
+      }),
+      postSyncPages,
+    });
+
+    await syncWithApi(adapter, api, TEST_USER_ID, { forceFullSyncWhenLocalEmpty: true });
+
+    expect(postSyncPages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pages: [expect.objectContaining({ id: sharedId, title: "Offline edit" })],
+      }),
+    );
+  });
+
   // ── Error handling ────────────────────────────────────────────────────
 
   it("increments consecutive failures on error", async () => {
