@@ -42,11 +42,12 @@ cd zedi
 ### 3. Setup
 
 ```bash
-# Recommended: run setup script
-bash scripts/setup.sh
+# Recommended
+bun run init
 
 # Or manually
 bun install
+bun run setup:agent-mirrors
 ```
 
 ### 4. Configure upstream

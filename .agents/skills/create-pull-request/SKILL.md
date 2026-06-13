@@ -15,7 +15,7 @@ description: >
 
 This skill uses **`develop` as the default `--base` branch** for Zedi. **Do not use `main` as `--base`** unless the user explicitly asks for a release or mainline merge PR.
 
-**Skills / `.cursor/skills/` (and similar workflow-only changes):** Open the PR so it **merges into the branch you were on when you created the topic branch** (the current integration line)—typically `develop` after `git checkout -b` from `develop`, or a parent feature branch if you branched from there. **Never open Skills-only PRs with `--base main`** by default.
+**Skills / `.agents/skills/` (and similar workflow-only changes):** Open the PR so it **merges into the branch you were on when you created the topic branch** (the current integration line)—typically `develop` after `git checkout -b` from `develop`, or a parent feature branch if you branched from there. **Never open Skills-only PRs with `--base main`** by default.
 
 If the current branch already contains the intended commits, reuse that branch and create or update the PR from it. When creating a new branch, obtain the branch name from the user (e.g. `feature/add-login`) or derive it from an issue number (e.g. `123` → `feature/123`). If neither is provided, ask the user.
 
