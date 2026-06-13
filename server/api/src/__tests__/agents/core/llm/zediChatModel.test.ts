@@ -11,6 +11,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
+import { z } from "zod";
 import { ZediChatModel } from "../../../../agents/core/llm/zediChatModel.js";
 import { createMockDb } from "../../../createMockDb.js";
 import type {
@@ -290,5 +291,77 @@ describe("ZediChatModel._llmType", () => {
       spy,
     );
     expect(model._llmType()).toBe("zedi-chat");
+  });
+});
+
+describe("ZediChatModel.bindTools", () => {
+  it("passes bound tools to callProvider and supports withStructuredOutput", async () => {
+    const spy = { calls: [] as CallSpy[] };
+    const { db, chains } = asDb([undefined, undefined]);
+    const model = new ZediChatModel({
+      provider: "google",
+      apiKey: "k",
+      apiModelId: "gemini-test",
+      modelRowId: "google:gemini-3.5-flash",
+      inputCostUnits: 1,
+      outputCostUnits: 2,
+      userId: "user-1",
+      tier: "free",
+      db,
+      feature: "wiki_compose:structure",
+      callProvider: async (_provider, _apiKey, _model, _messages, options = {}) => {
+        spy.calls.push({
+          provider: "google",
+          apiKey: "k",
+          model: "gemini-test",
+          messages: _messages,
+          options,
+        });
+        return {
+          content: "",
+          usage: { inputTokens: 12, outputTokens: 34 },
+          finishReason: "STOP",
+          toolCalls: [
+            {
+              id: "call_1",
+              name: "structure_dialogue",
+              args: {
+                sections: [
+                  { heading: "Overview", intent: "Introduce topic", depth: 1 },
+                  { heading: "History", intent: "Timeline", depth: 1 },
+                  { heading: "Legacy", intent: "Impact", depth: 1 },
+                ],
+              },
+            },
+          ],
+        };
+      },
+      streamProvider: async function* () {},
+    });
+
+    const schema = z.object({
+      sections: z.array(
+        z.object({
+          heading: z.string(),
+          intent: z.string(),
+          depth: z.number(),
+        }),
+      ),
+    });
+    const structured = model.withStructuredOutput(schema, { name: "structure_dialogue" });
+    const parsed = await structured.invoke([
+      new SystemMessage("You are an orchestrator."),
+      new HumanMessage("Topic: Surrealism"),
+    ]);
+
+    expect(parsed.sections).toHaveLength(3);
+    expect(spy.calls).toHaveLength(1);
+    expect(spy.calls[0]?.options.tools).toEqual([
+      expect.objectContaining({
+        type: "function",
+        function: expect.objectContaining({ name: "structure_dialogue" }),
+      }),
+    ]);
+    expect(chains.length).toBe(2);
   });
 });

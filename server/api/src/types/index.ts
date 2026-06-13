@@ -22,6 +22,43 @@ export interface AIMessage {
   content: string;
 }
 
+/** OpenAI-style function tool definition passed to provider APIs. */
+export interface ZediFunctionDefinition {
+  name: string;
+  description?: string;
+  parameters?: Record<string, unknown>;
+}
+
+/** LangChain `bindTools` / OpenAI-compatible tool entry. */
+export interface ZediChatTool {
+  type: "function";
+  function: ZediFunctionDefinition;
+}
+
+/** Force a specific function tool (OpenAI-compatible shape). */
+export interface ZediToolChoiceFunction {
+  type: "function";
+  function: { name: string };
+}
+
+/** Provider tool-choice hint for non-streaming calls. */
+export type ZediToolChoice = "auto" | "none" | "required" | ZediToolChoiceFunction;
+
+/** Parsed tool call returned by `callProvider` when the model selects a tool. */
+export interface ZediToolCall {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+}
+
+/** Standard non-streaming provider response from `callOpenAI` / `callAnthropic` / `callGoogle`. */
+export interface AIProviderCallResult {
+  content: string;
+  usage: TokenUsage;
+  finishReason: string;
+  toolCalls?: ZediToolCall[];
+}
+
 export interface AIChatOptions {
   temperature?: number;
   maxTokens?: number;
@@ -30,6 +67,10 @@ export interface AIChatOptions {
   webSearchOptions?: { search_context_size: "medium" | "low" | "high" };
   useWebSearch?: boolean;
   useGoogleSearch?: boolean;
+  /** Function tools for structured output / tool calling (non-streaming). */
+  tools?: ZediChatTool[];
+  /** Optional tool-choice hint; defaults to provider-specific auto behaviour. */
+  toolChoice?: ZediToolChoice;
 }
 
 export interface AIChatRequest {

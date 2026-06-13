@@ -36,10 +36,12 @@ import {
   type BaseChatModelCallOptions,
   type BaseChatModelParams,
 } from "@langchain/core/language_models/chat_models";
+import type { BaseLanguageModelInput } from "@langchain/core/language_models/base";
 import type { CallbackManagerForLLMRun } from "@langchain/core/callbacks/manager";
 import type { BaseMessage } from "@langchain/core/messages";
-import { AIMessage, AIMessageChunk } from "@langchain/core/messages";
+import { AIMessageChunk } from "@langchain/core/messages";
 import { ChatGenerationChunk, type ChatResult } from "@langchain/core/outputs";
+import type { Runnable } from "@langchain/core/runnables";
 import { callProvider, streamProvider } from "../../../services/aiProviders.js";
 import { calculateCost } from "../../../services/usageService.js";
 import type {
@@ -48,6 +50,8 @@ import type {
   ApiMode,
   Database,
   UserTier,
+  ZediChatTool,
+  ZediToolChoice,
 } from "../../../types/index.js";
 import { recordZediUsage, toZediMessages, type RecordZediUsageResult } from "./usageCallback.js";
 
@@ -134,10 +138,18 @@ export type ExtraProviderOptions = Pick<
 >;
 
 /**
+ * Call options surfaced by {@link ZediChatModel}, including LangChain tool binding.
+ */
+export interface ZediChatModelCallOptions extends BaseChatModelCallOptions {
+  tools?: ZediChatTool[];
+  tool_choice?: ZediToolChoice;
+}
+
+/**
  * Concrete `BaseChatModel` implementation routing through Zedi providers.
  * Zedi の providers 経由で呼び出す `BaseChatModel` 実装。
  */
-export class ZediChatModel extends BaseChatModel<BaseChatModelCallOptions> {
+export class ZediChatModel extends BaseChatModel<ZediChatModelCallOptions, AIMessageChunk> {
   /** LangChain serialization namespace. LangChain シリアライズ識別子。 */
   static lc_name(): string {
     return "ZediChatModel";
@@ -189,26 +201,56 @@ export class ZediChatModel extends BaseChatModel<BaseChatModelCallOptions> {
   }
 
   /**
-   * 非ストリーミング呼び出し。`callProvider` → cost 計算 → `recordUsage`。
+   * Expose LangChain tool-binding kwargs to `_generate`.
+   * `_generate` に LangChain の tool binding 引数を渡す。
+   */
+  get callKeys(): string[] {
+    return [...super.callKeys, "tools", "tool_choice"];
+  }
+
+  /**
+   * Bind OpenAI-shaped function tools for structured output / tool calling.
+   * 構造化出力・tool calling 向けに OpenAI 形式の function tools を束ねる。
+   */
+  bindTools(
+    tools: ZediChatTool[],
+    kwargs?: Partial<ZediChatModelCallOptions>,
+  ): Runnable<BaseLanguageModelInput, AIMessageChunk, ZediChatModelCallOptions> {
+    return this.withConfig({
+      tools,
+      ...kwargs,
+    } as Partial<ZediChatModelCallOptions>);
+  }
+
+  /**
    * Non-streaming generation path.
+   * 非ストリーミング呼び出し。`callProvider` → cost 計算 → `recordUsage`。
    */
   async _generate(
     messages: BaseMessage[],
-    _options: this["ParsedCallOptions"],
+    options: this["ParsedCallOptions"],
     runManager?: CallbackManagerForLLMRun,
   ): Promise<ChatResult> {
     const zediMessages = toZediMessages(messages);
+    const providerOptions: AIChatOptions = {
+      temperature: this.temperature,
+      maxTokens: this.maxTokens,
+      feature: this.feature,
+      ...this.extraProviderOptions,
+    };
+    if (options.tools?.length) {
+      providerOptions.tools = options.tools;
+    }
+    if (options.tool_choice !== undefined) {
+      providerOptions.toolChoice = options.tool_choice;
+    }
+
     const result = await this.callProviderFn(
       this.provider,
       this.apiKey,
       this.apiModelId,
       zediMessages,
-      {
-        temperature: this.temperature,
-        maxTokens: this.maxTokens,
-        feature: this.feature,
-        ...this.extraProviderOptions,
-      },
+      providerOptions,
     );
 
     const usage = await recordZediUsage({
@@ -225,8 +267,16 @@ export class ZediChatModel extends BaseChatModel<BaseChatModelCallOptions> {
     void this.tier;
     void runManager;
 
-    const aiMessage = new AIMessage({
+    const toolCalls = result.toolCalls?.map((call) => ({
+      id: call.id,
+      name: call.name,
+      args: call.args,
+      type: "tool_call" as const,
+    }));
+
+    const aiMessage = new AIMessageChunk({
       content: result.content,
+      tool_calls: toolCalls,
       response_metadata: {
         finishReason: result.finishReason,
         usage: {
