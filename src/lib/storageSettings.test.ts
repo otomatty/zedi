@@ -52,6 +52,7 @@ describe("storageSettings", () => {
 
   afterEach(() => {
     localStorage.clear();
+    vi.restoreAllMocks();
   });
 
   describe("saveStorageSettings", () => {

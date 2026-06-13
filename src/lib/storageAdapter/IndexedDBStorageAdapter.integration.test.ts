@@ -34,25 +34,28 @@ async function putLegacyNullPage(userId: string, id: string): Promise<void> {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction("my_pages", "readwrite");
-    tx.objectStore("my_pages").put({
-      id,
-      ownerId: "owner-1",
-      noteId: null,
-      sourcePageId: null,
-      title: "legacy",
-      contentPreview: null,
-      thumbnailUrl: null,
-      sourceUrl: null,
-      createdAt: 500,
-      updatedAt: 500,
-      isDeleted: false,
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction("my_pages", "readwrite");
+      tx.objectStore("my_pages").put({
+        id,
+        ownerId: "owner-1",
+        noteId: null,
+        sourcePageId: null,
+        title: "legacy",
+        contentPreview: null,
+        thumbnailUrl: null,
+        sourceUrl: null,
+        createdAt: 500,
+        updatedAt: 500,
+        isDeleted: false,
+      });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
     });
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
+  } finally {
+    db.close();
+  }
 }
 
 describe("IndexedDBStorageAdapter (fake-indexeddb integration)", () => {

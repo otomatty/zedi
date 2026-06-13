@@ -48,11 +48,13 @@ function streamOf<T>(items: T[]): AsyncIterable<T> {
 function makeCallbacks() {
   const chunks: string[] = [];
   const completed: { content: string; wikiLinks: string[] }[] = [];
+  const errors: Error[] = [];
   const callbacks: WikiGeneratorCallbacks = {
     onChunk: (c) => chunks.push(c),
     onComplete: (r) => completed.push(r),
+    onError: (e) => errors.push(e),
   };
-  return { callbacks, chunks, completed };
+  return { callbacks, chunks, completed, errors };
 }
 
 function settings(overrides: Partial<AISettings> = {}): AISettings {
