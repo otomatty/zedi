@@ -380,6 +380,38 @@ async function applyPull(
   );
 }
 
+/**
+ * On first sync (`lastSync == null` / `0`), {@link getPagesForPush} returns every
+ * default-note row in IndexedDB, including pages just pulled from the server.
+ * Drop rows whose local metadata is not newer than the pulled copy so we only
+ * POST local-only legacy rows or offline edits (issue #1020).
+ *
+ * 初回同期では pull 直後のサーバー行も push 候補に含まれるため、サーバー版と
+ * 同じか古い行を除外し、ローカル専用・オフライン編集のみ upload する。
+ */
+function filterRedundantInitialPushPages(
+  pagesForPush: PageMetadata[],
+  pulledPages: SyncPageItem[],
+): PageMetadata[] {
+  if (pagesForPush.length === 0 || pulledPages.length === 0) {
+    return pagesForPush;
+  }
+
+  const serverUpdatedAtById = new Map<string, number>();
+  for (const row of pulledPages) {
+    serverUpdatedAtById.set(
+      row.id,
+      typeof row.updated_at === "string" ? new Date(row.updated_at).getTime() : row.updated_at,
+    );
+  }
+
+  return pagesForPush.filter((page) => {
+    const serverUpdatedAt = serverUpdatedAtById.get(page.id);
+    if (serverUpdatedAt === undefined) return true;
+    return page.updatedAt > serverUpdatedAt;
+  });
+}
+
 function getPagesForPush(
   lastSync: number | null,
   allLocalPages: PageMetadata[],
@@ -411,12 +443,9 @@ async function finishSyncNoPush(
 function finishSyncIfNoPushNeeded(
   adapter: StorageAdapter,
   res: { server_time?: string },
-  isInitialSync: boolean,
-  localPageCount: number,
   pagesForPush: PageMetadata[],
 ): Promise<boolean> {
-  const noPush = (isInitialSync && localPageCount === 0) || pagesForPush.length === 0;
-  if (!noPush) return Promise.resolve(false);
+  if (pagesForPush.length > 0) return Promise.resolve(false);
   return finishSyncNoPush(adapter, res).then(() => true);
 }
 
@@ -482,21 +511,18 @@ export async function syncWithApi(
     const allPages = await adapter.getAllPages();
     const localPageCount = allPages.length;
     const since = computeSince(options, lastSync, localPageCount);
-    const isInitialSync = since === undefined;
 
     const res = normalizeSyncResponse(await api.getSyncPages(since));
     await applyPull(adapter, res);
 
     const pulledPageIds = new Set(res.pages.map((r) => r.id));
     const allLocalPages = await adapter.getAllPages();
-    const pagesForPush = getPagesForPush(
-      lastSync,
-      allLocalPages,
-      pulledPageIds,
-      res.default_note_id,
-    );
+    let pagesForPush = getPagesForPush(lastSync, allLocalPages, pulledPageIds, res.default_note_id);
+    if (!lastSync) {
+      pagesForPush = filterRedundantInitialPushPages(pagesForPush, res.pages);
+    }
 
-    if (await finishSyncIfNoPushNeeded(adapter, res, isInitialSync, localPageCount, pagesForPush)) {
+    if (await finishSyncIfNoPushNeeded(adapter, res, pagesForPush)) {
       return;
     }
 
