@@ -35,6 +35,27 @@ export async function resolveCheckpointerForRun(): Promise<BaseCheckpointSaver |
   return getPostgresCheckpointer();
 }
 
+/**
+ * `POST /run` が `failed` セッションを再実行する前に、同一 `thread_id` の
+ * LangGraph checkpoint を破棄する。残存 state と新しい run input が reducer で
+ * 混ざり、中途半端な outline / draft から completion が組み立てられるのを防ぐ。
+ *
+ * Drops all LangGraph checkpoints for a compose session thread before a failed
+ * session is retried via `POST /run`. Without this, stale graph state merges
+ * with fresh input and can produce incoherent completion markdown.
+ */
+export async function clearComposeThreadCheckpoint(
+  threadId: string,
+  checkpointer: BaseCheckpointSaver | false,
+): Promise<void> {
+  if (checkpointer === false) return;
+  const deleter = checkpointer as BaseCheckpointSaver & {
+    deleteThread?: (id: string) => Promise<void>;
+  };
+  if (typeof deleter.deleteThread !== "function") return;
+  await deleter.deleteThread(threadId);
+}
+
 export {
   ensurePostgresCheckpointerSetup,
   getPostgresCheckpointer,

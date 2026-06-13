@@ -52,6 +52,9 @@ const { mockLoadComposeSessionProjection, mockGraphRunnerStreamEvents, mockGraph
     mockGraphRunnerResume: vi.fn(),
   }));
 
+const mockClearComposeThreadCheckpoint = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const mockResolveCheckpointerForRun = vi.hoisted(() => vi.fn().mockResolvedValue(false));
+
 vi.mock("../../routes/composeSessionProjection.js", () => ({
   loadComposeSessionProjection: (...args: unknown[]) => mockLoadComposeSessionProjection(...args),
   projectComposeStateValues: vi.fn(),
@@ -66,7 +69,8 @@ vi.mock("../../agents/runner/graphRunner.js", () => ({
 }));
 
 vi.mock("../../agents/core/checkpoint/index.js", () => ({
-  resolveCheckpointerForRun: vi.fn().mockResolvedValue(false),
+  resolveCheckpointerForRun: (...args: unknown[]) => mockResolveCheckpointerForRun(...args),
+  clearComposeThreadCheckpoint: (...args: unknown[]) => mockClearComposeThreadCheckpoint(...args),
 }));
 
 import { Hono } from "hono";
@@ -164,6 +168,8 @@ beforeEach(() => {
     yield { event: "on_chain_end", data: {} };
   });
   mockGraphRunnerResume.mockReset().mockRejectedValue(new GraphNotRegisteredError("graph-removed"));
+  mockClearComposeThreadCheckpoint.mockReset().mockResolvedValue(undefined);
+  mockResolveCheckpointerForRun.mockReset().mockResolvedValue(false);
   __resetRegistryForTests();
   // Register a graph the routes can resolve. Body is irrelevant for CRUD tests.
   registerGraph({
@@ -516,6 +522,50 @@ describe("POST /api/pages/:pageId/compose-sessions/:id/run", () => {
     const text = await res.text();
     expect(text).toContain("event:");
     expect(mockGraphRunnerStreamEvents).toHaveBeenCalled();
+  });
+
+  it("clears stale checkpoint when retrying a failed session", async () => {
+    const mockCheckpointer = { deleteThread: vi.fn() };
+    mockResolveCheckpointerForRun.mockResolvedValue(mockCheckpointer);
+    const row = sessionRow({ id: "sess-failed-retry", status: "failed" });
+    const claimed = { ...row, status: "running" };
+    const { app } = createComposeApp([
+      ...pageAccessPrefix(),
+      [row],
+      [claimed],
+      [{ id: "sess-failed-retry" }],
+    ]);
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-failed-retry/run`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ input: { mode: "instant" } }),
+    });
+    expect(res.status).toBe(200);
+    expect(mockClearComposeThreadCheckpoint).toHaveBeenCalledWith(
+      "sess-failed-retry",
+      mockCheckpointer,
+    );
+  });
+
+  it("does not clear checkpoint when starting a pending session", async () => {
+    const row = sessionRow({ id: "sess-pending-clear", status: "pending" });
+    const claimed = { ...row, status: "running" };
+    const { app } = createComposeApp([
+      ...pageAccessPrefix(),
+      [row],
+      [claimed],
+      [{ id: "sess-pending-clear" }],
+    ]);
+    const res = await app.request(
+      `/api/pages/${PAGE_ID}/compose-sessions/sess-pending-clear/run`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ input: {} }),
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(mockClearComposeThreadCheckpoint).not.toHaveBeenCalled();
   });
 });
 
