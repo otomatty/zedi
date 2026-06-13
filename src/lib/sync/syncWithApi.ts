@@ -380,6 +380,38 @@ async function applyPull(
   );
 }
 
+/**
+ * On full / initial pull (`since` omitted), {@link getPagesForPush} returns every
+ * default-note row in IndexedDB, including pages just pulled from the server.
+ * Drop rows whose local metadata is not newer than the pulled copy so we only
+ * POST local-only legacy rows or offline edits (issue #1020).
+ *
+ * フル / 初回 pull では pull 直後のサーバー行も push 候補に含まれるため、サーバー版と
+ * 同じか古い行を除外し、ローカル専用・オフライン編集のみ upload する。
+ */
+function filterRedundantInitialPushPages(
+  pagesForPush: PageMetadata[],
+  pulledPages: SyncPageItem[],
+): PageMetadata[] {
+  if (pagesForPush.length === 0 || pulledPages.length === 0) {
+    return pagesForPush;
+  }
+
+  const serverUpdatedAtById = new Map<string, number>();
+  for (const row of pulledPages) {
+    serverUpdatedAtById.set(
+      row.id,
+      typeof row.updated_at === "string" ? new Date(row.updated_at).getTime() : row.updated_at,
+    );
+  }
+
+  return pagesForPush.filter((page) => {
+    const serverUpdatedAt = serverUpdatedAtById.get(page.id);
+    if (serverUpdatedAt === undefined) return true;
+    return page.updatedAt > serverUpdatedAt;
+  });
+}
+
 function getPagesForPush(
   lastSync: number | null,
   allLocalPages: PageMetadata[],
@@ -394,12 +426,12 @@ function getPagesForPush(
   // #1020). The server skips anything else anyway, but filtering here avoids
   // needless wire traffic if foreign-note rows ever sneak into IndexedDB.
   const defaultNoteOnly = allLocalPages.filter((p) => p.noteId === defaultNoteId);
-  // Full / initial pull (`since` omitted): push every local default-note row the
-  // server did not just return. This covers legacy `noteId: null` rows revealed
-  // by `reassignNullNotePages` (issue #1020) even when `lastSync` is already
-  // set — e.g. `forceFullSyncWhenLocalEmpty` recovery from a pre-#1061 skip.
+  // Full / initial pull (`since` omitted): consider every default-note row, then
+  // let {@link filterRedundantInitialPushPages} drop server echoes. Covers legacy
+  // `noteId: null` rows revealed by `reassignNullNotePages` (issue #1020) even
+  // when `lastSync` is already set — e.g. `forceFullSyncWhenLocalEmpty` recovery.
   if (!lastSync || isInitialSync) {
-    return defaultNoteOnly.filter((p) => !pulledPageIds.has(p.id));
+    return defaultNoteOnly;
   }
   return defaultNoteOnly.filter((p) => p.updatedAt > lastSync && !pulledPageIds.has(p.id));
 }
@@ -492,13 +524,16 @@ export async function syncWithApi(
 
     const pulledPageIds = new Set(res.pages.map((r) => r.id));
     const allLocalPages = await adapter.getAllPages();
-    const pagesForPush = getPagesForPush(
+    let pagesForPush = getPagesForPush(
       lastSync,
       allLocalPages,
       pulledPageIds,
       res.default_note_id,
       isInitialSync,
     );
+    if (!lastSync || isInitialSync) {
+      pagesForPush = filterRedundantInitialPushPages(pagesForPush, res.pages);
+    }
 
     if (await finishSyncIfNoPushNeeded(adapter, res, pagesForPush)) {
       return;

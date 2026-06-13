@@ -23,7 +23,7 @@ jobs:
       - name: Checkout (with retry)
         uses: Wandalen/wretry.action@v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@v6.0.3
           attempt_limit: 3
           attempt_delay: 5000
       - uses: ./.github/actions/setup-toolchain
@@ -98,7 +98,7 @@ jobs:
       - name: Checkout (with retry)
         uses: Wandalen/wretry.action@v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@v6.0.3
           attempt_limit: 3
           attempt_delay: 5000
       - uses: ./.github/actions/setup-toolchain
@@ -156,7 +156,7 @@ jobs:
       - name: Checkout (with retry)
         uses: Wandalen/wretry.action@v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@v6.0.3
           attempt_limit: 3
           attempt_delay: 5000
       # ルートには wrangler 用の依存が必要なので setup-toolchain の install を
