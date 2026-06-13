@@ -53,6 +53,15 @@ describe("detectLegacyMirrorDirs", () => {
     assert.deepEqual(detectLegacyMirrorDirs(repoRoot), [".claude/skills"]);
   });
 
+  it("treats a regular file at the mirror path as legacy", () => {
+    const repoRoot = makeTempRepo();
+    const mirrorFile = path.join(repoRoot, ".claude", "skills");
+    fs.mkdirSync(path.dirname(mirrorFile), { recursive: true });
+    fs.writeFileSync(mirrorFile, "not-a-directory");
+
+    assert.deepEqual(detectLegacyMirrorDirs(repoRoot), [".claude/skills"]);
+  });
+
   it("ignores existing symlinks and empty directories", { skip: !canCreateSymlinks }, () => {
     const repoRoot = makeTempRepo();
     const target = path.join(repoRoot, ".agents", "skills");

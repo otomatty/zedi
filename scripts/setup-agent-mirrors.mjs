@@ -52,6 +52,11 @@ export function detectLegacyMirrorDirs(repoRoot) {
     const stat = fs.lstatSync(mirrorAbs);
     if (stat.isSymbolicLink()) continue;
 
+    if (!stat.isDirectory()) {
+      legacy.push(mirror);
+      continue;
+    }
+
     if (fs.readdirSync(mirrorAbs).length > 0) {
       legacy.push(mirror);
     }
