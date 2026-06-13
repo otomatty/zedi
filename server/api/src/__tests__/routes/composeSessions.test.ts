@@ -556,14 +556,11 @@ describe("POST /api/pages/:pageId/compose-sessions/:id/run", () => {
       [claimed],
       [{ id: "sess-pending-clear" }],
     ]);
-    const res = await app.request(
-      `/api/pages/${PAGE_ID}/compose-sessions/sess-pending-clear/run`,
-      {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({ input: {} }),
-      },
-    );
+    const res = await app.request(`/api/pages/${PAGE_ID}/compose-sessions/sess-pending-clear/run`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ input: {} }),
+    });
     expect(res.status).toBe(200);
     expect(mockClearComposeThreadCheckpoint).not.toHaveBeenCalled();
   });
