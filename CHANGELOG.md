@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.23.0 (2026-06-13)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🔧 Maintenance
+* chore(deps): bump gitleaks/gitleaks-action from 2.3.9 to 3.0.0 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1002
+* chore(deps): bump @polar-sh/sdk from 0.47.1 to 0.48.0 in /server/api in the minor-and-patch group by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1008
+* chore(deps): bump pdfjs-dist from 5.7.284 to 6.0.227 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1004
+* chore(deps): bump @anthropic-ai/sdk from 0.98.1 to 0.100.1 in the minor-and-patch group by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1003
+* chore(deps-dev): bump vitest from 4.0.18 to 4.1.0 in /server/hocuspocus in the npm_and_yarn group across 1 directory by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1049
+
+
+**Full Changelog**: https://github.com/otomatty/zedi/compare/zedi-v0.22.0...zedi-v0.23.0
+
 ## 0.22.0 (2026-05-25)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
