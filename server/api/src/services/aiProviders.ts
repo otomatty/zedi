@@ -289,7 +289,12 @@ export async function callGoogle(
 
   const functionTools = normalizeFunctionTools(options.tools);
   if (functionTools.length > 0) {
-    Object.assign(body, buildGoogleToolRequest(functionTools, options.toolChoice));
+    Object.assign(
+      body,
+      buildGoogleToolRequest(functionTools, options.toolChoice, {
+        useGoogleSearch: options.useGoogleSearch,
+      }),
+    );
   } else if (options.useGoogleSearch) {
     body.tools = [{ googleSearch: {} }];
   }

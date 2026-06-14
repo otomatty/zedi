@@ -111,6 +111,52 @@ describe("buildGoogleToolRequest", () => {
       functionCallingConfig: { mode: "NONE" },
     });
   });
+
+  it("maps auto to VALIDATED when useGoogleSearch is combined with function tools", () => {
+    const payload = buildGoogleToolRequest(normalizeFunctionTools(sampleTools), "auto", {
+      useGoogleSearch: true,
+    });
+    expect(payload.toolConfig).toEqual({
+      functionCallingConfig: { mode: "VALIDATED" },
+      includeServerSideToolInvocations: true,
+    });
+  });
+
+  it("keeps googleSearch when function tools and useGoogleSearch are both set", () => {
+    const payload = buildGoogleToolRequest(normalizeFunctionTools(sampleTools), undefined, {
+      useGoogleSearch: true,
+    });
+    expect(payload.tools).toEqual([
+      {
+        functionDeclarations: [
+          {
+            name: "structure_dialogue",
+            description: "Propose an outline",
+            parameters: sampleTools[0]?.function.parameters,
+          },
+        ],
+      },
+      { googleSearch: {} },
+    ]);
+    expect(payload.toolConfig).toEqual({
+      includeServerSideToolInvocations: true,
+    });
+  });
+
+  it("merges functionCallingConfig with includeServerSideToolInvocations", () => {
+    const payload = buildGoogleToolRequest(
+      normalizeFunctionTools(sampleTools),
+      { type: "function", function: { name: "structure_dialogue" } },
+      { useGoogleSearch: true },
+    );
+    expect(payload.toolConfig).toEqual({
+      functionCallingConfig: {
+        mode: "ANY",
+        allowedFunctionNames: ["structure_dialogue"],
+      },
+      includeServerSideToolInvocations: true,
+    });
+  });
 });
 
 describe("buildAnthropicToolRequest", () => {
