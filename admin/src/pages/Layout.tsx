@@ -108,7 +108,10 @@ export default function Layout() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold tracking-tight">{t("nav.adminPanelTitle")}</span>
             {showDevelopmentBadge && (
-              <Badge variant="outline" className="border-amber-500/60 text-amber-300">
+              <Badge
+                variant="outline"
+                className="border-amber-500/50 text-amber-600 dark:text-amber-300"
+              >
                 {t("nav.environmentDevelopment")}
               </Badge>
             )}
@@ -135,7 +138,10 @@ export default function Layout() {
           <SidebarTrigger />
           <span className="text-sm font-medium">{t("nav.adminShortTitle")}</span>
           {showDevelopmentBadge && (
-            <Badge variant="outline" className="border-amber-500/60 text-amber-300">
+            <Badge
+              variant="outline"
+              className="border-amber-500/50 text-amber-600 dark:text-amber-300"
+            >
               {t("nav.environmentDevelopment")}
             </Badge>
           )}

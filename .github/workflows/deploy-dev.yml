@@ -136,6 +136,12 @@ jobs:
           attempt_limit: 3
           attempt_delay: 5000
       - uses: ./.github/actions/setup-toolchain
+      - name: Validate admin build env
+        run: |
+          if [ -z "${{ vars.API_BASE_URL }}" ]; then
+            echo "::error::GitHub development variable API_BASE_URL must be set before deploying admin (admin-dev cannot reach the API via same-origin /api)."
+            exit 1
+          fi
       - name: Install admin dependencies
         working-directory: admin
         run: bun install --frozen-lockfile

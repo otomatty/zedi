@@ -9,7 +9,7 @@ export type AdminEnvironmentLabel = "production" | "development";
  * ビルド時に `VITE_ENV_LABEL` が渡されていればその値を返す。
  */
 export function getAdminEnvironmentLabel(): AdminEnvironmentLabel | null {
-  const raw = import.meta.env.VITE_ENV_LABEL?.trim().toLowerCase();
+  const raw = import.meta.env?.VITE_ENV_LABEL?.trim().toLowerCase();
   if (raw === "production" || raw === "development") {
     return raw;
   }
