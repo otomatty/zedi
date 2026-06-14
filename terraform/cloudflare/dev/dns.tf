@@ -12,3 +12,14 @@ resource "cloudflare_record" "pages_dev_cname" {
   ttl             = 1
   allow_overwrite = true
 }
+
+# admin-dev.zedi-note.app -> Cloudflare Pages (zedi-admin-dev)
+resource "cloudflare_record" "pages_admin_dev_cname" {
+  zone_id         = data.cloudflare_zone.zedi.id
+  name            = var.pages_admin_dev_subdomain
+  type            = "CNAME"
+  content         = "${cloudflare_pages_project.zedi_admin_dev.name}.pages.dev"
+  proxied         = true
+  ttl             = 1
+  allow_overwrite = true
+}

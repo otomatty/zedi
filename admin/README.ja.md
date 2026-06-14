@@ -35,12 +35,22 @@ npm run dev:admin
 cd admin && npm install && npm run build
 ```
 
-出力は `admin/dist`。本番は Terraform で管理する Cloudflare Pages プロジェクト `zedi-admin` に対して、GitHub Actions `deploy-prod.yml` から自動デプロイする。
+出力は `admin/dist`。デプロイ先:
+
+| 環境 | URL                       | Cloudflare Pages | ワークフロー      |
+| ---- | ------------------------- | ---------------- | ----------------- |
+| 本番 | `admin.zedi-note.app`     | `zedi-admin`     | `deploy-prod.yml` |
+| 開発 | `admin-dev.zedi-note.app` | `zedi-admin-dev` | `deploy-dev.yml`  |
+
+いずれも Terraform（`terraform/cloudflare/prod` / `dev`）で管理する。
 
 ## 環境変数
 
-- **開発:** `.env` に `ZEDI_API_PROXY_TARGET=http://localhost:3000` を設定すると `/api` がその API にプロキシされる。
-- **本番:** GitHub Actions の production environment から `VITE_API_BASE_URL=https://api.zedi-note.app` を渡してビルドする。`VITE_MAIN_APP_URL` は `https://zedi-note.app` を使用する。
+- **開発（ローカル）:** `.env` に `ZEDI_API_PROXY_TARGET=http://localhost:3000` を設定すると `/api` がその API にプロキシされる。
+- **本番:** GitHub Actions の production environment から `VITE_API_BASE_URL`・`VITE_MAIN_APP_URL`・`VITE_ENV_LABEL=production` を渡してビルドする。
+- **開発（デプロイ）:** GitHub Actions の development environment から dev API の `VITE_API_BASE_URL`、`VITE_MAIN_APP_URL`（`https://dev.zedi-note.app`）、`VITE_ENV_LABEL=development` を渡す。サイドバーに **開発環境** バッジを表示し、本番への誤操作を防ぐ。
+
+初回の dev 管理画面デプロイ後、Railway **api-dev** の `CORS_ORIGIN` に `https://admin-dev.zedi-note.app` を追加し、`ADMIN_BASE_URL=https://admin-dev.zedi-note.app` を設定すること。GitHub **development** 変数 `MAIN_APP_URL=https://dev.zedi-note.app` も未設定なら追加する。
 
 ## 仕様
 

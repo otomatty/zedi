@@ -25,6 +25,7 @@ import {
   SidebarHeader,
 } from "@zedi/ui";
 import { useApiErrorActiveCount } from "./errors/useApiErrorActiveCount";
+import { isNonProductionAdminBuild } from "@/lib/adminEnvironment";
 
 interface NavItem {
   to: string;
@@ -98,12 +99,20 @@ function NavLink({ item, isActive }: NavLinkProps) {
 export default function Layout() {
   const location = useLocation();
   const { t } = useTranslation();
+  const showDevelopmentBadge = isNonProductionAdminBuild();
 
   return (
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader className="border-sidebar-border border-b px-4 py-3">
-          <span className="text-sm font-semibold tracking-tight">{t("nav.adminPanelTitle")}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold tracking-tight">{t("nav.adminPanelTitle")}</span>
+            {showDevelopmentBadge && (
+              <Badge variant="outline" className="border-amber-500/60 text-amber-300">
+                {t("nav.environmentDevelopment")}
+              </Badge>
+            )}
+          </div>
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
@@ -125,6 +134,11 @@ export default function Layout() {
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4 md:hidden">
           <SidebarTrigger />
           <span className="text-sm font-medium">{t("nav.adminShortTitle")}</span>
+          {showDevelopmentBadge && (
+            <Badge variant="outline" className="border-amber-500/60 text-amber-300">
+              {t("nav.environmentDevelopment")}
+            </Badge>
+          )}
         </header>
         <div className="flex-1 p-4 md:p-6">
           <Outlet />
