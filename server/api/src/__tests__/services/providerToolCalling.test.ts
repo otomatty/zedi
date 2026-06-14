@@ -112,6 +112,16 @@ describe("buildGoogleToolRequest", () => {
     });
   });
 
+  it("maps auto to VALIDATED when useGoogleSearch is combined with function tools", () => {
+    const payload = buildGoogleToolRequest(normalizeFunctionTools(sampleTools), "auto", {
+      useGoogleSearch: true,
+    });
+    expect(payload.toolConfig).toEqual({
+      functionCallingConfig: { mode: "VALIDATED" },
+      includeServerSideToolInvocations: true,
+    });
+  });
+
   it("keeps googleSearch when function tools and useGoogleSearch are both set", () => {
     const payload = buildGoogleToolRequest(normalizeFunctionTools(sampleTools), undefined, {
       useGoogleSearch: true,

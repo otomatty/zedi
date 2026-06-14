@@ -204,7 +204,7 @@ export function buildGoogleToolRequest(
     };
   } else if (toolChoice === "auto") {
     toolConfig.functionCallingConfig = {
-      mode: "AUTO",
+      mode: options?.useGoogleSearch ? "VALIDATED" : "AUTO",
     };
   }
   if (options?.useGoogleSearch) {
