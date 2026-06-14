@@ -1,6 +1,7 @@
 {
   "adminPanelTitle": "Zedi 管理画面",
   "adminShortTitle": "管理画面",
+  "environmentDevelopment": "開発環境",
   "menu": "メニュー",
   "unreadBadgeAriaLabel_one": "未対応の API エラー {{count}} 件",
   "unreadBadgeAriaLabel_other": "未対応の API エラー {{count}} 件",

@@ -20,3 +20,9 @@ variable "pages_dev_subdomain" {
   description = "Subdomain for dev frontend (e.g. dev -> dev.zedi-note.app)"
   default     = "dev"
 }
+
+variable "pages_admin_dev_subdomain" {
+  type        = string
+  description = "Subdomain for dev admin (e.g. admin-dev -> admin-dev.zedi-note.app)"
+  default     = "admin-dev"
+}
