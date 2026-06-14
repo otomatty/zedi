@@ -1,6 +1,7 @@
 {
   "adminPanelTitle": "Zedi Admin",
   "adminShortTitle": "Admin",
+  "environmentDevelopment": "Development",
   "menu": "Menu",
   "unreadBadgeAriaLabel_one": "{{count}} unresolved API error",
   "unreadBadgeAriaLabel_other": "{{count}} unresolved API errors",

@@ -116,3 +116,64 @@ jobs:
           # Cloudflare API truncates commit message at ~384 bytes without UTF-8 boundary check (workers-sdk#11749).
           # Use an explicit ASCII-only message to avoid "Invalid commit message" (code 8000111) when git message contains multi-byte chars.
           command: pages deploy dist --project-name=zedi-dev --commit-message "Deploy from GitHub Actions (develop) ${{ github.sha }}"
+
+  deploy-admin:
+    name: Deploy Admin
+    needs:
+      - migrate
+      - verify-server-health
+    if: |
+      always()
+      && needs.migrate.result == 'success'
+      && (needs.verify-server-health.result == 'success' || needs.verify-server-health.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
+        with:
+          action: actions/checkout@v6.0.3
+          attempt_limit: 3
+          attempt_delay: 5000
+      - uses: ./.github/actions/setup-toolchain
+      - name: Validate admin build env
+        run: |
+          if [ -z "${{ vars.API_BASE_URL }}" ]; then
+            echo "::error::GitHub development variable API_BASE_URL must be set before deploying admin (admin-dev cannot reach the API via same-origin /api)."
+            exit 1
+          fi
+      - name: Install admin dependencies
+        working-directory: admin
+        run: bun install --frozen-lockfile
+      - name: Build Admin
+        working-directory: admin
+        run: bun run build
+        env:
+          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+          VITE_MAIN_APP_URL: ${{ vars.MAIN_APP_URL || 'https://dev.zedi-note.app' }}
+          VITE_ENV_LABEL: development
+      - name: Deploy Admin to Cloudflare Pages
+        uses: nick-fields/retry@v4
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        with:
+          max_attempts: 3
+          timeout_minutes: 5
+          retry_wait_seconds: 60
+          command: >
+            bunx wrangler pages deploy admin/dist --project-name=zedi-admin-dev
+            --commit-message "Deploy admin from GitHub Actions (develop) ${{ github.sha }}"
+      - name: Upload Wrangler logs (Admin)
+        if: failure()
+        continue-on-error: true
+        run: |
+          mkdir -p wrangler-logs-admin-dev
+          if [ -d "$HOME/.config/.wrangler/logs" ]; then cp -r "$HOME/.config/.wrangler/logs/"* wrangler-logs-admin-dev/ 2>/dev/null || true; fi
+      - name: Upload Wrangler logs (Admin) artifact
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: wrangler-logs-admin-dev
+          path: wrangler-logs-admin-dev/

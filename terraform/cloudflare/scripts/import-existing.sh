@@ -63,6 +63,7 @@ ID_API_TXT=$(get_id "_railway-verify.api.zedi-note.app" "TXT")
 ID_REALTIME_CNAME=$(get_id "realtime.zedi-note.app" "CNAME")
 ID_REALTIME_TXT=$(get_id "_railway-verify.realtime.zedi-note.app" "TXT")
 ID_DEV_CNAME=$(get_id "dev.zedi-note.app" "CNAME")
+ID_ADMIN_DEV_CNAME=$(get_id "admin-dev.zedi-note.app" "CNAME")
 ID_APEX_CNAME=$(get_id "zedi-note.app" "CNAME")
 ID_ADMIN_CNAME=$(get_id "admin.zedi-note.app" "CNAME")
 
@@ -97,13 +98,20 @@ import_dev() {
   cd "$ROOT_DIR/dev"
   terraform init -input=false
   terraform import -input=false 'cloudflare_pages_project.zedi_dev' "$ACCOUNT_ID/zedi-dev" || echo "Skip zedi-dev Pages project (not found or already imported)"
+  terraform import -input=false 'cloudflare_pages_project.zedi_admin_dev' "$ACCOUNT_ID/zedi-admin-dev" || echo "Skip zedi-admin-dev Pages project (not found or already imported)"
   if [ -n "$ID_DEV_CNAME" ]; then
     terraform import -input=false 'cloudflare_record.pages_dev_cname' "$ZONE_ID/$ID_DEV_CNAME" || true
   else
     echo "Skip dev CNAME (not found)"
   fi
+  if [ -n "$ID_ADMIN_DEV_CNAME" ]; then
+    terraform import -input=false 'cloudflare_record.pages_admin_dev_cname' "$ZONE_ID/$ID_ADMIN_DEV_CNAME" || true
+  else
+    echo "Skip admin-dev CNAME (not found)"
+  fi
   # cloudflare_pages_domain は apply で作成されるか既存なら import。ID 形式: account_id/project_name/domain
-  terraform import -input=false 'cloudflare_pages_domain.zedi_dev' "$ACCOUNT_ID/zedi-dev/dev.zedi-note.app" 2>/dev/null || echo "Skip pages_domain (optional)"
+  terraform import -input=false 'cloudflare_pages_domain.zedi_dev' "$ACCOUNT_ID/zedi-dev/dev.zedi-note.app" 2>/dev/null || echo "Skip pages_domain zedi_dev (optional)"
+  terraform import -input=false 'cloudflare_pages_domain.zedi_admin_dev' "$ACCOUNT_ID/zedi-admin-dev/admin-dev.zedi-note.app" 2>/dev/null || echo "Skip pages_domain zedi_admin_dev (optional)"
 }
 
 import_prod() {

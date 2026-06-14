@@ -3,7 +3,21 @@
  *
  * 既存 ai-api/lambda/src/services/aiProviders.ts の Drizzle 移植版
  */
-import type { AIMessage, AIProviderType, AIChatOptions, TokenUsage } from "../types/index.js";
+import type {
+  AIMessage,
+  AIChatOptions,
+  AIProviderCallResult,
+  AIProviderType,
+} from "../types/index.js";
+import {
+  buildAnthropicToolRequest,
+  buildGoogleToolRequest,
+  buildOpenAiToolRequest,
+  normalizeFunctionTools,
+  parseAnthropicToolCalls,
+  parseGoogleToolCalls,
+  parseOpenAiToolCalls,
+} from "./providerToolCalling.js";
 
 // ── OpenAI ──────────────────────────────────────────────────────────────────
 
@@ -12,13 +26,14 @@ export async function callOpenAI(
   model: string,
   messages: AIMessage[],
   options: AIChatOptions = {},
-): Promise<{ content: string; usage: TokenUsage; finishReason: string }> {
+): Promise<AIProviderCallResult> {
   const body: Record<string, unknown> = {
     model,
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
     temperature: options.temperature ?? 0.7,
     max_tokens: options.maxTokens ?? 4096,
     stream: false,
+    ...buildOpenAiToolRequest(normalizeFunctionTools(options.tools), options.toolChoice),
   };
 
   if (options.useWebSearch && options.webSearchOptions) {
@@ -40,12 +55,25 @@ export async function callOpenAI(
   }
 
   const data = (await res.json()) as {
-    choices: Array<{ message: { content: string }; finish_reason: string }>;
+    choices: Array<{
+      message: {
+        content?: string | null;
+        tool_calls?: Array<{
+          id?: string;
+          function?: { name?: string; arguments?: string };
+        }>;
+      };
+      finish_reason: string;
+    }>;
     usage: { prompt_tokens: number; completion_tokens: number };
   };
 
+  const message = data.choices[0]?.message;
+  const toolCalls = message ? parseOpenAiToolCalls(message) : [];
+
   return {
-    content: data.choices[0]?.message?.content ?? "",
+    content: message?.content ?? "",
+    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
     usage: {
       inputTokens: data.usage?.prompt_tokens ?? 0,
       outputTokens: data.usage?.completion_tokens ?? 0,
@@ -107,7 +135,7 @@ export async function callAnthropic(
   model: string,
   messages: AIMessage[],
   options: AIChatOptions = {},
-): Promise<{ content: string; usage: TokenUsage; finishReason: string }> {
+): Promise<AIProviderCallResult> {
   const systemMessages = messages.filter((m) => m.role === "system");
   const nonSystemMessages = messages.filter((m) => m.role !== "system");
 
@@ -116,6 +144,7 @@ export async function callAnthropic(
     messages: nonSystemMessages.map((m) => ({ role: m.role, content: m.content })),
     max_tokens: options.maxTokens ?? 4096,
     temperature: options.temperature ?? 0.7,
+    ...buildAnthropicToolRequest(normalizeFunctionTools(options.tools), options.toolChoice),
   };
 
   if (systemMessages.length > 0) {
@@ -138,13 +167,33 @@ export async function callAnthropic(
   }
 
   const data = (await res.json()) as {
-    content: Array<{ text: string }>;
+    content: Array<{
+      type?: string;
+      text?: string;
+      id?: string;
+      name?: string;
+      input?: Record<string, unknown>;
+    }>;
     stop_reason: string;
     usage: { input_tokens: number; output_tokens: number };
   };
 
+  const contentBlocks = data.content ?? [];
+  const toolCalls = parseAnthropicToolCalls(contentBlocks);
+  const textContent = contentBlocks
+    .filter(
+      (block) =>
+        block &&
+        block.type !== "tool_use" &&
+        typeof block.text === "string" &&
+        (block.type === "text" || block.type === undefined),
+    )
+    .map((block) => block.text ?? "")
+    .join("");
+
   return {
-    content: data.content.map((c) => c.text).join(""),
+    content: textContent,
+    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
     usage: {
       inputTokens: data.usage?.input_tokens ?? 0,
       outputTokens: data.usage?.output_tokens ?? 0,
@@ -213,7 +262,7 @@ export async function callGoogle(
   model: string,
   messages: AIMessage[],
   options: AIChatOptions = {},
-): Promise<{ content: string; usage: TokenUsage; finishReason: string }> {
+): Promise<AIProviderCallResult> {
   const contents = messages
     .filter((m) => m.role !== "system")
     .map((m) => ({
@@ -238,7 +287,15 @@ export async function callGoogle(
     body.systemInstruction = { parts: [{ text: systemInstruction }] };
   }
 
-  if (options.useGoogleSearch) {
+  const functionTools = normalizeFunctionTools(options.tools);
+  if (functionTools.length > 0) {
+    Object.assign(
+      body,
+      buildGoogleToolRequest(functionTools, options.toolChoice, {
+        useGoogleSearch: options.useGoogleSearch,
+      }),
+    );
+  } else if (options.useGoogleSearch) {
     body.tools = [{ googleSearch: {} }];
   }
 
@@ -261,16 +318,24 @@ export async function callGoogle(
 
   const data = (await res.json()) as {
     candidates: Array<{
-      content: { parts: Array<{ text: string }> };
+      content: {
+        parts: Array<{
+          text?: string;
+          functionCall?: { name?: string; args?: Record<string, unknown> };
+        }>;
+      };
       finishReason: string;
     }>;
     usageMetadata?: { promptTokenCount: number; candidatesTokenCount: number };
   };
 
   const candidate = data.candidates?.[0];
+  const parts = candidate?.content?.parts ?? [];
+  const toolCalls = parseGoogleToolCalls(parts);
 
   return {
-    content: candidate?.content?.parts?.map((p) => p.text).join("") ?? "",
+    content: parts.map((p) => p.text ?? "").join(""),
+    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
     usage: {
       inputTokens: data.usageMetadata?.promptTokenCount ?? 0,
       outputTokens: data.usageMetadata?.candidatesTokenCount ?? 0,
@@ -416,7 +481,7 @@ export async function callProvider(
   model: string,
   messages: AIMessage[],
   options: AIChatOptions = {},
-): Promise<{ content: string; usage: TokenUsage; finishReason: string }> {
+): Promise<AIProviderCallResult> {
   switch (provider) {
     case "openai":
       return callOpenAI(apiKey, model, messages, options);

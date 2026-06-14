@@ -6,11 +6,11 @@ Cloudflare resources are split into **shared / dev / prod** stacks so dev and pr
 
 ## Directories and roles
 
-| Stack      | Directory | Terraform Cloud Workspace | Resources managed                                                                |
-| ---------- | --------- | ------------------------- | -------------------------------------------------------------------------------- |
-| **shared** | `shared/` | `cloudflare-shared`       | Zone reference; api/realtime DNS (CNAME + Railway verification TXT)              |
-| **dev**    | `dev/`    | `cloudflare-dev`          | Pages `zedi-dev`; DNS for `dev.zedi-note.app`                                    |
-| **prod**   | `prod/`   | `cloudflare-prod`         | Pages `zedi` and `zedi-admin`; DNS for `zedi-note.app` and `admin.zedi-note.app` |
+| Stack      | Directory | Terraform Cloud Workspace | Resources managed                                                                                |
+| ---------- | --------- | ------------------------- | ------------------------------------------------------------------------------------------------ |
+| **shared** | `shared/` | `cloudflare-shared`       | Zone reference; api/realtime DNS (CNAME + Railway verification TXT)                              |
+| **dev**    | `dev/`    | `cloudflare-dev`          | Pages `zedi-dev` and `zedi-admin-dev`; DNS for `dev.zedi-note.app` and `admin-dev.zedi-note.app` |
+| **prod**   | `prod/`   | `cloudflare-prod`         | Pages `zedi` and `zedi-admin`; DNS for `zedi-note.app` and `admin.zedi-note.app`                 |
 
 ## Apply timing
 
