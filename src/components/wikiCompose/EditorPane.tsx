@@ -34,6 +34,10 @@ const PreviewMarkdown: React.FC<{ source: string }> = React.memo(({ source }) =>
   <ReactMarkdown
     remarkPlugins={[remarkGfm]}
     components={{
+      // Drop images so the preview never fires off-site requests (tracking
+      // beacons) for URLs that slipped into the AI-generated body.
+      // 画像はトラッキングビーコン化を防ぐためプレビューでは描画しない。
+      img: () => null,
       a: ({ href, children }) => {
         if (href?.startsWith("wiki:")) {
           return <span className="wiki-link">{children}</span>;
