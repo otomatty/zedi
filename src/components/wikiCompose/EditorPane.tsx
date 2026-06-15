@@ -30,7 +30,7 @@ import type { DraftedSection, OutlineSection } from "@/lib/wikiCompose/types";
  * draft 本文は Markdown ソースなので、`<pre>` ではなくパースして描画する。
  * `[[Title]]` は wiki link チップとして表示する（プレビューでは遷移しない）。
  */
-const PreviewMarkdown: React.FC<{ source: string }> = ({ source }) => (
+const PreviewMarkdown: React.FC<{ source: string }> = React.memo(({ source }) => (
   <ReactMarkdown
     remarkPlugins={[remarkGfm]}
     components={{
@@ -49,7 +49,8 @@ const PreviewMarkdown: React.FC<{ source: string }> = ({ source }) => (
   >
     {replaceWikiLinksInMarkdown(source)}
   </ReactMarkdown>
-);
+));
+PreviewMarkdown.displayName = "PreviewMarkdown";
 
 export interface EditorPaneProps {
   title: string;
