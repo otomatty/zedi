@@ -25,7 +25,11 @@ const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
  */
 export async function isAnimatedPng(file: File | Blob): Promise<boolean> {
   try {
-    const buffer = await file.arrayBuffer();
+    // acTL は仕様上 IDAT より前（＝ファイル先頭付近）に現れるため、
+    // 巨大な PNG でも先頭の一部だけ読めば判定できる。モバイル等での OOM を避けるため
+    // ファイル全体ではなく先頭 1MB のみをメモリに読み込む。
+    const slice = file.slice(0, 1024 * 1024);
+    const buffer = await slice.arrayBuffer();
     const bytes = new Uint8Array(buffer);
 
     // PNG シグネチャを満たさなければ PNG ではない
