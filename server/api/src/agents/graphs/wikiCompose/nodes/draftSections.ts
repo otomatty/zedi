@@ -30,7 +30,13 @@ const SECTION_SYSTEM_PROMPT =
   "research list. Only cite sources that genuinely support the claim.\n" +
   "4. Aim for ~250–500 words. Use sub-headings only when depth=2 is " +
   "specified for sub-sections within the same draft pass.\n" +
-  "5. Plain Markdown; no HTML, no YAML frontmatter.";
+  "5. When you mention a distinct concept, entity, or term that deserves its " +
+  "own wiki page, wrap its first significant mention in a wiki link using " +
+  "double brackets: `[[Term]]`. Use the natural surface form as the title " +
+  "(e.g. `[[Transformer architecture]]`). Do NOT wiki-link the article's own " +
+  "title, generic words, or the same term more than once per section, and " +
+  "never put a wiki link inside a heading or inside a `[#N]` citation.\n" +
+  "6. Plain Markdown; no HTML, no YAML frontmatter.";
 
 function numberedSourceList(sources: Source[], allowedIds?: string[]): string[] {
   const allow = allowedIds && allowedIds.length > 0 ? new Set(allowedIds) : null;

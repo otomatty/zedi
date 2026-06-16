@@ -12,8 +12,49 @@
  */
 import React from "react";
 import { useTranslation } from "react-i18next";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { cn } from "@zedi/ui";
+import { replaceWikiLinksInMarkdown } from "@/components/aiChat/aiChatMarkdownHelpers";
 import type { DraftedSection, OutlineSection } from "@/lib/wikiCompose/types";
+
+/**
+ * Render compose body Markdown to styled HTML.
+ *
+ * The draft body is Markdown source (headings, lists, `[[wiki links]]`, …), so
+ * it must be parsed — not dumped into a `<pre>` — for the surrounding `prose`
+ * styles to apply. `[[Title]]` is normalised to `[Title](wiki:Title)` and shown
+ * as a non-navigating `.wiki-link` chip (the compose preview cannot yet resolve
+ * whether the target page exists).
+ *
+ * draft 本文は Markdown ソースなので、`<pre>` ではなくパースして描画する。
+ * `[[Title]]` は wiki link チップとして表示する（プレビューでは遷移しない）。
+ */
+const PreviewMarkdown: React.FC<{ source: string }> = React.memo(({ source }) => (
+  <ReactMarkdown
+    remarkPlugins={[remarkGfm]}
+    components={{
+      // Drop images so the preview never fires off-site requests (tracking
+      // beacons) for URLs that slipped into the AI-generated body.
+      // 画像はトラッキングビーコン化を防ぐためプレビューでは描画しない。
+      img: () => null,
+      a: ({ href, children }) => {
+        if (href?.startsWith("wiki:")) {
+          return <span className="wiki-link">{children}</span>;
+        }
+        const safeHref = href && /^(https?|mailto|tel):/i.test(href) ? href : undefined;
+        return (
+          <a href={safeHref} target="_blank" rel="noopener noreferrer">
+            {children}
+          </a>
+        );
+      },
+    }}
+  >
+    {replaceWikiLinksInMarkdown(source)}
+  </ReactMarkdown>
+));
+PreviewMarkdown.displayName = "PreviewMarkdown";
 
 export interface EditorPaneProps {
   title: string;
@@ -73,13 +114,10 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                     {isStreaming ? t("wikiCompose.editor.streaming") : section.intent}
                   </p>
                 ) : (
-                  // Plain-text rendering of the running buffer. Once the
-                  // section finalises we still render as <pre> to preserve
-                  // formatting; a future iteration can mount Tiptap here.
-                  // 進行中はバッファをそのまま <pre> で出す（フォーマット保持）。
-                  <pre className="!bg-transparent !p-0 font-sans text-sm leading-relaxed whitespace-pre-wrap">
-                    {body}
-                  </pre>
+                  // Render the running/finalised buffer as Markdown so headings,
+                  // lists and wiki links pick up the surrounding `prose` styles.
+                  // バッファを Markdown として描画し prose スタイルを効かせる。
+                  <PreviewMarkdown source={body} />
                 )}
               </section>
             );
@@ -92,9 +130,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           <h3 className="text-muted-foreground text-xs tracking-wide uppercase">
             {t("wikiCompose.editor.finalMarkdown")}
           </h3>
-          <pre className="!bg-muted/40 rounded-md p-3 font-mono text-xs whitespace-pre-wrap">
-            {completedMarkdown}
-          </pre>
+          <PreviewMarkdown source={completedMarkdown} />
         </section>
       ) : null}
     </div>
