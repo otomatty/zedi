@@ -125,6 +125,7 @@ export function isStorageConfiguredForUpload(settings: StorageSettings): boolean
 // Re-export types and utilities
 export * from "./types";
 export { convertToWebP } from "./convertToWebP";
+export { isAnimatedPng } from "./isAnimatedPng";
 export { GyazoProvider } from "./providers/GyazoProvider";
 export { GitHubProvider } from "./providers/GitHubProvider";
 export { GoogleDriveProvider } from "./providers/GoogleDriveProvider";
