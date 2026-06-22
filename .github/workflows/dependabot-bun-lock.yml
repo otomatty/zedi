@@ -47,7 +47,7 @@ jobs:
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.0
         with:
           # PR ブランチに直接書き戻すため、head ref をチェックアウトする。
           # Check out the PR head ref so we can push commits back to it.
