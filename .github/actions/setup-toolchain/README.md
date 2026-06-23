@@ -95,7 +95,7 @@ jobs:
       - name: Checkout (with retry)
         uses: Wandalen/wretry.action@v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@v7.0.0
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -117,7 +117,7 @@ steps:
   - name: Checkout (with retry)
     uses: Wandalen/wretry.action@v3
     with:
-      action: actions/checkout@v6.0.2
+      action: actions/checkout@v7.0.0
       with: |
         fetch-depth: 0
       attempt_limit: 3
@@ -141,7 +141,7 @@ steps:
   - name: Checkout (with retry)
     uses: Wandalen/wretry.action@v3
     with:
-      action: actions/checkout@v6.0.2
+      action: actions/checkout@v7.0.0
       attempt_limit: 3
       attempt_delay: 5000
 
@@ -163,7 +163,7 @@ steps:
   - name: Checkout (with retry)
     uses: Wandalen/wretry.action@v3
     with:
-      action: actions/checkout@v6.0.2
+      action: actions/checkout@v7.0.0
       attempt_limit: 3
       attempt_delay: 5000
 
@@ -200,7 +200,7 @@ composite action (see samples above).
 
 | ステップ / step                 | リトライ実装 / retry mechanism          | 試行回数 / attempts | 待機 / delay                                |
 | ------------------------------- | --------------------------------------- | ------------------- | ------------------------------------------- |
-| `actions/checkout@v6.0.2`       | caller 側 / `Wandalen/wretry.action@v3` | 3                   | 5000 ms                                     |
+| `actions/checkout@v7.0.0`       | caller 側 / `Wandalen/wretry.action@v3` | 3                   | 5000 ms                                     |
 | `actions/setup-node@v6`         | `Wandalen/wretry.action@v3`             | 3                   | 5000 ms                                     |
 | `oven-sh/setup-bun@v2`          | `Wandalen/wretry.action@v3`             | 3                   | 5000 ms                                     |
 | `bun install --frozen-lockfile` | shell 内ループ / inline shell loop      | 3                   | 5s → 10s（線形バックオフ / linear backoff） |
