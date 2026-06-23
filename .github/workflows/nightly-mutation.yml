@@ -26,7 +26,7 @@ jobs:
       - name: Checkout (with retry)
         uses: Wandalen/wretry.action@v3
         with:
-          action: actions/checkout@v6.0.3
+          action: actions/checkout@v7.0.0
           attempt_limit: 3
           attempt_delay: 5000
 
