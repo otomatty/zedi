@@ -1,19 +1,9 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { eq, sql } from "drizzle-orm";
 import { thumbnailObjects, thumbnailTierQuotas } from "../schema/index.js";
 import { getUserTier } from "./subscriptionService.js";
 import { getEnv } from "../lib/env.js";
+import type { StorageClient } from "../lib/storage/index.js";
 import type { Database } from "../types/index.js";
-
-const s3 = new S3Client({
-  endpoint: getEnv("STORAGE_ENDPOINT"),
-  region: "auto",
-  credentials: {
-    accessKeyId: getEnv("STORAGE_ACCESS_KEY"),
-    secretAccessKey: getEnv("STORAGE_SECRET_KEY"),
-  },
-  forcePathStyle: true,
-});
 
 // `thumbnail_tier_quotas` がシードされていない環境でフォールバック上限が小さすぎると
 // 数件クリップしただけで 413 を踏む。drizzle/0020_seed_thumbnail_tier_quotas.sql の
@@ -105,6 +95,7 @@ export async function commitImage(
   sourceUrl: string,
   fallbackUrl: string | undefined,
   db: Database,
+  storage: StorageClient,
 ): Promise<{ imageUrl: string; objectId: string }> {
   // BETTER_AUTH_URL は必須。S3 アップロードや DB 挿入より前に検証して fail-fast する。
   // Validate BETTER_AUTH_URL before any side effects so a missing env var cannot
@@ -142,16 +133,12 @@ export async function commitImage(
 
   const objectId = crypto.randomUUID();
   const s3Key = `users/${userId}/thumbnails/${objectId}.${ext}`;
-  const bucketName = process.env.STORAGE_BUCKET_NAME;
 
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: bucketName,
-      Key: s3Key,
-      Body: buffer,
-      ContentType: mimeType,
-    }),
-  );
+  await storage.putObject({
+    key: s3Key,
+    body: buffer,
+    contentType: mimeType,
+  });
 
   await db.insert(thumbnailObjects).values({
     id: objectId,

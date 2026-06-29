@@ -24,10 +24,22 @@
 - 既存オブジェクトの R2 への移送（必要なら `rclone` 等。ビッグバン前提なら新規のみでも可）。
 - **検証**: MCP `r2_buckets_list`、dev で `/api/media` アップロード→取得→削除の E2E。
 
-## Phase 2: server を Workers 化 (中リスク)
+## Phase 2: server を Workers 化 (中リスク) — Phase 2a 実装済み
+
+**Phase 2a（完了）**: API Worker 骨格 + R2 binding + storage 抽象化 + dev deploy CI。
+
+- `server/api/wrangler.jsonc`（`env.dev` / `env.production`、R2 `STORAGE_BUCKET` binding）
+- `server/api/src/worker.ts` — Hono `export default app`（Workers エントリ）
+- `server/api/src/lib/storage/` — `StorageClient` 抽象（R2 binding + S3 互換 presign）
+- `storageMiddleware` — リクエストごとに `c.set("storage", ...)`
+- `deploy-api-worker-dev.yml` — `develop` push で `wrangler deploy --env dev`
+- Railway `index.ts` は維持（並行稼働）。本番 DNS 切替は Phase 2b 以降。
+
+**Phase 2b（未着手）**: #1091 全 API の Workers 本番切替、#1092 mcp、#1093 Redis→KV。
 
 - #1091 api（Hono は Workers 互換、`nodejs_compat`）/ #1092 mcp / #1093 Redis→KV。
-- 各 `wrangler.jsonc` に `env.dev` / `env.production`、Secrets は `wrangler secret put`。
+- Worker secrets（`DATABASE_URL`, `REDIS_URL`, `BETTER_AUTH_*`, `STORAGE_*` for presign）を
+  `wrangler secret put --env dev` で設定してから health/E2E 検証。
 - **検証**: `wrangler dev` ローカル → dev デプロイ → `/health` の `git_commit_sha` 一致。
 
 ## Phase 3: フロント/admin を Pages→Workers Static Assets (Terraform 廃止の本丸)

@@ -1,0 +1,54 @@
+name: Deploy API Worker (dev)
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "server/api/**"
+      - ".github/workflows/deploy-api-worker-dev.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  deploy-api-worker-dev:
+    name: Deploy zedi-api-dev Worker
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@v3
+        with:
+          action: actions/checkout@v7.0.0
+          attempt_limit: 3
+          attempt_delay: 5000
+      - name: Install dependencies
+        working-directory: server/api
+        run: bun install --frozen-lockfile
+      - name: Deploy to Cloudflare Workers (dev)
+        uses: nick-fields/retry@v4
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        with:
+          max_attempts: 3
+          timeout_minutes: 10
+          retry_wait_seconds: 60
+          command: >
+            cd server/api &&
+            bunx wrangler deploy --env dev
+            --var GIT_COMMIT_SHA:${{ github.sha }}
+            --var ENVIRONMENT:development
+      - name: Wait for Worker /api/health
+        if: ${{ vars.WORKER_API_BASE_URL != '' }}
+        uses: nick-fields/retry@v4
+        with:
+          max_attempts: 10
+          timeout_minutes: 3
+          retry_wait_seconds: 20
+          command: |
+            curl --fail --show-error --silent "${{ vars.WORKER_API_BASE_URL }}/api/health"

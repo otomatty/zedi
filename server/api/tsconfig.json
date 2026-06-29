@@ -16,8 +16,8 @@
     "declarationMap": true,
     "sourceMap": true,
     "noUncheckedIndexedAccess": true,
-    "types": ["node", "bun-types"]
+    "types": ["node", "bun-types", "@cloudflare/workers-types"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "worker-configuration.d.ts"],
   "exclude": ["node_modules", "dist"]
 }
