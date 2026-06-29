@@ -42,6 +42,20 @@
 > Worker 名は Cloudflare の名前制約（長さ等）に従う。環境は単一 Worker を `env.*` で分けるか、
 > 名前サフィックス（`-dev`）で分けるかを Phase 2 着手時に確定する。
 
+## R2 バケット / R2 buckets (#1089)
+
+メディア / サムネイル / PDF ハイライトを単一バケットに格納する（現状の `STORAGE_BUCKET_NAME`
+1 個構成を踏襲）。環境ごとに 1 バケット。
+
+| 環境 | バケット名          | 状態                       |
+| ---- | ------------------- | -------------------------- |
+| dev  | `zedi-storage-dev`  | 作成済み (APAC / Standard) |
+| prod | `zedi-storage-prod` | 作成済み (APAC / Standard) |
+
+- S3 互換エンドポイント: `https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com`
+- R2 API トークン（Access Key ID / Secret）はダッシュボード R2 → Manage R2 API Tokens で発行
+  （MCP では発行不可）。`STORAGE_*` env に設定する。
+
 ## 環境変数の対応 / Env vars
 
 GitHub Environments（development / production）の既存 `vars` / `secrets`:

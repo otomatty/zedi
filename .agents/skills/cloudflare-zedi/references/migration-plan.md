@@ -13,8 +13,16 @@
 
 ## Phase 1: #1089 R2 (低リスク)
 
-- api 用 `wrangler.jsonc` に R2 binding を追加、`server/api` の S3 クライアントを R2 へ切替。
-- **検証**: MCP `r2_bucket_create` → `r2_buckets_list`、アップロード/取得の E2E。
+**方針**: R2 は S3 互換 API を持つため、Railway 上の現 API（`@aws-sdk/client-s3`）はコード変更
+なしで R2 に向けられる。Worker の R2 バインディングは API の Workers 化（Phase 2 / #1091）まで
+導入しない。Phase 1 は「S3 互換エンドポイント＋ env 切替」に限定する。
+
+- バケット作成: `zedi-storage-dev` / `zedi-storage-prod`（作成済み。MCP `r2_bucket_create`）。
+- R2 API トークン発行（ダッシュボード R2 → Manage R2 API Tokens。MCP では不可）。
+- `STORAGE_ENDPOINT` / `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` / `STORAGE_BUCKET_NAME` を
+  Railway（dev/prod）に設定。`.env.example` に書式を記載済み。
+- 既存オブジェクトの R2 への移送（必要なら `rclone` 等。ビッグバン前提なら新規のみでも可）。
+- **検証**: MCP `r2_buckets_list`、dev で `/api/media` アップロード→取得→削除の E2E。
 
 ## Phase 2: server を Workers 化 (中リスク)
 
