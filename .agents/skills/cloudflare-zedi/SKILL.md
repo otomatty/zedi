@@ -71,6 +71,15 @@ Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in know
 [references/migration-plan.md](references/migration-plan.md) に従う。1 フェーズ = 1 PR を基本とし、
 各 PR で「実装 → MCP で状態確認 → health/SHA 検証」のループを回す。
 
+## Secrets / Bindings ライフサイクル
+
+フェーズごとに **何を登録・更新・削除してよいか** のチェックリストは
+[references/secrets-template.md](references/secrets-template.md) を正とする。
+Worker 切替 PR を出す前に、Railway Variables と `wrangler secret list` を突合すること。
+
+_Secrets lifecycle per phase: [secrets-template.md](references/secrets-template.md).
+Reconcile Railway vars with `wrangler secret list` before each cutover PR._
+
 ## やってはいけないこと / Guardrails
 
 - **Terraform に新規リソースを足さない。** 移行対象（Workers/R2/D1/KV/DO）はすべて
