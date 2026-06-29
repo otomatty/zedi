@@ -30,46 +30,10 @@
  * delete fires after a successful page commit, the server preserves the
  * thumbnail.
  */
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { and, eq } from "drizzle-orm";
 import { pages, thumbnailObjects } from "../schema/index.js";
-import { getEnv } from "../lib/env.js";
+import type { StorageClient } from "../lib/storage/index.js";
 import type { Database } from "../types/index.js";
-
-// S3 クライアントとバケット名は遅延初期化する。`serve.ts` と違い、このサービス
-// は `pages.ts` から import される。`pages.ts` のテスト（routes/pages.test.ts）
-// などで STORAGE_* を未設定のまま実行されるケースがあり、モジュール直下で
-// `getEnv` を呼ぶと無関係なテストまで道連れに落ちてしまう。最初の GC 呼び出し
-// 時にだけ必須環境変数を要求し、テスト環境では env を仕込まずに pages の他
-// ロジックを検証できるようにする。
-//
-// Lazy-init the S3 client and bucket name. Unlike `serve.ts`, this module is
-// imported by `pages.ts`, which has tests that don't set STORAGE_* (the pages
-// route doesn't need storage for most cases). Calling `getEnv` at module
-// top-level would crash those unrelated tests on import; deferring the lookup
-// keeps the dependency local to actual GC calls.
-let s3: S3Client | undefined;
-let bucket: string | undefined;
-
-function getS3(): S3Client {
-  if (!s3) {
-    s3 = new S3Client({
-      endpoint: getEnv("STORAGE_ENDPOINT"),
-      region: "auto",
-      credentials: {
-        accessKeyId: getEnv("STORAGE_ACCESS_KEY"),
-        secretAccessKey: getEnv("STORAGE_SECRET_KEY"),
-      },
-      forcePathStyle: true,
-    });
-  }
-  return s3;
-}
-
-function getBucket(): string {
-  if (!bucket) bucket = getEnv("STORAGE_BUCKET_NAME");
-  return bucket;
-}
 
 /**
  * `deleteThumbnailObject` の結果種別。
@@ -145,6 +109,7 @@ export async function deleteThumbnailObject(
   objectId: string,
   userId: string,
   db: Database,
+  storage: StorageClient,
 ): Promise<DeleteThumbnailOutcome> {
   const txResult = await db.transaction(async (tx) => {
     // 1. 所有者チェック。所有者でない / 存在しない場合は `not_found` を返し、
@@ -217,7 +182,7 @@ export async function deleteThumbnailObject(
   // S3 deletion runs outside the transaction so external IO doesn't pin the
   // DB connection.
   try {
-    await getS3().send(new DeleteObjectCommand({ Bucket: getBucket(), Key: txResult.s3Key }));
+    await storage.deleteObject({ key: txResult.s3Key });
   } catch (err) {
     const s3Err = err as { name?: string } | null;
     if (s3Err?.name !== "NoSuchKey") {
