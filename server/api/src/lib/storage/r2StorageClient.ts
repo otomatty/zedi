@@ -2,6 +2,39 @@ import type { StorageClient, StorageGetObjectResult, StorageHeadObjectResult } f
 import { S3StorageClient } from "./s3StorageClient.js";
 
 /**
+ * Parses an HTTP `Range: bytes=...` header into Cloudflare R2's `R2Range` shape.
+ * HTTP Range ヘッダを R2 の `R2Range` に変換する。
+ */
+export function parseHttpRangeToR2Range(rangeHeader: string): R2Range | undefined {
+  const trimmed = rangeHeader.trim();
+  const match = /^bytes=(\d*)-(\d*)$/i.exec(trimmed);
+  if (!match) return undefined;
+
+  const [, startStr, endStr] = match;
+
+  if (startStr === "" && endStr !== "") {
+    const suffix = Number(endStr);
+    if (!Number.isFinite(suffix) || suffix <= 0) return undefined;
+    return { suffix };
+  }
+
+  if (startStr !== "") {
+    const offset = Number(startStr);
+    if (!Number.isFinite(offset) || offset < 0) return undefined;
+
+    if (endStr === "") {
+      return { offset };
+    }
+
+    const end = Number(endStr);
+    if (!Number.isFinite(end) || end < offset) return undefined;
+    return { offset, length: end - offset + 1 };
+  }
+
+  return undefined;
+}
+
+/**
  * R2 binding adapter: server-side ops use the binding; presigned URLs use the S3 API.
  * R2 バインディングアダプタ: サーバ側操作は binding、presigned URL は S3 API。
  */
@@ -22,8 +55,12 @@ export class R2StorageClient implements StorageClient {
   }
 
   async getObject(params: { key: string; range?: string }): Promise<StorageGetObjectResult> {
+    const r2Range = params.range ? parseHttpRangeToR2Range(params.range) : undefined;
+    if (params.range && !r2Range) {
+      throw Object.assign(new Error("Invalid range"), { name: "InvalidRange" });
+    }
     const object = await this.bucket.get(params.key, {
-      ...(params.range ? { range: params.range } : {}),
+      ...(r2Range ? { range: r2Range } : {}),
     });
     if (!object) {
       throw Object.assign(new Error("Object not found"), { name: "NoSuchKey" });

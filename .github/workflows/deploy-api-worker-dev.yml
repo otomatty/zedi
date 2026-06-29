@@ -26,6 +26,11 @@ jobs:
           action: actions/checkout@v7.0.0
           attempt_limit: 3
           attempt_delay: 5000
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          # server/api はルート workspace 外のため、ルート install は不要。
+          # server/api is outside the root workspace; skip root install.
+          install-deps: "false"
       - name: Install dependencies
         working-directory: server/api
         run: bun install --frozen-lockfile
