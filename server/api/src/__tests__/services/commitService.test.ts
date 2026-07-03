@@ -7,9 +7,10 @@
  * generation when the env is configured.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { StorageClient } from "../../lib/storage/types.js";
 
-const { mockS3Send, envMap } = vi.hoisted(() => ({
-  mockS3Send: vi.fn(),
+const { mockPutObject, envMap } = vi.hoisted(() => ({
+  mockPutObject: vi.fn(),
   envMap: {} as Record<string, string | undefined>,
 }));
 
@@ -21,19 +22,6 @@ vi.mock("../../lib/env.js", () => ({
   },
 }));
 
-vi.mock("@aws-sdk/client-s3", () => {
-  class MockS3Client {
-    send = (...args: unknown[]) => mockS3Send(...args);
-  }
-  function MockPutObjectCommand() {
-    /* stub */
-  }
-  return {
-    S3Client: MockS3Client,
-    PutObjectCommand: MockPutObjectCommand,
-  };
-});
-
 vi.mock("../../services/subscriptionService.js", () => ({
   getUserTier: vi.fn().mockResolvedValue("free"),
 }));
@@ -44,34 +32,32 @@ const TINY_PNG_BASE64 =
 const TEST_USER_ID = "user-test-123";
 const DATA_URI = `data:image/png;base64,${TINY_PNG_BASE64}`;
 
+function makeMockStorage(): StorageClient {
+  return {
+    putObject: mockPutObject,
+    getObject: vi.fn(),
+    headObject: vi.fn(),
+    deleteObject: vi.fn(),
+    getSignedPutUrl: vi.fn(),
+  };
+}
+
 function setBaseEnv() {
-  envMap.STORAGE_ENDPOINT = "http://localhost:9000";
-  envMap.STORAGE_ACCESS_KEY = "test-key";
-  envMap.STORAGE_SECRET_KEY = "test-secret";
-  envMap.STORAGE_BUCKET_NAME = "test-bucket";
   envMap.BETTER_AUTH_URL = "https://zedi.example.com";
-  process.env.STORAGE_BUCKET_NAME = "test-bucket";
 }
 
 function clearEnv() {
   for (const key of Object.keys(envMap)) {
     envMap[key] = undefined;
   }
-  process.env.STORAGE_BUCKET_NAME = undefined;
 }
 
 async function importCommitService() {
-  // 動的 import にして、モック適用後の最新モジュールを取得する。
-  // Use dynamic import so the module picks up our mocks.
   return await import("../../services/commitService.js");
 }
 
-function makeDbMock(tier: string, quotaBytes: number, usedBytes: number) {
-  // commitService は次の順番で DB を呼び出す:
-  // 1) getUserTier (モック済み、DB は使わない)
-  // 2) getStorageQuotaBytes: select().from().where().limit()
-  // 3) getStorageUsedBytes: select().from().where()
-  // 4) insert().values()
+function makeDbMock(_tier: string, quotaBytes: number, usedBytes: number) {
+  let selectCount = 0;
   const chain = (final: unknown) =>
     new Proxy(
       {},
@@ -84,21 +70,21 @@ function makeDbMock(tier: string, quotaBytes: number, usedBytes: number) {
         },
       },
     );
-
-  let call = 0;
   const db = new Proxy(
     {},
     {
       get(_, prop: string) {
-        return () => {
-          if (prop === "select") {
-            call++;
-            if (call === 1) return chain([{ storageLimitBytes: quotaBytes }]);
-            if (call === 2) return chain([{ sum: String(usedBytes) }]);
-          }
-          if (prop === "insert") return chain([]);
-          return chain([]);
-        };
+        if (prop === "select") {
+          return () => {
+            selectCount += 1;
+            if (selectCount === 1) {
+              return chain([{ storageLimitBytes: quotaBytes }]);
+            }
+            return chain([{ sum: String(usedBytes) }]);
+          };
+        }
+        if (prop === "insert") return () => chain([]);
+        return () => chain([]);
       },
     },
   );
@@ -108,8 +94,8 @@ function makeDbMock(tier: string, quotaBytes: number, usedBytes: number) {
 describe("commitImage — BETTER_AUTH_URL handling", () => {
   beforeEach(() => {
     clearEnv();
-    mockS3Send.mockReset();
-    mockS3Send.mockResolvedValue({});
+    mockPutObject.mockReset();
+    mockPutObject.mockResolvedValue(undefined);
     vi.resetModules();
   });
 
@@ -119,26 +105,26 @@ describe("commitImage — BETTER_AUTH_URL handling", () => {
 
     const { commitImage } = await importCommitService();
     const db = makeDbMock("free", 10 * 1024 * 1024, 0) as never;
+    const storage = makeMockStorage();
 
-    await expect(commitImage(TEST_USER_ID, DATA_URI, undefined, db)).rejects.toThrow(
+    await expect(commitImage(TEST_USER_ID, DATA_URI, undefined, db, storage)).rejects.toThrow(
       /Missing required env var: BETTER_AUTH_URL/,
     );
   });
 
-  it("BETTER_AUTH_URL 未設定時は S3 アップロード前に throw する / rejects before any S3 PUT when BETTER_AUTH_URL is unset", async () => {
+  it("BETTER_AUTH_URL 未設定時は storage 書き込み前に throw する / rejects before any storage PUT when BETTER_AUTH_URL is unset", async () => {
     setBaseEnv();
     envMap.BETTER_AUTH_URL = undefined;
 
     const { commitImage } = await importCommitService();
     const db = makeDbMock("free", 10 * 1024 * 1024, 0) as never;
+    const storage = makeMockStorage();
 
-    await expect(commitImage(TEST_USER_ID, DATA_URI, undefined, db)).rejects.toThrow(
+    await expect(commitImage(TEST_USER_ID, DATA_URI, undefined, db, storage)).rejects.toThrow(
       /Missing required env var: BETTER_AUTH_URL/,
     );
 
-    // オーファンオブジェクトを生まないために、S3 への PUT が一切発生していないこと。
-    // Verify we never hit S3 — otherwise a missing env leaves orphan objects.
-    expect(mockS3Send).not.toHaveBeenCalled();
+    expect(mockPutObject).not.toHaveBeenCalled();
   });
 
   it("BETTER_AUTH_URL が設定されていれば絶対 URL を返す / returns an absolute URL when BETTER_AUTH_URL is set", async () => {
@@ -146,8 +132,9 @@ describe("commitImage — BETTER_AUTH_URL handling", () => {
 
     const { commitImage } = await importCommitService();
     const db = makeDbMock("free", 10 * 1024 * 1024, 0) as never;
+    const storage = makeMockStorage();
 
-    const { imageUrl } = await commitImage(TEST_USER_ID, DATA_URI, undefined, db);
+    const { imageUrl } = await commitImage(TEST_USER_ID, DATA_URI, undefined, db, storage);
 
     expect(imageUrl).toMatch(/^https:\/\/zedi\.example\.com\/api\/thumbnail\/serve\/[0-9a-f-]+$/);
   });
@@ -158,8 +145,9 @@ describe("commitImage — BETTER_AUTH_URL handling", () => {
 
     const { commitImage } = await importCommitService();
     const db = makeDbMock("free", 10 * 1024 * 1024, 0) as never;
+    const storage = makeMockStorage();
 
-    const { imageUrl } = await commitImage(TEST_USER_ID, DATA_URI, undefined, db);
+    const { imageUrl } = await commitImage(TEST_USER_ID, DATA_URI, undefined, db, storage);
 
     expect(imageUrl.startsWith("https://zedi.example.com/api/thumbnail/serve/")).toBe(true);
     expect(imageUrl.startsWith("https://zedi.example.com//")).toBe(false);
@@ -170,8 +158,15 @@ describe("commitImage — BETTER_AUTH_URL handling", () => {
 
     const { commitImage } = await importCommitService();
     const db = makeDbMock("free", 10 * 1024 * 1024, 0) as never;
+    const storage = makeMockStorage();
 
-    const { imageUrl, objectId } = await commitImage(TEST_USER_ID, DATA_URI, undefined, db);
+    const { imageUrl, objectId } = await commitImage(
+      TEST_USER_ID,
+      DATA_URI,
+      undefined,
+      db,
+      storage,
+    );
 
     expect(objectId).toMatch(/^[0-9a-f-]+$/);
     expect(imageUrl.endsWith(`/api/thumbnail/serve/${objectId}`)).toBe(true);
@@ -181,8 +176,6 @@ describe("commitImage — BETTER_AUTH_URL handling", () => {
     setBaseEnv();
 
     const { commitImage } = await importCommitService();
-    // クォータ行が無い（rows[] = []）状態を再現する。
-    // Simulate the unseeded `thumbnail_tier_quotas` table.
     const db = new Proxy(
       {},
       {
@@ -208,8 +201,11 @@ describe("commitImage — BETTER_AUTH_URL handling", () => {
         },
       },
     ) as never;
+    const storage = makeMockStorage();
 
-    await expect(commitImage(TEST_USER_ID, DATA_URI, undefined, db)).resolves.toMatchObject({
+    await expect(
+      commitImage(TEST_USER_ID, DATA_URI, undefined, db, storage),
+    ).resolves.toMatchObject({
       objectId: expect.stringMatching(/^[0-9a-f-]+$/),
     });
   });

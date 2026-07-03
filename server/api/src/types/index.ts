@@ -1,12 +1,16 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "../schema/index.js";
+import type { CloudflareBindings } from "./cloudflare.js";
+import type { StorageClient } from "../lib/storage/index.js";
 
 export type AppEnv = {
+  Bindings: Partial<CloudflareBindings>;
   Variables: {
     userId: string;
     userEmail?: string;
     db: Database;
     redis: import("ioredis").Redis;
+    storage: StorageClient;
   };
 };
 

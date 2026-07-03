@@ -65,6 +65,7 @@ vi.mock("../../../services/thumbnailGcService.js", () => ({
 import { Hono } from "hono";
 import serveRoutes from "../../../routes/thumbnail/serve.js";
 import { createMockDb } from "../../createMockDb.js";
+import { createStorageClient } from "../../../lib/storage/createStorageClient.js";
 
 const TEST_USER_ID = "user-test-123";
 const ATTACKER_ID = "attacker-456";
@@ -75,6 +76,7 @@ function createServeApp(dbResults: unknown[] = []) {
   const app = new Hono<AppEnv>();
   app.use("*", async (c, next) => {
     c.set("db", mockDb.db as unknown as AppEnv["Variables"]["db"]);
+    c.set("storage", createStorageClient());
     await next();
   });
   app.route("/api/thumbnail/serve", serveRoutes);

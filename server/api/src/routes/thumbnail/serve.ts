@@ -1,24 +1,10 @@
 import { Readable } from "node:stream";
 import { Hono } from "hono";
 import { eq, and } from "drizzle-orm";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { authRequired } from "../../middleware/auth.js";
 import { thumbnailObjects } from "../../schema/index.js";
-import { getEnv } from "../../lib/env.js";
 import { deleteThumbnailObject } from "../../services/thumbnailGcService.js";
 import type { AppEnv } from "../../types/index.js";
-
-const s3 = new S3Client({
-  endpoint: getEnv("STORAGE_ENDPOINT"),
-  region: "auto",
-  credentials: {
-    accessKeyId: getEnv("STORAGE_ACCESS_KEY"),
-    secretAccessKey: getEnv("STORAGE_SECRET_KEY"),
-  },
-  forcePathStyle: true,
-});
-
-const BUCKET = getEnv("STORAGE_BUCKET_NAME");
 
 /** SVG は XSS リスクがあるためサムネイル配信では許可しない */
 const MIME_TYPES: Record<string, string> = {
@@ -40,6 +26,7 @@ app.get("/:id", authRequired, async (c) => {
   const objectId = c.req.param("id");
   const userId = c.get("userId");
   const db = c.get("db");
+  const storage = c.get("storage");
 
   const rows = await db
     .select()
@@ -57,7 +44,7 @@ app.get("/:id", authRequired, async (c) => {
 
   let response;
   try {
-    response = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: row.s3Key }));
+    response = await storage.getObject({ key: row.s3Key });
   } catch (err) {
     const meta = (err as { name?: string; $metadata?: { httpStatusCode?: number } } | undefined)
       ?.$metadata;
@@ -66,11 +53,11 @@ app.get("/:id", authRequired, async (c) => {
     if (name === "NoSuchKey" || code === 404) {
       return c.json({ error: "Object not found" }, 404);
     }
-    console.error("[thumbnail/serve] S3 GetObject failed:", err);
+    console.error("[thumbnail/serve] storage GetObject failed:", err);
     return c.json({ error: "Failed to retrieve object" }, 502);
   }
 
-  const body = response.Body;
+  const body = response.body;
   if (!body) return c.json({ error: "Object not found" }, 404);
 
   const webStream = body instanceof Readable ? Readable.toWeb(body) : (body as ReadableStream);
@@ -88,6 +75,7 @@ app.delete("/:id", authRequired, async (c) => {
   const objectId = c.req.param("id");
   const userId = c.get("userId");
   const db = c.get("db");
+  const storage = c.get("storage");
 
   // 共通 GC サービスに委譲する。サービスは所有者チェック → ライブ参照ガード →
   // DB 削除 → S3 削除を一貫した順序で実行する（issue #820）。
@@ -96,7 +84,7 @@ app.delete("/:id", authRequired, async (c) => {
   // live-reference guard, DB delete, and S3 delete (issue #820). The
   // ownership check is performed first so unauthorized callers always see
   // 404 — never 409 — and cannot probe other users' thumbnail state.
-  const outcome = await deleteThumbnailObject(objectId, userId, db);
+  const outcome = await deleteThumbnailObject(objectId, userId, db, storage);
 
   if (outcome === "not_found") {
     return c.json({ error: "Not found" }, 404);

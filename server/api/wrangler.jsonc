@@ -1,0 +1,42 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "zedi-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-06-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+  },
+  "r2_buckets": [
+    {
+      "binding": "STORAGE_BUCKET",
+      "bucket_name": "zedi-storage-prod",
+    },
+  ],
+  "env": {
+    "dev": {
+      "name": "zedi-api-dev",
+      "r2_buckets": [
+        {
+          "binding": "STORAGE_BUCKET",
+          "bucket_name": "zedi-storage-dev",
+        },
+      ],
+      "vars": {
+        "ENVIRONMENT": "development",
+      },
+    },
+    "production": {
+      "name": "zedi-api",
+      "r2_buckets": [
+        {
+          "binding": "STORAGE_BUCKET",
+          "bucket_name": "zedi-storage-prod",
+        },
+      ],
+      "vars": {
+        "ENVIRONMENT": "production",
+      },
+    },
+  },
+}

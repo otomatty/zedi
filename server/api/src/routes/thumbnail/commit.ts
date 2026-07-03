@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { authRequired } from "../../middleware/auth.js";
 import { rateLimit } from "../../middleware/rateLimit.js";
 import { commitImage } from "../../services/commitService.js";
+import { isStorageConfigured } from "../../lib/storage/index.js";
 import type { AppEnv } from "../../types/index.js";
 
 const app = new Hono<AppEnv>();
@@ -21,7 +22,7 @@ app.post("/", authRequired, rateLimit(), async (c) => {
     throw new HTTPException(400, { message: "sourceUrl is required" });
   }
 
-  if (!process.env.STORAGE_BUCKET_NAME) {
+  if (!isStorageConfigured(c.env)) {
     throw new HTTPException(503, { message: "サムネイルの保存先が設定されていません" });
   }
 
@@ -31,6 +32,7 @@ app.post("/", authRequired, rateLimit(), async (c) => {
       body.sourceUrl.trim(),
       body.fallbackUrl?.trim(),
       db,
+      c.get("storage"),
     );
     return c.json({ imageUrl, objectId, provider: "s3" as const });
   } catch (err) {

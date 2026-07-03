@@ -476,7 +476,7 @@ app.delete("/:id", authRequired, async (c) => {
   // soft-delete from the user's perspective. `deleteThumbnailObject` already
   // logs S3 failures so a sweeper can reclaim orphans.
   if (target?.thumbnailObjectId && target.ownerId) {
-    await deleteThumbnailObject(target.thumbnailObjectId, target.ownerId, db);
+    await deleteThumbnailObject(target.thumbnailObjectId, target.ownerId, db, c.get("storage"));
   }
 
   return c.json({ id: pageId, deleted: true });

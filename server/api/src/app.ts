@@ -5,6 +5,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { csrfOriginCheck } from "./middleware/csrfOrigin.js";
 import { dbMiddleware } from "./middleware/db.js";
 import { redisMiddleware } from "./middleware/redis.js";
+import { storageMiddleware } from "./middleware/storage.js";
 import { auth } from "./auth.js";
 import type { AppEnv } from "./types/index.js";
 
@@ -92,6 +93,7 @@ export function createApp(): Hono<AppEnv> {
   app.use("*", csrfOriginCheck);
   app.use("*", dbMiddleware);
   app.use("*", redisMiddleware);
+  app.use("*", storageMiddleware);
   app.onError(errorHandler);
 
   // Better Auth の magicLink プラグインは `POST /api/auth/sign-in/magic-link` を

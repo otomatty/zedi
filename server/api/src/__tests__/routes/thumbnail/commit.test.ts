@@ -33,15 +33,31 @@ import { Hono } from "hono";
 import commitRoutes from "../../../routes/thumbnail/commit.js";
 import { errorHandler } from "../../../middleware/errorHandler.js";
 import { createMockDb } from "../../createMockDb.js";
+import { createStorageClient } from "../../../lib/storage/createStorageClient.js";
 
 const TEST_USER_ID = "user-thumb-1";
 const ORIGINAL_ENV = { ...process.env };
+
+function setStorageEnv(): void {
+  process.env.STORAGE_BUCKET_NAME = "test-bucket";
+  process.env.STORAGE_ENDPOINT = "http://localhost:9000";
+  process.env.STORAGE_ACCESS_KEY = "test-key";
+  process.env.STORAGE_SECRET_KEY = "test-secret";
+}
+
+function clearStorageEnv(): void {
+  delete process.env.STORAGE_BUCKET_NAME;
+  delete process.env.STORAGE_ENDPOINT;
+  delete process.env.STORAGE_ACCESS_KEY;
+  delete process.env.STORAGE_SECRET_KEY;
+}
 
 function createTestApp() {
   const { db } = createMockDb([]);
   const app = new Hono<AppEnv>();
   app.use("*", async (c, next) => {
     c.set("db", db as unknown as AppEnv["Variables"]["db"]);
+    c.set("storage", createStorageClient());
     await next();
   });
   app.onError(errorHandler);
@@ -59,7 +75,7 @@ function authHeaders(): Record<string, string> {
 beforeEach(() => {
   mockCommitImage.mockReset();
   process.env = { ...ORIGINAL_ENV };
-  process.env.STORAGE_BUCKET_NAME = "test-bucket";
+  setStorageEnv();
 });
 
 // process.env と vi.spyOn(...) を必ずクリーンアップする。
@@ -97,8 +113,8 @@ describe("POST /api/thumbnail/commit", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 503 when STORAGE_BUCKET_NAME is not configured", async () => {
-    delete process.env.STORAGE_BUCKET_NAME;
+  it("returns 503 when storage is not configured", async () => {
+    clearStorageEnv();
     const app = createTestApp();
 
     const res = await app.request("/api/thumbnail/commit", {
@@ -140,6 +156,7 @@ describe("POST /api/thumbnail/commit", () => {
       TEST_USER_ID,
       "https://example.com/img.png",
       "https://example.com/fallback.png",
+      expect.anything(),
       expect.anything(),
     );
   });

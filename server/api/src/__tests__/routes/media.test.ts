@@ -65,6 +65,7 @@ vi.mock("@aws-sdk/s3-request-presigner", () => ({
 import { Hono } from "hono";
 import mediaRoutes from "../../routes/media.js";
 import { createMockDb } from "../createMockDb.js";
+import { createStorageClient } from "../../lib/storage/createStorageClient.js";
 
 const TEST_USER_ID = "user-test-123";
 const ATTACKER_ID = "attacker-456";
@@ -77,13 +78,18 @@ function authHeaders(userId = TEST_USER_ID) {
   };
 }
 
+function attachTestContext(app: Hono<AppEnv>, db: AppEnv["Variables"]["db"]): void {
+  app.use("*", async (c, next) => {
+    c.set("db", db);
+    c.set("storage", createStorageClient());
+    await next();
+  });
+}
+
 function createMediaApp(dbResults: unknown[]) {
   const { db } = createMockDb(dbResults);
   const app = new Hono<AppEnv>();
-  app.use("*", async (c, next) => {
-    c.set("db", db as unknown as AppEnv["Variables"]["db"]);
-    await next();
-  });
+  attachTestContext(app, db as unknown as AppEnv["Variables"]["db"]);
   app.route("/api/media", mediaRoutes);
   return app;
 }
@@ -416,10 +422,7 @@ describe("DELETE /api/media/:id — DB-first deletion order", () => {
     mockS3Send.mockResolvedValueOnce({});
     const { db, chains } = createMockDb([[mediaRow], [{ s3Key }]]);
     const app = new Hono<AppEnv>();
-    app.use("*", async (c, next) => {
-      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
-      await next();
-    });
+    attachTestContext(app, db as unknown as AppEnv["Variables"]["db"]);
     app.route("/api/media", mediaRoutes);
 
     const res = await app.request(`/api/media/${MEDIA_ID}`, {
@@ -440,10 +443,7 @@ describe("DELETE /api/media/:id — DB-first deletion order", () => {
     // Ownership changed between SELECT and DELETE; S3 must not be touched.
     const { db, chains } = createMockDb([[mediaRow], []]);
     const app = new Hono<AppEnv>();
-    app.use("*", async (c, next) => {
-      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
-      await next();
-    });
+    attachTestContext(app, db as unknown as AppEnv["Variables"]["db"]);
     app.route("/api/media", mediaRoutes);
 
     const res = await app.request(`/api/media/${MEDIA_ID}`, {
@@ -466,10 +466,7 @@ describe("DELETE /api/media/:id — DB-first deletion order", () => {
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { db } = createMockDb([[mediaRow], [{ s3Key }]]);
     const app = new Hono<AppEnv>();
-    app.use("*", async (c, next) => {
-      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
-      await next();
-    });
+    attachTestContext(app, db as unknown as AppEnv["Variables"]["db"]);
     app.route("/api/media", mediaRoutes);
 
     const res = await app.request(`/api/media/${MEDIA_ID}`, {
@@ -489,10 +486,7 @@ describe("DELETE /api/media/:id — DB-first deletion order", () => {
     });
     const { db } = createMockDb([[mediaRow], [{ s3Key }]]);
     const app = new Hono<AppEnv>();
-    app.use("*", async (c, next) => {
-      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
-      await next();
-    });
+    attachTestContext(app, db as unknown as AppEnv["Variables"]["db"]);
     app.route("/api/media", mediaRoutes);
 
     const res = await app.request(`/api/media/${MEDIA_ID}`, {
@@ -507,10 +501,7 @@ describe("DELETE /api/media/:id — DB-first deletion order", () => {
   it("returns 403 when media belongs to another user (no storage call, no DB delete)", async () => {
     const { chains, db } = createMockDb([[{ ...mediaRow, ownerId: ATTACKER_ID }]]);
     const app = new Hono<AppEnv>();
-    app.use("*", async (c, next) => {
-      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
-      await next();
-    });
+    attachTestContext(app, db as unknown as AppEnv["Variables"]["db"]);
     app.route("/api/media", mediaRoutes);
 
     const res = await app.request(`/api/media/${MEDIA_ID}`, {
@@ -527,10 +518,7 @@ describe("DELETE /api/media/:id — DB-first deletion order", () => {
   it("returns 404 when media row is missing (no storage call, no DB delete)", async () => {
     const { chains, db } = createMockDb([[]]);
     const app = new Hono<AppEnv>();
-    app.use("*", async (c, next) => {
-      c.set("db", db as unknown as AppEnv["Variables"]["db"]);
-      await next();
-    });
+    attachTestContext(app, db as unknown as AppEnv["Variables"]["db"]);
     app.route("/api/media", mediaRoutes);
 
     const res = await app.request(`/api/media/${MEDIA_ID}`, {

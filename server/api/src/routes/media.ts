@@ -2,30 +2,11 @@ import { Readable } from "node:stream";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { eq, and } from "drizzle-orm";
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-  HeadObjectCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { media } from "../schema/index.js";
 import { authRequired } from "../middleware/auth.js";
-import { getEnv } from "../lib/env.js";
 import type { AppEnv } from "../types/index.js";
 
-const s3 = new S3Client({
-  endpoint: getEnv("STORAGE_ENDPOINT"),
-  region: "auto",
-  credentials: {
-    accessKeyId: getEnv("STORAGE_ACCESS_KEY"),
-    secretAccessKey: getEnv("STORAGE_SECRET_KEY"),
-  },
-  forcePathStyle: true,
-});
-
-const BUCKET = getEnv("STORAGE_BUCKET_NAME");
+const BUCKET_UPLOAD_EXPIRY_SECONDS = 900;
 
 /**
  * api オリジンでバイトを返すため、ユーザー提供の Content-Type をそのまま使わない。
@@ -108,6 +89,7 @@ const app = new Hono<AppEnv>();
 
 app.post("/upload", authRequired, async (c) => {
   const userId = c.get("userId");
+  const storage = c.get("storage");
 
   const body = await c.req.json<{
     file_name: string;
@@ -132,15 +114,11 @@ app.post("/upload", authRequired, async (c) => {
   const mediaId = crypto.randomUUID();
   const s3Key = `users/${userId}/media/${mediaId}/${body.file_name}`;
 
-  const presignedUrl = await getSignedUrl(
-    s3,
-    new PutObjectCommand({
-      Bucket: BUCKET,
-      Key: s3Key,
-      ContentType: body.content_type,
-    }),
-    { expiresIn: 900 },
-  );
+  const presignedUrl = await storage.getSignedPutUrl({
+    key: s3Key,
+    contentType: body.content_type,
+    expiresInSeconds: BUCKET_UPLOAD_EXPIRY_SECONDS,
+  });
 
   return c.json({ upload_url: presignedUrl, media_id: mediaId, s3_key: s3Key });
 });
@@ -148,6 +126,7 @@ app.post("/upload", authRequired, async (c) => {
 app.post("/confirm", authRequired, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
+  const storage = c.get("storage");
 
   const body = await c.req.json<{
     media_id: string;
@@ -190,10 +169,10 @@ app.post("/confirm", authRequired, async (c) => {
   // about `file_size` cannot leave >50MB blobs attached to their account.
   let verifiedSize: number | null = null;
   try {
-    const head = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: body.s3_key }));
-    const length = typeof head.ContentLength === "number" ? head.ContentLength : null;
+    const head = await storage.headObject({ key: body.s3_key });
+    const length = typeof head.contentLength === "number" ? head.contentLength : null;
     if (length !== null && length > MAX_UPLOAD_SIZE_BYTES) {
-      await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: body.s3_key })).catch((err) => {
+      await storage.deleteObject({ key: body.s3_key }).catch((err) => {
         console.warn("[media] failed to delete oversized upload", {
           s3Key: body.s3_key,
           err,
@@ -245,6 +224,7 @@ app.get("/:id", authRequired, async (c) => {
   const mediaId = c.req.param("id");
   const userId = c.get("userId");
   const db = c.get("db");
+  const storage = c.get("storage");
 
   const result = await db.select().from(media).where(eq(media.id, mediaId)).limit(1);
 
@@ -267,13 +247,10 @@ app.get("/:id", authRequired, async (c) => {
 
   let response;
   try {
-    response = await s3.send(
-      new GetObjectCommand({
-        Bucket: BUCKET,
-        Key: row.s3Key,
-        ...(rangeHeader ? { Range: rangeHeader } : {}),
-      }),
-    );
+    response = await storage.getObject({
+      key: row.s3Key,
+      ...(rangeHeader ? { range: rangeHeader } : {}),
+    });
   } catch (err) {
     const meta = (err as { name?: string; $metadata?: { httpStatusCode?: number } } | undefined)
       ?.$metadata;
@@ -285,16 +262,16 @@ app.get("/:id", authRequired, async (c) => {
     if (name === "InvalidRange" || code === 416) {
       return c.json({ error: "Requested range not satisfiable" }, 416);
     }
-    console.error("[media] S3 GetObject failed:", err);
+    console.error("[media] storage GetObject failed:", err);
     return c.json({ error: "Failed to retrieve object" }, 502);
   }
 
-  const body = response.Body;
+  const body = response.body;
   if (!body) return c.json({ error: "Object not found" }, 404);
 
   const { contentType, contentDisposition } = resolveProxyContentHeaders(
     row.contentType,
-    response.ContentType,
+    response.contentType,
     row.fileName,
   );
 
@@ -314,17 +291,17 @@ app.get("/:id", authRequired, async (c) => {
   if (contentDisposition) {
     headers["Content-Disposition"] = contentDisposition;
   }
-  const len = response.ContentLength;
+  const len = response.contentLength;
   if (typeof len === "number" && len >= 0) {
     headers["Content-Length"] = String(len);
   }
-  if (response.ContentRange) {
-    headers["Content-Range"] = response.ContentRange;
+  if (response.contentRange) {
+    headers["Content-Range"] = response.contentRange;
   }
 
   // S3 が部分応答を返した場合は 206 でそのまま返す。
   // Relay S3's partial-content responses as HTTP 206.
-  const status = response.ContentRange ? 206 : 200;
+  const status = response.contentRange ? 206 : 200;
 
   return new Response(webStream as BodyInit, {
     status,
@@ -336,6 +313,7 @@ app.delete("/:id", authRequired, async (c) => {
   const mediaId = c.req.param("id");
   const userId = c.get("userId");
   const db = c.get("db");
+  const storage = c.get("storage");
 
   const result = await db.select().from(media).where(eq(media.id, mediaId)).limit(1);
 
@@ -371,12 +349,7 @@ app.delete("/:id", authRequired, async (c) => {
   }
 
   try {
-    await s3.send(
-      new DeleteObjectCommand({
-        Bucket: BUCKET,
-        Key: deletedRow.s3Key,
-      }),
-    );
+    await storage.deleteObject({ key: deletedRow.s3Key });
   } catch (err) {
     // DB 行は既に削除済み。NoSuchKey は冪等として無視し、それ以外の失敗は
     // 孤立オブジェクトとして警告だけ残す（DB と storage の再同期は別経路に任せる）。
@@ -385,7 +358,7 @@ app.delete("/:id", authRequired, async (c) => {
     // so ops can sweep the orphaned S3 object — do NOT resurrect the DB row.
     const s3Err = err as { name?: string } | null;
     if (s3Err?.name !== "NoSuchKey") {
-      console.error("[media] S3 DeleteObject failed after DB delete (orphaned object):", {
+      console.error("[media] storage DeleteObject failed after DB delete (orphaned object):", {
         mediaId,
         s3Key: deletedRow.s3Key,
         err,
