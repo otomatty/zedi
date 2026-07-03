@@ -48,8 +48,10 @@ app.post("/fetch", authRequired, async (c) => {
     }
     // 上流 fetch のエラーメッセージ（内部詳細を含みうる）はクライアントへ透過させず、
     // 固定文言に統一する。errorHandler の 5xx sanitize は HTTPException を素通しするため、
-    // 生の err.message を渡さないことがここでの防御になる。
+    // 生の err.message を渡さないことがここでの防御になる。生エラーはサーバログにのみ残す。
     // Never forward the raw upstream fetch error to clients; use a fixed message.
+    // Keep the original error in server logs (errorHandler only logs the fixed message).
+    console.error("clip fetch failed", err);
     throw new HTTPException(502, { message: "Fetch failed" });
   } finally {
     clearTimeout(timeout);
