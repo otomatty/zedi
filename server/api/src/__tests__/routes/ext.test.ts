@@ -143,10 +143,11 @@ async function parseJsonOrText(res: Response): Promise<{ message?: string }> {
 }
 
 describe("POST /api/ext/clip-and-create", () => {
-  const mockRedis = createMockRedis();
+  let mockRedis: AppEnv["Variables"]["redis"];
   const mockDb = {} as AppEnv["Variables"]["db"];
 
   beforeEach(() => {
+    mockRedis = createMockRedis();
     mockClipAndCreate.mockClear();
     mockResolveAiConfigForRequest.mockReset();
     mockResolveAiConfigForRequest.mockResolvedValue(null);
@@ -361,10 +362,11 @@ describe("POST /api/ext/clip-and-create", () => {
 });
 
 describe("POST /api/ext/session", () => {
-  const mockRedis = createMockRedis();
+  let mockRedis: AppEnv["Variables"]["redis"];
   const mockDb = {} as AppEnv["Variables"]["db"];
 
   beforeEach(() => {
+    mockRedis = createMockRedis();
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
     mockStoreExtensionCode.mockResolvedValue(undefined);
     mockIssueExtensionToken.mockResolvedValue({
@@ -517,10 +519,11 @@ describe("POST /api/ext/session", () => {
 });
 
 describe("GET /api/ext/authorize-code", () => {
-  const mockRedis = createMockRedis();
+  let mockRedis: AppEnv["Variables"]["redis"];
   const mockDb = {} as AppEnv["Variables"]["db"];
 
   beforeEach(() => {
+    mockRedis = createMockRedis();
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
     mockStoreExtensionCode.mockResolvedValue(undefined);
     mockIsRedirectUriAllowed.mockReturnValue(true);
@@ -579,10 +582,11 @@ describe("GET /api/ext/authorize-code", () => {
 });
 
 describe("POST /api/ext/authorize-code", () => {
-  const mockRedis = createMockRedis();
+  let mockRedis: AppEnv["Variables"]["redis"];
   const mockDb = {} as AppEnv["Variables"]["db"];
 
   beforeEach(() => {
+    mockRedis = createMockRedis();
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
     mockStoreExtensionCode.mockResolvedValue(undefined);
     mockIsRedirectUriAllowed.mockReturnValue(true);

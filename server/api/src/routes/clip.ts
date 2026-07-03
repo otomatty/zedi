@@ -46,9 +46,10 @@ app.post("/fetch", authRequired, async (c) => {
     if (err instanceof Error && err.name === "AbortError") {
       throw new HTTPException(502, { message: "Request timed out" });
     }
-    if (err instanceof Error && err.message.startsWith("Fetch failed:")) {
-      throw new HTTPException(502, { message: err.message });
-    }
+    // 上流 fetch のエラーメッセージ（内部詳細を含みうる）はクライアントへ透過させず、
+    // 固定文言に統一する。errorHandler の 5xx sanitize は HTTPException を素通しするため、
+    // 生の err.message を渡さないことがここでの防御になる。
+    // Never forward the raw upstream fetch error to clients; use a fixed message.
     throw new HTTPException(502, { message: "Fetch failed" });
   } finally {
     clearTimeout(timeout);
