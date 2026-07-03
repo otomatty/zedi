@@ -46,9 +46,12 @@ app.post("/fetch", authRequired, async (c) => {
     if (err instanceof Error && err.name === "AbortError") {
       throw new HTTPException(502, { message: "Request timed out" });
     }
-    if (err instanceof Error && err.message.startsWith("Fetch failed:")) {
-      throw new HTTPException(502, { message: err.message });
-    }
+    // 上流 fetch のエラーメッセージ（内部詳細を含みうる）はクライアントへ透過させず、
+    // 固定文言に統一する。errorHandler の 5xx sanitize は HTTPException を素通しするため、
+    // 生の err.message を渡さないことがここでの防御になる。生エラーはサーバログにのみ残す。
+    // Never forward the raw upstream fetch error to clients; use a fixed message.
+    // Keep the original error in server logs (errorHandler only logs the fixed message).
+    console.error("clip fetch failed", err);
     throw new HTTPException(502, { message: "Fetch failed" });
   } finally {
     clearTimeout(timeout);
@@ -207,8 +210,11 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
     // /fetch ハンドラと同じパターンに合わせる。
     // Preserve HTTPException status codes (4xx etc.); mirrors the /fetch handler.
     if (err instanceof HTTPException) throw err;
-    const msg = err instanceof Error ? err.message : "YouTube extraction failed";
-    throw new HTTPException(502, { message: msg });
+    // 上流（YouTube 抽出・字幕・AI 要約）のエラー詳細はクライアントへ透過させず、
+    // サーバログにのみ残して固定文言を返す。
+    // Do not forward upstream error details to clients; log them and return a fixed message.
+    console.error("YouTube clip failed", err);
+    throw new HTTPException(502, { message: "YouTube extraction failed" });
   }
 });
 

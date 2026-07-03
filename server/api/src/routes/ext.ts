@@ -9,6 +9,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { authRequired } from "../middleware/auth.js";
 import { extAuthRequired } from "../middleware/extAuth.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 import { randomBytes } from "node:crypto";
 import {
   consumeExtensionCode,
@@ -26,8 +27,25 @@ import type { AppEnv, AIProviderType } from "../types/index.js";
 
 const app = new Hono<AppEnv>();
 
+// MCP の同等エンドポイントと対称のレート制限。認証前のトークン交換は IP 単位、
+// 認証済みの clip は user 単位で絞る。
+// Mirror the MCP endpoints: throttle the pre-auth token exchange per IP and the
+// authenticated clip endpoint per user.
+const sessionRateLimit = rateLimit({
+  limit: 10,
+  windowSec: 60,
+  keyBy: "ip",
+  label: "ext:session",
+});
+const clipRateLimit = rateLimit({
+  limit: 30,
+  windowSec: 60,
+  keyBy: "user",
+  label: "ext:clip",
+});
+
 // ── POST /session ─────────────────────────────────────────────────────────
-app.post("/session", async (c) => {
+app.post("/session", sessionRateLimit, async (c) => {
   const redis = c.get("redis");
   if (!redis) {
     throw new HTTPException(503, { message: "Redis unavailable" });
@@ -141,7 +159,7 @@ app.post("/authorize-code", authRequired, async (c) => {
 // 制約: isClipUrlAllowedAfterDns の DNS 検証と、後段の fetch(url) の名前解決は別タイミングのため、
 // DNS rebinding（検証時は public IP でも fetch 時に private へ再解決されうる）の TOCTOU が残る。
 // Limitation: DNS check and fetch use separate lookups; DNS rebinding (TOCTOU) is not fully mitigated.
-app.post("/clip-and-create", extAuthRequired, async (c) => {
+app.post("/clip-and-create", extAuthRequired, clipRateLimit, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");
 

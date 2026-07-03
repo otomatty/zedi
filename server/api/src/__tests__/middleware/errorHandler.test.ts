@@ -4,7 +4,7 @@
  * - HTTPException はそのままステータスとメッセージを返す。
  * - サービス層が throw する `new Error("UNAUTHORIZED")` などの
  *   "magic message" は statusMap に従って HTTP ステータスへ写像される。
- * - 未知のエラーは 500 を返し、message は「Internal server error」または素のエラー文。
+ * - 未知のエラーは 500 を返し、message は必ず「Internal server error」に sanitize する。
  * - Sentry capture は実装側の `shouldCaptureApiException` の判定に従い、
  *   `captureApiException` だけを差し替える partial mock で検証する。
  *
@@ -179,11 +179,13 @@ describe("errorHandler", () => {
   });
 
   describe("unknown errors", () => {
-    it("returns 500 for an Error with an unmapped message and echoes the message", async () => {
-      const res = await appThrowing(new Error("kapow")).request("/throw");
+    it("returns 500 for an Error with an unmapped message and hides the raw message", async () => {
+      // 5xx では DB/内部の生メッセージを露出させず、固定文言に差し替える。
+      // On 5xx the raw message must be sanitized so internal/DB details never leak.
+      const res = await appThrowing(new Error('relation "pages" does not exist')).request("/throw");
       expect(res.status).toBe(500);
       const body = (await res.json()) as { error: string };
-      expect(body.error).toBe("kapow");
+      expect(body.error).toBe("Internal server error");
     });
 
     it("logs the error with method and path context", async () => {

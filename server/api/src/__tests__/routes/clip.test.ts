@@ -300,6 +300,9 @@ describe("POST /api/clip/youtube", () => {
     });
     expect(res.status).toBe(502);
     const body = (await res.json()) as { error?: string };
-    expect(body.error).toMatch(/YouTube API down/i);
+    // 固定文言のみを返し、上流エラーの生メッセージは漏らさない。
+    // Fixed message only; the raw upstream error must not leak.
+    expect(body.error).toBe("YouTube extraction failed");
+    expect(body.error).not.toMatch(/YouTube API down/i);
   });
 });

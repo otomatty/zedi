@@ -4,7 +4,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   assertSupportedComposeBackend,
-  assertSupportedBackendP0,
   createZediChatModel,
   UnsupportedBackendError,
   MissingUserCredentialError,
@@ -27,7 +26,6 @@ describe("assertSupportedComposeBackend", () => {
     "accepts %s",
     (backend) => {
       expect(assertSupportedComposeBackend(backend)).toBe(backend);
-      expect(assertSupportedBackendP0(backend)).toBe(backend);
     },
   );
 

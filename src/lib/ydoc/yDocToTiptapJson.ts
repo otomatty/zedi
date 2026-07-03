@@ -91,13 +91,3 @@ export function textToInlineNodes(text: Y.XmlText): Record<string, unknown>[] {
     return mark;
   });
 }
-
-/**
- * @deprecated テスト互換用。通常は `textToInlineNodes` と親の paragraph を使う。
- * Test-only convenience: wraps inline nodes in a paragraph.
- */
-export function textToJson(text: Y.XmlText): Record<string, unknown> | null {
-  const inlines = textToInlineNodes(text);
-  if (inlines.length === 0) return null;
-  return { type: "paragraph", content: inlines };
-}

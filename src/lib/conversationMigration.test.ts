@@ -1,28 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ChatMessage, Conversation } from "../types/aiChat";
-import { migrateConversation, needsMigration } from "./conversationMigration";
-
-describe("needsMigration", () => {
-  it("returns true when legacy messages array is present without messageMap", () => {
-    // Partial fixture: needsMigration only inspects messages/messageMap.
-    expect(needsMigration({ messages: [] } as unknown as Conversation)).toBe(true);
-    expect(
-      needsMigration({
-        messages: [{ id: "u1", role: "user", content: "Hi", timestamp: 0 }],
-      } as Conversation),
-    ).toBe(true);
-  });
-
-  it("returns false when messageMap is present", () => {
-    expect(
-      needsMigration({
-        messageMap: {},
-        rootMessageId: null,
-        activeLeafId: null,
-      } as Conversation),
-    ).toBe(false);
-  });
-});
+import { migrateConversation } from "./conversationMigration";
 
 describe("migrateConversation", () => {
   it("converts flat messages to messageMap with parent chain", () => {
