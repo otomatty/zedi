@@ -94,11 +94,6 @@ export function assertSupportedComposeBackend(backend: string): ExecutionBackend
 }
 
 /**
- * @deprecated Use {@link assertSupportedComposeBackend}. Kept for barrel exports.
- */
-export const assertSupportedBackendP0 = assertSupportedComposeBackend;
-
-/**
  * Build a {@link ZediChatModel} ready to be plugged into a LangGraph node.
  */
 export async function createZediChatModel(input: CreateZediChatModelInput): Promise<ZediChatModel> {

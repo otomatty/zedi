@@ -38,12 +38,6 @@ export const SUPPORTED_COMPOSE_BACKENDS: ReadonlyArray<ExecutionBackend> = [
 ];
 
 /**
- * @deprecated P0 名。`SUPPORTED_COMPOSE_BACKENDS` を使用すること。
- * Alias kept for imports that still reference the P0 symbol.
- */
-export const SUPPORTED_BACKENDS_P0: ReadonlyArray<ExecutionBackend> = SUPPORTED_COMPOSE_BACKENDS;
-
-/**
  * 与えられた値が `ExecutionBackend` の文字列かどうかを判定する。
  * Type guard for `ExecutionBackend`.
  */

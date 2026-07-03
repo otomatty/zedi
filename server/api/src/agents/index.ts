@@ -20,7 +20,6 @@ export {
 export {
   createZediChatModel,
   assertSupportedComposeBackend,
-  assertSupportedBackendP0,
   MissingUserCredentialError,
   BackendProviderMismatchError,
   UnsupportedBackendError,

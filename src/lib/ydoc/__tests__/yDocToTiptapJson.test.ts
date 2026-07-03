@@ -8,7 +8,6 @@ import {
   yXmlFragmentToTiptapJson,
   yXmlElementToJson,
   textToInlineNodes,
-  textToJson,
 } from "../yDocToTiptapJson";
 
 describe("yXmlFragmentToTiptapJson", () => {
@@ -147,22 +146,5 @@ describe("textToInlineNodes", () => {
 
     const nodes = textToInlineNodes(text);
     expect(nodes[0]?.marks).toEqual([{ type: "link", attrs: { href: "https://example.com" } }]);
-  });
-});
-
-describe("textToJson (paragraph wrapper)", () => {
-  it("wraps inline nodes in a paragraph for legacy callers", () => {
-    const doc = new Y.Doc();
-    const fragment = doc.getXmlFragment("test");
-    const text = new Y.XmlText();
-    fragment.insert(0, [text]);
-    text.insert(0, "Plain text");
-
-    const result = textToJson(text);
-
-    expect(result).toEqual({
-      type: "paragraph",
-      content: [{ type: "text", text: "Plain text" }],
-    });
   });
 });
