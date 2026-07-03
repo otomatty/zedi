@@ -208,8 +208,11 @@ app.post("/youtube", authRequired, rateLimit(), async (c) => {
     // /fetch ハンドラと同じパターンに合わせる。
     // Preserve HTTPException status codes (4xx etc.); mirrors the /fetch handler.
     if (err instanceof HTTPException) throw err;
-    const msg = err instanceof Error ? err.message : "YouTube extraction failed";
-    throw new HTTPException(502, { message: msg });
+    // 上流（YouTube 抽出・字幕・AI 要約）のエラー詳細はクライアントへ透過させず、
+    // サーバログにのみ残して固定文言を返す。
+    // Do not forward upstream error details to clients; log them and return a fixed message.
+    console.error("YouTube clip failed", err);
+    throw new HTTPException(502, { message: "YouTube extraction failed" });
   }
 });
 
