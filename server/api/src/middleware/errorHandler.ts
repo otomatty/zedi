@@ -41,5 +41,9 @@ export const errorHandler: ErrorHandler<AppEnv> = (err, c) => {
       routePath: c.req.routePath,
     });
   }
-  return c.json({ error: message }, status as ContentfulStatusCode);
+  // 5xx では DB/内部の生メッセージ（スキーマ名・接続先など）をクライアントへ露出しない。
+  // statusMap で明示された 4xx コードのみ、そのままレスポンスに載せる。
+  // Never leak raw internal/DB error messages on 5xx; only the mapped 4xx codes are safe to return.
+  const responseMessage = status >= 500 ? "Internal server error" : message;
+  return c.json({ error: responseMessage }, status as ContentfulStatusCode);
 };

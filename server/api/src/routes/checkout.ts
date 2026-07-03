@@ -15,6 +15,19 @@ app.post("/checkout", authRequired, async (c) => {
     return c.json({ error: "productId is required" }, 400);
   }
 
+  // productId は Pro プランの許可製品（環境変数）のみに限定する。
+  // これがないと同一 Polar 組織の任意製品でチェックアウトでき、Webhook が
+  // subscription.active を製品非依存で pro に昇格させるため権限昇格につながる。
+  // Restrict productId to the configured Pro products; otherwise a user could
+  // check out any product in the Polar org and get elevated to pro via the webhook.
+  const allowedProductIds = [
+    process.env.POLAR_PRO_MONTHLY_PRODUCT_ID,
+    process.env.POLAR_PRO_YEARLY_PRODUCT_ID,
+  ].filter((id): id is string => !!id);
+  if (!allowedProductIds.includes(productId)) {
+    return c.json({ error: "Invalid productId" }, 400);
+  }
+
   const polar = new Polar({
     accessToken: getEnv("POLAR_ACCESS_TOKEN"),
     server: process.env.NODE_ENV === "production" ? "production" : "sandbox",

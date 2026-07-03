@@ -64,6 +64,10 @@ beforeEach(() => {
   mockCustomerSessionsCreate.mockReset();
   mockGetAllowedOrigins.mockReset().mockReturnValue([]);
   mockGetEnv.mockReset().mockReturnValue("polar-token");
+  // productId 許可リストの元。テストの productId (prod-1 / prod-2) を許可製品として登録する。
+  // Source of the productId allowlist; register the test productIds as allowed products.
+  process.env.POLAR_PRO_MONTHLY_PRODUCT_ID = "prod-1";
+  process.env.POLAR_PRO_YEARLY_PRODUCT_ID = "prod-2";
 });
 
 // ── POST /api/checkout ──────────────────────────────────────────────────────
@@ -81,6 +85,21 @@ describe("POST /api/checkout", () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("productId is required");
+    expect(mockCheckoutsCreate).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when productId is not in the allowed products", async () => {
+    const app = createTestApp();
+
+    const res = await app.request("/api/checkout", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ productId: "prod-not-allowed" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Invalid productId");
     expect(mockCheckoutsCreate).not.toHaveBeenCalled();
   });
 

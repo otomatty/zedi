@@ -95,6 +95,44 @@ function createExtApp(redis: AppEnv["Variables"]["redis"], db: AppEnv["Variables
   return app;
 }
 
+/**
+ * rateLimit ミドルウェアが `multi().incr().expire().exec()` を呼ぶため、テスト用の最小 Redis を用意する。
+ * In-memory stand-in for the bits of ioredis that the rateLimit middleware exercises.
+ */
+function createMockRedis(): AppEnv["Variables"]["redis"] {
+  const store = new Map<string, number>();
+  const incr = (key: string): number => {
+    const next = (store.get(key) ?? 0) + 1;
+    store.set(key, next);
+    return next;
+  };
+  return {
+    multi: vi.fn(() => {
+      const ops: Array<() => unknown> = [];
+      const chain = {
+        incr(key: string) {
+          ops.push(() => incr(key));
+          return chain;
+        },
+        expire(_key: string, _ttl: number) {
+          ops.push(() => 1);
+          return chain;
+        },
+        async exec() {
+          return ops.map((op) => [null, op()]);
+        },
+      };
+      return chain;
+    }),
+    get: vi.fn(async (key: string) => {
+      const v = store.get(key);
+      return v === undefined ? null : String(v);
+    }),
+    set: vi.fn(async () => "OK"),
+    del: vi.fn(async (key: string) => (store.delete(key) ? 1 : 0)),
+  } as unknown as AppEnv["Variables"]["redis"];
+}
+
 async function parseJsonOrText(res: Response): Promise<{ message?: string }> {
   const raw = await res.text();
   try {
@@ -105,7 +143,7 @@ async function parseJsonOrText(res: Response): Promise<{ message?: string }> {
 }
 
 describe("POST /api/ext/clip-and-create", () => {
-  const mockRedis = {} as AppEnv["Variables"]["redis"];
+  const mockRedis = createMockRedis();
   const mockDb = {} as AppEnv["Variables"]["db"];
 
   beforeEach(() => {
@@ -323,7 +361,7 @@ describe("POST /api/ext/clip-and-create", () => {
 });
 
 describe("POST /api/ext/session", () => {
-  const mockRedis = {} as AppEnv["Variables"]["redis"];
+  const mockRedis = createMockRedis();
   const mockDb = {} as AppEnv["Variables"]["db"];
 
   beforeEach(() => {
@@ -479,7 +517,7 @@ describe("POST /api/ext/session", () => {
 });
 
 describe("GET /api/ext/authorize-code", () => {
-  const mockRedis = {} as AppEnv["Variables"]["redis"];
+  const mockRedis = createMockRedis();
   const mockDb = {} as AppEnv["Variables"]["db"];
 
   beforeEach(() => {
@@ -541,7 +579,7 @@ describe("GET /api/ext/authorize-code", () => {
 });
 
 describe("POST /api/ext/authorize-code", () => {
-  const mockRedis = {} as AppEnv["Variables"]["redis"];
+  const mockRedis = createMockRedis();
   const mockDb = {} as AppEnv["Variables"]["db"];
 
   beforeEach(() => {
