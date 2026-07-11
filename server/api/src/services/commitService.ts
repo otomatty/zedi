@@ -2,8 +2,11 @@ import { eq, sql } from "drizzle-orm";
 import { thumbnailObjects, thumbnailTierQuotas } from "../schema/index.js";
 import { getUserTier } from "./subscriptionService.js";
 import { getEnv } from "../lib/env.js";
+import { assertClipFetchUrlAllowed, ClipFetchBlockedError } from "../lib/clipServerFetch.js";
 import type { StorageClient } from "../lib/storage/index.js";
 import type { Database } from "../types/index.js";
+
+const MAX_REDIRECTS = 5;
 
 // `thumbnail_tier_quotas` がシードされていない環境でフォールバック上限が小さすぎると
 // 数件クリップしただけで 413 を踏む。drizzle/0020_seed_thumbnail_tier_quotas.sql の
@@ -45,12 +48,43 @@ async function fetchImageAsBuffer(
     return { buffer, mimeType, ext };
   }
 
-  const response = await fetch(sourceUrl, {
-    headers: {
-      "User-Agent": "zedi-thumbnail-api/1.0 (https://zedi.app)",
-      Accept: "image/*,*/*;q=0.8",
-    },
-  });
+  // SSRF 対策: 初回 URL と各リダイレクト先を DNS 解決込みで検証する
+  // (clip-fetch と同じポリシー)。redirect: "manual" で自動追従させない。
+  // SSRF protection: validate the initial URL and every redirect hop with DNS
+  // resolution (same policy as clip-fetch); manual redirects prevent
+  // unvalidated auto-follow to internal hosts.
+  await assertClipFetchUrlAllowed(sourceUrl);
+
+  let response!: Response;
+  let currentUrl = sourceUrl;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    response = await fetch(currentUrl, {
+      headers: {
+        "User-Agent": "zedi-thumbnail-api/1.0 (https://zedi.app)",
+        Accept: "image/*,*/*;q=0.8",
+      },
+      redirect: "manual",
+    });
+    const isRedirect =
+      response.type === "opaqueredirect" || [301, 302, 303, 307, 308].includes(response.status);
+    if (isRedirect) {
+      const location = response.headers.get("Location");
+      if (!location || hop === MAX_REDIRECTS) {
+        throw new ClipFetchBlockedError("Redirect chain not allowed");
+      }
+      let nextUrl: string;
+      try {
+        nextUrl = new URL(location, currentUrl).href;
+      } catch {
+        throw new ClipFetchBlockedError("Invalid redirect Location");
+      }
+      await assertClipFetchUrlAllowed(nextUrl);
+      currentUrl = nextUrl;
+      continue;
+    }
+    break;
+  }
 
   if (!response.ok) {
     throw new Error(`Image fetch failed: ${response.status}`);

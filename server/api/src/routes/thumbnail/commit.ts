@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { authRequired } from "../../middleware/auth.js";
 import { rateLimit } from "../../middleware/rateLimit.js";
 import { commitImage } from "../../services/commitService.js";
+import { ClipFetchBlockedError } from "../../lib/clipServerFetch.js";
 import { isStorageConfigured } from "../../lib/storage/index.js";
 import type { AppEnv } from "../../types/index.js";
 
@@ -36,6 +37,9 @@ app.post("/", authRequired, rateLimit(), async (c) => {
     );
     return c.json({ imageUrl, objectId, provider: "s3" as const });
   } catch (err) {
+    if (err instanceof ClipFetchBlockedError) {
+      throw new HTTPException(400, { message: err.message });
+    }
     if (err instanceof Error && err.message === "STORAGE_QUOTA_EXCEEDED") {
       // クライアントは `code` を見てアップグレード誘導 UI を出す。
       // The client looks at `code` to surface the upgrade-plan prompt.

@@ -172,6 +172,27 @@ describe("commitImage — BETTER_AUTH_URL handling", () => {
     expect(imageUrl.endsWith(`/api/thumbnail/serve/${objectId}`)).toBe(true);
   });
 
+  it.each([
+    "http://127.0.0.1/image.png",
+    "http://localhost/image.png",
+    "http://169.254.169.254/latest/meta-data/",
+    "http://10.0.0.5/image.png",
+  ])(
+    "SSRF ポリシーで内部/プライベート URL の取得を拒否する / rejects fetching internal/private URLs (%s)",
+    async (sourceUrl) => {
+      setBaseEnv();
+
+      const { commitImage } = await importCommitService();
+      const db = makeDbMock("free", 10 * 1024 * 1024, 0) as never;
+      const storage = makeMockStorage();
+
+      await expect(commitImage(TEST_USER_ID, sourceUrl, undefined, db, storage)).rejects.toThrow(
+        /URL not allowed/,
+      );
+      expect(mockPutObject).not.toHaveBeenCalled();
+    },
+  );
+
   it("クォータ未シードでも 100MB のフォールバックでアップロードできる / accepts upload using 100MB fallback when quota table is unseeded", async () => {
     setBaseEnv();
 
