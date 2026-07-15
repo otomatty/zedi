@@ -408,7 +408,9 @@ app.post("/:pageId/compose-sessions/:id/run", authRequired, rateLimit(), async (
         finalStatus = "failed";
         lastError = lastError ?? "Client disconnected";
       }
-      void persistSession();
+      void persistSession().catch((err) => {
+        console.error(`[composeSessions] persistSession failed on abort for session=${id}:`, err);
+      });
     });
 
     // `DATABASE_URL` が設定された本番経路では `PostgresSaver` を取得して

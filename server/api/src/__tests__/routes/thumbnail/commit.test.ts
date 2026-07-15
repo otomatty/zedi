@@ -195,6 +195,23 @@ describe("POST /api/thumbnail/commit", () => {
     expect(res.status).toBe(502);
   });
 
+  it("returns 400 when commitService throws ClipFetchBlockedError", async () => {
+    const { ClipFetchBlockedError, DISALLOWED_CLIP_URL_MESSAGE } =
+      await import("../../../lib/clipServerFetch.js");
+    mockCommitImage.mockRejectedValue(new ClipFetchBlockedError(DISALLOWED_CLIP_URL_MESSAGE));
+    const app = createTestApp();
+
+    const res = await app.request("/api/thumbnail/commit", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ sourceUrl: "https://example.com/img.png" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toBe(DISALLOWED_CLIP_URL_MESSAGE);
+  });
+
   it("returns 401 without auth", async () => {
     const app = createTestApp();
 
