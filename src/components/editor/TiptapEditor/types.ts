@@ -66,11 +66,6 @@ export interface TiptapEditorProps {
   initialContent?: string;
   /** initialContent をエディタに反映したあとに呼ぶ */
   onInitialContentApplied?: () => void;
-  /** Wiki生成中（この間はリンク判定をスキップしてちらつきを防ぐ） */
-  isWikiGenerating?: boolean;
-  /** コラボモード時、Wiki生成内容を Y.Doc に反映する用。反映後に onWikiContentApplied を呼ぶ */
-  wikiContentForCollab?: string | null;
-  onWikiContentApplied?: () => void;
   /**
    * 編集中ページが所属するノート ID。`null` は個人ページ、文字列値はノート
    * ネイティブページ。WikiLink のサジェスト・解決候補をノート／個人スコープに

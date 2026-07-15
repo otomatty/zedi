@@ -36,9 +36,6 @@ function useEditorControllers(args: {
   insertAtCursorRef: TiptapEditorProps["insertAtCursorRef"];
   initialContent: TiptapEditorProps["initialContent"];
   onInitialContentApplied: TiptapEditorProps["onInitialContentApplied"];
-  isWikiGenerating: boolean;
-  wikiContentForCollab: TiptapEditorProps["wikiContentForCollab"];
-  onWikiContentApplied: TiptapEditorProps["onWikiContentApplied"];
   editorRef: MutableRefObject<Editor | null>;
   lastSelectionRef: MutableRefObject<{ from: number; to: number } | null>;
   editorContainerRef: RefObject<HTMLDivElement | null>;
@@ -133,14 +130,11 @@ function useEditorControllers(args: {
     onContentError: args.onContentError,
     isReadOnly: args.isReadOnly,
     pageId: args.pageId,
-    isWikiGenerating: args.isWikiGenerating,
     collaborationConfig: args.collaborationConfig,
     focusContentRef: args.focusContentRef,
     insertAtCursorRef: args.insertAtCursorRef,
     initialContent: args.initialContent,
     onInitialContentApplied: args.onInitialContentApplied,
-    wikiContentForCollab: args.wikiContentForCollab,
-    onWikiContentApplied: args.onWikiContentApplied,
     handleImageUpload: args.handleImageUpload,
     isEditorInitializedRef,
     pageNoteId: args.pageNoteId,
@@ -168,9 +162,6 @@ export function useTiptapEditorController({
   pageActionHubRef,
   initialContent,
   onInitialContentApplied,
-  isWikiGenerating = false,
-  wikiContentForCollab,
-  onWikiContentApplied,
   pageNoteId = null,
 }: TiptapEditorProps) {
   const { editorFontSizePx } = useGeneralSettings();
@@ -242,9 +233,6 @@ export function useTiptapEditorController({
     insertAtCursorRef,
     initialContent,
     onInitialContentApplied,
-    isWikiGenerating,
-    wikiContentForCollab: wikiContentForCollab ?? null,
-    onWikiContentApplied,
     editorRef,
     lastSelectionRef,
     editorContainerRef,

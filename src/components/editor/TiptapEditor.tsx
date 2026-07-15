@@ -47,9 +47,6 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   pageActionHubRef,
   initialContent,
   onInitialContentApplied,
-  isWikiGenerating = false,
-  wikiContentForCollab,
-  onWikiContentApplied,
   pageNoteId = null,
   bottomBarTrailingAction,
 }) => {
@@ -116,9 +113,6 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     pageActionHubRef,
     initialContent,
     onInitialContentApplied,
-    isWikiGenerating,
-    wikiContentForCollab,
-    onWikiContentApplied,
     pageNoteId,
   });
 

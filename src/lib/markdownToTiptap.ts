@@ -1,6 +1,6 @@
 /**
  * Markdown → Tiptap JSON 変換の共通モジュール。
- * wikiGenerator と aiChatActionHelpers の両方で利用。
+ * aiChatActionHelpers などから利用。
  *
  * 見出しの方針:
  * - `# X` は **本文の見出しに変換しない**（ページの h1 はタイトル input が担うため、`# X` を

@@ -9,8 +9,6 @@ interface UseWikiLinkStatusSyncOptions {
   content: string;
   pageId: string | undefined;
   onChange: (content: string) => void;
-  /** true の間は同期をスキップ（Wiki生成中のリンクスタイルちらつき防止） */
-  skipSync?: boolean;
   /**
    * 編集中ページの noteId。`null`（既定）は個人ページ、文字列値なら
    * ノートネイティブページ。存在確認のスコープを切り替えるために使う。
@@ -46,7 +44,6 @@ export function useWikiLinkStatusSync({
   content,
   pageId,
   onChange,
-  skipSync = false,
   pageNoteId = null,
 }: UseWikiLinkStatusSyncOptions): void {
   const noteTitleIndexQuery = useNoteTitleIndex(pageNoteId ?? "", {
@@ -80,7 +77,7 @@ export function useWikiLinkStatusSync({
   }>({ pageId: null, wikiLinkCount: 0, pageScopeSignature: null });
 
   useEffect(() => {
-    if (skipSync || !editor || !content || !pageId) {
+    if (!editor || !content || !pageId) {
       return;
     }
 
@@ -135,7 +132,7 @@ export function useWikiLinkStatusSync({
     // コンテンツ反映を待ってから実行
     const timer = setTimeout(updateWikiLinkStatus, 150);
     return () => clearTimeout(timer);
-  }, [skipSync, editor, content, checkExistence, pageId, onChange, pageScopeSignature]);
+  }, [editor, content, checkExistence, pageId, onChange, pageScopeSignature]);
 }
 
 // --- ヘルパー関数 ---

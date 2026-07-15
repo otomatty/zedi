@@ -468,7 +468,6 @@ function NotePageEditorEditable({
           currentPageId={page.id}
           pageId={page.id}
           isNewPage={false}
-          isWikiGenerating={false}
           isReadOnly={false}
           // ノートネイティブページは IndexedDB に永続化されない（個人ページ
           // しか同期しない）ため、`linkedPagesMode="repo"` だと `usePage` が
