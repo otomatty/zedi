@@ -69,6 +69,9 @@ async function fetchImageAsBuffer(
     const isRedirect =
       response.type === "opaqueredirect" || [301, 302, 303, 307, 308].includes(response.status);
     if (isRedirect) {
+      // リダイレクト応答の本文は読まないので接続を解放する。
+      // Cancel unused redirect bodies so connections are released promptly.
+      await response.body?.cancel();
       const location = response.headers.get("Location");
       if (!location || hop === MAX_REDIRECTS) {
         throw new ClipFetchBlockedError("Redirect chain not allowed");

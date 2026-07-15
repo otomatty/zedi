@@ -6,12 +6,17 @@
  * Verifies fail-fast behavior when BETTER_AUTH_URL is unset, and imageUrl
  * generation when the env is configured.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { lookup } from "node:dns/promises";
 import type { StorageClient } from "../../lib/storage/types.js";
 
 const { mockPutObject, envMap } = vi.hoisted(() => ({
   mockPutObject: vi.fn(),
   envMap: {} as Record<string, string | undefined>,
+}));
+
+vi.mock("node:dns/promises", () => ({
+  lookup: vi.fn(),
 }));
 
 vi.mock("../../lib/env.js", () => ({
@@ -25,6 +30,8 @@ vi.mock("../../lib/env.js", () => ({
 vi.mock("../../services/subscriptionService.js", () => ({
   getUserTier: vi.fn().mockResolvedValue("free"),
 }));
+
+const originalFetch = globalThis.fetch;
 
 const TINY_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgAAIAAAUAAen63NgAAAAASUVORK5CYII=";
@@ -96,7 +103,15 @@ describe("commitImage — BETTER_AUTH_URL handling", () => {
     clearEnv();
     mockPutObject.mockReset();
     mockPutObject.mockResolvedValue(undefined);
+    vi.mocked(lookup).mockReset();
+    vi.mocked(lookup).mockResolvedValue([
+      { address: "93.184.216.34", family: 4 },
+    ] as unknown as Awaited<ReturnType<typeof lookup>>);
     vi.resetModules();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
   });
 
   it("BETTER_AUTH_URL 未設定時は fail-fast で throw する / throws when BETTER_AUTH_URL is unset", async () => {
@@ -192,6 +207,29 @@ describe("commitImage — BETTER_AUTH_URL handling", () => {
       expect(mockPutObject).not.toHaveBeenCalled();
     },
   );
+
+  it("公開 URL からのプライベート宛リダイレクトを拒否する / rejects redirect from public URL to a private address", async () => {
+    setBaseEnv();
+
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    fetchMock.mockResolvedValueOnce(
+      new Response(null, {
+        status: 302,
+        headers: { Location: "http://127.0.0.1/secret.png" },
+      }),
+    );
+
+    const { commitImage } = await importCommitService();
+    const db = makeDbMock("free", 10 * 1024 * 1024, 0) as never;
+    const storage = makeMockStorage();
+
+    await expect(
+      commitImage(TEST_USER_ID, "https://example.com/image.png", undefined, db, storage),
+    ).rejects.toThrow(/URL not allowed/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(mockPutObject).not.toHaveBeenCalled();
+  });
 
   it("クォータ未シードでも 100MB のフォールバックでアップロードできる / accepts upload using 100MB fallback when quota table is unseeded", async () => {
     setBaseEnv();
