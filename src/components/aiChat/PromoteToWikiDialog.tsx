@@ -21,8 +21,6 @@ import {
 import { callAIService } from "@/lib/aiService";
 import { loadAISettings } from "@/lib/aiSettings";
 import { useCreatePage } from "@/hooks/pages/usePageQueries";
-import { useWikiSchema } from "@/hooks/wiki/useWikiSchema";
-import { navigateToWikiCompose } from "@/lib/wikiCompose/navigation";
 import { EntityRow } from "./EntityRow";
 
 /**
@@ -38,8 +36,6 @@ interface PromoteToWikiDialogProps {
   conversationText: string;
   /** Known page titles for isNew determination. / 既存ページタイトル一覧 */
   existingTitles: string[];
-  /** Conversation id for provenance. / 出典用会話 ID */
-  conversationId?: string;
 }
 
 type DialogBodyProps = Omit<PromoteToWikiDialogProps, "open">;
@@ -194,17 +190,11 @@ function useEntityExtraction(
  * 本体コンポーネント。`open=true` のときのみマウントされるので、Router / プロバイダの実体が必ず存在する。
  */
 
-function PromoteToWikiDialogBody({
-  onClose,
-  conversationText,
-  existingTitles,
-  conversationId,
-}: DialogBodyProps) {
+function PromoteToWikiDialogBody({ onClose, conversationText, existingTitles }: DialogBodyProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { mutateAsync: createPage } = useCreatePage();
-  const { data: schemaData } = useWikiSchema();
 
   const [entities, setEntities] = useState<ExtractedEntity[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -253,37 +243,15 @@ function PromoteToWikiDialogBody({
       const firstCreated = created.find((p): p is NonNullable<typeof p> => p != null);
       if (!firstCreated) throw new Error("no pages created");
 
-      const firstEntity = selectedEntities[created.indexOf(firstCreated)];
       toast({ title: t("aiChat.notifications.promoteSuccess") });
       onClose();
-      navigateToWikiCompose({
-        navigate,
-        noteId: firstCreated.noteId,
-        pageId: firstCreated.id,
-        seed: {
-          outline: `- ${firstEntity.summary}`,
-          conversationText,
-          userSchema: schemaData?.content,
-          conversationId,
-        },
-      });
+      navigate(`/notes/${firstCreated.noteId}/${firstCreated.id}`);
     } catch {
       toast({ title: t("aiChat.notifications.promoteFailed"), variant: "destructive" });
     } finally {
       setIsCreating(false);
     }
-  }, [
-    entities,
-    selected,
-    createPage,
-    navigate,
-    conversationText,
-    schemaData,
-    conversationId,
-    toast,
-    t,
-    onClose,
-  ]);
+  }, [entities, selected, createPage, navigate, toast, t, onClose]);
 
   return (
     <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">

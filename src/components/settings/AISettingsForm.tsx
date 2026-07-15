@@ -22,7 +22,6 @@ import { ProviderSelector } from "./ProviderSelector";
 import { SectionSaveStatus } from "./SectionSaveStatus";
 import { ClaudeCodePrerequisites } from "./ClaudeCodePrerequisites";
 import { McpServerSettings } from "./McpServerSettings";
-import { ComposeByokCredentialsSection } from "./ComposeByokCredentialsSection";
 import { getProviderById, type AIInteractionMode } from "@/types/ai";
 import { isTauriDesktop } from "@/lib/platform";
 import { useTranslation } from "react-i18next";
@@ -142,11 +141,6 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
 
         {isClaudeCode && <ClaudeCodePrerequisites />}
         {isClaudeCode && <McpServerSettings />}
-
-        <div className="border-border space-y-3 border-t pt-6">
-          <h3 className="text-sm font-medium">{t("wikiCompose.credentials.title")}</h3>
-          <ComposeByokCredentialsSection />
-        </div>
       </CardContent>
 
       <CardFooter className="flex justify-between">
