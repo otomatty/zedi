@@ -1,0 +1,103 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun .codex/hooks/aidlc-codex-adapter.ts session-start"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun .codex/hooks/aidlc-codex-adapter.ts mint"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun .codex/hooks/aidlc-codex-adapter.ts reviewer-scope"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun .codex/hooks/aidlc-codex-adapter.ts audit-and-sensors"
+          }
+        ],
+        "matcher": "apply_patch"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun .codex/hooks/aidlc-codex-adapter.ts state-sync"
+          }
+        ],
+        "matcher": "update_plan"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun .codex/hooks/aidlc-codex-adapter.ts runtime-compile"
+          }
+        ],
+        "matcher": "Bash"
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun .codex/hooks/aidlc-codex-adapter.ts validate-state"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun .codex/hooks/aidlc-codex-adapter.ts post-compact"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun .codex/hooks/aidlc-codex-adapter.ts log-subagent"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun .codex/hooks/aidlc-codex-adapter.ts stop"
+          }
+        ]
+      }
+    ]
+  }
+}

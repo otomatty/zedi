@@ -78,5 +78,14 @@ src-tauri/binaries/claude-sidecar*
 .cursor/skills/
 .cursor/agents/
 
-# Local-only notes (not tracked). See AGENTS.md / SPECIFICATION_POLICY.md.
+# Local-only notes (not tracked). See AGENTS.md.
 /docs/
+
+# AI-DLC — per-user cursors and machine-local runtime (aidlc-workflows v2)
+# Rule: commit shared work (method, state, audit shards, artifacts); ignore cursors/runtime.
+aidlc/active-space
+aidlc/spaces/*/intents/active-intent
+aidlc/.aidlc-clone-id
+aidlc/.aidlc-sessions/
+aidlc/spaces/*/intents/*/runtime-graph.json
+aidlc/spaces/*/intents/*/.aidlc-*
