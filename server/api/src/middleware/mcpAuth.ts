@@ -26,14 +26,14 @@ import type { AppEnv } from "../types/index.js";
 
 /**
  * Bearer トークンを検証し、ペイロードを返す。形式不正・検証失敗時は 401 を投げる。
- * `redis` を渡した場合は deny-list を参照し、失効済みトークンを拒否する。
+ * `kv` を渡した場合は deny-list を参照し、失効済みトークンを拒否する。
  *
  * Verifies the Bearer token from request headers; throws HTTPException 401 on failure.
- * When `redis` is provided, revoked tokens are rejected via the deny-list.
+ * When `kv` is provided, revoked tokens are rejected via the deny-list.
  */
 async function extractAndVerify(
   authHeader: string | undefined,
-  redis: AppEnv["Variables"]["redis"] | undefined,
+  kv: AppEnv["Variables"]["kv"] | undefined,
 ) {
   const parts = authHeader?.trim().split(/\s+/) ?? [];
   if (parts.length !== 2 || parts[0]?.toLowerCase() !== "bearer" || !parts[1]) {
@@ -42,11 +42,11 @@ async function extractAndVerify(
   const token = parts[1];
   let payload: Awaited<ReturnType<typeof verifyMcpToken>>;
   try {
-    payload = await verifyMcpToken(token, redis);
+    payload = await verifyMcpToken(token, kv);
   } catch (err) {
     if (err instanceof McpRevocationLookupError) {
-      // Redis 障害時はインフラ問題として 503 を返す。401 に潰すと正規トークンを誤って拒絶する。
-      // Redis outage must surface as 503, not 401, so legitimately signed tokens aren't misclassified.
+      // ストア障害時はインフラ問題として 503 を返す。401 に潰すと正規トークンを誤って拒絶する。
+      // A deny-list store outage must surface as 503, not 401, so legitimately signed tokens aren't misclassified.
       console.error("[mcp] deny-list lookup failed", err);
       throw new HTTPException(503, { message: "Token deny-list unavailable" });
     }
@@ -85,7 +85,7 @@ async function ensureActiveMcpUser(db: AppEnv["Variables"]["db"], userId: string
  * Auth middleware for read-only MCP routes; accepts `mcp:read` or `mcp:write` scope.
  */
 export const mcpReadRequired = createMiddleware<AppEnv>(async (c, next) => {
-  const payload = await extractAndVerify(c.req.header("Authorization"), c.get("redis"));
+  const payload = await extractAndVerify(c.req.header("Authorization"), c.get("kv"));
   if (!hasScope(payload, MCP_SCOPE_READ) && !hasScope(payload, MCP_SCOPE_WRITE)) {
     throw new HTTPException(403, { message: "mcp:read scope required" });
   }
@@ -99,7 +99,7 @@ export const mcpReadRequired = createMiddleware<AppEnv>(async (c, next) => {
  * Auth middleware for write MCP routes; requires `mcp:write` scope.
  */
 export const mcpWriteRequired = createMiddleware<AppEnv>(async (c, next) => {
-  const payload = await extractAndVerify(c.req.header("Authorization"), c.get("redis"));
+  const payload = await extractAndVerify(c.req.header("Authorization"), c.get("kv"));
   if (!hasScope(payload, MCP_SCOPE_WRITE)) {
     throw new HTTPException(403, { message: "mcp:write scope required" });
   }

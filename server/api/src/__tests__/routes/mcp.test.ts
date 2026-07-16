@@ -95,10 +95,10 @@ import { Hono } from "hono";
 import { auth } from "../../auth.js";
 import mcpRoutes from "../../routes/mcp.js";
 
-function createMcpApp(redis: AppEnv["Variables"]["redis"], db: AppEnv["Variables"]["db"]) {
+function createMcpApp(kv: AppEnv["Variables"]["kv"], db: AppEnv["Variables"]["db"]) {
   const app = new Hono<AppEnv>();
   app.use("*", async (c, next) => {
-    c.set("redis", redis);
+    c.set("kv", kv);
     c.set("db", db);
     await next();
   });
@@ -116,50 +116,36 @@ async function parseJsonOrText(res: Response): Promise<{ message?: string }> {
 }
 
 /**
- * rateLimit ミドルウェアが `incr` / `expire` を呼ぶため、テスト用の最小 Redis を用意する。
- * In-memory stand-in for the bits of ioredis that the rateLimit middleware exercises.
+ * rateLimit ミドルウェア等が使う最小のインメモリ KvStore を用意する。
+ * In-memory stand-in for the KvStore operations the routes exercise.
  */
-function createMockRedis(): AppEnv["Variables"]["redis"] {
-  const store = new Map<string, number>();
-  const incr = (key: string): number => {
-    const next = (store.get(key) ?? 0) + 1;
-    store.set(key, next);
-    return next;
-  };
+function createMockKv(): AppEnv["Variables"]["kv"] {
+  const counters = new Map<string, number>();
+  const values = new Map<string, string>();
   return {
-    // rateLimit ミドルウェアが使う MULTI/EXEC を満たす最小のチェインを返す。
-    // Minimal multi() chain: the rateLimit middleware only issues incr + expire.
-    multi: vi.fn(() => {
-      const ops: Array<() => unknown> = [];
-      const chain = {
-        incr(key: string) {
-          ops.push(() => incr(key));
-          return chain;
-        },
-        expire(_key: string, _ttl: number) {
-          ops.push(() => 1);
-          return chain;
-        },
-        async exec() {
-          return ops.map((op) => [null, op()]);
-        },
-      };
-      return chain;
+    incrWithTtl: vi.fn(async (key: string, _ttlSec: number) => {
+      const next = (counters.get(key) ?? 0) + 1;
+      counters.set(key, next);
+      return next;
     }),
-    get: vi.fn(async (key: string) => {
-      const v = store.get(key);
-      return v === undefined ? null : String(v);
+    get: vi.fn(async (key: string) => values.get(key) ?? null),
+    setex: vi.fn(async (key: string, _ttlSec: number, value: string) => {
+      values.set(key, value);
     }),
-    set: vi.fn(async () => "OK"),
-    del: vi.fn(async (key: string) => (store.delete(key) ? 1 : 0)),
-  } as unknown as AppEnv["Variables"]["redis"];
+    getdel: vi.fn(async (key: string) => {
+      const v = values.get(key) ?? null;
+      values.delete(key);
+      return v;
+    }),
+    ttl: vi.fn(async () => null),
+  } as unknown as AppEnv["Variables"]["kv"];
 }
 
-let mockRedis = createMockRedis();
+let mockKv = createMockKv();
 const mockDb = {} as AppEnv["Variables"]["db"];
 
 beforeEach(() => {
-  mockRedis = createMockRedis();
+  mockKv = createMockKv();
   vi.mocked(auth.api.getSession).mockResolvedValue(null);
   mockConsumeMcpCode.mockReset();
   mockVerifyPKCE.mockReset();
@@ -181,7 +167,7 @@ describe("POST /api/mcp/authorize-code", () => {
   });
 
   it("returns 401 when Better Auth session is missing", async () => {
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/authorize-code", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/authorize-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -195,7 +181,7 @@ describe("POST /api/mcp/authorize-code", () => {
 
   it("returns 400 when redirect_uri or code_challenge is missing", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/authorize-code", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/authorize-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ redirect_uri: "http://127.0.0.1:5173/cb" }),
@@ -208,7 +194,7 @@ describe("POST /api/mcp/authorize-code", () => {
   it("returns 400 when redirect_uri is not allowed", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
     mockIsMcpRedirectUriAllowed.mockReturnValue(false);
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/authorize-code", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/authorize-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -223,7 +209,7 @@ describe("POST /api/mcp/authorize-code", () => {
 
   it("returns 400 when scopes contain unknown values", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/authorize-code", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/authorize-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -239,7 +225,7 @@ describe("POST /api/mcp/authorize-code", () => {
 
   it("returns 200 with code and state on success", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/authorize-code", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/authorize-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -260,7 +246,7 @@ describe("POST /api/mcp/authorize-code", () => {
 
 describe("POST /api/mcp/session", () => {
   it("returns 400 when grant_type is not authorization_code", async () => {
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/session", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -276,7 +262,7 @@ describe("POST /api/mcp/session", () => {
   });
 
   it("returns 400 when required fields are missing", async () => {
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/session", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ grant_type: "authorization_code", code: "c" }),
@@ -287,7 +273,7 @@ describe("POST /api/mcp/session", () => {
   it("returns 400 when code is invalid or expired", async () => {
     mockIsMcpRedirectUriAllowed.mockReturnValue(true);
     mockConsumeMcpCode.mockResolvedValue(null);
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/session", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -308,7 +294,7 @@ describe("POST /api/mcp/session", () => {
       redirectUri: "http://127.0.0.1:5173/cb",
     });
     mockVerifyPKCE.mockReturnValue(true);
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/session", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -331,7 +317,7 @@ describe("POST /api/mcp/session", () => {
       redirectUri: "http://127.0.0.1:5173/cb",
     });
     mockVerifyPKCE.mockReturnValue(false);
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/session", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -352,7 +338,7 @@ describe("POST /api/mcp/session", () => {
       redirectUri: "http://127.0.0.1:5173/cb",
     });
     mockVerifyPKCE.mockReturnValue(true);
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/session", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -375,7 +361,7 @@ describe("POST /api/mcp/session", () => {
 
 describe("POST /api/mcp/clip", () => {
   it("returns 401 without Bearer", async () => {
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/clip", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/clip", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: "https://example.com/x" }),
@@ -384,7 +370,7 @@ describe("POST /api/mcp/clip", () => {
   });
 
   it("returns 403 when token has read-only scope", async () => {
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/clip", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/clip", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -397,7 +383,7 @@ describe("POST /api/mcp/clip", () => {
   });
 
   it("returns 400 when url is missing", async () => {
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/clip", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/clip", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer t" },
       body: JSON.stringify({}),
@@ -406,7 +392,7 @@ describe("POST /api/mcp/clip", () => {
   });
 
   it("returns 400 for SSRF (localhost)", async () => {
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/clip", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/clip", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer t" },
       body: JSON.stringify({ url: "http://localhost/admin" }),
@@ -415,7 +401,7 @@ describe("POST /api/mcp/clip", () => {
   });
 
   it("returns 200 with page info when clipAndCreate succeeds", async () => {
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/clip", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/clip", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -433,7 +419,7 @@ describe("POST /api/mcp/clip", () => {
 
 describe("POST /api/mcp/revoke", () => {
   it("returns 401 without Bearer", async () => {
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/revoke", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/revoke", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -442,8 +428,8 @@ describe("POST /api/mcp/revoke", () => {
     expect(mockStoreMcpRevocation).not.toHaveBeenCalled();
   });
 
-  it("records the revocation in Redis and returns 200", async () => {
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/revoke", {
+  it("records the revocation in the KV store and returns 200", async () => {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/revoke", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -456,7 +442,7 @@ describe("POST /api/mcp/revoke", () => {
     const body = (await res.json()) as { revoked?: boolean };
     expect(body.revoked).toBe(true);
     expect(mockStoreMcpRevocation).toHaveBeenCalledOnce();
-    expect(mockStoreMcpRevocation).toHaveBeenCalledWith(mockRedis, "user-revoke-42");
+    expect(mockStoreMcpRevocation).toHaveBeenCalledWith(mockKv, "user-revoke-42");
   });
 });
 
@@ -465,7 +451,7 @@ describe("POST /api/mcp/revoke-session", () => {
     // デバイス紛失等のユーザー操作用エンドポイント。セッションなしは 401。
     // Session-protected endpoint for UI-driven revocation; no session → 401.
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/revoke-session", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/revoke-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -474,11 +460,11 @@ describe("POST /api/mcp/revoke-session", () => {
     expect(mockStoreMcpRevocation).not.toHaveBeenCalled();
   });
 
-  it("records the revocation in Redis when called with a valid user session", async () => {
+  it("records the revocation in the KV store when called with a valid user session", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({
       user: { ...mockSessionUser, id: "user-session-7" },
     } as AuthSession);
-    const res = await createMcpApp(mockRedis, mockDb).request("/api/mcp/revoke-session", {
+    const res = await createMcpApp(mockKv, mockDb).request("/api/mcp/revoke-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -487,7 +473,7 @@ describe("POST /api/mcp/revoke-session", () => {
     const body = (await res.json()) as { revoked?: boolean };
     expect(body.revoked).toBe(true);
     expect(mockStoreMcpRevocation).toHaveBeenCalledOnce();
-    expect(mockStoreMcpRevocation).toHaveBeenCalledWith(mockRedis, "user-session-7");
+    expect(mockStoreMcpRevocation).toHaveBeenCalledWith(mockKv, "user-session-7");
   });
 });
 
@@ -521,7 +507,7 @@ describe("rate limiting (#562)", () => {
   });
 
   it("POST /api/mcp/clip returns 429 with Retry-After once the per-user limit is exceeded", async () => {
-    const app = createMcpApp(mockRedis, mockDb);
+    const app = createMcpApp(mockKv, mockDb);
     // 30/min/user. 30 回まで通して 31 回目で 429。
     // Limit is 30/min/user; the 31st call in the window must fail.
     let firstLimited: Response | null = null;
@@ -555,7 +541,7 @@ describe("rate limiting (#562)", () => {
   });
 
   it("POST /api/mcp/clip keeps separate buckets for different users", async () => {
-    const app = createMcpApp(mockRedis, mockDb);
+    const app = createMcpApp(mockKv, mockDb);
     // ユーザー A を上限まで使い切ってもユーザー B は影響を受けない。
     // Burning user A's bucket must not bleed into user B's.
     for (let i = 0; i < 30; i++) {
@@ -585,7 +571,7 @@ describe("rate limiting (#562)", () => {
   it("POST /api/mcp/session returns 429 once the per-IP limit is exceeded", async () => {
     mockIsMcpRedirectUriAllowed.mockReturnValue(true);
     mockConsumeMcpCode.mockResolvedValue(null);
-    const app = createMcpApp(mockRedis, mockDb);
+    const app = createMcpApp(mockKv, mockDb);
     let firstLimited: Response | null = null;
     // session は 10/min/IP。認証前ルートなので userId は無く IP でキー付けされる。
     // /session is unauthenticated so the bucket is keyed by IP (10/min).
@@ -616,7 +602,7 @@ describe("rate limiting (#562)", () => {
   it("POST /api/mcp/authorize-code is rate limited per user", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
     mockIsMcpRedirectUriAllowed.mockReturnValue(true);
-    const app = createMcpApp(mockRedis, mockDb);
+    const app = createMcpApp(mockKv, mockDb);
     let firstLimited: Response | null = null;
     // authorize-code は 20/min/user。
     // Limit: 20/min/user.

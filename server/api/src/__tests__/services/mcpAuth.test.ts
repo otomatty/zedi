@@ -30,12 +30,13 @@ import {
   MCP_JWT_EXP_DAYS_DEFAULT,
 } from "../../services/mcpAuth.js";
 import { createHash } from "node:crypto";
+import type { KvStore } from "../../lib/kv/index.js";
 
 /**
- * Minimal Redis-like in-memory mock used by store/consume tests.
- * 簡易インメモリ Redis モック（テスト用）。
+ * Minimal KvStore-like in-memory mock used by store/consume tests.
+ * 簡易インメモリ KvStore モック（テスト用）。
  */
-function createMockRedis() {
+function createMockKv() {
   const store = new Map<string, { value: string; expireAt: number }>();
   return {
     setex: vi.fn(async (key: string, ttl: number, value: string) => {
@@ -75,23 +76,23 @@ describe("verifyPKCE", () => {
 });
 
 describe("storeMcpCode / consumeMcpCode", () => {
-  let redis: ReturnType<typeof createMockRedis>;
+  let kv: ReturnType<typeof createMockKv>;
 
   beforeEach(() => {
-    redis = createMockRedis();
+    kv = createMockKv();
   });
 
   it("stores code with mcp:code: prefix and TTL, then retrieves payload atomically", async () => {
     await storeMcpCode(
-      redis as unknown as import("ioredis").Redis,
+      kv as unknown as KvStore,
       "code-xyz",
       "user-1",
       "challenge-xyz",
       "http://127.0.0.1:5173/callback",
     );
 
-    expect(redis.setex).toHaveBeenCalledOnce();
-    const setexCall = redis.setex.mock.calls[0];
+    expect(kv.setex).toHaveBeenCalledOnce();
+    const setexCall = kv.setex.mock.calls[0];
     if (!setexCall) throw new Error("setex was not called");
     const [key, ttl, raw] = setexCall;
     expect(key).toMatch(/^mcp:code:code-xyz$/);
@@ -108,7 +109,7 @@ describe("storeMcpCode / consumeMcpCode", () => {
       redirectUri: "http://127.0.0.1:5173/callback",
     });
 
-    const consumed = await consumeMcpCode(redis as unknown as import("ioredis").Redis, "code-xyz");
+    const consumed = await consumeMcpCode(kv as unknown as KvStore, "code-xyz");
     expect(consumed).toEqual({
       userId: "user-1",
       codeChallenge: "challenge-xyz",
@@ -117,24 +118,24 @@ describe("storeMcpCode / consumeMcpCode", () => {
 
     // Re-consumption must return null (atomic delete-on-get).
     // 2 回目は null（取得と削除が原子的）。
-    const second = await consumeMcpCode(redis as unknown as import("ioredis").Redis, "code-xyz");
+    const second = await consumeMcpCode(kv as unknown as KvStore, "code-xyz");
     expect(second).toBeNull();
   });
 
   it("returns null for unknown code", async () => {
-    const result = await consumeMcpCode(redis as unknown as import("ioredis").Redis, "missing");
+    const result = await consumeMcpCode(kv as unknown as KvStore, "missing");
     expect(result).toBeNull();
   });
 
   it("returns null when stored JSON is malformed", async () => {
-    await redis.setex("mcp:code:bad", 60, "{not-json");
-    const result = await consumeMcpCode(redis as unknown as import("ioredis").Redis, "bad");
+    await kv.setex("mcp:code:bad", 60, "{not-json");
+    const result = await consumeMcpCode(kv as unknown as KvStore, "bad");
     expect(result).toBeNull();
   });
 
   it("returns null when required fields are missing", async () => {
-    await redis.setex("mcp:code:partial", 60, JSON.stringify({ userId: "u1" }));
-    const result = await consumeMcpCode(redis as unknown as import("ioredis").Redis, "partial");
+    await kv.setex("mcp:code:partial", 60, JSON.stringify({ userId: "u1" }));
+    const result = await consumeMcpCode(kv as unknown as KvStore, "partial");
     expect(result).toBeNull();
   });
 });
@@ -246,19 +247,16 @@ describe("hasScope", () => {
 
 describe("storeMcpRevocation / getMcpRevocationTimestamp", () => {
   it("writes mcp:revoked:<userId> with current epoch seconds and revocation TTL", async () => {
-    const redis = createMockRedis();
+    const kv = createMockKv();
     const before = Math.floor(Date.now() / 1000);
-    const stored = await storeMcpRevocation(
-      redis as unknown as import("ioredis").Redis,
-      "user-rev-1",
-    );
+    const stored = await storeMcpRevocation(kv as unknown as KvStore, "user-rev-1");
     const after = Math.floor(Date.now() / 1000);
 
     expect(stored).toBeGreaterThanOrEqual(before);
     expect(stored).toBeLessThanOrEqual(after);
 
-    expect(redis.setex).toHaveBeenCalledOnce();
-    const call = redis.setex.mock.calls[0];
+    expect(kv.setex).toHaveBeenCalledOnce();
+    const call = kv.setex.mock.calls[0];
     if (!call) throw new Error("setex was not called");
     const [key, ttl, value] = call;
     expect(key).toBe(`${MCP_REVOKED_PREFIX}user-rev-1`);
@@ -294,31 +292,22 @@ describe("storeMcpRevocation / getMcpRevocationTimestamp", () => {
   });
 
   it("getMcpRevocationTimestamp returns null when no entry exists", async () => {
-    const redis = createMockRedis();
-    const ts = await getMcpRevocationTimestamp(
-      redis as unknown as import("ioredis").Redis,
-      "user-absent",
-    );
+    const kv = createMockKv();
+    const ts = await getMcpRevocationTimestamp(kv as unknown as KvStore, "user-absent");
     expect(ts).toBeNull();
   });
 
   it("getMcpRevocationTimestamp returns null when stored value is not numeric", async () => {
-    const redis = createMockRedis();
-    await redis.setex(`${MCP_REVOKED_PREFIX}user-garbage`, 60, "not-a-number");
-    const ts = await getMcpRevocationTimestamp(
-      redis as unknown as import("ioredis").Redis,
-      "user-garbage",
-    );
+    const kv = createMockKv();
+    await kv.setex(`${MCP_REVOKED_PREFIX}user-garbage`, 60, "not-a-number");
+    const ts = await getMcpRevocationTimestamp(kv as unknown as KvStore, "user-garbage");
     expect(ts).toBeNull();
   });
 
   it("getMcpRevocationTimestamp returns the stored epoch value", async () => {
-    const redis = createMockRedis();
-    await redis.setex(`${MCP_REVOKED_PREFIX}user-set`, 60, "1700000000");
-    const ts = await getMcpRevocationTimestamp(
-      redis as unknown as import("ioredis").Redis,
-      "user-set",
-    );
+    const kv = createMockKv();
+    await kv.setex(`${MCP_REVOKED_PREFIX}user-set`, 60, "1700000000");
+    const ts = await getMcpRevocationTimestamp(kv as unknown as KvStore, "user-set");
     expect(ts).toBe(1700000000);
   });
 });
@@ -327,17 +316,17 @@ describe("verifyMcpToken deny-list round-trip", () => {
   it("rejects a token whose iat is earlier than the stored revocation timestamp", async () => {
     // Issue a token, then simulate a revoke that happens 30s later by writing
     // `mcp:revoked:<sub>` = iat + 30 directly (avoids fake-timer interplay with jose).
-    // 30 秒後の失効を模擬するため、iat+30 を Redis に直書きして round-trip を再現する。
-    const redis = createMockRedis();
+    // 30 秒後の失効を模擬するため、iat+30 をストアに直書きして round-trip を再現する。
+    const kv = createMockKv();
     const { access_token } = await issueMcpToken("user-revoked", [MCP_SCOPE_READ, MCP_SCOPE_WRITE]);
     const [, payloadB64] = access_token.split(".");
     if (!payloadB64) throw new Error("jwt has no payload segment");
     const iat = (
       JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as { iat: number }
     ).iat;
-    await redis.setex(`${MCP_REVOKED_PREFIX}user-revoked`, 60, String(iat + 30));
+    await kv.setex(`${MCP_REVOKED_PREFIX}user-revoked`, 60, String(iat + 30));
 
-    const payload = await verifyMcpToken(access_token, redis as unknown as import("ioredis").Redis);
+    const payload = await verifyMcpToken(access_token, kv as unknown as KvStore);
     expect(payload).toBeNull();
   });
 
@@ -345,59 +334,59 @@ describe("verifyMcpToken deny-list round-trip", () => {
     // Boundary case: a token with iat == revokedAt must be rejected to avoid a 1-second
     // window where a pre-revoke token remains valid at second-precision.
     // 秒精度の境界で、失効直前 (同一秒) に発行されたトークンが残らないよう iat == revokedAt は失効扱いとする。
-    const redis = createMockRedis();
+    const kv = createMockKv();
     const { access_token } = await issueMcpToken("user-boundary", [MCP_SCOPE_READ]);
     const [, payloadB64] = access_token.split(".");
     if (!payloadB64) throw new Error("jwt has no payload segment");
     const iat = (
       JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as { iat: number }
     ).iat;
-    await redis.setex(`${MCP_REVOKED_PREFIX}user-boundary`, 60, String(iat));
+    await kv.setex(`${MCP_REVOKED_PREFIX}user-boundary`, 60, String(iat));
 
-    const payload = await verifyMcpToken(access_token, redis as unknown as import("ioredis").Redis);
+    const payload = await verifyMcpToken(access_token, kv as unknown as KvStore);
     expect(payload).toBeNull();
   });
 
   it("accepts a token whose iat is strictly after the stored revocation timestamp", async () => {
     // A token issued in a later second than the revoke remains valid.
     // 失効後 (iat > revokedAt) に発行されたトークンは有効。
-    const redis = createMockRedis();
+    const kv = createMockKv();
     const { access_token } = await issueMcpToken("user-after-revoke", [MCP_SCOPE_READ]);
     const [, payloadB64] = access_token.split(".");
     if (!payloadB64) throw new Error("jwt has no payload segment");
     const iat = (
       JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as { iat: number }
     ).iat;
-    await redis.setex(`${MCP_REVOKED_PREFIX}user-after-revoke`, 60, String(iat - 1));
+    await kv.setex(`${MCP_REVOKED_PREFIX}user-after-revoke`, 60, String(iat - 1));
 
-    const payload = await verifyMcpToken(access_token, redis as unknown as import("ioredis").Redis);
+    const payload = await verifyMcpToken(access_token, kv as unknown as KvStore);
     expect(payload).not.toBeNull();
     expect(payload?.sub).toBe("user-after-revoke");
   });
 
   it("passes through verification when no revocation entry exists", async () => {
-    const redis = createMockRedis();
+    const kv = createMockKv();
     const { access_token } = await issueMcpToken("user-untouched", [MCP_SCOPE_READ]);
-    const payload = await verifyMcpToken(access_token, redis as unknown as import("ioredis").Redis);
+    const payload = await verifyMcpToken(access_token, kv as unknown as KvStore);
     expect(payload).not.toBeNull();
     expect(payload?.sub).toBe("user-untouched");
   });
 
-  it("ignores the deny-list when redis is not supplied (backwards-compatible)", async () => {
-    const redis = createMockRedis();
-    const { access_token } = await issueMcpToken("user-no-redis", [MCP_SCOPE_READ]);
+  it("ignores the deny-list when kv is not supplied (backwards-compatible)", async () => {
+    const kv = createMockKv();
+    const { access_token } = await issueMcpToken("user-no-kv", [MCP_SCOPE_READ]);
     const [, payloadB64] = access_token.split(".");
     if (!payloadB64) throw new Error("jwt has no payload segment");
     const iat = (
       JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as { iat: number }
     ).iat;
-    await redis.setex(`${MCP_REVOKED_PREFIX}user-no-redis`, 60, String(iat + 60));
+    await kv.setex(`${MCP_REVOKED_PREFIX}user-no-kv`, 60, String(iat + 60));
 
-    // Without redis, verification must not consult the deny-list.
-    // redis を渡さない場合は deny-list を参照しないこと。
+    // Without kv, verification must not consult the deny-list.
+    // kv を渡さない場合は deny-list を参照しないこと。
     const payload = await verifyMcpToken(access_token);
     expect(payload).not.toBeNull();
-    expect(payload?.sub).toBe("user-no-redis");
+    expect(payload?.sub).toBe("user-no-kv");
   });
 
   it("end-to-end: issueMcpToken → storeMcpRevocation → verifyMcpToken returns null", async () => {
@@ -409,13 +398,10 @@ describe("verifyMcpToken deny-list round-trip", () => {
       const { access_token } = await issueMcpToken("user-e2e", [MCP_SCOPE_READ, MCP_SCOPE_WRITE]);
 
       vi.setSystemTime(new Date("2026-04-01T00:00:30Z"));
-      const redis = createMockRedis();
-      await storeMcpRevocation(redis as unknown as import("ioredis").Redis, "user-e2e");
+      const kv = createMockKv();
+      await storeMcpRevocation(kv as unknown as KvStore, "user-e2e");
 
-      const payload = await verifyMcpToken(
-        access_token,
-        redis as unknown as import("ioredis").Redis,
-      );
+      const payload = await verifyMcpToken(access_token, kv as unknown as KvStore);
       expect(payload).toBeNull();
     } finally {
       vi.useRealTimers();
@@ -423,24 +409,24 @@ describe("verifyMcpToken deny-list round-trip", () => {
   });
 
   it("throws McpRevocationLookupError when the deny-list lookup fails (does not downgrade to 401)", async () => {
-    // Redis 障害を null (→401) にすり替えず、専用エラーで上位に伝播させることを確認する。
-    // Confirms Redis I/O errors during deny-list lookup propagate as McpRevocationLookupError
+    // ストア障害を null (→401) にすり替えず、専用エラーで上位に伝播させることを確認する。
+    // Confirms store I/O errors during deny-list lookup propagate as McpRevocationLookupError
     // rather than being silently converted into a null payload.
-    const { access_token } = await issueMcpToken("user-redis-outage", [MCP_SCOPE_READ]);
-    const brokenRedis = {
+    const { access_token } = await issueMcpToken("user-kv-outage", [MCP_SCOPE_READ]);
+    const brokenKv = {
       get: vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
-    } as unknown as import("ioredis").Redis;
+    } as unknown as KvStore;
 
-    await expect(verifyMcpToken(access_token, brokenRedis)).rejects.toBeInstanceOf(
+    await expect(verifyMcpToken(access_token, brokenKv)).rejects.toBeInstanceOf(
       McpRevocationLookupError,
     );
   });
 
-  it("still returns null (401-bound) for structurally invalid tokens even when redis is provided", async () => {
+  it("still returns null (401-bound) for structurally invalid tokens even when kv is provided", async () => {
     // JWT 検証失敗は従来どおり null を返し、401 扱いにすること (503 に波及させない)。
     // JWT validation failures still return null (→ 401), independent of deny-list behavior.
-    const redis = createMockRedis();
-    const payload = await verifyMcpToken("not-a-jwt", redis as unknown as import("ioredis").Redis);
+    const kv = createMockKv();
+    const payload = await verifyMcpToken("not-a-jwt", kv as unknown as KvStore);
     expect(payload).toBeNull();
   });
 });

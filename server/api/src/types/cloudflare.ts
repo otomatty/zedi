@@ -7,4 +7,6 @@
 export interface CloudflareBindings {
   /** R2 bucket for media / thumbnails / PDF highlights (#1089). */
   STORAGE_BUCKET: R2Bucket;
+  /** Per-key KV Durable Objects: rate limits, one-time codes, deny-list (#1093). */
+  KV_DO: DurableObjectNamespace;
 }

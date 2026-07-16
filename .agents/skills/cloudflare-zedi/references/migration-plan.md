@@ -35,10 +35,16 @@
 - `deploy-api-worker-dev.yml` — `develop` push で `wrangler deploy --env dev`
 - Railway `index.ts` は維持（並行稼働）。本番 DNS 切替は Phase 2b 以降。
 
-**Phase 2b（未着手）**: #1091 全 API の Workers 本番切替、#1092 mcp、#1093 Redis→KV。
+**Phase 2b**: #1091 全 API の Workers 本番切替、#1092 mcp、#1093 Redis→KV。
 
-- #1091 api（Hono は Workers 互換、`nodejs_compat`）/ #1092 mcp / #1093 Redis→KV。
-- Worker secrets（`DATABASE_URL`, `REDIS_URL`, `BETTER_AUTH_*`, `STORAGE_*` for presign）を
+- **#1093（API 側コード実装済み）**: `server/api/src/lib/kv/` の `KvStore` 抽象で Redis 依存を撤去。
+  - Node/Railway: `RedisKvStore`（ioredis, `REDIS_URL`）。Workers: `DurableObjectKvStore`
+    （`KV_DO` binding, 論理キーごとに 1 DO, SQLite classes）。
+  - 用途: レート制限カウンタ（`incrWithTtl` 固定ウィンドウ）、ext/MCP ワンタイムコード
+    （`getdel` 原子消費）、MCP 失効 deny-list（`get`/`setex`）。
+  - Worker には `REDIS_URL` secret 不要。Hocuspocus のキャッシュは #1094 で対応。
+- #1091 api（Hono は Workers 互換、`nodejs_compat`）/ #1092 mcp は未着手。
+- Worker secrets（`DATABASE_URL`, `BETTER_AUTH_*`, `STORAGE_*` for presign）を
   `wrangler secret put --env dev` で設定してから health/E2E 検証。
 - **検証**: `wrangler dev` ローカル → dev デプロイ → `/health` の `git_commit_sha` 一致。
 

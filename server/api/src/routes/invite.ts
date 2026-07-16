@@ -14,7 +14,7 @@ import { authRequired } from "../middleware/auth.js";
 import { sendInvitationMagicLink } from "../services/magicLinkService.js";
 import { getOptionalEnv } from "../lib/env.js";
 import type { AppEnv } from "../types/index.js";
-import type { Redis } from "ioredis";
+import type { KvStore } from "../lib/kv/index.js";
 
 const app = new Hono<AppEnv>();
 
@@ -28,34 +28,15 @@ const EMAIL_LINK_DAILY_WINDOW_SEC = 24 * 60 * 60; // 1 day
 const EMAIL_LINK_DAILY_WINDOW_LIMIT = 5;
 
 /**
- * INCR し、新規作成時のみ EXPIRE を付与する（固定ウィンドウ）。
- * Lua スクリプトで 1 ラウンドトリップに収め、サーバ側で原子的に実行する。
- *
- * Increment a counter and only set EXPIRE on the *first* INCR. Running this as
- * a single Lua script keeps it atomic server-side and — crucially — prevents
- * sliding-window behaviour where refreshing TTL on every call would let an
- * attacker avoid the window boundary.
- */
-const INCR_WITH_EXPIRE_ON_CREATE =
-  "local c = redis.call('incr', KEYS[1]); if c == 1 then redis.call('expire', KEYS[1], ARGV[1]) end; return c";
-
-async function incrWithExpire(redis: Redis, key: string, ttlSec: number): Promise<number> {
-  const result = await redis.eval(INCR_WITH_EXPIRE_ON_CREATE, 1, key, String(ttlSec));
-  if (typeof result === "number") return result;
-  if (typeof result === "string") {
-    const parsed = Number.parseInt(result, 10);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
-}
-
-/**
  * 残りの再試行待ち秒数を算出する（現時点での TTL ベース）。
- * Compute the retry-after seconds based on the current TTL.
+ * カウンタの INCR + EXPIRE-on-create（固定ウィンドウ）は KvStore の
+ * `incrWithTtl` がストア側で原子的に行う。
+ *
+ * Compute the retry-after seconds based on the current TTL. The atomic
+ * INCR + EXPIRE-on-create (fixed window) lives in KvStore#incrWithTtl.
  */
-async function getRetryAfter(redis: Redis, key: string, fallbackSec: number): Promise<number> {
-  const ttl = await redis.ttl(key);
-  return ttl > 0 ? ttl : fallbackSec;
+async function getRetryAfter(kv: KvStore, key: string, fallbackSec: number): Promise<number> {
+  return (await kv.ttl(key)) ?? fallbackSec;
 }
 
 // ── GET /invite/:token ─────────────────────────────────────────────────────
@@ -289,8 +270,8 @@ app.post("/:token/email-link", async (c) => {
     throw new HTTPException(410, { message: "Invitation has expired" });
   }
 
-  // レート制限は Redis がある場合のみ適用する。Redis 未設定の開発環境では無効化する。
-  // Rate limits are enforced only when Redis is available (no-op in dev without Redis).
+  // レート制限は KvStore がある場合のみ適用する。未設定の開発環境では無効化する。
+  // Rate limits are enforced only when a KvStore is available (no-op in dev without one).
   //
   // 重要: 短期ウィンドウ → 日次ウィンドウの順に *逐次* カウントアップする。
   // 並列に INCR すると、短期で弾かれたリクエストまで日次カウンタを消費してしまい、
@@ -300,14 +281,14 @@ app.post("/:token/email-link", async (c) => {
   // the daily counter when the short window passes. Parallel INCR would let a
   // caller exhaust the daily budget from short-window rejections alone — a
   // denial-of-service on the rescue flow (see otomatty/zedi#668 review).
-  const redis = c.get("redis") as Redis | undefined;
-  if (redis) {
+  const kv = c.get("kv");
+  if (kv) {
     const shortKey = `ratelimit:invite-email-link:5min:${token}`;
     const dailyKey = `ratelimit:invite-email-link:day:${token}`;
 
-    const shortCount = await incrWithExpire(redis, shortKey, EMAIL_LINK_SHORT_WINDOW_SEC);
+    const shortCount = await kv.incrWithTtl(shortKey, EMAIL_LINK_SHORT_WINDOW_SEC);
     if (shortCount > EMAIL_LINK_SHORT_WINDOW_LIMIT) {
-      const retryAfter = await getRetryAfter(redis, shortKey, EMAIL_LINK_SHORT_WINDOW_SEC);
+      const retryAfter = await getRetryAfter(kv, shortKey, EMAIL_LINK_SHORT_WINDOW_SEC);
       return c.json(
         {
           error: "RATE_LIMIT_EXCEEDED",
@@ -324,9 +305,9 @@ app.post("/:token/email-link", async (c) => {
       );
     }
 
-    const dailyCount = await incrWithExpire(redis, dailyKey, EMAIL_LINK_DAILY_WINDOW_SEC);
+    const dailyCount = await kv.incrWithTtl(dailyKey, EMAIL_LINK_DAILY_WINDOW_SEC);
     if (dailyCount > EMAIL_LINK_DAILY_WINDOW_LIMIT) {
-      const retryAfter = await getRetryAfter(redis, dailyKey, EMAIL_LINK_DAILY_WINDOW_SEC);
+      const retryAfter = await getRetryAfter(kv, dailyKey, EMAIL_LINK_DAILY_WINDOW_SEC);
       return c.json(
         {
           error: "RATE_LIMIT_EXCEEDED",

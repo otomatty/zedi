@@ -46,9 +46,9 @@ const clipRateLimit = rateLimit({
 
 // ── POST /session ─────────────────────────────────────────────────────────
 app.post("/session", sessionRateLimit, async (c) => {
-  const redis = c.get("redis");
-  if (!redis) {
-    throw new HTTPException(503, { message: "Redis unavailable" });
+  const kv = c.get("kv");
+  if (!kv) {
+    throw new HTTPException(503, { message: "KV store unavailable" });
   }
 
   const body = await c.req.json<{
@@ -72,7 +72,7 @@ app.post("/session", sessionRateLimit, async (c) => {
     throw new HTTPException(400, { message: "redirect_uri not allowed" });
   }
 
-  const data = await consumeExtensionCode(redis, body.code.trim());
+  const data = await consumeExtensionCode(kv, body.code.trim());
   if (!data) {
     throw new HTTPException(400, { message: "Invalid or expired code" });
   }
@@ -94,9 +94,9 @@ app.post("/session", sessionRateLimit, async (c) => {
 // ── GET /authorize-code ────────────────────────────────────────────────────
 // 認証済みセッションでワンタイムコード発行。ExtensionAuthCallback が呼ぶ。
 app.get("/authorize-code", authRequired, async (c) => {
-  const redis = c.get("redis");
-  if (!redis) {
-    throw new HTTPException(503, { message: "Redis unavailable" });
+  const kv = c.get("kv");
+  if (!kv) {
+    throw new HTTPException(503, { message: "KV store unavailable" });
   }
 
   const redirectUri = c.req.query("redirect_uri")?.trim();
@@ -115,7 +115,7 @@ app.get("/authorize-code", authRequired, async (c) => {
 
   const userId = c.get("userId");
   const code = randomBytes(32).toString("base64url");
-  await storeExtensionCode(redis, code, userId, codeChallenge, redirectUri);
+  await storeExtensionCode(kv, code, userId, codeChallenge, redirectUri);
 
   return c.json({ code, state });
 });
@@ -123,9 +123,9 @@ app.get("/authorize-code", authRequired, async (c) => {
 // ── POST /authorize-code ────────────────────────────────────────────────────
 // Called by ExtensionAuthCallback page (with session cookie) to issue one-time code.
 app.post("/authorize-code", authRequired, async (c) => {
-  const redis = c.get("redis");
-  if (!redis) {
-    throw new HTTPException(503, { message: "Redis unavailable" });
+  const kv = c.get("kv");
+  if (!kv) {
+    throw new HTTPException(503, { message: "KV store unavailable" });
   }
 
   const body = await c.req.json<{
@@ -147,7 +147,7 @@ app.post("/authorize-code", authRequired, async (c) => {
 
   const userId = c.get("userId");
   const code = randomBytes(32).toString("base64url");
-  await storeExtensionCode(redis, code, userId, body.code_challenge.trim(), redirectUri);
+  await storeExtensionCode(kv, code, userId, body.code_challenge.trim(), redirectUri);
 
   return c.json({
     code,

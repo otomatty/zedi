@@ -1,5 +1,5 @@
 /**
- * rateLimit — Redis ベースのシンプルなレート制限ミドルウェア
+ * rateLimit — KvStore ベースのシンプルなレート制限ミドルウェア
  *
  * 使い方 / Usage:
  *   - 既存 API: `rateLimit()` もしくは `rateLimit("pro")`
@@ -10,10 +10,10 @@
  * 429 応答には `Retry-After` / `X-RateLimit-*` ヘッダと、
  * MCP クライアントが解釈できる JSON ボディを返す。
  *
- * Simple Redis-based rate limiter. Supports the legacy string-tier call form
- * and a richer options object for per-endpoint limits (windowSec, keyBy, label).
+ * Simple KvStore-backed rate limiter (Redis on Node, Durable Objects on
+ * Workers — #1093). Supports the legacy string-tier call form and a richer
+ * options object for per-endpoint limits (windowSec, keyBy, label).
  */
-import type { Redis } from "ioredis";
 import { createMiddleware } from "hono/factory";
 import { extractClientIp } from "../lib/clientIp.js";
 import type { AppEnv } from "../types/index.js";
@@ -44,7 +44,7 @@ export interface RateLimitOptions {
   windowSec: number;
   /** キーの導出元。省略時は `user`。 Key derivation source; defaults to `user`. */
   keyBy?: RateLimitKeyBy;
-  /** Redis キーの接頭辞 (エンドポイントの区別に使う)。 Redis key prefix used to scope the bucket per endpoint. */
+  /** バケットキーの接頭辞 (エンドポイントの区別に使う)。 Key prefix used to scope the bucket per endpoint. */
   label?: string;
 }
 
@@ -63,7 +63,7 @@ function currentWindowBucket(windowSec: number): number {
 
 /**
  * レート制限ミドルウェアを生成する。
- * Returns a Hono middleware that enforces a rate limit backed by Redis.
+ * Returns a Hono middleware that enforces a rate limit backed by the KvStore.
  *
  * @param arg - 既存互換の tier 文字列 (`"free"` / `"pro"`) もしくは {@link RateLimitOptions}.
  */
@@ -83,8 +83,8 @@ export function rateLimit(arg: string | RateLimitOptions = "free") {
       };
 
   return createMiddleware<AppEnv>(async (c, next) => {
-    const redis = c.get("redis") as Redis | undefined;
-    if (!redis) {
+    const kv = c.get("kv");
+    if (!kv) {
       await next();
       return;
     }
@@ -107,16 +107,14 @@ export function rateLimit(arg: string | RateLimitOptions = "free") {
         : String(currentWindowBucket(options.windowSec));
     const key = `ratelimit:${options.label}:${subject}:${windowToken}`;
 
-    // INCR と EXPIRE をトランザクションで発行することで、INCR 後にアプリが落ちても
-    // TTL 無しのキーが残り続けることを防ぐ。ioredis の `multi().exec()` は Redis
-    // の MULTI/EXEC を使うためサーバ側でアトミック。
-    // Wrap INCR + EXPIRE in a MULTI/EXEC transaction so a crash between the two
-    // commands cannot leave a TTL-less key lingering in Redis.
+    // カウンタのインクリメントと TTL 設定はストア側で原子的に行われる
+    // (Redis は Lua 1 往復、Durable Object は入力ゲートで直列化)。キーには
+    // ウィンドウトークンが含まれるため、TTL はクリーンアップ用途のみ。
+    // The increment + TTL happen atomically inside the store (a single Lua
+    // round-trip on Redis; serialised by input gates on Durable Objects).
+    // Keys embed the window token, so the TTL is purely for cleanup.
     const ttl = Math.max(options.windowSec * 2, options.windowSec + 60);
-    const results = await redis.multi().incr(key).expire(key, ttl).exec();
-    const incrResult = results?.[0];
-    const count =
-      Array.isArray(incrResult) && typeof incrResult[1] === "number" ? incrResult[1] : 0;
+    const count = await kv.incrWithTtl(key, ttl);
 
     if (count > options.limit) {
       // 現在のウィンドウが終わるまでの残り秒数。1h ウィンドウも実時間で計算する
