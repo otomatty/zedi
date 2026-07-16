@@ -31,6 +31,10 @@ interface KvOpRequest {
 export class KvDurableObject {
   constructor(private readonly state: DurableObjectState) {}
 
+  /**
+   * JSON プロトコル (`{ op, ttlSec?, value? }`) の 1 操作を処理する。
+   * Handles one JSON-protocol operation (`{ op, ttlSec?, value? }`).
+   */
   async fetch(request: Request): Promise<Response> {
     let body: KvOpRequest;
     try {

@@ -37,14 +37,20 @@ const INCR_WITH_EXPIRE_ON_CREATE =
 export class RedisKvStore implements KvStore {
   constructor(private readonly redis: Redis) {}
 
+  /** GET をそのまま委譲する。 / Delegates to Redis GET. */
   async get(key: string): Promise<string | null> {
     return this.redis.get(key);
   }
 
+  /** SETEX をそのまま委譲する。 / Delegates to Redis SETEX. */
   async setex(key: string, ttlSec: number, value: string): Promise<void> {
     await this.redis.setex(key, ttlSec, value);
   }
 
+  /**
+   * ネイティブ GETDEL を優先し、無ければ Lua で原子的に GET+DEL する。
+   * Prefers native GETDEL, falling back to an atomic Lua GET+DEL.
+   */
   async getdel(key: string): Promise<string | null> {
     const maybeGetdel = (this.redis as { getdel?: (k: string) => Promise<string | null> }).getdel;
     if (typeof maybeGetdel === "function") {
@@ -54,6 +60,10 @@ export class RedisKvStore implements KvStore {
     return typeof result === "string" ? result : null;
   }
 
+  /**
+   * INCR + EXPIRE-on-create を Lua 1 往復で原子的に実行する。
+   * Runs the atomic INCR + EXPIRE-on-create Lua script in one round-trip.
+   */
   async incrWithTtl(key: string, ttlSec: number): Promise<number> {
     const result = await this.redis.eval(INCR_WITH_EXPIRE_ON_CREATE, 1, key, String(ttlSec));
     if (typeof result === "number") return result;
@@ -64,6 +74,10 @@ export class RedisKvStore implements KvStore {
     return 0;
   }
 
+  /**
+   * 残 TTL を秒で返す。キー不在 (-2) / TTL 無し (-1) は null に正規化する。
+   * Returns the remaining TTL in seconds, normalising -2/-1 sentinels to null.
+   */
   async ttl(key: string): Promise<number | null> {
     const ttl = await this.redis.ttl(key);
     return ttl > 0 ? ttl : null;

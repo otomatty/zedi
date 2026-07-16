@@ -103,22 +103,22 @@ function createMockKv(): AppEnv["Variables"]["kv"] {
   const counters = new Map<string, number>();
   const values = new Map<string, string>();
   return {
-    incrWithTtl: vi.fn(async (key: string, _ttlSec: number) => {
+    incrWithTtl: vi.fn(async (key: string, _ttlSec: number): Promise<number> => {
       const next = (counters.get(key) ?? 0) + 1;
       counters.set(key, next);
       return next;
     }),
-    get: vi.fn(async (key: string) => values.get(key) ?? null),
-    setex: vi.fn(async (key: string, _ttlSec: number, value: string) => {
+    get: vi.fn(async (key: string): Promise<string | null> => values.get(key) ?? null),
+    setex: vi.fn(async (key: string, _ttlSec: number, value: string): Promise<void> => {
       values.set(key, value);
     }),
-    getdel: vi.fn(async (key: string) => {
+    getdel: vi.fn(async (key: string): Promise<string | null> => {
       const v = values.get(key) ?? null;
       values.delete(key);
       return v;
     }),
-    ttl: vi.fn(async () => null),
-  } as unknown as AppEnv["Variables"]["kv"];
+    ttl: vi.fn(async (): Promise<number | null> => null),
+  } satisfies AppEnv["Variables"]["kv"];
 }
 
 async function parseJsonOrText(res: Response): Promise<{ message?: string }> {

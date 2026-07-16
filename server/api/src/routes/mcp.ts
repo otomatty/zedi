@@ -189,7 +189,7 @@ async function recordMcpRevocation(
   kv: AppEnv["Variables"]["kv"] | undefined,
   userId: string,
   source: "mcp" | "session",
-) {
+): Promise<void> {
   if (!kv) {
     throw new HTTPException(503, { message: "KV store unavailable" });
   }

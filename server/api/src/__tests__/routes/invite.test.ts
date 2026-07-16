@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../types/index.js";
+import type { KvStore } from "../../lib/kv/index.js";
 
 // ── Auth mock ──────────────────────────────────────────────────────────────
 
@@ -145,7 +146,12 @@ function createKvMock() {
   // set; the existence Set remains for test hooks.
   const keys = new Set<string>();
 
-  const api = {
+  const api: KvStore & {
+    _reset(): void;
+    _incr(key: string): void;
+    _setTtl(key: string, ttlSec: number): void;
+    _getCount(key: string): number;
+  } = {
     async incrWithTtl(key: string, ttlSec: number): Promise<number> {
       // 本実装（Redis Lua / Durable Object）に対応する JS ミラー。
       // JS mirror of the atomic INCR + EXPIRE-on-create in production stores.
@@ -179,6 +185,11 @@ function createKvMock() {
       counters.set(key, next);
       keys.add(key);
     },
+    _setTtl(key: string, ttlSec: number): void {
+      // テストから残り TTL を直接再現するための補助。 / Seed a remaining TTL directly.
+      keys.add(key);
+      ttls.set(key, ttlSec);
+    },
     _getCount(key: string): number {
       return counters.get(key) ?? 0;
     },
@@ -194,7 +205,7 @@ function createTestAppWithKv(dbResults: unknown[], kv: KvMock) {
 
   app.use("*", async (c, next) => {
     c.set("db", db as unknown as AppEnv["Variables"]["db"]);
-    c.set("kv", kv as unknown as AppEnv["Variables"]["kv"]);
+    c.set("kv", kv);
     await next();
   });
 
@@ -723,20 +734,20 @@ describe("POST /api/invite/:token/email-link", () => {
     // TTL を手で進めたことにする（残り 60 秒）。2 回目のリクエストで TTL が再延長
     // されないことを確認する（スライディングウィンドウでは 300 秒に戻ってしまう）。
     kv._reset();
-    // カウンタを 1 に戻し、TTL は 60 秒の想定で再現。
+    // カウンタを 1、残り TTL を 60 秒として再現。
+    // Recreate a bucket with count=1 and 60 seconds remaining.
     kv._incr(shortKey);
-    // eval は新規作成のみ EXPIRE するため、TTL は更新されない想定。
-    // TTL を検証するため、mock のマップを直接操作する代わりに再設定は行わない。
+    kv._setTtl(shortKey, 60);
     const second = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
     expect(second.status).toBe(429);
-    // 2 回目は c != 1 なので TTL 設定は走らない。KvStore の契約では
-    // 「TTL 未設定」は null を返すため、この値で TTL 未更新を検証する。
-    // Second increment returns c != 1, so no TTL is set. KvStore reports
-    // "no TTL" as null, confirming the window was not extended.
-    expect(await kv.ttl(shortKey)).toBeNull();
+    // 2 回目は c != 1 なので TTL 設定は走らず、既存の残り TTL (60 秒) が
+    // そのまま維持される（スライディングウィンドウなら 300 秒に戻ってしまう）。
+    // The second increment must not touch the TTL: the remaining 60 seconds
+    // stay as-is (a sliding window would reset it to 300).
+    expect(await kv.ttl(shortKey)).toBe(60);
   });
 
   it("KvStore が無い環境ではレート制限を適用せずに送信する", async () => {

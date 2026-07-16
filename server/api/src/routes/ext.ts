@@ -121,6 +121,7 @@ app.get("/authorize-code", authRequired, async (c) => {
 });
 
 // ── POST /authorize-code ────────────────────────────────────────────────────
+// ExtensionAuthCallback ページがセッション Cookie 付きで呼び出し、ワンタイムコードを発行する。
 // Called by ExtensionAuthCallback page (with session cookie) to issue one-time code.
 app.post("/authorize-code", authRequired, async (c) => {
   const kv = c.get("kv");

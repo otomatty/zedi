@@ -20,6 +20,7 @@ import {
   MCP_SCOPE_WRITE,
   hasScope,
   McpRevocationLookupError,
+  type McpTokenPayload,
 } from "../services/mcpAuth.js";
 import { users } from "../schema/users.js";
 import type { AppEnv } from "../types/index.js";
@@ -34,7 +35,7 @@ import type { AppEnv } from "../types/index.js";
 async function extractAndVerify(
   authHeader: string | undefined,
   kv: AppEnv["Variables"]["kv"] | undefined,
-) {
+): Promise<McpTokenPayload> {
   const parts = authHeader?.trim().split(/\s+/) ?? [];
   if (parts.length !== 2 || parts[0]?.toLowerCase() !== "bearer" || !parts[1]) {
     throw new HTTPException(401, { message: "Bearer token required" });

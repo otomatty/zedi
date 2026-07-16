@@ -154,7 +154,7 @@ bunx wrangler secret put BETTER_AUTH_SECRET --env dev
 
 | 操作                                        | 対象                                                                             |
 | ------------------------------------------- | -------------------------------------------------------------------------------- |
-| **登録（wrangler.jsonc）**                  | KV namespace binding（#1093）                                                    |
+| **登録（wrangler.jsonc）**                  | Durable Object binding `KV_DO`（`KvDurableObject`、#1093 済）                    |
 | **登録（Worker secrets dev + production）** | マスター「必須」のみ（`REDIS_URL` は不要 — `KV_DO` DO binding で代替、#1093 済） |
 | **登録（vars / CI）**                       | `GIT_COMMIT_SHA` を deploy workflow で注入                                       |
 | **更新**                                    | `BETTER_AUTH_URL` → Worker custom domain（`api.zedi-note.app` 等）               |

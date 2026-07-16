@@ -4,6 +4,15 @@ import type { CloudflareBindings } from "./cloudflare.js";
 import type { StorageClient } from "../lib/storage/index.js";
 import type { KvStore } from "../lib/kv/index.js";
 
+/**
+ * Hono アプリ共通の環境型。Bindings は Cloudflare Workers のリソース
+ * （Node 実行時は未定義のため Partial）、Variables はミドルウェアが
+ * リクエストごとに注入するコンテキスト値。
+ *
+ * Shared Hono environment type. Bindings hold Cloudflare Workers resources
+ * (Partial because they are absent on Node); Variables are per-request
+ * context values injected by middleware.
+ */
 export type AppEnv = {
   Bindings: Partial<CloudflareBindings>;
   Variables: {

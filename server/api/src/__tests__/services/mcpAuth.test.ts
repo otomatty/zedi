@@ -33,29 +33,30 @@ import { createHash } from "node:crypto";
 import type { KvStore } from "../../lib/kv/index.js";
 
 /**
- * Minimal KvStore-like in-memory mock used by store/consume tests.
- * 簡易インメモリ KvStore モック（テスト用）。
+ * Minimal KvStore in-memory mock used by store/consume tests.
+ * KvStore を構造的に満たす簡易インメモリモック（テスト用）。
  */
 function createMockKv() {
   const store = new Map<string, { value: string; expireAt: number }>();
   return {
-    setex: vi.fn(async (key: string, ttl: number, value: string) => {
+    setex: vi.fn(async (key: string, ttl: number, value: string): Promise<void> => {
       store.set(key, { value, expireAt: Date.now() + ttl * 1000 });
-      return "OK" as const;
     }),
-    get: vi.fn(async (key: string) => {
+    get: vi.fn(async (key: string): Promise<string | null> => {
       const entry = store.get(key);
       if (!entry) return null;
       return entry.value;
     }),
-    getdel: vi.fn(async (key: string) => {
+    getdel: vi.fn(async (key: string): Promise<string | null> => {
       const entry = store.get(key);
       if (!entry) return null;
       store.delete(key);
       return entry.value;
     }),
+    incrWithTtl: vi.fn(async (_key: string, _ttlSec: number): Promise<number> => 1),
+    ttl: vi.fn(async (_key: string): Promise<number | null> => null),
     _store: store,
-  };
+  } satisfies KvStore & { _store: Map<string, { value: string; expireAt: number }> };
 }
 
 describe("verifyPKCE", () => {
@@ -83,13 +84,7 @@ describe("storeMcpCode / consumeMcpCode", () => {
   });
 
   it("stores code with mcp:code: prefix and TTL, then retrieves payload atomically", async () => {
-    await storeMcpCode(
-      kv as unknown as KvStore,
-      "code-xyz",
-      "user-1",
-      "challenge-xyz",
-      "http://127.0.0.1:5173/callback",
-    );
+    await storeMcpCode(kv, "code-xyz", "user-1", "challenge-xyz", "http://127.0.0.1:5173/callback");
 
     expect(kv.setex).toHaveBeenCalledOnce();
     const setexCall = kv.setex.mock.calls[0];
@@ -109,7 +104,7 @@ describe("storeMcpCode / consumeMcpCode", () => {
       redirectUri: "http://127.0.0.1:5173/callback",
     });
 
-    const consumed = await consumeMcpCode(kv as unknown as KvStore, "code-xyz");
+    const consumed = await consumeMcpCode(kv, "code-xyz");
     expect(consumed).toEqual({
       userId: "user-1",
       codeChallenge: "challenge-xyz",
@@ -118,24 +113,24 @@ describe("storeMcpCode / consumeMcpCode", () => {
 
     // Re-consumption must return null (atomic delete-on-get).
     // 2 回目は null（取得と削除が原子的）。
-    const second = await consumeMcpCode(kv as unknown as KvStore, "code-xyz");
+    const second = await consumeMcpCode(kv, "code-xyz");
     expect(second).toBeNull();
   });
 
   it("returns null for unknown code", async () => {
-    const result = await consumeMcpCode(kv as unknown as KvStore, "missing");
+    const result = await consumeMcpCode(kv, "missing");
     expect(result).toBeNull();
   });
 
   it("returns null when stored JSON is malformed", async () => {
     await kv.setex("mcp:code:bad", 60, "{not-json");
-    const result = await consumeMcpCode(kv as unknown as KvStore, "bad");
+    const result = await consumeMcpCode(kv, "bad");
     expect(result).toBeNull();
   });
 
   it("returns null when required fields are missing", async () => {
     await kv.setex("mcp:code:partial", 60, JSON.stringify({ userId: "u1" }));
-    const result = await consumeMcpCode(kv as unknown as KvStore, "partial");
+    const result = await consumeMcpCode(kv, "partial");
     expect(result).toBeNull();
   });
 });
@@ -249,7 +244,7 @@ describe("storeMcpRevocation / getMcpRevocationTimestamp", () => {
   it("writes mcp:revoked:<userId> with current epoch seconds and revocation TTL", async () => {
     const kv = createMockKv();
     const before = Math.floor(Date.now() / 1000);
-    const stored = await storeMcpRevocation(kv as unknown as KvStore, "user-rev-1");
+    const stored = await storeMcpRevocation(kv, "user-rev-1");
     const after = Math.floor(Date.now() / 1000);
 
     expect(stored).toBeGreaterThanOrEqual(before);
@@ -293,21 +288,21 @@ describe("storeMcpRevocation / getMcpRevocationTimestamp", () => {
 
   it("getMcpRevocationTimestamp returns null when no entry exists", async () => {
     const kv = createMockKv();
-    const ts = await getMcpRevocationTimestamp(kv as unknown as KvStore, "user-absent");
+    const ts = await getMcpRevocationTimestamp(kv, "user-absent");
     expect(ts).toBeNull();
   });
 
   it("getMcpRevocationTimestamp returns null when stored value is not numeric", async () => {
     const kv = createMockKv();
     await kv.setex(`${MCP_REVOKED_PREFIX}user-garbage`, 60, "not-a-number");
-    const ts = await getMcpRevocationTimestamp(kv as unknown as KvStore, "user-garbage");
+    const ts = await getMcpRevocationTimestamp(kv, "user-garbage");
     expect(ts).toBeNull();
   });
 
   it("getMcpRevocationTimestamp returns the stored epoch value", async () => {
     const kv = createMockKv();
     await kv.setex(`${MCP_REVOKED_PREFIX}user-set`, 60, "1700000000");
-    const ts = await getMcpRevocationTimestamp(kv as unknown as KvStore, "user-set");
+    const ts = await getMcpRevocationTimestamp(kv, "user-set");
     expect(ts).toBe(1700000000);
   });
 });
@@ -326,7 +321,7 @@ describe("verifyMcpToken deny-list round-trip", () => {
     ).iat;
     await kv.setex(`${MCP_REVOKED_PREFIX}user-revoked`, 60, String(iat + 30));
 
-    const payload = await verifyMcpToken(access_token, kv as unknown as KvStore);
+    const payload = await verifyMcpToken(access_token, kv);
     expect(payload).toBeNull();
   });
 
@@ -343,7 +338,7 @@ describe("verifyMcpToken deny-list round-trip", () => {
     ).iat;
     await kv.setex(`${MCP_REVOKED_PREFIX}user-boundary`, 60, String(iat));
 
-    const payload = await verifyMcpToken(access_token, kv as unknown as KvStore);
+    const payload = await verifyMcpToken(access_token, kv);
     expect(payload).toBeNull();
   });
 
@@ -359,7 +354,7 @@ describe("verifyMcpToken deny-list round-trip", () => {
     ).iat;
     await kv.setex(`${MCP_REVOKED_PREFIX}user-after-revoke`, 60, String(iat - 1));
 
-    const payload = await verifyMcpToken(access_token, kv as unknown as KvStore);
+    const payload = await verifyMcpToken(access_token, kv);
     expect(payload).not.toBeNull();
     expect(payload?.sub).toBe("user-after-revoke");
   });
@@ -367,7 +362,7 @@ describe("verifyMcpToken deny-list round-trip", () => {
   it("passes through verification when no revocation entry exists", async () => {
     const kv = createMockKv();
     const { access_token } = await issueMcpToken("user-untouched", [MCP_SCOPE_READ]);
-    const payload = await verifyMcpToken(access_token, kv as unknown as KvStore);
+    const payload = await verifyMcpToken(access_token, kv);
     expect(payload).not.toBeNull();
     expect(payload?.sub).toBe("user-untouched");
   });
@@ -399,9 +394,9 @@ describe("verifyMcpToken deny-list round-trip", () => {
 
       vi.setSystemTime(new Date("2026-04-01T00:00:30Z"));
       const kv = createMockKv();
-      await storeMcpRevocation(kv as unknown as KvStore, "user-e2e");
+      await storeMcpRevocation(kv, "user-e2e");
 
-      const payload = await verifyMcpToken(access_token, kv as unknown as KvStore);
+      const payload = await verifyMcpToken(access_token, kv);
       expect(payload).toBeNull();
     } finally {
       vi.useRealTimers();
@@ -413,9 +408,10 @@ describe("verifyMcpToken deny-list round-trip", () => {
     // Confirms store I/O errors during deny-list lookup propagate as McpRevocationLookupError
     // rather than being silently converted into a null payload.
     const { access_token } = await issueMcpToken("user-kv-outage", [MCP_SCOPE_READ]);
-    const brokenKv = {
+    const brokenKv: KvStore = {
+      ...createMockKv(),
       get: vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
-    } as unknown as KvStore;
+    };
 
     await expect(verifyMcpToken(access_token, brokenKv)).rejects.toBeInstanceOf(
       McpRevocationLookupError,
@@ -426,7 +422,7 @@ describe("verifyMcpToken deny-list round-trip", () => {
     // JWT 検証失敗は従来どおり null を返し、401 扱いにすること (503 に波及させない)。
     // JWT validation failures still return null (→ 401), independent of deny-list behavior.
     const kv = createMockKv();
-    const payload = await verifyMcpToken("not-a-jwt", kv as unknown as KvStore);
+    const payload = await verifyMcpToken("not-a-jwt", kv);
     expect(payload).toBeNull();
   });
 });
