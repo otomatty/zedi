@@ -10,9 +10,8 @@
 /docker-compose*.yml @otomatty
 /Dockerfile* @otomatty
 
-# Docs policy: prose lives minimally at repo root; journal for daily notes
+# Docs / agent policy (spec + TDD live in AGENTS.md; local docs/ is gitignored)
 /journal/ @otomatty
-/SPECIFICATION_POLICY.md @otomatty
 /AGENTS.md @otomatty
 /README.md @otomatty
 /CONTRIBUTING.md @otomatty

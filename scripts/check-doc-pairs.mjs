@@ -13,8 +13,8 @@ const DOC_PAIRS = [
   { en: "README.md", ja: "README.ja.md" },
   { en: "CONTRIBUTING.md", ja: "CONTRIBUTING.ja.md" },
   { en: "SECURITY.md", ja: "SECURITY.ja.md" },
-  { en: "DOCUMENTATION.md", ja: "DOCUMENTATION.ja.md" },
   { en: "extension/README.md", ja: "extension/README.ja.md" },
+
   { en: "server/mcp/README.md", ja: "server/mcp/README.ja.md" },
   { en: "admin/README.md", ja: "admin/README.ja.md" },
   {
