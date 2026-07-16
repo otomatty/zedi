@@ -1,19 +1,19 @@
 /**
  * MCP (Model Context Protocol) 認証ライブラリ
  *
- * - ワンタイムコードの Redis 保存・原子的取得
+ * - ワンタイムコードの KvStore 保存・原子的取得
  * - PKCE 検証
  * - JWT 発行・検証 (scope: mcp:read / mcp:write, audience: zedi-mcp)
  *
  * 既存の拡張用認証 (`extAuth.ts`) と並行した独立系統として提供する。
- * `BETTER_AUTH_SECRET` は共有するが、`audience` と Redis key prefix で blast radius を分離する。
+ * `BETTER_AUTH_SECRET` は共有するが、`audience` と KV key prefix で blast radius を分離する。
  *
  * MCP auth library: PKCE, one-time code storage, JWT issuance/verification.
- * Shares `BETTER_AUTH_SECRET` with extension auth but isolates audience and Redis namespace.
+ * Shares `BETTER_AUTH_SECRET` with extension auth but isolates audience and KV namespace.
  */
 import { createHash } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
-import type { Redis } from "ioredis";
+import type { KvStore } from "../lib/kv/index.js";
 import { getEnv, getOptionalEnv } from "../lib/env.js";
 
 // ── Constants / 定数 ────────────────────────────────────────────────────────
@@ -33,12 +33,12 @@ export const MCP_SCOPE_READ = "mcp:read";
 /** 書き込み系操作用スコープ / Scope for write MCP tools. */
 export const MCP_SCOPE_WRITE = "mcp:write";
 
-/** Redis key prefix (extAuth の `ext:code:` と分離) / Redis namespace distinct from ext codes. */
-const REDIS_CODE_PREFIX = "mcp:code:";
+/** KV key prefix (extAuth の `ext:code:` と分離) / KV namespace distinct from ext codes. */
+const KV_CODE_PREFIX = "mcp:code:";
 
 /**
- * Redis key prefix for per-user MCP token revocation timestamps.
- * ユーザー単位の MCP トークン失効時刻を保存する Redis キー prefix。
+ * KV key prefix for per-user MCP token revocation timestamps.
+ * ユーザー単位の MCP トークン失効時刻を保存する KV キー prefix。
  */
 export const MCP_REVOKED_PREFIX = "mcp:revoked:";
 
@@ -64,46 +64,34 @@ export function verifyPKCE(codeVerifier: string, codeChallenge: string): boolean
   return computed === codeChallenge;
 }
 
-// ── One-time code storage (Redis) ───────────────────────────────────────────
+// ── One-time code storage (KvStore) ─────────────────────────────────────────
 
 /**
- * MCP 用ワンタイムコードを Redis に保存する。発行時の `redirect_uri` を保存し、交換時に照合する。
- * Stores MCP one-time code in Redis with userId, code_challenge, redirect_uri for exchange-time binding.
+ * MCP 用ワンタイムコードを KvStore に保存する。発行時の `redirect_uri` を保存し、交換時に照合する。
+ * Stores MCP one-time code with userId, code_challenge, redirect_uri for exchange-time binding.
  */
 export async function storeMcpCode(
-  redis: Redis,
+  kv: KvStore,
   code: string,
   userId: string,
   codeChallenge: string,
   redirectUri: string,
 ): Promise<void> {
-  const key = `${REDIS_CODE_PREFIX}${code}`;
+  const key = `${KV_CODE_PREFIX}${code}`;
   const value = JSON.stringify({ userId, codeChallenge, redirectUri });
-  await redis.setex(key, MCP_CODE_TTL_SEC, value);
+  await kv.setex(key, MCP_CODE_TTL_SEC, value);
 }
-
-const CONSUME_SCRIPT = `
-  local v = redis.call('GET', KEYS[1])
-  if v then redis.call('DEL', KEYS[1]); return v; end
-  return nil
-`;
 
 /**
  * MCP 用ワンタイムコードを原子的に取得・削除する。保存されていた `redirect_uri` も返す。
- * Atomically retrieves and consumes (deletes) MCP one-time code from Redis.
+ * Atomically retrieves and consumes (deletes) the MCP one-time code.
  */
 export async function consumeMcpCode(
-  redis: Redis,
+  kv: KvStore,
   code: string,
 ): Promise<{ userId: string; codeChallenge: string; redirectUri: string } | null> {
-  const key = `${REDIS_CODE_PREFIX}${code}`;
-  let raw: string | null = null;
-  if (typeof (redis as { getdel?: (k: string) => Promise<string | null> }).getdel === "function") {
-    raw = await (redis as { getdel: (k: string) => Promise<string | null> }).getdel(key);
-  } else {
-    const result = await redis.eval(CONSUME_SCRIPT, 1, key);
-    raw = typeof result === "string" ? result : null;
-  }
+  const key = `${KV_CODE_PREFIX}${code}`;
+  const raw = await kv.getdel(key);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as {
@@ -221,7 +209,7 @@ export async function issueMcpToken(
 /**
  * 失効レコードの TTL (秒)。現在の設定値とデフォルト値の大きい方を使う。
  * `MCP_JWT_EXP_DAYS` を後から短縮しても、旧設定で発行済みの長寿命トークンが
- * Redis の失効キー消滅後に再び有効化されないよう、デフォルト (最大想定) を下限とする。
+ * 失効キー消滅後に再び有効化されないよう、デフォルト (最大想定) を下限とする。
  *
  * Returns the TTL (seconds) for revocation entries: the greater of the current
  * configured JWT lifetime and the default. This prevents a later reduction of
@@ -233,18 +221,18 @@ export function getMcpRevocationTtlSeconds(): number {
 }
 
 /**
- * 指定ユーザーの MCP トークンをすべて失効させるために、現在時刻 (UNIX 秒) を Redis に書き込む。
+ * 指定ユーザーの MCP トークンをすべて失効させるために、現在時刻 (UNIX 秒) を KvStore に書き込む。
  * TTL は現在設定とデフォルトの大きい方とし、設定変更で失効情報が先に消えるのを防ぐ。
  * 戻り値は記録した失効時刻 (UNIX 秒)。
  *
- * Records a per-user MCP revocation timestamp (epoch seconds) in Redis with a TTL
+ * Records a per-user MCP revocation timestamp (epoch seconds) with a TTL
  * that is at least as long as the maximum expected JWT lifetime, so the entry
  * cannot expire before every previously issued token does.
  * Returns the stored revocation timestamp in epoch seconds.
  */
-export async function storeMcpRevocation(redis: Redis, userId: string): Promise<number> {
+export async function storeMcpRevocation(kv: KvStore, userId: string): Promise<number> {
   const now = Math.floor(Date.now() / 1000);
-  await redis.setex(`${MCP_REVOKED_PREFIX}${userId}`, getMcpRevocationTtlSeconds(), String(now));
+  await kv.setex(`${MCP_REVOKED_PREFIX}${userId}`, getMcpRevocationTtlSeconds(), String(now));
   return now;
 }
 
@@ -253,22 +241,22 @@ export async function storeMcpRevocation(redis: Redis, userId: string): Promise<
  * Returns the stored MCP revocation timestamp (epoch seconds) for a user, or null if none / malformed.
  */
 export async function getMcpRevocationTimestamp(
-  redis: Redis,
+  kv: KvStore,
   userId: string,
 ): Promise<number | null> {
-  const raw = await redis.get(`${MCP_REVOKED_PREFIX}${userId}`);
+  const raw = await kv.get(`${MCP_REVOKED_PREFIX}${userId}`);
   if (!raw) return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
 }
 
 /**
- * Deny-list 参照で発生した Redis 障害を JWT 検証失敗と区別するためのエラー型。
+ * Deny-list 参照で発生したストア障害を JWT 検証失敗と区別するためのエラー型。
  * 呼び出し側 (ミドルウェア) はこれを捕捉し、401 ではなく 503 で応答する。
  *
  * Dedicated error type raised when the revocation deny-list lookup itself fails
- * (e.g. Redis outage). Lets callers map infrastructure errors to 503 instead of
- * silently returning 401 "invalid token" for legitimately signed tokens.
+ * (e.g. a Redis / Durable Object outage). Lets callers map infrastructure errors
+ * to 503 instead of silently returning 401 "invalid token" for legitimately signed tokens.
  */
 export class McpRevocationLookupError extends Error {
   /**
@@ -286,15 +274,15 @@ export class McpRevocationLookupError extends Error {
 
 /**
  * Bearer トークンを検証し、ペイロードを返す。audience と最低 1 つの MCP スコープを要求する。
- * `redis` を渡した場合は `mcp:revoked:<sub>` の失効時刻と `iat` を比較し、失効後に発行されたトークンのみ通す。
+ * `kv` を渡した場合は `mcp:revoked:<sub>` の失効時刻と `iat` を比較し、失効後に発行されたトークンのみ通す。
  * 比較は `iat <= revokedAt` を失効扱いとし、秒精度で同一秒に発行された境界トークンも安全側で拒否する。
  *
  * JWT 自体の検証失敗 (署名不一致・audience 相違・形式不正など) は `null` を返す。
- * 一方、deny-list の Redis 参照に失敗した場合は `McpRevocationLookupError` を投げ、
+ * 一方、deny-list の参照に失敗した場合は `McpRevocationLookupError` を投げ、
  * ミドルウェアで 503 にマップできるようにする (インフラ障害を 401 と誤認させない)。
  *
  * Verifies MCP Bearer token and returns payload; requires `zedi-mcp` audience and at least one mcp:* scope.
- * When `redis` is provided, consults the deny-list: rejects tokens whose `iat` is at or before the stored
+ * When `kv` is provided, consults the deny-list: rejects tokens whose `iat` is at or before the stored
  * revocation timestamp (inclusive, to cover boundary tokens at second-precision).
  *
  * JWT verification failures (bad signature, wrong audience, malformed payload, etc.) return `null`.
@@ -303,7 +291,7 @@ export class McpRevocationLookupError extends Error {
  */
 export async function verifyMcpToken(
   token: string,
-  redis?: Redis | null,
+  kv?: KvStore | null,
 ): Promise<McpTokenPayload | null> {
   let verified: McpTokenPayload;
   let iat: number;
@@ -331,16 +319,16 @@ export async function verifyMcpToken(
     return null;
   }
 
-  // Deny-list lookup runs outside the JWT try/catch so Redis-side I/O errors
+  // Deny-list lookup runs outside the JWT try/catch so store-side I/O errors
   // are NOT silently swallowed as "invalid token". The caller must distinguish
   // an infrastructure outage (→ 503) from an auth failure (→ 401).
   //
-  // deny-list 参照は JWT 検証とは別の try で扱い、Redis 障害を誤って 401 に
+  // deny-list 参照は JWT 検証とは別の try で扱い、ストア障害を誤って 401 に
   // すり替えないようにする。呼び出し側でインフラ障害 (503) と認証失敗 (401) を分離する。
-  if (redis) {
+  if (kv) {
     let revokedAt: number | null;
     try {
-      revokedAt = await getMcpRevocationTimestamp(redis, verified.sub);
+      revokedAt = await getMcpRevocationTimestamp(kv, verified.sub);
     } catch (err) {
       throw new McpRevocationLookupError("Failed to consult MCP revocation deny-list", {
         cause: err,

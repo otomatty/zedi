@@ -84,10 +84,10 @@ import { Hono } from "hono";
 import { auth } from "../../auth.js";
 import extRoutes from "../../routes/ext.js";
 
-function createExtApp(redis: AppEnv["Variables"]["redis"], db: AppEnv["Variables"]["db"]) {
+function createExtApp(kv: AppEnv["Variables"]["kv"], db: AppEnv["Variables"]["db"]) {
   const app = new Hono<AppEnv>();
   app.use("*", async (c, next) => {
-    c.set("redis", redis);
+    c.set("kv", kv);
     c.set("db", db);
     await next();
   });
@@ -96,41 +96,29 @@ function createExtApp(redis: AppEnv["Variables"]["redis"], db: AppEnv["Variables
 }
 
 /**
- * rateLimit ミドルウェアが `multi().incr().expire().exec()` を呼ぶため、テスト用の最小 Redis を用意する。
- * In-memory stand-in for the bits of ioredis that the rateLimit middleware exercises.
+ * rateLimit ミドルウェア等が使う最小のインメモリ KvStore を用意する。
+ * In-memory stand-in for the KvStore operations the routes exercise.
  */
-function createMockRedis(): AppEnv["Variables"]["redis"] {
-  const store = new Map<string, number>();
-  const incr = (key: string): number => {
-    const next = (store.get(key) ?? 0) + 1;
-    store.set(key, next);
-    return next;
-  };
+function createMockKv(): AppEnv["Variables"]["kv"] {
+  const counters = new Map<string, number>();
+  const values = new Map<string, string>();
   return {
-    multi: vi.fn(() => {
-      const ops: Array<() => unknown> = [];
-      const chain = {
-        incr(key: string) {
-          ops.push(() => incr(key));
-          return chain;
-        },
-        expire(_key: string, _ttl: number) {
-          ops.push(() => 1);
-          return chain;
-        },
-        async exec() {
-          return ops.map((op) => [null, op()]);
-        },
-      };
-      return chain;
+    incrWithTtl: vi.fn(async (key: string, _ttlSec: number): Promise<number> => {
+      const next = (counters.get(key) ?? 0) + 1;
+      counters.set(key, next);
+      return next;
     }),
-    get: vi.fn(async (key: string) => {
-      const v = store.get(key);
-      return v === undefined ? null : String(v);
+    get: vi.fn(async (key: string): Promise<string | null> => values.get(key) ?? null),
+    setex: vi.fn(async (key: string, _ttlSec: number, value: string): Promise<void> => {
+      values.set(key, value);
     }),
-    set: vi.fn(async () => "OK"),
-    del: vi.fn(async (key: string) => (store.delete(key) ? 1 : 0)),
-  } as unknown as AppEnv["Variables"]["redis"];
+    getdel: vi.fn(async (key: string): Promise<string | null> => {
+      const v = values.get(key) ?? null;
+      values.delete(key);
+      return v;
+    }),
+    ttl: vi.fn(async (): Promise<number | null> => null),
+  } satisfies AppEnv["Variables"]["kv"];
 }
 
 async function parseJsonOrText(res: Response): Promise<{ message?: string }> {
@@ -143,18 +131,18 @@ async function parseJsonOrText(res: Response): Promise<{ message?: string }> {
 }
 
 describe("POST /api/ext/clip-and-create", () => {
-  let mockRedis: AppEnv["Variables"]["redis"];
+  let mockKv: AppEnv["Variables"]["kv"];
   const mockDb = {} as AppEnv["Variables"]["db"];
 
   beforeEach(() => {
-    mockRedis = createMockRedis();
+    mockKv = createMockKv();
     mockClipAndCreate.mockClear();
     mockResolveAiConfigForRequest.mockReset();
     mockResolveAiConfigForRequest.mockResolvedValue(null);
   });
 
   it("returns 401 when Authorization Bearer is missing", async () => {
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/clip-and-create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -164,7 +152,7 @@ describe("POST /api/ext/clip-and-create", () => {
   });
 
   it("returns 400 when url is missing", async () => {
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/clip-and-create", {
       method: "POST",
       headers: {
@@ -188,7 +176,7 @@ describe("POST /api/ext/clip-and-create", () => {
   });
 
   it("returns 400 when url is empty string", async () => {
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/clip-and-create", {
       method: "POST",
       headers: {
@@ -202,7 +190,7 @@ describe("POST /api/ext/clip-and-create", () => {
   });
 
   it("returns 400 for localhost (SSRF protection)", async () => {
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/clip-and-create", {
       method: "POST",
       headers: {
@@ -226,7 +214,7 @@ describe("POST /api/ext/clip-and-create", () => {
   });
 
   it("returns 400 for 127.0.0.1 (SSRF protection)", async () => {
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/clip-and-create", {
       method: "POST",
       headers: {
@@ -240,7 +228,7 @@ describe("POST /api/ext/clip-and-create", () => {
   });
 
   it("returns 400 for private IP 192.168.x.x (SSRF protection)", async () => {
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/clip-and-create", {
       method: "POST",
       headers: {
@@ -254,7 +242,7 @@ describe("POST /api/ext/clip-and-create", () => {
   });
 
   it("returns 400 for private IP 10.x.x.x (SSRF protection)", async () => {
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/clip-and-create", {
       method: "POST",
       headers: {
@@ -268,7 +256,7 @@ describe("POST /api/ext/clip-and-create", () => {
   });
 
   it("returns 200 with page_id when url is allowed and clipAndCreate succeeds", async () => {
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/clip-and-create", {
       method: "POST",
       headers: {
@@ -286,7 +274,7 @@ describe("POST /api/ext/clip-and-create", () => {
   });
 
   it("does not resolve AI config for non-YouTube URLs even when provider/model are present", async () => {
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/clip-and-create", {
       method: "POST",
       headers: {
@@ -328,7 +316,7 @@ describe("POST /api/ext/clip-and-create", () => {
       },
     });
 
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/clip-and-create", {
       method: "POST",
       headers: {
@@ -362,11 +350,11 @@ describe("POST /api/ext/clip-and-create", () => {
 });
 
 describe("POST /api/ext/session", () => {
-  let mockRedis: AppEnv["Variables"]["redis"];
+  let mockKv: AppEnv["Variables"]["kv"];
   const mockDb = {} as AppEnv["Variables"]["db"];
 
   beforeEach(() => {
-    mockRedis = createMockRedis();
+    mockKv = createMockKv();
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
     mockStoreExtensionCode.mockResolvedValue(undefined);
     mockIssueExtensionToken.mockResolvedValue({
@@ -376,7 +364,7 @@ describe("POST /api/ext/session", () => {
   });
 
   it("returns 400 when grant_type is not authorization_code", async () => {
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -393,7 +381,7 @@ describe("POST /api/ext/session", () => {
   });
 
   it("returns 400 when code, code_verifier or redirect_uri is missing", async () => {
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -409,7 +397,7 @@ describe("POST /api/ext/session", () => {
 
   it("returns 400 when redirect_uri is not allowed", async () => {
     mockIsRedirectUriAllowed.mockReturnValue(false);
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -428,7 +416,7 @@ describe("POST /api/ext/session", () => {
   it("returns 400 when code is invalid or expired", async () => {
     mockIsRedirectUriAllowed.mockReturnValue(true);
     mockConsumeExtensionCode.mockResolvedValue(null);
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -452,7 +440,7 @@ describe("POST /api/ext/session", () => {
       redirectUri: "https://x.chromiumapp.org/",
     });
     mockVerifyPKCE.mockReturnValue(true);
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -476,7 +464,7 @@ describe("POST /api/ext/session", () => {
       redirectUri: "https://x.chromiumapp.org/",
     });
     mockVerifyPKCE.mockReturnValue(false);
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -500,7 +488,7 @@ describe("POST /api/ext/session", () => {
       redirectUri: "https://x.chromiumapp.org/",
     });
     mockVerifyPKCE.mockReturnValue(true);
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -519,18 +507,18 @@ describe("POST /api/ext/session", () => {
 });
 
 describe("GET /api/ext/authorize-code", () => {
-  let mockRedis: AppEnv["Variables"]["redis"];
+  let mockKv: AppEnv["Variables"]["kv"];
   const mockDb = {} as AppEnv["Variables"]["db"];
 
   beforeEach(() => {
-    mockRedis = createMockRedis();
+    mockKv = createMockKv();
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
     mockStoreExtensionCode.mockResolvedValue(undefined);
     mockIsRedirectUriAllowed.mockReturnValue(true);
   });
 
   it("returns 401 when session is missing", async () => {
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request(
       "/api/ext/authorize-code?redirect_uri=https://x.chromiumapp.org/&code_challenge=ch&state=s",
       { method: "GET" },
@@ -540,7 +528,7 @@ describe("GET /api/ext/authorize-code", () => {
 
   it("returns 400 when redirect_uri or code_challenge is missing", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request(
       "/api/ext/authorize-code?redirect_uri=https://x.chromiumapp.org/",
       {
@@ -555,7 +543,7 @@ describe("GET /api/ext/authorize-code", () => {
   it("returns 400 when redirect_uri is not allowed", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
     mockIsRedirectUriAllowed.mockReturnValue(false);
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request(
       "/api/ext/authorize-code?redirect_uri=https://evil.com/&code_challenge=ch&state=s",
       { method: "GET" },
@@ -567,7 +555,7 @@ describe("GET /api/ext/authorize-code", () => {
 
   it("returns 200 with code and state when session and params are valid", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request(
       "/api/ext/authorize-code?redirect_uri=https://x.chromiumapp.org/&code_challenge=ch&state=st",
       { method: "GET" },
@@ -582,18 +570,18 @@ describe("GET /api/ext/authorize-code", () => {
 });
 
 describe("POST /api/ext/authorize-code", () => {
-  let mockRedis: AppEnv["Variables"]["redis"];
+  let mockKv: AppEnv["Variables"]["kv"];
   const mockDb = {} as AppEnv["Variables"]["db"];
 
   beforeEach(() => {
-    mockRedis = createMockRedis();
+    mockKv = createMockKv();
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
     mockStoreExtensionCode.mockResolvedValue(undefined);
     mockIsRedirectUriAllowed.mockReturnValue(true);
   });
 
   it("returns 401 when session is missing", async () => {
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/authorize-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -608,7 +596,7 @@ describe("POST /api/ext/authorize-code", () => {
 
   it("returns 400 when redirect_uri or code_challenge is missing", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/authorize-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -621,7 +609,7 @@ describe("POST /api/ext/authorize-code", () => {
 
   it("returns 200 with code and state when session and body are valid", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({ user: mockSessionUser } as AuthSession);
-    const app = createExtApp(mockRedis, mockDb);
+    const app = createExtApp(mockKv, mockDb);
     const res = await app.request("/api/ext/authorize-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -69,9 +69,9 @@ const app = new Hono<AppEnv>();
 //
 // Issues a one-time PKCE code for an authenticated user; later exchanged at /session for a JWT.
 app.post("/authorize-code", authRequired, authorizeCodeRateLimit, async (c) => {
-  const redis = c.get("redis");
-  if (!redis) {
-    throw new HTTPException(503, { message: "Redis unavailable" });
+  const kv = c.get("kv");
+  if (!kv) {
+    throw new HTTPException(503, { message: "KV store unavailable" });
   }
 
   const body = await c.req.json<{
@@ -109,7 +109,7 @@ app.post("/authorize-code", authRequired, authorizeCodeRateLimit, async (c) => {
   // Embed scopes in the challenge value so /session can decide what to mint.
   // 簡易のためスコープは challenge と一緒に保持する (challenge:scopes 形式)。
   const challengeWithScopes = `${body.code_challenge.trim()}|${requestedScopes.join(",")}`;
-  await storeMcpCode(redis, code, userId, challengeWithScopes, redirectUri);
+  await storeMcpCode(kv, code, userId, challengeWithScopes, redirectUri);
 
   return c.json({
     code,
@@ -121,9 +121,9 @@ app.post("/authorize-code", authRequired, authorizeCodeRateLimit, async (c) => {
 // PKCE code + verifier を交換して MCP 用 JWT を発行する。
 // Exchanges a one-time code + PKCE verifier for an MCP-scoped JWT.
 app.post("/session", sessionRateLimit, async (c) => {
-  const redis = c.get("redis");
-  if (!redis) {
-    throw new HTTPException(503, { message: "Redis unavailable" });
+  const kv = c.get("kv");
+  if (!kv) {
+    throw new HTTPException(503, { message: "KV store unavailable" });
   }
 
   const body = await c.req.json<{
@@ -147,7 +147,7 @@ app.post("/session", sessionRateLimit, async (c) => {
     throw new HTTPException(400, { message: "redirect_uri not allowed" });
   }
 
-  const data = await consumeMcpCode(redis, body.code.trim());
+  const data = await consumeMcpCode(kv, body.code.trim());
   if (!data) {
     throw new HTTPException(400, { message: "Invalid or expired code" });
   }
@@ -181,31 +181,31 @@ app.post("/session", sessionRateLimit, async (c) => {
 });
 
 /**
- * 共通: Redis に失効時刻を書き込むヘルパ。MCP bearer / ユーザーセッションの両経路から呼ぶ。
+ * 共通: KvStore に失効時刻を書き込むヘルパ。MCP bearer / ユーザーセッションの両経路から呼ぶ。
  * Shared helper that writes a per-user revocation timestamp, used by both
  * the MCP-bearer and session-protected revoke endpoints.
  */
 async function recordMcpRevocation(
-  redis: AppEnv["Variables"]["redis"] | undefined,
+  kv: AppEnv["Variables"]["kv"] | undefined,
   userId: string,
   source: "mcp" | "session",
-) {
-  if (!redis) {
-    throw new HTTPException(503, { message: "Redis unavailable" });
+): Promise<void> {
+  if (!kv) {
+    throw new HTTPException(503, { message: "KV store unavailable" });
   }
-  const revokedAt = await storeMcpRevocation(redis, userId);
+  const revokedAt = await storeMcpRevocation(kv, userId);
   console.log(`[mcp] revoke recorded via=${source} userId=${userId} revokedAt=${revokedAt}`);
 }
 
 // ── POST /revoke ────────────────────────────────────────────────────────────
-// 呼び出し元ユーザーの MCP JWT を失効させる。Redis に `mcp:revoked:<userId>` として
+// 呼び出し元ユーザーの MCP JWT を失効させる。KvStore に `mcp:revoked:<userId>` として
 // 失効時刻 (UNIX 秒) を保存し、以降の `verifyMcpToken` は `iat <= revokedAt` のトークンを拒否する。
 // 現行スコープ粒度では per-user で十分。
 //
-// Per-user MCP token revocation backed by a Redis deny-list. Subsequent `verifyMcpToken`
+// Per-user MCP token revocation backed by a KV deny-list. Subsequent `verifyMcpToken`
 // calls reject tokens whose `iat` is at or before the stored revocation timestamp.
 app.post("/revoke", mcpReadRequired, async (c) => {
-  await recordMcpRevocation(c.get("redis"), c.get("userId"), "mcp");
+  await recordMcpRevocation(c.get("kv"), c.get("userId"), "mcp");
   return c.json({ revoked: true });
 });
 
@@ -216,7 +216,7 @@ app.post("/revoke", mcpReadRequired, async (c) => {
 // Session-protected counterpart to POST /revoke. Lets users invalidate all their
 // MCP tokens from the web UI when the MCP token itself is unavailable (e.g. lost device).
 app.post("/revoke-session", authRequired, async (c) => {
-  await recordMcpRevocation(c.get("redis"), c.get("userId"), "session");
+  await recordMcpRevocation(c.get("kv"), c.get("userId"), "session");
   return c.json({ revoked: true });
 });
 

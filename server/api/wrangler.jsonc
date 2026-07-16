@@ -13,6 +13,22 @@
       "bucket_name": "zedi-storage-prod",
     },
   ],
+  // KV Durable Objects (#1093): レート制限カウンタ・ワンタイムコード・MCP deny-list。
+  // migrations はトップレベルのみ（wrangler が deploy 対象の env に適用する）。
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "KV_DO",
+        "class_name": "KvDurableObject",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["KvDurableObject"],
+    },
+  ],
   "env": {
     "dev": {
       "name": "zedi-api-dev",
@@ -22,6 +38,14 @@
           "bucket_name": "zedi-storage-dev",
         },
       ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "KV_DO",
+            "class_name": "KvDurableObject",
+          },
+        ],
+      },
       "vars": {
         "ENVIRONMENT": "development",
       },
@@ -34,6 +58,14 @@
           "bucket_name": "zedi-storage-prod",
         },
       ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "KV_DO",
+            "class_name": "KvDurableObject",
+          },
+        ],
+      },
       "vars": {
         "ENVIRONMENT": "production",
       },

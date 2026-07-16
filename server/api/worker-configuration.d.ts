@@ -7,6 +7,7 @@ declare namespace Cloudflare {
     ENVIRONMENT?: string;
     GIT_COMMIT_SHA?: string;
     STORAGE_BUCKET: R2Bucket;
+    KV_DO: DurableObjectNamespace;
     DATABASE_URL: string;
     REDIS_URL?: string;
     BETTER_AUTH_SECRET: string;

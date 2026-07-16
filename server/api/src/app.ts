@@ -4,7 +4,7 @@ import { getAllowedOrigins, isWildcardCors } from "./lib/cors.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { csrfOriginCheck } from "./middleware/csrfOrigin.js";
 import { dbMiddleware } from "./middleware/db.js";
-import { redisMiddleware } from "./middleware/redis.js";
+import { kvMiddleware } from "./middleware/kv.js";
 import { storageMiddleware } from "./middleware/storage.js";
 import { auth } from "./auth.js";
 import type { AppEnv } from "./types/index.js";
@@ -92,7 +92,7 @@ export function createApp(): Hono<AppEnv> {
 
   app.use("*", csrfOriginCheck);
   app.use("*", dbMiddleware);
-  app.use("*", redisMiddleware);
+  app.use("*", kvMiddleware);
   app.use("*", storageMiddleware);
   app.onError(errorHandler);
 

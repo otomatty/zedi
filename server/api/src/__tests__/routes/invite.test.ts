@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../../types/index.js";
+import type { KvStore } from "../../lib/kv/index.js";
 
 // ── Auth mock ──────────────────────────────────────────────────────────────
 
@@ -126,44 +127,52 @@ function createTestApp(dbResults: unknown[]) {
   return { app, chains };
 }
 
-// ── In-memory Redis mock (only the subset we use) ──────────────────────────
+// ── In-memory KvStore mock (only the subset we use) ─────────────────────────
 
 /**
- * email-link エンドポイントで使う Redis の最小実装。`eval`（Lua）と `ttl` のみ対応する。
- * サーバ側は incrWithExpire を Lua スクリプトで実装しており、
- * 初回 INCR 時のみ EXPIRE を設定する固定ウィンドウ挙動を再現する。
+ * email-link エンドポイントで使う KvStore の最小実装。`incrWithTtl` と `ttl` のみ
+ * 実質使われる。初回 INCR 時のみ TTL を設定する固定ウィンドウ挙動を再現する。
  *
- * Minimal Redis mock focused on the `eval` script used by incrWithExpire plus
- * `ttl` for retry-after computation. The EXPIRE is only set on the *first*
- * INCR so the mock mirrors the production fixed-window semantics.
+ * Minimal KvStore mock focused on `incrWithTtl` plus `ttl` for retry-after
+ * computation. The TTL is only set on the *first* increment so the mock
+ * mirrors the production fixed-window semantics.
  */
-function createRedisMock() {
+function createKvMock() {
   const counters = new Map<string, number>();
   const ttls = new Map<string, number>();
-  // 本番 Redis は「存在するが TTL 未設定」で `-1`、「キー不在」で `-2` を返す。
-  // モックで両者を区別するために存在チェック用の Set を別に持つ。
-  // Track key existence separately so `ttl()` can distinguish "key missing"
-  // (-2) from "key exists, no TTL set" (-1), matching production Redis
-  // semantics (see coderabbitai review on #668).
+  // 「存在するが TTL 未設定」（→ null）と「キー不在」（→ null）はどちらも null を
+  // 返す（KvStore の契約）。存在チェック用の Set はテストフックのために残す。
+  // KvStore#ttl returns null both when the key is missing and when no TTL is
+  // set; the existence Set remains for test hooks.
   const keys = new Set<string>();
 
-  const api = {
-    async eval(script: string, _numKeys: number, key: string, ttlArg: string): Promise<number> {
-      // 本実装の Lua スクリプトに対応する JS ミラー / JS mirror of the prod Lua script.
+  const api: KvStore & {
+    _reset(): void;
+    _incr(key: string): void;
+    _setTtl(key: string, ttlSec: number): void;
+    _getCount(key: string): number;
+  } = {
+    async incrWithTtl(key: string, ttlSec: number): Promise<number> {
+      // 本実装（Redis Lua / Durable Object）に対応する JS ミラー。
+      // JS mirror of the atomic INCR + EXPIRE-on-create in production stores.
       const next = (counters.get(key) ?? 0) + 1;
       counters.set(key, next);
       keys.add(key);
       if (next === 1) {
-        const ttlSec = Number.parseInt(ttlArg, 10);
-        if (Number.isFinite(ttlSec)) ttls.set(key, ttlSec);
+        ttls.set(key, ttlSec);
       }
-      // script はテストで無視するが、万が一の typo 検出用に構造だけ確認する。
-      if (!script.includes("incr")) throw new Error(`unexpected redis eval script: ${script}`);
       return next;
     },
-    async ttl(key: string): Promise<number> {
-      if (!keys.has(key)) return -2;
-      return ttls.get(key) ?? -1;
+    async ttl(key: string): Promise<number | null> {
+      if (!keys.has(key)) return null;
+      return ttls.get(key) ?? null;
+    },
+    async get(): Promise<string | null> {
+      return null;
+    },
+    async setex(): Promise<void> {},
+    async getdel(): Promise<string | null> {
+      return null;
     },
     _reset() {
       counters.clear();
@@ -176,6 +185,11 @@ function createRedisMock() {
       counters.set(key, next);
       keys.add(key);
     },
+    _setTtl(key: string, ttlSec: number): void {
+      // テストから残り TTL を直接再現するための補助。 / Seed a remaining TTL directly.
+      keys.add(key);
+      ttls.set(key, ttlSec);
+    },
     _getCount(key: string): number {
       return counters.get(key) ?? 0;
     },
@@ -183,15 +197,15 @@ function createRedisMock() {
   return api;
 }
 
-type RedisMock = ReturnType<typeof createRedisMock>;
+type KvMock = ReturnType<typeof createKvMock>;
 
-function createTestAppWithRedis(dbResults: unknown[], redis: RedisMock) {
+function createTestAppWithKv(dbResults: unknown[], kv: KvMock) {
   const { db, chains } = createMockDb(dbResults);
   const app = new Hono<AppEnv>();
 
   app.use("*", async (c, next) => {
     c.set("db", db as unknown as AppEnv["Variables"]["db"]);
-    c.set("redis", redis as unknown as AppEnv["Variables"]["redis"]);
+    c.set("kv", kv);
     await next();
   });
 
@@ -530,10 +544,10 @@ describe("POST /api/invite/:token/email-link", () => {
   }
 
   it("202 を返し、招待先メール宛にマジックリンクを送信する", async () => {
-    const redis = createRedisMock();
+    const kv = createKvMock();
     // 6 回分の invitation select を積む（最初の1回だけ使う）
     // Provide 6 invitation selects for the whole describe block's needs.
-    const { app } = createTestAppWithRedis([[createInvitationRow()]], redis);
+    const { app } = createTestAppWithKv([[createInvitationRow()]], kv);
 
     const res = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
       method: "POST",
@@ -558,8 +572,8 @@ describe("POST /api/invite/:token/email-link", () => {
   });
 
   it("無効なトークンは 404 を返す", async () => {
-    const redis = createRedisMock();
-    const { app } = createTestAppWithRedis([[]], redis);
+    const kv = createKvMock();
+    const { app } = createTestAppWithKv([[]], kv);
 
     const res = await app.request("/api/invite/invalid-token/email-link", {
       method: "POST",
@@ -571,11 +585,11 @@ describe("POST /api/invite/:token/email-link", () => {
   });
 
   it("期限切れトークンは 410 を返す（accept エンドポイントと同じ意味論）", async () => {
-    const redis = createRedisMock();
+    const kv = createKvMock();
     const invitation = createInvitationRow({
       expiresAt: new Date("2020-01-01T00:00:00Z"),
     });
-    const { app } = createTestAppWithRedis([[invitation]], redis);
+    const { app } = createTestAppWithKv([[invitation]], kv);
 
     const res = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
       method: "POST",
@@ -587,11 +601,11 @@ describe("POST /api/invite/:token/email-link", () => {
   });
 
   it("使用済みトークンは 409 を返す", async () => {
-    const redis = createRedisMock();
+    const kv = createKvMock();
     const invitation = createInvitationRow({
       usedAt: new Date("2026-01-01T00:00:00Z"),
     });
-    const { app } = createTestAppWithRedis([[invitation]], redis);
+    const { app } = createTestAppWithKv([[invitation]], kv);
 
     const res = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
       method: "POST",
@@ -603,12 +617,9 @@ describe("POST /api/invite/:token/email-link", () => {
   });
 
   it("5 分ウィンドウ内の 2 回目の呼び出しは 429 (short) を返し送信しない", async () => {
-    const redis = createRedisMock();
+    const kv = createKvMock();
     // 2 回分の invitation select を積む（毎回先頭の配列が消費される）
-    const { app } = createTestAppWithRedis(
-      [[createInvitationRow()], [createInvitationRow()]],
-      redis,
-    );
+    const { app } = createTestAppWithKv([[createInvitationRow()], [createInvitationRow()]], kv);
 
     const first = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
       method: "POST",
@@ -631,36 +642,36 @@ describe("POST /api/invite/:token/email-link", () => {
   });
 
   it("1 日 5 回の上限を超えた 6 回目は 429 (daily) を返す", async () => {
-    const redis = createRedisMock();
+    const kv = createKvMock();
     // 1日ウィンドウだけ 5 を超えるよう、短期ウィンドウは都度スキップ済みに見せかける。
     // 短期ウィンドウのカウントを毎回リセットして「5 分ウィンドウは空」と想定する。
     // Provide 6 invitation rows for 6 requests.
     const rows: unknown[] = [];
     for (let i = 0; i < 6; i++) rows.push([createInvitationRow()]);
-    const { app } = createTestAppWithRedis(rows, redis);
+    const { app } = createTestAppWithKv(rows, kv);
 
     const shortKey = `ratelimit:invite-email-link:5min:${TEST_TOKEN}`;
 
     // 1 回目〜5 回目は 202 を返す（各呼び出し前に短期ウィンドウをリセット）
     for (let i = 0; i < 5; i++) {
-      redis._reset();
+      kv._reset();
       // 直前の呼び出しまでに累積した daily カウントを復元
       // Restore the daily counter so rolling the short window doesn't reset it.
       const dailyKey = `ratelimit:invite-email-link:day:${TEST_TOKEN}`;
-      for (let n = 0; n < i; n++) redis._incr(dailyKey);
+      for (let n = 0; n < i; n++) kv._incr(dailyKey);
 
       const res = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
       expect(res.status).toBe(202);
-      expect(redis._getCount(shortKey)).toBe(1);
+      expect(kv._getCount(shortKey)).toBe(1);
     }
 
     // 6 回目: daily が 6 になり 429 (daily) を返す
-    redis._reset();
+    kv._reset();
     const dailyKey = `ratelimit:invite-email-link:day:${TEST_TOKEN}`;
-    for (let n = 0; n < 5; n++) redis._incr(dailyKey);
+    for (let n = 0; n < 5; n++) kv._incr(dailyKey);
     const sixth = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -675,11 +686,11 @@ describe("POST /api/invite/:token/email-link", () => {
   });
 
   it("短期ウィンドウで弾かれたリクエストは日次カウンタを消費しない（DoS 防止）", async () => {
-    const redis = createRedisMock();
+    const kv = createKvMock();
     // 1 回目のリクエスト + 4 回分の短期拒否用に 5 回分の invitation を積む。
     const rows: unknown[] = [];
     for (let i = 0; i < 5; i++) rows.push([createInvitationRow()]);
-    const { app } = createTestAppWithRedis(rows, redis);
+    const { app } = createTestAppWithKv(rows, kv);
 
     const shortKey = `ratelimit:invite-email-link:5min:${TEST_TOKEN}`;
     const dailyKey = `ratelimit:invite-email-link:day:${TEST_TOKEN}`;
@@ -690,7 +701,7 @@ describe("POST /api/invite/:token/email-link", () => {
       headers: { "Content-Type": "application/json" },
     });
     expect(first.status).toBe(202);
-    expect(redis._getCount(dailyKey)).toBe(1);
+    expect(kv._getCount(dailyKey)).toBe(1);
 
     // 2〜5 回目は短期ウィンドウで全て拒否。daily は 1 のまま。
     for (let i = 0; i < 4; i++) {
@@ -699,21 +710,18 @@ describe("POST /api/invite/:token/email-link", () => {
         headers: { "Content-Type": "application/json" },
       });
       expect(res.status).toBe(429);
-      expect(redis._getCount(dailyKey)).toBe(1);
+      expect(kv._getCount(dailyKey)).toBe(1);
     }
 
     // short は 5 まで積まれているはず（毎回 INCR される）。
-    expect(redis._getCount(shortKey)).toBe(5);
+    expect(kv._getCount(shortKey)).toBe(5);
     // magicLink サービスは 1 回だけ呼ばれる。
     expect(sendInvitationMagicLinkMock).toHaveBeenCalledTimes(1);
   });
 
   it("TTL は初回 INCR 時のみ付与され、再送でスライディングウィンドウ化しない", async () => {
-    const redis = createRedisMock();
-    const { app } = createTestAppWithRedis(
-      [[createInvitationRow()], [createInvitationRow()]],
-      redis,
-    );
+    const kv = createKvMock();
+    const { app } = createTestAppWithKv([[createInvitationRow()], [createInvitationRow()]], kv);
 
     // 1 回目: 新規作成で TTL=5min を付与。
     await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
@@ -721,29 +729,28 @@ describe("POST /api/invite/:token/email-link", () => {
       headers: { "Content-Type": "application/json" },
     });
     const shortKey = `ratelimit:invite-email-link:5min:${TEST_TOKEN}`;
-    expect(await redis.ttl(shortKey)).toBe(5 * 60);
+    expect(await kv.ttl(shortKey)).toBe(5 * 60);
 
     // TTL を手で進めたことにする（残り 60 秒）。2 回目のリクエストで TTL が再延長
     // されないことを確認する（スライディングウィンドウでは 300 秒に戻ってしまう）。
-    redis._reset();
-    // カウンタを 1 に戻し、TTL は 60 秒の想定で再現。
-    redis._incr(shortKey);
-    // eval は新規作成のみ EXPIRE するため、TTL は更新されない想定。
-    // TTL を検証するため、mock のマップを直接操作する代わりに再設定は行わない。
+    kv._reset();
+    // カウンタを 1、残り TTL を 60 秒として再現。
+    // Recreate a bucket with count=1 and 60 seconds remaining.
+    kv._incr(shortKey);
+    kv._setTtl(shortKey, 60);
     const second = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
     expect(second.status).toBe(429);
-    // 2 回目は c != 1 なので EXPIRE は走らず、TTL は付与されない。モックは本番 Redis と
-    // 同様に「キー存在・TTL 未設定」で -1 を返すため、この値で TTL 未更新を検証する。
-    // Second INCR returns c != 1, so EXPIRE is skipped. The mock mirrors real
-    // Redis semantics: -1 for an existing key without TTL, confirming the
-    // window was not extended.
-    expect(await redis.ttl(shortKey)).toBe(-1);
+    // 2 回目は c != 1 なので TTL 設定は走らず、既存の残り TTL (60 秒) が
+    // そのまま維持される（スライディングウィンドウなら 300 秒に戻ってしまう）。
+    // The second increment must not touch the TTL: the remaining 60 seconds
+    // stay as-is (a sliding window would reset it to 300).
+    expect(await kv.ttl(shortKey)).toBe(60);
   });
 
-  it("Redis が無い環境ではレート制限を適用せずに送信する", async () => {
+  it("KvStore が無い環境ではレート制限を適用せずに送信する", async () => {
     const { app } = createTestApp([
       [createInvitationRow()],
       [createInvitationRow()],
@@ -765,8 +772,8 @@ describe("POST /api/invite/:token/email-link", () => {
       sent: false,
       error: "simulated failure",
     });
-    const redis = createRedisMock();
-    const { app } = createTestAppWithRedis([[createInvitationRow()]], redis);
+    const kv = createKvMock();
+    const { app } = createTestAppWithKv([[createInvitationRow()]], kv);
 
     const res = await app.request(`/api/invite/${TEST_TOKEN}/email-link`, {
       method: "POST",

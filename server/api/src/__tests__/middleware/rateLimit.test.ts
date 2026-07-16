@@ -6,46 +6,14 @@
  * - 429 応答に Retry-After / X-RateLimit-* ヘッダと RATE_LIMIT_EXCEEDED JSON を返す
  * - keyBy: "ip" は IP ヘッダでキー付けされ、ユーザーごとの干渉がないこと
  *
- * Unit tests for the rate limit middleware (#562).
+ * Unit tests for the rate limit middleware (#562, KvStore-backed since #1093).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import type { AppEnv } from "../../types/index.js";
 import { rateLimit } from "../../middleware/rateLimit.js";
-
-/**
- * rateLimit ミドルウェアは `multi().incr(key).expire(key, ttl).exec()` を呼ぶため、
- * その最低限の形を満たすインメモリ Redis を用意する。
- * Minimal in-memory stand-in that mimics the subset of ioredis used by the middleware.
- */
-function createMockRedis(): AppEnv["Variables"]["redis"] {
-  const store = new Map<string, number>();
-  const incr = (key: string): number => {
-    const next = (store.get(key) ?? 0) + 1;
-    store.set(key, next);
-    return next;
-  };
-  return {
-    multi: vi.fn(() => {
-      const ops: Array<() => unknown> = [];
-      const chain = {
-        incr(key: string) {
-          ops.push(() => incr(key));
-          return chain;
-        },
-        expire(_key: string, _ttl: number) {
-          ops.push(() => 1);
-          return chain;
-        },
-        async exec() {
-          return ops.map((op) => [null, op()]);
-        },
-      };
-      return chain;
-    }),
-  } as unknown as AppEnv["Variables"]["redis"];
-}
+import { createMemoryKvStore } from "../helpers/memoryKvStore.js";
 
 function appWith(middleware: ReturnType<typeof rateLimit>, setup: (c: Context<AppEnv>) => void) {
   const app = new Hono<AppEnv>();
@@ -59,7 +27,7 @@ function appWith(middleware: ReturnType<typeof rateLimit>, setup: (c: Context<Ap
 }
 
 describe("rateLimit middleware", () => {
-  let redis: AppEnv["Variables"]["redis"];
+  let kv: AppEnv["Variables"]["kv"];
 
   // `extractClientIp` は TRUST_PROXY=true のときだけ x-forwarded-for を採用するため、
   // IP ベースのバケットを検証するテスト中は明示的にプロキシ信頼を有効にする。
@@ -68,7 +36,7 @@ describe("rateLimit middleware", () => {
   const originalTrustProxy = process.env.TRUST_PROXY;
 
   beforeEach(() => {
-    redis = createMockRedis();
+    kv = createMemoryKvStore();
     process.env.TRUST_PROXY = "true";
   });
 
@@ -80,7 +48,7 @@ describe("rateLimit middleware", () => {
     }
   });
 
-  it("passes through when no redis is bound (graceful degradation)", async () => {
+  it("passes through when no kv store is bound (graceful degradation)", async () => {
     const app = new Hono<AppEnv>();
     app.get("/test", rateLimit({ limit: 1, windowSec: 60, keyBy: "user", label: "t" }), (c) =>
       c.json({ ok: true }),
@@ -93,7 +61,7 @@ describe("rateLimit middleware", () => {
 
   it("rejects after the configured limit with 429 and Retry-After", async () => {
     const app = appWith(rateLimit({ limit: 2, windowSec: 60, keyBy: "user", label: "t" }), (c) => {
-      c.set("redis", redis);
+      c.set("kv", kv);
       c.set("userId", "user-1");
     });
 
@@ -121,7 +89,7 @@ describe("rateLimit middleware", () => {
     // Same user, different labels → independent buckets.
     const app = new Hono<AppEnv>();
     app.use("*", async (c, next) => {
-      c.set("redis", redis);
+      c.set("kv", kv);
       c.set("userId", "user-1");
       await next();
     });
@@ -141,7 +109,7 @@ describe("rateLimit middleware", () => {
   it("keyBy: ip uses the forwarded IP header", async () => {
     const app = new Hono<AppEnv>();
     app.use("*", async (c, next) => {
-      c.set("redis", redis);
+      c.set("kv", kv);
       await next();
     });
     app.get("/test", rateLimit({ limit: 1, windowSec: 60, keyBy: "ip", label: "ipt" }), (c) =>
@@ -170,7 +138,7 @@ describe("rateLimit middleware", () => {
     // 既存呼び出し (`rateLimit()` や `rateLimit("free")`) は Free=120/h のまま動く必要がある。
     // Legacy callers must keep the old semantics.
     const app = appWith(rateLimit(), (c) => {
-      c.set("redis", redis);
+      c.set("kv", kv);
       c.set("userId", "user-legacy");
     });
 
@@ -187,7 +155,7 @@ describe("rateLimit middleware", () => {
     const app = appWith(
       rateLimit({ limit: 1, windowSec: 60 * 60, keyBy: "user", label: "hour" }),
       (c) => {
-        c.set("redis", redis);
+        c.set("kv", kv);
         c.set("userId", "user-hour");
       },
     );
@@ -199,30 +167,19 @@ describe("rateLimit middleware", () => {
     expect(retryAfter).toBeLessThanOrEqual(3600);
   });
 
-  it("uses MULTI/EXEC so INCR and EXPIRE are issued atomically", async () => {
-    // MULTI/EXEC による原子性を保証するため、rateLimit は単独の incr / expire を呼ばない。
-    // The middleware should use `multi()` so a crash cannot leave a TTL-less key.
-    const multiSpy = vi.fn();
-    const fakeRedis = {
-      multi: () => {
-        multiSpy();
-        const chain = {
-          incr: () => chain,
-          expire: () => chain,
-          exec: async () => [
-            [null, 1],
-            [null, 1],
-          ],
-        };
-        return chain;
-      },
-      incr: vi.fn(),
-      expire: vi.fn(),
-    } as unknown as AppEnv["Variables"]["redis"];
+  it("issues a single atomic incrWithTtl call per request", async () => {
+    // カウンタの INCR と TTL 設定はストア側で原子的に行われる必要があるため、
+    // ミドルウェアは KvStore#incrWithTtl を 1 回だけ呼ぶ。
+    // The middleware must delegate atomicity to the store via exactly one
+    // incrWithTtl call so a crash cannot leave a TTL-less counter.
+    const incrSpy = vi.fn(async () => 1);
+    const fakeKv = {
+      incrWithTtl: incrSpy,
+    } as unknown as AppEnv["Variables"]["kv"];
 
     const app = new Hono<AppEnv>();
     app.use("*", async (c, next) => {
-      c.set("redis", fakeRedis);
+      c.set("kv", fakeKv);
       c.set("userId", "user-atomic");
       await next();
     });
@@ -231,10 +188,12 @@ describe("rateLimit middleware", () => {
     );
     const res = await app.request("/test");
     expect(res.status).toBe(200);
-    expect(multiSpy).toHaveBeenCalled();
-    expect(
-      (fakeRedis as unknown as { incr: ReturnType<typeof vi.fn> }).incr,
-    ).not.toHaveBeenCalled();
+    expect(incrSpy).toHaveBeenCalledOnce();
+    const call = incrSpy.mock.calls[0] as unknown as [string, number];
+    expect(call[0]).toContain("ratelimit:atomic:user-atomic:");
+    // TTL はウィンドウ長より十分長いクリーンアップ用の値。
+    // The TTL is a cleanup horizon longer than the window itself.
+    expect(call[1]).toBeGreaterThanOrEqual(120);
   });
 
   it("keyBy: user falls back to IP when no userId is set", async () => {
@@ -242,7 +201,7 @@ describe("rateLimit middleware", () => {
     // Even before auth, the middleware keys on IP so it isn't a free pass.
     const app = new Hono<AppEnv>();
     app.use("*", async (c, next) => {
-      c.set("redis", redis);
+      c.set("kv", kv);
       await next();
     });
     app.get("/test", rateLimit({ limit: 1, windowSec: 60, keyBy: "user", label: "ut" }), (c) =>

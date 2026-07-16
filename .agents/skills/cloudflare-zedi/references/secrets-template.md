@@ -62,27 +62,27 @@ Never commit secret values; use `wrangler secret put` for Workers._
 
 ### Secrets — 機能別（未設定なら該当機能のみ無効）
 
-| 名前                                                                      | 用途                                | 備考                                              |
-| ------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------- |
-| `REDIS_URL`                                                               | レート制限・キャッシュ等            | Phase 2b まで Worker にも必要。**2b KV 後に削除** |
-| `POLAR_ACCESS_TOKEN`                                                      | 課金 API                            |                                                   |
-| `POLAR_WEBHOOK_SECRET`                                                    | Polar webhook 署名                  |                                                   |
-| `POLAR_PRO_MONTHLY_PRODUCT_ID` / `POLAR_PRO_YEARLY_PRODUCT_ID`            | プラン ID                           | Var 化可（秘密ではない）                          |
-| `RESEND_API_KEY` / `RESEND_FROM_EMAIL`                                    | メール送信                          | 未設定時 no-op                                    |
-| `SENTRY_DSN_API`                                                          | Sentry 送信                         |                                                   |
-| `SENTRY_WEBHOOK_SECRET`                                                   | Sentry webhook 署名                 |                                                   |
-| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`                                    | システム LLM（BYOK 以外）           |                                                   |
-| `OPENROUTER_API_KEY`                                                      | AI モデル料金 sync                  | 未設定時デフォルト cost                           |
-| `USER_AI_CREDENTIALS_ENCRYPTION_KEY`                                      | BYOK 暗号化                         | 32 bytes base64/hex                               |
-| `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY` / `GITHUB_APP_INSTALLATION_ID` | Sentry→GitHub dispatch              |                                                   |
-| `GITHUB_DISPATCH_REPOSITORY`                                              | dispatch 先 `owner/repo`            | 未設定時 dispatch スキップ                        |
-| `MONITORING_NOTIFY_EMAIL` / `ADMIN_BASE_URL`                              | エラー通知メール                    |                                                   |
-| `GOOGLE_CUSTOM_SEARCH_API_KEY` / `GOOGLE_CUSTOM_SEARCH_ENGINE_ID`         | サムネ画像検索                      |                                                   |
-| `YOUTUBE_DATA_API_KEY`                                                    | クリップ / ext                      |                                                   |
-| `SYNC_AI_MODELS_SECRET`                                                   | admin モデル sync                   |                                                   |
-| `HOCUSPOCUS_INTERNAL_URL`                                                 | Y.js 無効化通知                     | Phase 4 まで Railway internal URL                 |
-| `TRUST_PROXY`                                                             | `true` when behind CF/Railway proxy | Worker では通常 `true`                            |
-| `EXTENSION_ORIGIN`                                                        | ブラウザ拡張 origin                 | 本番のみ                                          |
+| 名前                                                                      | 用途                                | 備考                                                                           |
+| ------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------ |
+| `REDIS_URL`                                                               | レート制限・キャッシュ等            | Railway/Node のみ。**Worker は `KV_DO` DO binding を使うため不要（#1093 済）** |
+| `POLAR_ACCESS_TOKEN`                                                      | 課金 API                            |                                                                                |
+| `POLAR_WEBHOOK_SECRET`                                                    | Polar webhook 署名                  |                                                                                |
+| `POLAR_PRO_MONTHLY_PRODUCT_ID` / `POLAR_PRO_YEARLY_PRODUCT_ID`            | プラン ID                           | Var 化可（秘密ではない）                                                       |
+| `RESEND_API_KEY` / `RESEND_FROM_EMAIL`                                    | メール送信                          | 未設定時 no-op                                                                 |
+| `SENTRY_DSN_API`                                                          | Sentry 送信                         |                                                                                |
+| `SENTRY_WEBHOOK_SECRET`                                                   | Sentry webhook 署名                 |                                                                                |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`                                    | システム LLM（BYOK 以外）           |                                                                                |
+| `OPENROUTER_API_KEY`                                                      | AI モデル料金 sync                  | 未設定時デフォルト cost                                                        |
+| `USER_AI_CREDENTIALS_ENCRYPTION_KEY`                                      | BYOK 暗号化                         | 32 bytes base64/hex                                                            |
+| `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY` / `GITHUB_APP_INSTALLATION_ID` | Sentry→GitHub dispatch              |                                                                                |
+| `GITHUB_DISPATCH_REPOSITORY`                                              | dispatch 先 `owner/repo`            | 未設定時 dispatch スキップ                                                     |
+| `MONITORING_NOTIFY_EMAIL` / `ADMIN_BASE_URL`                              | エラー通知メール                    |                                                                                |
+| `GOOGLE_CUSTOM_SEARCH_API_KEY` / `GOOGLE_CUSTOM_SEARCH_ENGINE_ID`         | サムネ画像検索                      |                                                                                |
+| `YOUTUBE_DATA_API_KEY`                                                    | クリップ / ext                      |                                                                                |
+| `SYNC_AI_MODELS_SECRET`                                                   | admin モデル sync                   |                                                                                |
+| `HOCUSPOCUS_INTERNAL_URL`                                                 | Y.js 無効化通知                     | Phase 4 まで Railway internal URL                                              |
+| `TRUST_PROXY`                                                             | `true` when behind CF/Railway proxy | Worker では通常 `true`                                                         |
+| `EXTENSION_ORIGIN`                                                        | ブラウザ拡張 origin                 | 本番のみ                                                                       |
 
 ### Railway のみ（Worker では不要）
 
@@ -152,17 +152,17 @@ bunx wrangler secret put BETTER_AUTH_SECRET --env dev
 
 ### Phase 2b — #1091 本番切替 + #1092 MCP + #1093 KV
 
-| 操作                                        | 対象                                                                    |
-| ------------------------------------------- | ----------------------------------------------------------------------- |
-| **登録（wrangler.jsonc）**                  | KV namespace binding（#1093）                                           |
-| **登録（Worker secrets dev + production）** | マスター「必須」+ Redis 利用機能があれば `REDIS_URL`（KV 移行完了まで） |
-| **登録（vars / CI）**                       | `GIT_COMMIT_SHA` を deploy workflow で注入                              |
-| **更新**                                    | `BETTER_AUTH_URL` → Worker custom domain（`api.zedi-note.app` 等）      |
-| **更新**                                    | OAuth プロバイダの redirect URI を Worker URL に追加                    |
-| **更新**                                    | Polar / Sentry webhook URL を Worker URL に                             |
-| **登録（MCP Worker）**                      | `ZEDI_API_URL`, `BETTER_AUTH_SECRET`                                    |
-| **削除（Worker secrets）**                  | `REDIS_URL` — KV binding + コード切替完了後                             |
-| **削除（Railway）**                         | **まだしない** — DNS 切替・検証後 Phase 5                               |
+| 操作                                        | 対象                                                                             |
+| ------------------------------------------- | -------------------------------------------------------------------------------- |
+| **登録（wrangler.jsonc）**                  | Durable Object binding `KV_DO`（`KvDurableObject`、#1093 済）                    |
+| **登録（Worker secrets dev + production）** | マスター「必須」のみ（`REDIS_URL` は不要 — `KV_DO` DO binding で代替、#1093 済） |
+| **登録（vars / CI）**                       | `GIT_COMMIT_SHA` を deploy workflow で注入                                       |
+| **更新**                                    | `BETTER_AUTH_URL` → Worker custom domain（`api.zedi-note.app` 等）               |
+| **更新**                                    | OAuth プロバイダの redirect URI を Worker URL に追加                             |
+| **更新**                                    | Polar / Sentry webhook URL を Worker URL に                                      |
+| **登録（MCP Worker）**                      | `ZEDI_API_URL`, `BETTER_AUTH_SECRET`                                             |
+| **削除（Worker secrets）**                  | `REDIS_URL` — 登録済みの場合のみ（#1093 で `KV_DO` DO binding に切替済み）       |
+| **削除（Railway）**                         | **まだしない** — DNS 切替・検証後 Phase 5                                        |
 
 ### Phase 3 — フロント/admin Static Assets
 

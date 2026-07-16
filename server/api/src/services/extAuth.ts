@@ -1,7 +1,7 @@
 /**
  * Chrome 拡張用認証ライブラリ
  *
- * - ワンタイムコードの Redis 保存・取得
+ * - ワンタイムコードの KvStore 保存・取得
  * - PKCE 検証
  * - JWT 発行・検証
  *
@@ -9,7 +9,7 @@
  */
 import { createHash } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
-import type { Redis } from "ioredis";
+import type { KvStore } from "../lib/kv/index.js";
 import { getEnv, getOptionalEnv } from "../lib/env.js";
 
 const CODE_TTL_SEC = 300; // 5 minutes
@@ -33,11 +33,11 @@ export function verifyPKCE(codeVerifier: string, codeChallenge: string): boolean
 }
 
 /**
- * ワンタイムコードを Redis に保存する。発行時の redirect_uri も保存し、交換時に照合する。
- * Stores one-time authorization code in Redis with userId, code_challenge, and redirect_uri for exchange-time binding.
+ * ワンタイムコードを KvStore に保存する。発行時の redirect_uri も保存し、交換時に照合する。
+ * Stores one-time authorization code with userId, code_challenge, and redirect_uri for exchange-time binding.
  */
 export async function storeExtensionCode(
-  redis: Redis,
+  kv: KvStore,
   code: string,
   userId: string,
   codeChallenge: string,
@@ -45,31 +45,19 @@ export async function storeExtensionCode(
 ): Promise<void> {
   const key = `ext:code:${code}`;
   const value = JSON.stringify({ userId, codeChallenge, redirectUri });
-  await redis.setex(key, CODE_TTL_SEC, value);
+  await kv.setex(key, CODE_TTL_SEC, value);
 }
-
-const CONSUME_SCRIPT = `
-  local v = redis.call('GET', KEYS[1])
-  if v then redis.call('DEL', KEYS[1]); return v; end
-  return nil
-`;
 
 /**
  * ワンタイムコードを原子的に取得・削除する。保存されていた redirect_uri も返す。
- * Atomically retrieves and consumes (deletes) one-time code from Redis; returns stored redirect_uri for binding check.
+ * Atomically retrieves and consumes (deletes) the one-time code; returns stored redirect_uri for binding check.
  */
 export async function consumeExtensionCode(
-  redis: Redis,
+  kv: KvStore,
   code: string,
 ): Promise<{ userId: string; codeChallenge: string; redirectUri: string } | null> {
   const key = `ext:code:${code}`;
-  let raw: string | null = null;
-  if (typeof (redis as { getdel?: (k: string) => Promise<string | null> }).getdel === "function") {
-    raw = await (redis as { getdel: (k: string) => Promise<string | null> }).getdel(key);
-  } else {
-    const result = await redis.eval(CONSUME_SCRIPT, 1, key);
-    raw = typeof result === "string" ? result : null;
-  }
+  const raw = await kv.getdel(key);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as {
