@@ -231,12 +231,14 @@ function PromoteToWikiDialogBody({ onClose, conversationText, existingTitles }: 
       // unmount cannot interrupt in-flight creations.
       // 並列でページ作成してから遷移する（遷移に伴うアンマウントで作成が中断されないように）。
       // 抽出サマリーを初期本文として埋め、空ページに着地しないようにする。
-      // Seed each page with its extracted summary so users don't land on a blank page.
+      // タイトルはページの title 列が担うため、先頭 H1 は落とす。
+      // Seed each page with its extracted summary so users don't land on a blank
+      // page. Drop a leading H1 since the page title lives in the title field.
       const created = await Promise.all(
         selectedEntities.map((entity) =>
           createPage({
             title: entity.title,
-            content: convertMarkdownToTiptapContent(entity.summary),
+            content: convertMarkdownToTiptapContent(entity.summary, { dropLeadingH1: true }),
           }).catch(() => null),
         ),
       );
