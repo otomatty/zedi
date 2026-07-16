@@ -170,7 +170,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   return (
     <div className="flex-1 pt-6 pb-32">
       <Container>
-        {/* ページタイトル */}
+        {/* ページタイトル / Page title */}
         <div className="flex items-start gap-3 pt-6 pb-2">
           <div className="min-w-0 flex-1">
             <PageTitleBlock
@@ -186,7 +186,8 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
         {/* Source URL Badge - クリップしたページの場合に表示 */}
         {sourceUrl && <SourceUrlBadge sourceUrl={sourceUrl} />}
 
-        {/* エディター（コラボ初期同期中はスケルトンを表示） */}
+        {/* エディター（コラボ初期同期中はスケルトンを表示）
+            Editor (shows a skeleton while the initial collaboration sync is pending). */}
         <div className="relative">
           {showCollaborationLoading && <EditorSkeleton />}
           {showEditor && (

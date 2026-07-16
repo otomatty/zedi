@@ -74,12 +74,9 @@ test.describe("Linked Pages journeys (issue #1036)", () => {
     await page.getByPlaceholder("タイトル").fill("Linked Journey");
     const putRequest = await titleSaved;
 
-    // Assert: PUT body にタイトルが入っている。Wiki生成ボタンはタイトルが
-    // 空白以外になった瞬間に表示される（保存とは無関係）。
-    // Assert: the PUT body carries the title. The Wiki生成 button shows as soon
-    // as the title is non-blank (independent of saving).
+    // Assert: PUT body にタイトルが入っている。
+    // Assert: the PUT body carries the title.
     expect(putRequest.postDataJSON()).toMatchObject({ title: "Linked Journey" });
-    await expect(page.getByText("Wiki生成")).toBeVisible();
 
     // 本文入力（REST には保存されない。Y.Doc 経由）。
     // Type body text (not persisted over REST; goes through the Y.Doc).

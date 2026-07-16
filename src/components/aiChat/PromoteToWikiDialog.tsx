@@ -21,6 +21,7 @@ import {
 import { callAIService } from "@/lib/aiService";
 import { loadAISettings } from "@/lib/aiSettings";
 import { useCreatePage } from "@/hooks/pages/usePageQueries";
+import { convertMarkdownToTiptapContent } from "@/lib/markdownToTiptap";
 import { EntityRow } from "./EntityRow";
 
 /**
@@ -229,9 +230,14 @@ function PromoteToWikiDialogBody({ onClose, conversationText, existingTitles }: 
       // Create all pages in parallel before navigating so that navigation-induced
       // unmount cannot interrupt in-flight creations.
       // 並列でページ作成してから遷移する（遷移に伴うアンマウントで作成が中断されないように）。
+      // 抽出サマリーを初期本文として埋め、空ページに着地しないようにする。
+      // Seed each page with its extracted summary so users don't land on a blank page.
       const created = await Promise.all(
         selectedEntities.map((entity) =>
-          createPage({ title: entity.title, content: "" }).catch(() => null),
+          createPage({
+            title: entity.title,
+            content: convertMarkdownToTiptapContent(entity.summary),
+          }).catch(() => null),
         ),
       );
 
