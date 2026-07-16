@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "zedi-mcp",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-06-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+  },
+  // ZEDI_API_URL: バックエンド REST API の URL。dev はデプロイ CI が GitHub
+  // Environment 変数 (API_BASE_URL) から `--var` で注入する。未指定時はコードの
+  // DEFAULT_API_URL にフォールバックする。JWT 検証・deny-list は API 側 (#1093)。
+  // ZEDI_API_URL: backend REST API base URL. The dev deploy workflow injects it
+  // via `--var` from the GitHub Environment; production pins the custom domain.
+  "env": {
+    "dev": {
+      "name": "zedi-mcp-dev",
+      "vars": {
+        "ENVIRONMENT": "development",
+      },
+    },
+    "production": {
+      "name": "zedi-mcp",
+      "vars": {
+        "ENVIRONMENT": "production",
+        "ZEDI_API_URL": "https://api.zedi-note.app",
+      },
+    },
+  },
+}

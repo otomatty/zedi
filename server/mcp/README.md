@@ -185,6 +185,24 @@ Use HTTP transport settings in Claude Code `mcpServers`. Set `Authorization` hea
 
 The server is stateless (new `McpServer` per request), so the same JWT can be used from multiple clients without session conflicts.
 
+### 3c. Deploy on Cloudflare Workers (#1092 / migrating from Railway)
+
+The HTTP transport can also be deployed as a Cloudflare Worker (the migration target per issue [#1088](https://github.com/otomatty/zedi/issues/1088); Railway remains transitional). Entry point is `src/worker.ts`; the source of truth for configuration is `wrangler.jsonc` (`env.dev` = `zedi-mcp-dev` / `env.production` = `zedi-mcp`).
+
+```bash
+cd server/mcp
+bun install
+bun run worker:dev                 # local (wrangler dev --env dev)
+bun run worker:deploy:dev          # deploy to dev
+bun run worker:deploy:production   # deploy to production
+```
+
+- `ZEDI_API_URL` comes from `wrangler.jsonc` `vars` (production) or a deploy-time `--var` (dev CI injects it from the `API_BASE_URL` GitHub Environment variable).
+- CI: pushes to `develop` touching `server/mcp/**` run `.github/workflows/deploy-mcp-worker-dev.yml`, which executes `wrangler deploy --env dev` and probes `/health`. `/health` reports `git_commit_sha` for deploy verification.
+- JWT verification and the revocation deny-list live in the API (`server/api`, moved to KV/Durable Objects in #1093), so this Worker needs no `BETTER_AUTH_SECRET` and no Redis/KV binding — it forwards the bearer token to the API as-is.
+- The transport is stateless Streamable HTTP (each request gets a response; no long-lived SSE stream), so it does not conflict with Workers execution-time limits. Once the API cuts over to Workers (#1091), consider Service Bindings for the internal hop.
+- Client configuration is the same as 3b — point `url` at the Worker domain (`https://zedi-mcp.<account>.workers.dev/mcp` or a custom domain).
+
 ---
 
 ## 4. Available tools

@@ -1,82 +1,26 @@
 #!/usr/bin/env node
 /**
- * Zedi MCP — HTTP / Streamable HTTP エントリーポイント
+ * Zedi MCP — HTTP / Streamable HTTP エントリーポイント (Node)
  *
  * Hono + `WebStandardStreamableHTTPServerTransport` を使い、外部 Claude Code クライアントから
- * リモート接続を受け付ける。Railway などの単独サービスとしてデプロイする想定。
+ * リモート接続を受け付ける。Railway などの単独 Node サービスとしてデプロイする想定。
+ * アプリ本体 (ルーティング / Bearer 認証 / MCP 配線) は `app.ts` に切り出しており、
+ * Cloudflare Workers エントリ (`worker.ts`) と共有する (#1092)。
  *
  * 環境変数:
  *   ZEDI_API_URL    バックエンド REST API の URL (例: http://api.railway.internal:3000)
  *   PORT            待ち受けポート (default: 3100)
  *   MCP_HOST        待ち受けホスト (default: 0.0.0.0)
  *
- * リクエストはセッションごとに以下の流れで処理する:
- *   1. クライアントが `Authorization: Bearer <MCP JWT>` ヘッダ付きでアクセス
- *   2. ヘッダから JWT を取り出し、新しい `HttpZediClient` を生成
- *   3. リクエストごとに新しい `McpServer` を建て、トランスポートを通して応答する
- *      (ステートレスモード — sessionIdGenerator: undefined)
- *
- * HTTP entry point for the Zedi MCP server using Streamable HTTP transport.
- * Each request gets its own per-token client + server instance (stateless).
+ * Node HTTP entry point for the Zedi MCP server. The Hono app itself lives in
+ * `app.ts`, shared with the Cloudflare Workers entry (`worker.ts`).
  */
 import { serve } from "@hono/node-server";
-import { Hono } from "hono";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { createMcpServer } from "./server.js";
-import { HttpZediClient } from "./client/httpClient.js";
+import { createHttpApp, DEFAULT_API_URL } from "./app.js";
 
-const DEFAULT_API_URL = "https://api.zedi.app";
-
-function extractBearer(authHeader: string | undefined): string | null {
-  if (!authHeader?.startsWith("Bearer ")) return null;
-  const token = authHeader.slice(7).trim();
-  return token || null;
-}
-
-/**
- * リクエストごとに `HttpZediClient` と `McpServer` を生成し、トランスポートで応答する。
- * Per-request handler: builds an isolated MCP server bound to the caller's bearer token.
- */
-async function handleMcpRequest(rawRequest: Request, apiUrl: string): Promise<Response> {
-  const token = extractBearer(rawRequest.headers.get("Authorization") ?? undefined);
-  if (!token) {
-    return new Response(
-      JSON.stringify({ error: "unauthorized", message: "Bearer token required" }),
-      { status: 401, headers: { "Content-Type": "application/json" } },
-    );
-  }
-
-  const client = new HttpZediClient({ baseUrl: apiUrl, token });
-  const server = createMcpServer(client);
-  // Stateless mode: each HTTP exchange creates its own ephemeral session.
-  // セッションは持たず、リクエストごとに新規生成する。
-  const transport = new WebStandardStreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-  });
-  await server.connect(transport);
-
-  try {
-    return await transport.handleRequest(rawRequest);
-  } finally {
-    // Best-effort cleanup; the per-request server isn't reused.
-    // 使い捨てサーバーは後始末のみする。
-    await server.close().catch(() => {});
-  }
-}
-
-/**
- * Hono アプリを生成する。テストから呼べるよう関数として export する。
- * Builds the Hono app; exported for testing.
- */
-export function createHttpApp(apiUrl: string): Hono {
-  const app = new Hono();
-
-  app.get("/health", (c) => c.json({ ok: true, server: "zedi-mcp", apiUrl }));
-
-  app.all("/mcp", async (c) => handleMcpRequest(c.req.raw, apiUrl));
-
-  return app;
-}
+// 後方互換のため再エクスポートする (既存テスト / 利用側は `http.js` から import している)。
+// Re-exported for backward compatibility with existing imports.
+export { createHttpApp } from "./app.js";
 
 async function main() {
   const apiUrl = process.env.ZEDI_API_URL ?? DEFAULT_API_URL;

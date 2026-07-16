@@ -76,6 +76,35 @@ describe("createHttpApp", () => {
     expect(body.apiUrl).toBe(API_URL);
   });
 
+  it("GET /health returns git_commit_sha null when no commit env is set", async () => {
+    vi.stubEnv("GIT_COMMIT_SHA", "");
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", "");
+    const app = createHttpApp(API_URL);
+    const res = await app.request("/health");
+    const body = (await res.json()) as { git_commit_sha: string | null };
+    expect(body.git_commit_sha).toBeNull();
+    vi.unstubAllEnvs();
+  });
+
+  it("GET /health returns git_commit_sha from GIT_COMMIT_SHA (Workers CI var)", async () => {
+    vi.stubEnv("GIT_COMMIT_SHA", "abc123def456");
+    const app = createHttpApp(API_URL);
+    const res = await app.request("/health");
+    const body = (await res.json()) as { git_commit_sha: string | null };
+    expect(body.git_commit_sha).toBe("abc123def456");
+    vi.unstubAllEnvs();
+  });
+
+  it("GET /health falls back to RAILWAY_GIT_COMMIT_SHA", async () => {
+    vi.stubEnv("GIT_COMMIT_SHA", "");
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", "railway-sha-789");
+    const app = createHttpApp(API_URL);
+    const res = await app.request("/health");
+    const body = (await res.json()) as { git_commit_sha: string | null };
+    expect(body.git_commit_sha).toBe("railway-sha-789");
+    vi.unstubAllEnvs();
+  });
+
   it("POST /mcp without Authorization returns 401", async () => {
     const res = await mcpPost();
     expect(res.status).toBe(401);
