@@ -2,6 +2,12 @@
 CHANGELOG.md
 src-tauri/tauri.conf.json
 
+# AI-DLC vendored harness (aidlc-workflows v2) — keep upstream formatting
+.codex/
+aidlc/
+.agents/skills/aidlc/
+.agents/skills/aidlc-*/
+
 .claude/
 dist/
 dist-ssr/
