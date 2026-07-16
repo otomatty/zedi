@@ -133,7 +133,6 @@ export const NotePagePublicView: React.FC<NotePagePublicViewProps> = ({ pageId, 
       currentPageId={page.id}
       pageId={page.id}
       isNewPage={false}
-      isWikiGenerating={false}
       isReadOnly
       linkedPagesMode="api"
       showToolbar={false}

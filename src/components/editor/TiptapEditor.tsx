@@ -47,11 +47,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   pageActionHubRef,
   initialContent,
   onInitialContentApplied,
-  isWikiGenerating = false,
-  wikiContentForCollab,
-  onWikiContentApplied,
   pageNoteId = null,
-  wikiComposeHref,
   bottomBarTrailingAction,
 }) => {
   const { t } = useTranslation();
@@ -117,11 +113,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     pageActionHubRef,
     initialContent,
     onInitialContentApplied,
-    isWikiGenerating,
-    wikiContentForCollab,
-    onWikiContentApplied,
     pageNoteId,
-    wikiComposeHref,
   });
 
   // 入力バーへフォーカスを移すための imperative ハンドル（issue #928 §Cmd+K）。

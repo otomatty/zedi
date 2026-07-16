@@ -66,11 +66,6 @@ export interface TiptapEditorProps {
   initialContent?: string;
   /** initialContent をエディタに反映したあとに呼ぶ */
   onInitialContentApplied?: () => void;
-  /** Wiki生成中（この間はリンク判定をスキップしてちらつきを防ぐ） */
-  isWikiGenerating?: boolean;
-  /** コラボモード時、Wiki生成内容を Y.Doc に反映する用。反映後に onWikiContentApplied を呼ぶ */
-  wikiContentForCollab?: string | null;
-  onWikiContentApplied?: () => void;
   /**
    * 編集中ページが所属するノート ID。`null` は個人ページ、文字列値はノート
    * ネイティブページ。WikiLink のサジェスト・解決候補をノート／個人スコープに
@@ -82,11 +77,6 @@ export interface TiptapEditorProps {
    * Phase 4.
    */
   pageNoteId?: string | null;
-  /**
-   * Wiki Compose 画面 URL。PageActionHub の `wiki.compose` と同経路 (#950)。
-   * Route to the Wiki Compose UI; used by PageActionHub `wiki.compose`.
-   */
-  wikiComposeHref?: string;
   /**
    * 画面下部の Wiki Link 入力バー右隣に並べるアクション（例: PageActionHub FAB）。
    * Trailing control rendered beside the floating Wiki Link input bar.

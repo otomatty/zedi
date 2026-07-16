@@ -33,7 +33,6 @@ import SearchResults from "./pages/SearchResults";
 import NotFound from "./pages/NotFound";
 import NoteView from "./pages/NoteView";
 import NotePageView from "./pages/NotePageView";
-import WikiComposePage from "./pages/WikiComposePage";
 import NoteSettings from "./pages/NoteSettings";
 import GeneralSection from "./pages/NoteSettings/sections/GeneralSection";
 import VisibilitySection from "./pages/NoteSettings/sections/VisibilitySection";
@@ -186,23 +185,6 @@ const App = () => (
                         </ProtectedRoute>
                       }
                     />
-                    {/* Wiki Compose split-screen UI (issue #950).
-                        Rendered chrome-less (outside `AppShellRoute`) so the
-                        focused authoring view owns the whole viewport — no
-                        global Header or mobile BottomNav — which keeps the
-                        split panes from being clipped on small screens.
-                        Optional `:sessionId` keeps one route element so URL
-                        persistence does not remount and abort the first SSE run.
-
-                        Wiki Compose は集中作業用の全画面ビュー。グローバル
-                        Header / モバイル BottomNav を出さないよう
-                        `AppShellRoute` の外に置き、狭い画面で分割ペインが
-                        見切れないようにする。 */}
-                    <Route
-                      path="/notes/:noteId/:pageId/compose/:sessionId?"
-                      element={<WikiComposePage />}
-                    />
-
                     {/* App shell routes: wrapped with the shared AppLayout
                         so every page gets the common Header + primary nav + user menu + AI dock.
                         共通 AppLayout（ヘッダー + 機能ナビ + ユーザーメニュー + AI ドック）でラップ。 */}

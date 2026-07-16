@@ -195,7 +195,6 @@ export function AIChatPanelContent({
         onClose={promote.close}
         conversationText={promote.conversationText}
         existingTitles={existingTitles}
-        conversationId={activeConversationId ?? undefined}
       />
     </div>
   );
