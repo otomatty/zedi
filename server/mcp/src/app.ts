@@ -35,7 +35,7 @@ export interface McpWorkerEnv {
   ZEDI_API_URL?: string;
   /** デプロイ検証用のコミット SHA (CI が `--var` で注入) / Commit SHA injected by CI. */
   GIT_COMMIT_SHA?: string;
-  /** development / production */
+  /** 実行環境の識別子 (development / production) / Runtime environment identifier. */
   ENVIRONMENT?: string;
 }
 

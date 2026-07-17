@@ -11,6 +11,13 @@ on:
 permissions:
   contents: read
 
+# デプロイを直列化する。古い push のデプロイが新しい push を追い越さないよう、
+# 実行中ランはキャンセルせず待機させる。
+# Serialize deploys so an older push can't finish after (and clobber) a newer one.
+concurrency:
+  group: deploy-mcp-worker-dev
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -21,9 +28,9 @@ jobs:
     environment: development
     steps:
       - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@v3
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v7.0.0
+          action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
           attempt_limit: 3
           attempt_delay: 5000
       - uses: ./.github/actions/setup-toolchain
@@ -53,7 +60,10 @@ jobs:
             --var GIT_COMMIT_SHA:${{ github.sha }}
             --var ENVIRONMENT:development
             ${{ vars.API_BASE_URL != '' && format('--var ZEDI_API_URL:{0}', vars.API_BASE_URL) || '' }}
-      - name: Wait for Worker /health
+      # WORKER_MCP_BASE_URL 未設定時は skip する（deploy-api-worker-dev と同じ
+      # ブートストラップ挙動。URL 確定後に GitHub Environment 変数を設定する）。
+      # Skipped until WORKER_MCP_BASE_URL is configured, mirroring the API workflow.
+      - name: Verify Worker /health (SHA gate)
         if: ${{ vars.WORKER_MCP_BASE_URL != '' }}
         uses: nick-fields/retry@v4
         with:
@@ -61,4 +71,7 @@ jobs:
           timeout_minutes: 3
           retry_wait_seconds: 20
           command: |
-            curl --fail --show-error --silent "${{ vars.WORKER_MCP_BASE_URL }}/health"
+            body="$(curl --fail --show-error --silent "${{ vars.WORKER_MCP_BASE_URL }}/health")"
+            echo "$body"
+            echo "$body" | jq --exit-status --arg sha "${{ github.sha }}" \
+              '.ok == true and .server == "zedi-mcp" and .git_commit_sha == $sha' > /dev/null

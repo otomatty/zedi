@@ -200,8 +200,8 @@ bun run worker:deploy:production   # deploy to production
 - `ZEDI_API_URL` comes from `wrangler.jsonc` `vars` (production) or a deploy-time `--var` (dev CI injects it from the `API_BASE_URL` GitHub Environment variable).
 - CI: pushes to `develop` touching `server/mcp/**` run `.github/workflows/deploy-mcp-worker-dev.yml`, which executes `wrangler deploy --env dev` and probes `/health`. `/health` reports `git_commit_sha` for deploy verification.
 - JWT verification and the revocation deny-list live in the API (`server/api`, moved to KV/Durable Objects in #1093), so this Worker needs no `BETTER_AUTH_SECRET` and no Redis/KV binding — it forwards the bearer token to the API as-is.
-- The transport is stateless Streamable HTTP (each request gets a response; no long-lived SSE stream), so it does not conflict with Workers execution-time limits. Once the API cuts over to Workers (#1091), consider Service Bindings for the internal hop.
-- Client configuration is the same as 3b — point `url` at the Worker domain (`https://zedi-mcp.<account>.workers.dev/mcp` or a custom domain).
+- The transport is stateless Streamable HTTP (each request gets a response; no long-lived SSE stream), so it avoids long-lived-connection issues — though each request still runs under the usual per-request Worker limits (CPU time, memory, subrequests). Once the API cuts over to Workers (#1091), consider Service Bindings for the internal hop.
+- Client configuration is the same as 3b — point `url` at the Worker domain (`https://<worker-name>.<account-subdomain>.workers.dev/mcp`, e.g. `https://zedi-mcp.<account-subdomain>.workers.dev/mcp`, or a custom domain).
 
 ---
 

@@ -200,8 +200,8 @@ bun run worker:deploy:production   # 本番デプロイ
 - `ZEDI_API_URL` は `wrangler.jsonc` の `vars`（production）またはデプロイ時の `--var`（dev は CI が GitHub Environment 変数 `API_BASE_URL` から注入）で設定する。
 - CI: `develop` への push（`server/mcp/**` 変更時）で `.github/workflows/deploy-mcp-worker-dev.yml` が `wrangler deploy --env dev` を実行し、`/health` の疎通を確認する。`/health` はデプロイ検証用に `git_commit_sha` を返す。
 - JWT の検証・失効（deny-list）は API 側（`server/api`、#1093 で KV/Durable Objects 化）の責務のため、この Worker に `BETTER_AUTH_SECRET` や Redis/KV は不要。Bearer トークンをそのまま API へ転送する。
-- ステートレスな Streamable HTTP（リクエスト毎に応答を返し、常駐 SSE ストリームを持たない）なので、Workers の実行時間制約と競合しない。API の Workers 本番切替（#1091）後は Service Bindings 化を検討。
-- クライアント設定は 3b と同じ。`url` を Worker のドメイン（`https://zedi-mcp.<account>.workers.dev/mcp` またはカスタムドメイン）に差し替える。
+- ステートレスな Streamable HTTP（リクエスト毎に応答を返し、常駐 SSE ストリームを持たない）なので長時間接続の問題は回避できる。ただしリクエスト単位の Workers 制限（CPU 時間・メモリ・サブリクエスト数）は通常どおり適用される。API の Workers 本番切替（#1091）後は Service Bindings 化を検討。
+- クライアント設定は 3b と同じ。`url` を Worker のドメイン（`https://<worker-name>.<account-subdomain>.workers.dev/mcp`、例: `https://zedi-mcp.<account-subdomain>.workers.dev/mcp`、またはカスタムドメイン）に差し替える。
 
 ---
 

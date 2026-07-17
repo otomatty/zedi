@@ -6,7 +6,7 @@
  *
  * Tests for the HTTP transport entry point — health, auth, and per-request MCP wiring.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockConnect = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const mockClose = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
@@ -66,6 +66,12 @@ describe("createHttpApp", () => {
     });
   });
 
+  afterEach(() => {
+    // stubEnv した環境変数がテスト失敗時にも他のテストへ漏れないようにする。
+    // Ensure stubbed env vars never leak into later tests, even on failure.
+    vi.unstubAllEnvs();
+  });
+
   it("GET /health returns ok", async () => {
     const app = createHttpApp(API_URL);
     const res = await app.request("/health");
@@ -83,7 +89,6 @@ describe("createHttpApp", () => {
     const res = await app.request("/health");
     const body = (await res.json()) as { git_commit_sha: string | null };
     expect(body.git_commit_sha).toBeNull();
-    vi.unstubAllEnvs();
   });
 
   it("GET /health returns git_commit_sha from GIT_COMMIT_SHA (Workers CI var)", async () => {
@@ -92,7 +97,6 @@ describe("createHttpApp", () => {
     const res = await app.request("/health");
     const body = (await res.json()) as { git_commit_sha: string | null };
     expect(body.git_commit_sha).toBe("abc123def456");
-    vi.unstubAllEnvs();
   });
 
   it("GET /health falls back to RAILWAY_GIT_COMMIT_SHA", async () => {
@@ -102,7 +106,6 @@ describe("createHttpApp", () => {
     const res = await app.request("/health");
     const body = (await res.json()) as { git_commit_sha: string | null };
     expect(body.git_commit_sha).toBe("railway-sha-789");
-    vi.unstubAllEnvs();
   });
 
   it("POST /mcp without Authorization returns 401", async () => {
