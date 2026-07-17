@@ -45,6 +45,10 @@ interface RequestContextInfo {
   gitCommitSha: string | null;
 }
 
+/**
+ * `Authorization` ヘッダから Bearer トークンを取り出す。形式不正・空は null。
+ * Extracts the bearer token from an Authorization header; null when malformed or empty.
+ */
 function extractBearer(authHeader: string | undefined): string | null {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.slice(7).trim();
