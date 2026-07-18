@@ -1,7 +1,8 @@
 /**
- * Bulk-upload secrets from `.env.worker.<env>` via `wrangler secret put`.
+ * Bulk-upload secrets from `.env.worker.<env>` via `wrangler secret bulk` (single deployment).
+ * `.env.worker.<env>` から `wrangler secret bulk` で secrets を一括投入する（1 回のデプロイ）。
  *
- * Usage:
+ * Usage / 使い方:
  *   bun run worker:secrets:put -- --env dev
  *   bun run worker:secrets:put -- --env production
  *   bun run worker:secrets:put -- --env dev --dry-run
@@ -10,7 +11,7 @@ import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseWorkerEnvFile } from "./parseWorkerEnvFile.js";
+import { parseWorkerEnvFile, serializeWorkerEnvFile } from "./parseWorkerEnvFile.js";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const API_ROOT = resolve(SCRIPT_DIR, "..");
@@ -58,19 +59,19 @@ function parseArgs(argv: string[]): {
   return { env, file, dryRun };
 }
 
-function putSecret(name: string, value: string, env: WranglerEnv): Promise<void> {
+/** Upload all secrets in one `wrangler secret bulk` request (single Worker version). */
+function putSecretsBulk(body: string, env: WranglerEnv): Promise<void> {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn("bunx", ["wrangler", "secret", "put", name, "--env", env], {
+    const child = spawn("bunx", ["wrangler", "secret", "bulk", "--env", env], {
       cwd: API_ROOT,
       stdio: ["pipe", "inherit", "inherit"],
-      shell: true,
     });
-    child.stdin.write(value);
+    child.stdin.write(body);
     child.stdin.end();
     child.on("error", reject);
     child.on("close", (code) => {
       if (code === 0) resolvePromise();
-      else reject(new Error(`wrangler secret put ${name} failed (exit ${code})`));
+      else reject(new Error(`wrangler secret bulk failed (exit ${code})`));
     });
   });
 }
@@ -89,15 +90,16 @@ async function main(): Promise<void> {
   console.log(
     `${dryRun ? "[dry-run] " : ""}Putting ${entries.length} secret(s) from ${envPath} → --env ${env}`,
   );
-  for (const { name, value } of entries) {
-    if (dryRun) {
+  if (dryRun) {
+    for (const { name, value } of entries) {
       console.log(`  ${name} (${value.length} chars)`);
-      continue;
     }
-    console.log(`  ${name}...`);
-    await putSecret(name, value, env);
+    console.log("Dry run complete.");
+    return;
   }
-  console.log(dryRun ? "Dry run complete." : "Done.");
+
+  await putSecretsBulk(serializeWorkerEnvFile(entries), env);
+  console.log("Done.");
 }
 
 main().catch((err: unknown) => {
