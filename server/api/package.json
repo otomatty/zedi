@@ -19,7 +19,8 @@
     "worker:dev": "wrangler dev --env dev",
     "worker:deploy:dev": "wrangler deploy --env dev",
     "worker:deploy:production": "wrangler deploy --env production",
-    "worker:types": "wrangler types"
+    "worker:types": "wrangler types",
+    "worker:secrets:put": "tsx scripts/putWorkerSecrets.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1002.0",

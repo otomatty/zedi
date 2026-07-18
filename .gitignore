@@ -23,6 +23,11 @@ public/pdfjs/
 .env.production
 .env
 server/.dev.vars
+# Worker secret bulk-upload sources (examples are committed)
+server/api/.env.worker.dev
+server/api/.env.worker.production
+server/mcp/.env.worker.dev
+server/mcp/.env.worker.production
 
 # Server build artifacts
 server/api/dist/
@@ -80,6 +85,7 @@ src-tauri/binaries/claude-sidecar*
 
 # Local-only notes (not tracked). See AGENTS.md.
 /docs/
+/journal/
 
 # AI-DLC — per-user cursors and machine-local runtime (aidlc-workflows v2)
 # Rule: commit shared work (method, state, audit shards, artifacts); ignore cursors/runtime.
