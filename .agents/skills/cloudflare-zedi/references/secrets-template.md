@@ -202,11 +202,14 @@ bunx wrangler secret put BETTER_AUTH_SECRET --env dev
 ## コピー手順（Railway → Worker）/ Copy checklist
 
 1. Railway dashboard → api サービス → Variables をエクスポート（または 1 件ずつ）。
-2. `server/api` で `bunx wrangler secret list --env dev` と突合。
-3. マスター一覧の「必須」をすべて `wrangler secret put`。
-4. `/health` で `runtime: cloudflare-workers` と `git_commit_sha` を確認。
-5. auth / media upload / webhook のスモークテスト。
-6. production は dev 成功後に `--env production` で同手順。
+2. `server/api/.env.worker.dev.example` を `.env.worker.dev` にコピーし値を埋める（gitignored）。
+   production は `.env.worker.production`。
+3. 一括投入: `cd server/api && bun run worker:secrets:put -- --env dev`
+   （確認のみ: `--dry-run`。個別 `wrangler secret put` でも可。）
+4. `bunx wrangler secret list --env dev` とマスター一覧を突合。
+5. `/health` で `runtime: cloudflare-workers` と `git_commit_sha` を確認。
+6. auth / media upload / webhook のスモークテスト。
+7. production は dev 成功後に `.env.worker.production` → `--env production`。
 
 ---
 
