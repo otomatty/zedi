@@ -1,9 +1,14 @@
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
-import { initSentry } from "./lib/sentry.js";
+import { registerAgentRoutes } from "./appAgents.js";
+import { captureApiException, initSentry } from "./lib/sentry.js";
+import { installNodeSocketIpResolver } from "./lib/clientIpNode.js";
+import { installNodeKvStoreFactory } from "./lib/kv/createKvStoreNode.js";
 
 initSentry();
-const app = createApp();
+installNodeSocketIpResolver();
+installNodeKvStoreFactory();
+const app = createApp({ registerAgentRoutes, captureApiException });
 const port = parseInt(process.env.PORT || "3000", 10);
 
 serve({ fetch: app.fetch, port }, (info) => {

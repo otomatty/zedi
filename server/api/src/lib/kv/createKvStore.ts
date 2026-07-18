@@ -1,31 +1,34 @@
 /**
- * createKvStore — ランタイムに応じた KvStore の生成 (#1093)
+ * createKvStore — ランタイムに応じた KvStore の生成 (#1093 / #1091)
  *
- * Workers では `KV_DO` binding（Durable Object）、Node/Railway では `REDIS_URL`
- * から生成する。どちらも無い場合は null（レート制限等は graceful degradation）。
+ * Workers では `KV_DO` binding（Durable Object）、Node/Railway では
+ * `createKvStoreNode.ts` が注入する Redis ファクトリから生成する。どちらも
+ * 無い場合は null（レート制限等は graceful degradation）。
+ *
+ * Node アダプタ（ioredis）はこのモジュールから静的 import しない — Worker
+ * バンドル・workerd 実行から ioredis を物理的に除外するためのモジュール境界
+ * （#1091 FR-5。`worker:bundle:check` が不在を検査する）。
  *
  * Creates a KvStore for the current runtime: the `KV_DO` Durable Object
- * binding on Workers, an ioredis client from `REDIS_URL` on Node/Railway,
- * or null when neither is configured (callers degrade gracefully).
+ * binding on Workers, or the injected Node factory (ioredis-backed, wired by
+ * `createKvStoreNode.ts` from the Node entry only). ioredis is never imported
+ * statically here so it stays out of the Worker bundle.
  */
-import { Redis } from "ioredis";
 import type { CloudflareBindings } from "../../types/cloudflare.js";
 import { DurableObjectKvStore } from "./doKvStore.js";
-import { RedisKvStore } from "./redisKvStore.js";
 import type { KvStore } from "./types.js";
 
-let _redis: Redis | null = null;
+/** Node エントリが注入する KvStore ファクトリ（未注入 = Workers or 未設定）。 */
+export type NodeKvStoreFactory = () => KvStore | null;
 
-function getRedis(): Redis | null {
-  if (_redis) return _redis;
-  const url = process.env.REDIS_URL;
-  if (!url) return null;
-  _redis = new Redis(url, { maxRetriesPerRequest: 3, lazyConnect: true });
-  _redis.connect().catch((err) => {
-    console.error("[Redis] Connection failed:", err);
-    _redis = null;
-  });
-  return _redis;
+let nodeKvStoreFactory: NodeKvStoreFactory | null = null;
+
+/**
+ * Node 側 KvStore ファクトリを注入する（null でリセット）。
+ * Inject the Node-only KvStore factory (pass null to reset).
+ */
+export function setNodeKvStoreFactory(factory: NodeKvStoreFactory | null): void {
+  nodeKvStoreFactory = factory;
 }
 
 /**
@@ -36,6 +39,5 @@ export function createKvStore(bindings?: Partial<CloudflareBindings>): KvStore |
   if (bindings?.KV_DO) {
     return new DurableObjectKvStore(bindings.KV_DO);
   }
-  const redis = getRedis();
-  return redis ? new RedisKvStore(redis) : null;
+  return nodeKvStoreFactory?.() ?? null;
 }

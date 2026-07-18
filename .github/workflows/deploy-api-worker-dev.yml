@@ -34,6 +34,13 @@ jobs:
       - name: Install dependencies
         working-directory: server/api
         run: bun install --frozen-lockfile
+      # ci.yml とは並列起動のため、デプロイ前実行を機械的に保証するのはこのステップ
+      # (#1091 LC-5)。dry-run のため Cloudflare 資格情報は不要。
+      # Runs the credential-free bundle guard right before deploy — ci.yml runs
+      # in parallel on the same push, so this step is the ordering guarantee.
+      - name: Worker bundle check
+        working-directory: server/api
+        run: bun run worker:bundle:check
       - name: Deploy to Cloudflare Workers (dev)
         uses: nick-fields/retry@v4
         env:

@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getAllowedOrigins, isWildcardCors } from "./lib/cors.js";
-import { errorHandler } from "./middleware/errorHandler.js";
+import { createErrorHandler } from "./middleware/errorHandler.js";
+import type { ApiExceptionCapture } from "./lib/sentryShared.js";
 import { csrfOriginCheck } from "./middleware/csrfOrigin.js";
 import { dbMiddleware } from "./middleware/db.js";
 import { kvMiddleware } from "./middleware/kv.js";
@@ -18,7 +19,6 @@ import noteRoutes from "./routes/notes/index.js";
 import searchRoutes from "./routes/search.js";
 import mediaRoutes from "./routes/media.js";
 import clipRoutes from "./routes/clip.js";
-import ingestRoutes from "./routes/ingest.js";
 import pdfSourcesRoutes from "./routes/pdfSources.js";
 import wikiSchemaRoutes from "./routes/wikiSchema.js";
 import extRoutes from "./routes/ext.js";
@@ -44,34 +44,32 @@ import lintRoutes from "./routes/lint.js";
 import activityRoutes from "./routes/activity.js";
 import onboardingRoutes from "./routes/onboarding.js";
 import internalRoutes from "./routes/internal.js";
-import composeSessionRoutes from "./routes/composeSessions.js";
 import userAiCredentialRoutes from "./routes/userAiCredentials.js";
-import { registerStubGraph } from "./agents/registry/stubGraph.js";
-import { registerResearchLoopGraph } from "./agents/subgraphs/research/index.js";
-import { registerWikiComposeGraph } from "./agents/graphs/wikiCompose/index.js";
-import { registerIngestPlannerGraph } from "./agents/graphs/ingest/index.js";
-import { registerWikiMaintenanceGraph } from "./agents/graphs/wikiMaintenance/index.js";
+
+/**
+ * createApp のオプション。
+ * Options for {@link createApp}.
+ */
+export interface CreateAppOptions {
+  /**
+   * LangGraph 依存ルート（compose-sessions / ingest）と graph 登録を行うフック。
+   * Node エントリ（index.ts）だけが appAgents.ts の実装を渡す。Worker エントリは
+   * 渡さないことで `@langchain/*` をバンドルから物理的に除外する（#1091 FR-1）。
+   */
+  registerAgentRoutes?: (app: Hono<AppEnv>) => void;
+
+  /**
+   * errorHandler に注入する Sentry capture 関数。index.ts は @sentry/node、
+   * worker.ts は @sentry/cloudflare の実装を渡す。未指定なら no-op。
+   */
+  captureApiException?: ApiExceptionCapture;
+}
 
 /**
  * Creates and configures the Hono API app (routes, CORS, etc.).
  * Hono APIアプリを作成・設定する（ルート・CORS等）。
  */
-export function createApp(): Hono<AppEnv> {
-  // Wiki Compose graphs を registry に登録する。いずれも idempotent。
-  // - `wiki-compose-stub` — P0 smoke test (#948)
-  // - `wiki-compose-research` — P1 自律調査ループ (#949)
-  // - `wiki-compose` — P2 全体オーケストレータ (#950)
-  // - `ingest-planner` — P4 ingest + shared research loop (#952)
-  // - `wiki-maintenance` — P5 broken links + stub scan (#953)
-  //
-  // Register all Wiki Compose graphs. Calls are idempotent across hot
-  // reloads (registry uses `Map#set` so the latest registration wins).
-  registerStubGraph();
-  registerResearchLoopGraph();
-  registerWikiComposeGraph();
-  registerIngestPlannerGraph();
-  registerWikiMaintenanceGraph();
-
+export function createApp(options: CreateAppOptions = {}): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   const wildcard = isWildcardCors();
   const allowedOrigins = getAllowedOrigins();
@@ -94,7 +92,7 @@ export function createApp(): Hono<AppEnv> {
   app.use("*", dbMiddleware);
   app.use("*", kvMiddleware);
   app.use("*", storageMiddleware);
-  app.onError(errorHandler);
+  app.onError(createErrorHandler({ captureApiException: options.captureApiException }));
 
   // Better Auth の magicLink プラグインは `POST /api/auth/sign-in/magic-link` を
   // 自動で登録するが、これを公開すると招待トークン検証やレート制限を経由せずに
@@ -163,10 +161,6 @@ export function createApp(): Hono<AppEnv> {
   // Page Snapshots (version history)
   app.route("/api/pages", pageSnapshotRoutes);
 
-  // Wiki Compose sessions (LangGraph runs) — issue #948.
-  // `/api/pages/:pageId/compose-sessions[/:id[/run|/resume]]`
-  app.route("/api/pages", composeSessionRoutes);
-
   // Sync
   app.route("/api/sync/pages", syncPageRoutes);
 
@@ -187,9 +181,6 @@ export function createApp(): Hono<AppEnv> {
 
   // Clip
   app.route("/api/clip", clipRoutes);
-
-  // Ingest (LLM Wiki pattern, P1)
-  app.route("/api/ingest", ingestRoutes);
 
   // Local PDF sources + highlights (issue otomatty/zedi#389).
   // PDF binaries never reach the server — only hashes / page counts / highlights.
@@ -229,6 +220,10 @@ export function createApp(): Hono<AppEnv> {
   app.route("/api/thumbnail/image-generate", thumbGenerateRoutes);
   app.route("/api/thumbnail/commit", thumbCommitRoutes);
   app.route("/api/thumbnail/serve", thumbServeRoutes);
+
+  // LangGraph 依存ルート（compose-sessions / ingest）はフック経由でのみ登録される。
+  // パスが他ルートと競合しないため、404 フォールバック直前の一括登録で足りる。
+  options.registerAgentRoutes?.(app);
 
   // 404 fallback（要求パスを返してデバッグしやすくする）
   app.all("*", (c) => c.json({ error: "Not found", path: c.req.path, method: c.req.method }, 404));
