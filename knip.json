@@ -106,7 +106,8 @@
     "@langchain/openai",
     "@langchain/anthropic",
     "@langchain/google-genai",
-    "@vitest/coverage-v8"
+    "@vitest/coverage-v8",
+    "cloudflare"
   ],
   "ignoreExportsUsedInFile": {
     "interface": true,
