@@ -224,6 +224,7 @@ bunx wrangler secret put BETTER_AUTH_SECRET --env dev
 
 ## 関連 / Related
 
+- [worker-secret-values.md](worker-secret-values.md) — 各値の**取得方法**（どこから取るか）
 - [migration-plan.md](migration-plan.md) — フェーズ定義
 - [token-scopes.md](token-scopes.md) — API トークンスコープ
 - `server/api/.env.example` — 鍵名とコメント
