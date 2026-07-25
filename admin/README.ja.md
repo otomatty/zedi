@@ -54,5 +54,5 @@ cd admin && npm install && npm run build
 
 ## 仕様
 
-- 挙動・契約は **ソースの TSDoc** とテストを正とする（[`SPECIFICATION_POLICY.md`](../SPECIFICATION_POLICY.md)）。
+- 挙動・契約は **ソースの TSDoc** とテストを正とする（[`AGENTS.md`](../AGENTS.md)）。
 - [Issue #141 — AIモデル管理](https://github.com/otomatty/zedi/issues/141)
