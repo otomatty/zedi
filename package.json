@@ -94,7 +94,7 @@
     "dompurify": ">=3.4.9"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.110.0",
+    "@anthropic-ai/sdk": "^0.112.3",
     "@dagrejs/dagre": "^3.0.0",
     "@google/genai": "^2.0.1",
     "@google/generative-ai": "^0.24.1",
@@ -181,7 +181,7 @@
     "i18next-browser-languagedetector": "^8.2.1",
     "idb-keyval": "^6.2.2",
     "input-otp": "^1.4.2",
-    "katex": "^0.17.0",
+    "katex": "^0.18.1",
     "lowlight": "^3.3.0",
     "lucide-react": "^1.7.0",
     "mermaid": "^11.12.2",
