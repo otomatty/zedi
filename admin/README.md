@@ -54,5 +54,5 @@ After the first dev admin deploy, update Railway **api-dev** `CORS_ORIGIN` to in
 
 ## Specification
 
-- Behavior and contracts are defined in **source TSDoc** and tests ([`SPECIFICATION_POLICY.md`](../SPECIFICATION_POLICY.md)).
+- Behavior and contracts are defined in **source TSDoc** and tests ([`AGENTS.md`](../AGENTS.md)).
 - [Issue #141 — AI model management](https://github.com/otomatty/zedi/issues/141)

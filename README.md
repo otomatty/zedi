@@ -299,7 +299,7 @@ bun run test:mutation:dry
 bun run test:mutation
 ```
 
-Quality metrics, testing policy, and how to write specifications: [AGENTS.md](AGENTS.md) and [SPECIFICATION_POLICY.md](SPECIFICATION_POLICY.md).
+Quality metrics, testing policy (TDD / mutation), and how to write specifications: [AGENTS.md](AGENTS.md).
 
 ---
 

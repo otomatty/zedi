@@ -302,7 +302,7 @@ bun run test:mutation:dry
 bun run test:mutation
 ```
 
-品質指標・テスト方針・仕様の書き方は [AGENTS.md](AGENTS.md) と [SPECIFICATION_POLICY.md](SPECIFICATION_POLICY.md) を参照してください。
+品質指標・テスト方針（TDD / Mutation）・仕様の書き方は [AGENTS.md](AGENTS.md) を参照してください。
 
 ---
 
