@@ -28,8 +28,6 @@ export default defineConfig({
           // wrangler secrets）。ここではダミー値でランタイム適合のみ検証する。
           GOOGLE_CLIENT_ID: "workerd-test-google-id",
           GOOGLE_CLIENT_SECRET: "workerd-test-google-secret",
-          GITHUB_CLIENT_ID: "workerd-test-github-id",
-          GITHUB_CLIENT_SECRET: "workerd-test-github-secret",
           CORS_ORIGIN: "https://zedi-note.app",
           // DB へは到達しない（lazy 接続）。到達した場合はマスク済み 5xx を検証する。
           DATABASE_URL: "postgres://workerd-test:unused@127.0.0.1:5/unused",

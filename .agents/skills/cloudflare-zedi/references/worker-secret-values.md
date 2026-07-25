@@ -11,7 +11,7 @@
 
 ## まず deploy を通す最小構成 / Minimum to unblock deploy
 
-`wrangler deploy` の起動検証は必須 8 項目が **非空である**ことだけを見る（値の正しさは
+`wrangler deploy` の起動検証は必須 6 項目が **非空である**ことだけを見る（値の正しさは
 検証しない）。認証フロー・DB 到達の dev 検証は #1090（D1）後なので、**いま deploy を
 通すだけなら**次の割り切りが可能:
 
@@ -21,7 +21,6 @@
 | `BETTER_AUTH_URL`         | `https://zedi-api-dev.otomatty.workers.dev`（実 URL）            |
 | `CORS_ORIGIN`             | 実オリジン（CORS を正しく動かすなら本物、boot だけなら仮でも可） |
 | `GOOGLE_CLIENT_ID/SECRET` | OAuth を試すまでは仮文字列で可（例 `placeholder`）               |
-| `GITHUB_CLIENT_ID/SECRET` | 同上                                                             |
 | `DATABASE_URL`            | プレースホルダのまま（例ファイル既定）                           |
 
 OAuth プロバイダの実値は sign-in を実際に試すとき（#1090 後）に差し替える。
@@ -59,17 +58,11 @@ OAuth プロバイダの実値は sign-in を実際に試すとき（#1090 後�
 ### GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
 
 - OAuth sign-in を dev で試すときに必要。それまでは仮文字列で boot を通せる。
+  ソーシャルログインは **Google のみ**。
 - **新規作成/取得**: [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
   → APIs & Services → **Credentials** → **Create Credentials → OAuth client ID**
   （Web application）。または既存クライアントの ID / Secret を使う。
 - **Authorized redirect URIs** に `<BETTER_AUTH_URL>/api/auth/callback/google` を追加。
-
-### GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET
-
-- OAuth sign-in を dev で試すときに必要。それまでは仮文字列で boot を通せる。
-- **新規作成/取得**: GitHub → Settings → **Developer settings** → **OAuth Apps** →
-  **New OAuth App**（または既存アプリ）。Client secret は「Generate a new client secret」。
-- **Authorization callback URL** に `<BETTER_AUTH_URL>/api/auth/callback/github` を設定。
 
 ### DATABASE_URL
 
@@ -122,9 +115,9 @@ bun run worker:secrets:put -- --env dev             # 一括投入
 bunx wrangler secret list --env dev                 # Worker 側に載った secret 名の確認
 ```
 
-- ⚠️ `worker:secrets:put` は **空値をスキップ**する。必須 8 項目に値（プレースホルダ含む）が
+- ⚠️ `worker:secrets:put` は **空値をスキップ**する。必須 6 項目に値（プレースホルダ含む）が
   入っていないとアップロードされず、deploy が `... must be set` で失敗する。`--dry-run` で
-  8 項目が出ることを確認する。
+  6 項目が出ることを確認する。
 - ⚠️ **順序**: secrets 投入 → その後 `wrangler deploy`（deploy 時の起動検証で必須値を読む）。
 - 投入後、CI の `deploy-api-worker-dev.yml` を再実行するか develop への push で dev デプロイ。
 
