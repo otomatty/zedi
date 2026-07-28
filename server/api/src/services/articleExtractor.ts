@@ -9,7 +9,16 @@
  * Ingest プランナー（otomatty/zedi#595）が Page を保存せずに同じ抽出を行うために共有する。
  */
 import { Mutex } from "async-mutex";
-import { JSDOM } from "jsdom";
+// jsdom は Node 専用（workerd では実行不可）のため静的 import しない。
+// Worker のモジュールロードを通し、clip 実行時のみ評価する（呼ばれた場合の
+// 失敗は onError でマスク済み 5xx になる — #1091 RL-3）。
+// jsdom is Node-only; load it lazily so the Worker module graph still boots.
+type JsdomModule = typeof import("jsdom");
+let _jsdom: JsdomModule | null = null;
+async function loadJsdom(): Promise<JsdomModule> {
+  if (!_jsdom) _jsdom = await import("jsdom");
+  return _jsdom;
+}
 import { Readability } from "@mozilla/readability";
 import { generateJSON } from "@tiptap/html";
 import { getSchema } from "@tiptap/core";
@@ -275,6 +284,7 @@ export async function extractArticleFromUrl(input: ExtractArticleInput): Promise
     clearTimeout(timer);
   }
 
+  const { JSDOM } = await loadJsdom();
   const dom = new JSDOM(html, { url: finalUrl });
   const document = dom.window.document;
 

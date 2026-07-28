@@ -9,7 +9,6 @@
   "joining": "Joining...",
   "signInToAccept": "Sign in to accept this invitation",
   "signInWithGoogle": "Sign in with Google",
-  "signInWithGitHub": "Sign in with GitHub",
   "emailMismatch": "This account ({{userEmail}}) differs from the invited address ({{email}}).",
   "emailMismatchHelp": "You can accept the invitation in one of the following ways:",
   "sendMagicLinkCta": "Send a sign-in link to {{email}}",

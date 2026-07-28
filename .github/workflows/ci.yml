@@ -286,6 +286,13 @@ jobs:
         working-directory: server/api
         run: bunx tsc --noEmit
 
+      # Worker バンドル検査 (#1091 FR-1.2): dry-run（資格情報不要）で
+      # LangGraph / @hono/node-server / @sentry/node / ioredis の不在を fail-fast。
+      # Credential-free Worker bundle guard (dry-run) — forbidden deps must be absent.
+      - name: Worker bundle check
+        working-directory: server/api
+        run: bun run worker:bundle:check
+
   api-test:
     name: API Tests
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
@@ -315,6 +322,12 @@ jobs:
       - name: Run tests
         working-directory: server/api
         run: bunx vitest run --coverage
+
+      # workerd 実行テスト (#1091 FR-5): Worker エントリを実ランタイムで検証。
+      # Worker-runtime tests on workerd via vitest-pool-workers.
+      - name: Run worker-runtime tests
+        working-directory: server/api
+        run: bun run test:worker
 
       - name: Upload API coverage report
         if: always()

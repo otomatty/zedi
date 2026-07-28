@@ -7,6 +7,11 @@
   "observability": {
     "enabled": true,
   },
+  // RUNTIME はランタイム判定の明示シグナル（#1091 SR-5 / clientIp.ts）。
+  // ENVIRONMENT は dev/prod の区別であり Railway 側にも存在するため流用しない。
+  "vars": {
+    "RUNTIME": "cloudflare-workers",
+  },
   "r2_buckets": [
     {
       "binding": "STORAGE_BUCKET",
@@ -48,6 +53,7 @@
       },
       "vars": {
         "ENVIRONMENT": "development",
+        "RUNTIME": "cloudflare-workers",
       },
     },
     "production": {
@@ -68,6 +74,7 @@
       },
       "vars": {
         "ENVIRONMENT": "production",
+        "RUNTIME": "cloudflare-workers",
       },
     },
   },

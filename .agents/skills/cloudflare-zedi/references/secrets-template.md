@@ -53,8 +53,7 @@ Never commit secret values; use `wrangler secret put` for Workers._
 | `BETTER_AUTH_SECRET`                        | セッション・署名                  | 同値（**必ず同一** — Hocuspocus / MCP と共有）  |
 | `BETTER_AUTH_URL`                           | OAuth コールバック base           | Worker URL に更新（DNS 切替 PR で）             |
 | `CORS_ORIGIN`                               | CSRF / trusted origins            | フロント URL（Phase 3 後に Workers ドメインへ） |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth                      | 同値                                            |
-| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth                      | 同値                                            |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth（唯一の social IdP） | 同値                                            |
 | `STORAGE_ENDPOINT`                          | R2 S3 互換 endpoint（presign 用） | 同値                                            |
 | `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY` | R2 API token（presign 用）        | 同値（binding とは別 — presign に必要）         |
 | `STORAGE_BUCKET_NAME`                       | バケット名                        | `zedi-storage-dev` / `zedi-storage-prod`        |
@@ -224,6 +223,7 @@ bunx wrangler secret put BETTER_AUTH_SECRET --env dev
 
 ## 関連 / Related
 
+- [worker-secret-values.md](worker-secret-values.md) — 各値の**取得方法**（どこから取るか）
 - [migration-plan.md](migration-plan.md) — フェーズ定義
 - [token-scopes.md](token-scopes.md) — API トークンスコープ
 - `server/api/.env.example` — 鍵名とコメント

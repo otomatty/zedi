@@ -148,38 +148,44 @@ describe("extractArticleFromUrl", () => {
     expect(mockFetchHtml).not.toHaveBeenCalled();
   });
 
-  it("通常記事を取得して Tiptap JSON・プレビュー・ハッシュを返す / fetches a normal article and returns Tiptap JSON, preview and hash", async () => {
-    mockFetchHtml.mockResolvedValue({
-      html: ARTICLE_HTML,
-      finalUrl: "https://blog.example.com/post",
-      contentType: "text/html",
-    });
+  // jsdom は遅延 import (#1091) のため、最初に踏むテストはモジュールロード分の
+  // 時間を要する。timeout を引き上げる（jsdom lazy-load pays its cost here）。
+  it(
+    "通常記事を取得して Tiptap JSON・プレビュー・ハッシュを返す / fetches a normal article and returns Tiptap JSON, preview and hash",
+    { timeout: 30_000 },
+    async () => {
+      mockFetchHtml.mockResolvedValue({
+        html: ARTICLE_HTML,
+        finalUrl: "https://blog.example.com/post",
+        contentType: "text/html",
+      });
 
-    const result = await extractArticleFromUrl({
-      url: "https://blog.example.com/post",
-      previewLength: 30,
-    });
+      const result = await extractArticleFromUrl({
+        url: "https://blog.example.com/post",
+        previewLength: 30,
+      });
 
-    expect(result.finalUrl).toBe("https://blog.example.com/post");
-    expect(result.title).toBe("Sample Article Title");
-    // og:image の相対 URL は finalUrl を基準に絶対化される。
-    // The relative og:image is resolved against finalUrl.
-    expect(result.thumbnailUrl).toBe("https://blog.example.com/cover.png");
-    // 先頭に OGP 画像ノードが差し込まれる。
-    // The OGP image node is prepended to the document content.
-    expect(result.tiptapJson.type).toBe("doc");
-    expect(result.tiptapJson.content?.[0]).toEqual({
-      type: "image",
-      attrs: { src: "https://blog.example.com/cover.png", alt: "Sample Article Title" },
-    });
-    // contentText は previewLength で切り詰められる。
-    // contentText is truncated to previewLength characters.
-    expect(result.contentText).toHaveLength(30);
-    // contentHash は本文の SHA-256（64 桁の 16 進）。
-    // contentHash is a SHA-256 hex digest (64 chars).
-    expect(result.contentHash).toMatch(/^[0-9a-f]{64}$/);
-    expect(result.aiUsage).toBeUndefined();
-  });
+      expect(result.finalUrl).toBe("https://blog.example.com/post");
+      expect(result.title).toBe("Sample Article Title");
+      // og:image の相対 URL は finalUrl を基準に絶対化される。
+      // The relative og:image is resolved against finalUrl.
+      expect(result.thumbnailUrl).toBe("https://blog.example.com/cover.png");
+      // 先頭に OGP 画像ノードが差し込まれる。
+      // The OGP image node is prepended to the document content.
+      expect(result.tiptapJson.type).toBe("doc");
+      expect(result.tiptapJson.content?.[0]).toEqual({
+        type: "image",
+        attrs: { src: "https://blog.example.com/cover.png", alt: "Sample Article Title" },
+      });
+      // contentText は previewLength で切り詰められる。
+      // contentText is truncated to previewLength characters.
+      expect(result.contentText).toHaveLength(30);
+      // contentHash は本文の SHA-256（64 桁の 16 進）。
+      // contentHash is a SHA-256 hex digest (64 chars).
+      expect(result.contentHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(result.aiUsage).toBeUndefined();
+    },
+  );
 
   it("og:image が無ければ thumbnailUrl は null で画像ノードを差し込まない / no thumbnail node when og:image is absent", async () => {
     const noImageHtml = ARTICLE_HTML.replace(/<meta property="og:image"[^>]*>/, "");

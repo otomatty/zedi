@@ -5,31 +5,22 @@
  * - サービス層が throw する `new Error("UNAUTHORIZED")` などの
  *   "magic message" は statusMap に従って HTTP ステータスへ写像される。
  * - 未知のエラーは 500 を返し、message は必ず「Internal server error」に sanitize する。
- * - Sentry capture は実装側の `shouldCaptureApiException` の判定に従い、
- *   `captureApiException` だけを差し替える partial mock で検証する。
+ * - Sentry capture は DI（`createErrorHandler({ captureApiException })`）で注入し、
+ *   実装側の `shouldCaptureApiException` の判定に従うことを検証する（#1091 LC-4:
+ *   Worker バンドルに @sentry/node を入れないため、errorHandler は SDK を
+ *   静的 import せず capture 関数を注入で受け取る）。
  *
  * Unit tests for the global Hono error handler. Covers HTTPException pass-through,
  * the magic-message → status mapping, the unknown-error 500 default, and the
- * Sentry capture policy by partially mocking only `captureApiException`.
+ * Sentry capture policy via the injected capture function (DI — no SDK import).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../../types/index.js";
+import { createErrorHandler } from "../../middleware/errorHandler.js";
 
-const sentryMock = vi.hoisted(() => ({
-  captureApiException: vi.fn(),
-}));
-
-vi.mock("../../lib/sentry.js", async () => {
-  const actual = await vi.importActual<typeof import("../../lib/sentry.js")>("../../lib/sentry.js");
-  return {
-    ...actual,
-    captureApiException: sentryMock.captureApiException,
-  };
-});
-
-import { errorHandler } from "../../middleware/errorHandler.js";
+const captureSpy = vi.fn();
 
 /**
  * Build an app whose `/throw` route throws the supplied error.
@@ -37,7 +28,7 @@ import { errorHandler } from "../../middleware/errorHandler.js";
  */
 function appThrowing(err: unknown) {
   const app = new Hono<AppEnv>();
-  app.onError(errorHandler);
+  app.onError(createErrorHandler({ captureApiException: captureSpy }));
   app.get("/throw", () => {
     throw err;
   });
@@ -55,7 +46,7 @@ describe("errorHandler", () => {
 
   afterEach(() => {
     errorSpy.mockRestore();
-    sentryMock.captureApiException.mockReset();
+    captureSpy.mockReset();
   });
 
   describe("HTTPException pass-through", () => {
@@ -85,7 +76,7 @@ describe("errorHandler", () => {
       async (status) => {
         await appThrowing(new HTTPException(status, { message: "expected" })).request("/throw");
 
-        expect(sentryMock.captureApiException).not.toHaveBeenCalled();
+        expect(captureSpy).not.toHaveBeenCalled();
       },
     );
 
@@ -94,7 +85,7 @@ describe("errorHandler", () => {
 
       await appThrowing(err).request("/throw");
 
-      expect(sentryMock.captureApiException).toHaveBeenCalledWith(
+      expect(captureSpy).toHaveBeenCalledWith(
         err,
         status,
         expect.objectContaining({
@@ -134,7 +125,7 @@ describe("errorHandler", () => {
     ] as const)("does not capture expected Error('%s') as %d", async (message, _expectedStatus) => {
       await appThrowing(new Error(message)).request("/throw");
 
-      expect(sentryMock.captureApiException).not.toHaveBeenCalled();
+      expect(captureSpy).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -148,7 +139,7 @@ describe("errorHandler", () => {
 
       await appThrowing(err).request("/throw");
 
-      expect(sentryMock.captureApiException).toHaveBeenCalledWith(
+      expect(captureSpy).toHaveBeenCalledWith(
         err,
         expectedStatus,
         expect.objectContaining({
@@ -163,18 +154,33 @@ describe("errorHandler", () => {
       // Ensures we forward the route pattern (e.g., `/invite/:token`) so that
       // request-time capability tokens never reach Sentry through `extra`.
       const app = new Hono<AppEnv>();
-      app.onError(errorHandler);
+      app.onError(createErrorHandler({ captureApiException: captureSpy }));
       app.get("/invite/:token", () => {
         throw new Error("kapow");
       });
 
       await app.request("/invite/secret-capability-token");
 
-      expect(sentryMock.captureApiException).toHaveBeenCalledWith(
+      expect(captureSpy).toHaveBeenCalledWith(
         expect.any(Error),
         500,
         expect.objectContaining({ method: "GET", routePath: "/invite/:token" }),
       );
+    });
+  });
+
+  describe("default handler (no capture injected — worker-safe no-op)", () => {
+    it("still shapes errors without any capture function", async () => {
+      const app = new Hono<AppEnv>();
+      app.onError(createErrorHandler());
+      app.get("/throw", () => {
+        throw new Error('relation "pages" does not exist');
+      });
+
+      const res = await app.request("/throw");
+      expect(res.status).toBe(500);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toBe("Internal server error");
     });
   });
 

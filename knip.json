@@ -33,8 +33,9 @@
       "project": ["src/**/*.ts"]
     },
     "server/api": {
-      "entry": ["scripts/**/*.ts", "src/agents/index.ts"],
-      "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts"]
+      "entry": ["scripts/**/*.ts", "src/agents/index.ts", "src/__tests__/**/*.test.ts"],
+      "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts"],
+      "vitest": false
     },
     "server/hocuspocus": {
       "project": ["src/**/*.ts"]
@@ -106,7 +107,8 @@
     "@langchain/openai",
     "@langchain/anthropic",
     "@langchain/google-genai",
-    "@vitest/coverage-v8"
+    "@vitest/coverage-v8",
+    "cloudflare"
   ],
   "ignoreExportsUsedInFile": {
     "interface": true,
