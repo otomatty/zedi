@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // フロントエンド SPA を Workers Static Assets で配信する（#1088 Phase 3, Pages 廃止）。
+  // ビルド（vite build → dist/）は CI が行い、ここは配信設定のみを持つ。
+  // public/_headers・public/_redirects は dist/ にコピーされ Workers でも適用される。
+  "name": "zedi-web",
+  "compatibility_date": "2026-06-25",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+  },
+  "env": {
+    "dev": {
+      "name": "zedi-web-dev",
+      // custom_domain: DNS は Cloudflare が自動生成する。旧 Pages（zedi-dev）の
+      // カスタムドメイン/CNAME が残っていると deploy が衝突するため、カット
+      // オーバー時に先に外すこと（.claude/skills/cloudflare-zedi 参照）。
+      "routes": [{ "pattern": "dev.zedi-note.app", "custom_domain": true }],
+    },
+    "production": {
+      "name": "zedi-web",
+      "routes": [{ "pattern": "zedi-note.app", "custom_domain": true }],
+    },
+  },
+}
