@@ -1,0 +1,23 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  // 管理画面 SPA を Workers Static Assets で配信する（#1088 Phase 3, Pages 廃止）。
+  // ビルド（vite build → dist/）は CI が行い、ここは配信設定のみを持つ。
+  "name": "zedi-admin",
+  "compatibility_date": "2026-06-25",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+  },
+  "env": {
+    "dev": {
+      "name": "zedi-admin-dev",
+      // custom_domain: 旧 Pages（zedi-admin-dev）のカスタムドメインを外してから
+      // カットオーバーする（.claude/skills/cloudflare-zedi 参照）。
+      "routes": [{ "pattern": "admin-dev.zedi-note.app", "custom_domain": true }],
+    },
+    "production": {
+      "name": "zedi-admin",
+      "routes": [{ "pattern": "admin.zedi-note.app", "custom_domain": true }],
+    },
+  },
+}

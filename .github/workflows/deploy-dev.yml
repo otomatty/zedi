@@ -107,15 +107,16 @@ jobs:
           VITE_REALTIME_URL: ${{ vars.REALTIME_URL }}
           VITE_POLAR_PRO_MONTHLY_PRODUCT_ID: ${{ vars.POLAR_MONTHLY_ID }}
           VITE_POLAR_PRO_YEARLY_PRODUCT_ID: ${{ vars.POLAR_YEARLY_ID }}
-      - name: Deploy to Cloudflare Pages
+      # Workers Static Assets (#1088 Phase 3)。旧 Pages プロジェクト zedi-dev は
+      # カットオーバー完了後に削除する。custom_domain (dev.zedi-note.app) は旧
+      # Pages カスタムドメインを外してからでないと deploy が衝突する。
+      - name: Deploy Frontend Worker (dev)
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           packageManager: bun
-          # Cloudflare API truncates commit message at ~384 bytes without UTF-8 boundary check (workers-sdk#11749).
-          # Use an explicit ASCII-only message to avoid "Invalid commit message" (code 8000111) when git message contains multi-byte chars.
-          command: pages deploy dist --project-name=zedi-dev --commit-message "Deploy from GitHub Actions (develop) ${{ github.sha }}"
+          command: deploy --env dev
 
   deploy-admin:
     name: Deploy Admin
@@ -152,7 +153,9 @@ jobs:
           VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
           VITE_MAIN_APP_URL: ${{ vars.MAIN_APP_URL || 'https://dev.zedi-note.app' }}
           VITE_ENV_LABEL: development
-      - name: Deploy Admin to Cloudflare Pages
+      # Workers Static Assets (#1088 Phase 3)。旧 Pages プロジェクト zedi-admin-dev は
+      # カットオーバー完了後に削除する。
+      - name: Deploy Admin Worker (dev)
         uses: nick-fields/retry@v4
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -161,9 +164,7 @@ jobs:
           max_attempts: 3
           timeout_minutes: 5
           retry_wait_seconds: 60
-          command: >
-            bunx wrangler pages deploy admin/dist --project-name=zedi-admin-dev
-            --commit-message "Deploy admin from GitHub Actions (develop) ${{ github.sha }}"
+          command: bunx wrangler deploy --env dev --config admin/wrangler.jsonc
       - name: Upload Wrangler logs (Admin)
         if: failure()
         continue-on-error: true
