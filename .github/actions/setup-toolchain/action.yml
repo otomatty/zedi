@@ -74,6 +74,7 @@ runs:
         action: actions/setup-node@v6
         with: |
           node-version-file: .nvmrc
+          check-latest: true
         attempt_limit: 3
         attempt_delay: 5000
 
