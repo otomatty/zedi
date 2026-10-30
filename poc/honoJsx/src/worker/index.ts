@@ -1,12 +1,19 @@
 import { routePartykitRequest } from "partyserver";
-import { createApp, type Env } from "./app";
-import { createNoteStore } from "./fakeNotes";
+import { createApp } from "./app";
+import type { Env } from "./env";
+import { authorizeRealtime } from "./realtime/authorize";
 
 export { PageRoom } from "./pageRoom";
 
 const app = createApp({
-  notes: createNoteStore({ count: 10_000, seed: 1 }),
-  routeRealtime: (request, env) => routePartykitRequest(request, env as unknown as Cloudflare.Env),
+  routeRealtime: (request, env) =>
+    routePartykitRequest(request, env, {
+      onBeforeConnect: (req, lobby) =>
+        lobby.className === "PageRoom"
+          ? authorizeRealtime(req, env, lobby.name)
+          : new Response("Not found", { status: 404 }),
+      onBeforeRequest: () => new Response("Not found", { status: 404 }),
+    }),
 });
 
 export default app satisfies ExportedHandler<Env>;

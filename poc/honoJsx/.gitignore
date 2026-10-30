@@ -2,3 +2,4 @@ node_modules/
 dist/
 .wrangler/
 results/raw/
+.dev.vars

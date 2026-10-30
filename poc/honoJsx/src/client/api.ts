@@ -1,21 +1,52 @@
-import type { NoteListResponse, NoteSummary } from "../shared/types";
+import type { PageDetail, PageListResponse, SearchResponse } from "../shared/types";
+import type { Me } from "./lib/session";
 
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`${res.status} ${url}`);
+/** Non-2xx API response. */
+export class ApiError extends Error {
+  /** Keeps the HTTP status so callers can tell "not found" from other failures. */
+  constructor(
+    readonly status: number,
+    url: string,
+  ) {
+    super(`${status} ${url}`);
+  }
+}
+
+async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
+  if (!res.ok) throw new ApiError(res.status, url);
   return (await res.json()) as T;
 }
 
-/** Query key + fetcher for the full note list (shared by the list page and the palette). */
-export const allNotesQuery = {
-  queryKey: ["notes", "all"] as const,
-  queryFn: () => getJson<NoteListResponse>("/api/notes?limit=10000"),
-  staleTime: 60_000,
-};
-
 /**
- * Fetches one note's metadata.
- * ノート 1 件のメタデータを取得する。
+ * Current user and default note, or null when signed out.
+ * ログイン中のユーザーと既定ノート（未ログインなら null）。
  */
-export const fetchNote = (id: string) =>
-  getJson<NoteSummary>(`/api/notes/${encodeURIComponent(id)}`);
+export async function fetchMe(): Promise<Me | null> {
+  const res = await fetch("/api/me");
+  if (res.status === 401) return null;
+  if (!res.ok) throw new ApiError(res.status, "/api/me");
+  return (await res.json()) as Me;
+}
+
+/** One keyset page of a note's pages (newest first). */
+export const fetchPageList = (noteId: string, cursor: string | null) =>
+  request<PageListResponse>(
+    `/api/notes/${encodeURIComponent(noteId)}/pages?limit=100${cursor ? `&cursor=${cursor}` : ""}`,
+  );
+
+/** A page and the caller's role. */
+export const fetchPage = (id: string) =>
+  request<PageDetail>(`/api/pages/${encodeURIComponent(id)}`);
+
+/** Full-text search across every note the user can access. */
+export const searchPages = (q: string) =>
+  request<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}`);
+
+/** Creates a page in a note and returns its id. */
+export const createPage = (noteId: string, title: string) =>
+  request<{ id: string }>(`/api/notes/${encodeURIComponent(noteId)}/pages`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ title }),
+  });

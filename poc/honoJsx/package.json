@@ -9,10 +9,13 @@
     "dev:worker": "wrangler dev --port 8787",
     "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.client.json && tsc --noEmit -p tsconfig.worker.json",
-    "test": "vitest run",
+    "test": "vitest run && vitest run -c vitest.config.worker.ts",
     "bundle:report": "node scripts/bundleReport.mjs",
     "measure": "node scripts/measure.mjs",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "test:unit": "vitest run",
+    "test:worker": "vitest run -c vitest.config.worker.ts",
+    "db:migrate": "wrangler d1 migrations apply DB --local"
   },
   "dependencies": {
     "@floating-ui/dom": "^1.8.0",
@@ -24,18 +27,23 @@
     "@tiptap/pm": "^3.32.1",
     "@tiptap/starter-kit": "^3.32.1",
     "@tiptap/suggestion": "^3.32.1",
+    "better-auth": "^1.7.14",
+    "drizzle-orm": "^0.45.4",
     "hono": "^4.13.14",
     "partyserver": "^0.5.10",
     "y-partyserver": "^2.2.0",
     "yjs": "^13.6.33"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.11",
     "@cloudflare/workers-types": "^5.20261030.1",
     "@testing-library/dom": "^10.4.2",
     "happy-dom": "^21.0.4",
+    "lib0": "^0.2.117",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "4.1.10",
-    "wrangler": "^4.156.0"
+    "wrangler": "^4.156.0",
+    "y-protocols": "^1.0.7"
   }
 }

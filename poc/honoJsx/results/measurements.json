@@ -1,53 +1,65 @@
 {
-  "measuredAt": "2026-10-30T02:32:50.625Z",
+  "measuredAt": "2026-10-30T03:28:50.910Z",
+  "seedPages": 10000,
   "runs": [
     {
       "cpuRate": 1,
       "notes": {
-        "firstRenderMs": 252.9,
+        "firstRenderMs": 146.6,
         "rowsInDom": 19,
-        "scrollFps": 58.7,
+        "scrollFps": 60.6,
         "scrollLongTasks": {
           "count": 0,
           "totalMs": 0
         },
-        "heapMB": 9.5
+        "scrolledRows": 379,
+        "pageRequestsWhileScrolling": 4,
+        "heapMB": 7.4
       },
       "typingSmallDoc": {
-        "readyMs": 282.7,
+        "readyMs": 253,
         "latencyMs": {
           "n": 52,
-          "p50": 4.6,
-          "p95": 17.9,
-          "max": 18.7
+          "p50": 3.7,
+          "p95": 17.1,
+          "max": 18.4
         }
       },
       "typingLargeDoc": {
-        "readyMs": 294.3,
+        "readyMs": 255.1,
         "latencyMs": {
           "n": 52,
-          "p50": 13.6,
-          "p95": 21.3,
-          "max": 32.7
+          "p50": 11.7,
+          "p95": 20.1,
+          "max": 20.6
         }
       },
       "typingLargeDocNoCollab": {
-        "readyMs": 294,
+        "readyMs": 218.7,
         "latencyMs": {
           "n": 52,
-          "p50": 10.9,
-          "p95": 18.9,
-          "max": 25.8
+          "p50": 7.9,
+          "p95": 17.7,
+          "max": 18.3
         }
       },
       "collabPropagationMs": {
         "n": 20,
-        "p50": 33,
-        "p95": 52,
-        "max": 52
+        "p50": 32,
+        "p95": 54,
+        "max": 54
       },
       "aiDirect": {
-        "seconds": 6.66,
+        "seconds": 6.58,
+        "fps": 59.8,
+        "tokens": 2000,
+        "longTasks": {
+          "count": 0,
+          "totalMs": 0
+        }
+      },
+      "aiState": {
+        "seconds": 6.49,
         "fps": 60.1,
         "tokens": 2000,
         "longTasks": {
@@ -55,18 +67,9 @@
           "totalMs": 0
         }
       },
-      "aiState": {
-        "seconds": 6.62,
-        "fps": 60,
-        "tokens": 2000,
-        "longTasks": {
-          "count": 0,
-          "totalMs": 0
-        }
-      },
       "aiBlocks": {
-        "seconds": 6.56,
-        "fps": 59.9,
+        "seconds": 6.44,
+        "fps": 60.1,
         "tokens": 2000,
         "longTasks": {
           "count": 0,
@@ -74,8 +77,8 @@
         }
       },
       "aiDirect10k": {
-        "seconds": 32.42,
-        "fps": 57.4,
+        "seconds": 32.25,
+        "fps": 58.8,
         "tokens": 10000,
         "longTasks": {
           "count": 0,
@@ -83,8 +86,8 @@
         }
       },
       "aiBlocks10k": {
-        "seconds": 32.41,
-        "fps": 59.9,
+        "seconds": 32.2,
+        "fps": 60,
         "tokens": 10000,
         "longTasks": {
           "count": 0,
@@ -92,114 +95,259 @@
         }
       },
       "aiState10k": {
-        "seconds": 32.66,
-        "fps": 57.4,
+        "seconds": 32.29,
+        "fps": 58.6,
         "tokens": 10000,
         "longTasks": {
-          "count": 0,
-          "totalMs": 0
+          "count": 1,
+          "totalMs": 52
         }
       }
     },
     {
       "cpuRate": 4,
       "notes": {
-        "firstRenderMs": 631.5,
+        "firstRenderMs": 426.8,
         "rowsInDom": 19,
-        "scrollFps": 56.9,
+        "scrollFps": 57.8,
         "scrollLongTasks": {
           "count": 0,
           "totalMs": 0
         },
-        "heapMB": 9.4
+        "scrolledRows": 363,
+        "pageRequestsWhileScrolling": 4,
+        "heapMB": 7.2
       },
       "typingSmallDoc": {
-        "readyMs": 929,
+        "readyMs": 700.2,
         "latencyMs": {
           "n": 52,
-          "p50": 22.4,
-          "p95": 39.1,
-          "max": 97.8
+          "p50": 19.5,
+          "p95": 51.6,
+          "max": 90.2
         }
       },
       "typingLargeDoc": {
-        "readyMs": 859.6,
+        "readyMs": 694.6,
         "latencyMs": {
           "n": 52,
-          "p50": 107,
-          "p95": 184.4,
-          "max": 284.2
+          "p50": 87.8,
+          "p95": 274.1,
+          "max": 366.6
         }
       },
       "typingLargeDocNoCollab": {
-        "readyMs": 829.1,
+        "readyMs": 658,
         "latencyMs": {
           "n": 52,
-          "p50": 47.3,
-          "p95": 78.5,
-          "max": 142.8
+          "p50": 37.3,
+          "p95": 57.5,
+          "max": 130
         }
       },
       "collabPropagationMs": {
         "n": 20,
-        "p50": 99,
-        "p95": 292,
-        "max": 292
+        "p50": 70,
+        "p95": 138,
+        "max": 138
       },
       "aiDirect": {
-        "seconds": 6.94,
-        "fps": 50,
+        "seconds": 6.67,
+        "fps": 54.4,
         "tokens": 2000,
         "longTasks": {
-          "count": 1,
-          "totalMs": 134
+          "count": 0,
+          "totalMs": 0
         }
       },
       "aiState": {
-        "seconds": 6.73,
-        "fps": 44.7,
+        "seconds": 6.67,
+        "fps": 50.5,
         "tokens": 2000,
         "longTasks": {
-          "count": 1,
-          "totalMs": 54
+          "count": 0,
+          "totalMs": 0
         }
       },
       "aiBlocks": {
-        "seconds": 6.99,
-        "fps": 57.5,
+        "seconds": 6.6,
+        "fps": 59.2,
         "tokens": 2000,
         "longTasks": {
-          "count": 1,
-          "totalMs": 144
+          "count": 0,
+          "totalMs": 0
         }
       },
       "aiDirect10k": {
-        "seconds": 33.28,
-        "fps": 23.7,
+        "seconds": 32.38,
+        "fps": 25.2,
         "tokens": 10000,
         "longTasks": {
-          "count": 213,
-          "totalMs": 16350
+          "count": 215,
+          "totalMs": 15440
         }
       },
       "aiBlocks10k": {
-        "seconds": 33.25,
-        "fps": 58.3,
+        "seconds": 32.38,
+        "fps": 59.8,
         "tokens": 10000,
         "longTasks": {
-          "count": 1,
-          "totalMs": 132
+          "count": 0,
+          "totalMs": 0
         }
       },
       "aiState10k": {
-        "seconds": 32.87,
-        "fps": 21.3,
+        "seconds": 32.28,
+        "fps": 23.8,
         "tokens": 10000,
         "longTasks": {
-          "count": 214,
-          "totalMs": 15994
+          "count": 206,
+          "totalMs": 14538
         }
       }
     }
-  ]
+  ],
+  "seed": {
+    "inserted": 10000,
+    "ms": 475,
+    "rowsWritten": 50000,
+    "clientMs": 493
+  },
+  "api": {
+    "me": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 9.4,
+        "p95": 12,
+        "max": 12.2
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 0,
+        "max": 1
+      },
+      "rowsRead": 1
+    },
+    "pageDetail": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 7.7,
+        "p95": 9,
+        "max": 9.9
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 1,
+        "max": 1
+      },
+      "rowsRead": 2
+    },
+    "listFirst100": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 11,
+        "p95": 15.6,
+        "max": 19.6
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 1,
+        "max": 2
+      },
+      "rowsRead": 102
+    },
+    "listAfter5000": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 10.6,
+        "p95": 16.8,
+        "max": 19.7
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 1,
+        "max": 1
+      },
+      "rowsRead": 103
+    },
+    "searchFtsJapanese": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 9.6,
+        "p95": 13.4,
+        "max": 15.1
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 2,
+        "p95": 2,
+        "max": 3
+      },
+      "rowsRead": 41
+    },
+    "searchFtsEnglish": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 10,
+        "p95": 14.2,
+        "max": 15.3
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 2,
+        "p95": 3,
+        "max": 3
+      },
+      "rowsRead": 41
+    },
+    "searchFtsNoHit": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 7.4,
+        "p95": 11.3,
+        "max": 13.9
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 1,
+        "max": 1
+      },
+      "rowsRead": 0
+    },
+    "searchLikeTwoChars": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 7.5,
+        "p95": 9.5,
+        "max": 11.6
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 1,
+        "max": 1
+      },
+      "rowsRead": 189
+    },
+    "searchLikeTwoCharsNoHit": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 13.6,
+        "p95": 17.2,
+        "max": 18.7
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 5,
+        "p95": 7,
+        "max": 7
+      },
+      "rowsRead": 10004
+    }
+  }
 }

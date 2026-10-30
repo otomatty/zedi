@@ -1,37 +1,44 @@
 {
   "assets": [
     {
-      "path": "assets/AiChatPage-BSY8HkCE.js",
+      "path": "assets/AiChatPage-BDn43JJ5.js",
       "initial": false,
       "raw": 3109,
-      "gzip": 1604,
-      "brotli": 1384
+      "gzip": 1603,
+      "brotli": 1363
     },
     {
-      "path": "assets/EditorPage-mV2-MhKv.js",
+      "path": "assets/EditorPage-B7osQr7N.js",
       "initial": false,
-      "raw": 554477,
-      "gzip": 174748,
-      "brotli": 148673
+      "raw": 554798,
+      "gzip": 174896,
+      "brotli": 148777
     },
     {
-      "path": "assets/index-D3xPk6QJ.js",
-      "initial": true,
-      "raw": 87162,
-      "gzip": 28135,
-      "brotli": 25172
+      "path": "assets/authClient-KmrCVLrO.js",
+      "initial": false,
+      "raw": 30799,
+      "gzip": 11484,
+      "brotli": 10261
     },
     {
-      "path": "assets/index-x5IL89cT.css",
+      "path": "assets/index-D3RoKfLm.css",
       "initial": true,
-      "raw": 4555,
-      "gzip": 1473,
-      "brotli": 1232
+      "raw": 5382,
+      "gzip": 1635,
+      "brotli": 1374
+    },
+    {
+      "path": "assets/index-DY2r__BU.js",
+      "initial": true,
+      "raw": 92750,
+      "gzip": 30007,
+      "brotli": 26746
     }
   ],
   "initialJs": {
-    "raw": 87162,
-    "gzip": 28135,
-    "brotli": 25172
+    "raw": 92750,
+    "gzip": 30007,
+    "brotli": 26746
   }
 }

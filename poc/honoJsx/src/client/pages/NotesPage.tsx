@@ -1,56 +1,115 @@
-import { useEffect, useRef } from "hono/jsx/dom";
-import { allNotesQuery } from "../api";
-import { useQuery } from "../lib/query";
+import { useContext, useEffect, useRef, useState } from "hono/jsx/dom";
+import type { PageListResponse } from "../../shared/types";
+import { createPage, fetchPageList } from "../api";
+import { useInfiniteQuery } from "../lib/infiniteQuery";
+import { QueryClientContext } from "../lib/query";
 import { useVirtualizer } from "../lib/virtual";
+import { router } from "../routing";
 
 const ROW_HEIGHT = 72;
+const PREFETCH_ROWS = 30;
 const dateFormat = new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium", timeStyle: "short" });
 
 /**
- * Virtualized list of all notes (10,000 rows; only the visible ones are in the DOM).
- * 全ノートの仮想化リスト。表示範囲の行だけを DOM に置く。
+ * Pages of a note from D1: keyset-paginated (100 per request) and virtualized; the next page
+ * is fetched when the viewport gets close to the end of what is loaded.
+ * D1 のページ一覧。100 件ずつのキーセット取得 + 仮想スクロールで、末尾に近づくと次を読む。
  */
-export function NotesPage() {
+export function NotesPage({ noteId }: { noteId: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const notes = useQuery(allNotesQuery);
-  const items = notes.data?.items ?? [];
+  const client = useContext(QueryClientContext);
+  const [creating, setCreating] = useState(false);
+  const list = useInfiniteQuery<PageListResponse, string | null>({
+    queryKey: ["pages", noteId],
+    initialPageParam: null,
+    queryFn: ({ pageParam }) => fetchPageList(noteId, pageParam),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  });
+  const items = list.data?.pages.flatMap((p) => p.items) ?? [];
+  const firstPage = list.data?.pages[0];
   const virtualizer = useVirtualizer({
-    count: items.length,
+    count: items.length + (list.hasNextPage ? 1 : 0),
     getScrollElement: () => scrollRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: 8,
   });
+  const virtualItems = virtualizer.getVirtualItems();
+  const lastIndex = virtualItems.at(-1)?.index ?? 0;
+
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = list;
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && lastIndex >= items.length - PREFETCH_ROWS) {
+      void fetchNextPage();
+    }
+  }, [lastIndex, items.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   useEffect(() => {
-    if (items.length > 0 && performance.getEntriesByName("notes:first-render").length === 0) {
+    if (
+      list.status === "success" &&
+      performance.getEntriesByName("notes:first-render").length === 0
+    ) {
       requestAnimationFrame(() => performance.mark("notes:first-render"));
     }
-  }, [items.length]);
+  }, [list.status]);
 
-  if (notes.status === "pending") return <p class="muted">読み込み中…</p>;
-  if (notes.status === "error") return <p role="alert">読み込みに失敗しました。</p>;
+  const create = async () => {
+    setCreating(true);
+    try {
+      const time = new Intl.DateTimeFormat("ja-JP", { timeStyle: "medium" }).format(new Date());
+      const { id } = await createPage(noteId, `新しいページ ${time}`);
+      await client?.invalidateQueries({ queryKey: ["pages", noteId] });
+      router.navigate(`/notes/${id}`);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  if (list.status === "pending") return <p class="muted">読み込み中…</p>;
+  if (list.status === "error") return <p role="alert">読み込みに失敗しました。</p>;
 
   return (
     <section class="notes">
-      <h1>
-        ノート一覧 <span class="muted">{notes.data.total.toLocaleString()} 件</span>
-      </h1>
+      <header class="notes-header">
+        <h1>
+          ノート一覧 <span class="muted">{(firstPage?.total ?? 0).toLocaleString()} 件</span>
+        </h1>
+        {firstPage && firstPage.role !== "viewer" && (
+          <button
+            type="button"
+            class="primary-button"
+            disabled={creating}
+            onClick={() => void create()}
+            data-testid="new-page"
+          >
+            新規ページ
+          </button>
+        )}
+      </header>
       <div ref={scrollRef} class="note-scroll" data-testid="note-scroll">
         <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
-          {virtualizer.getVirtualItems().map((row) => {
-            const note = items[row.index];
-            if (!note) return null;
+          {virtualItems.map((row) => {
+            const page = items[row.index];
+            if (!page) {
+              return (
+                <div
+                  key="loader"
+                  class="note-row muted"
+                  style={{ transform: `translateY(${row.start}px)`, height: `${ROW_HEIGHT}px` }}
+                >
+                  読み込み中…
+                </div>
+              );
+            }
             return (
               <a
-                key={note.id}
-                href={`/notes/${note.id}`}
+                key={page.id}
+                href={`/notes/${page.id}`}
                 class="note-row"
                 style={{ transform: `translateY(${row.start}px)`, height: `${ROW_HEIGHT}px` }}
               >
-                <span class="note-title">{note.title}</span>
+                <span class="note-title">{page.title}</span>
                 <span class="note-meta">
-                  {note.tags.map((t) => `#${t}`).join(" ")} ・{" "}
-                  {dateFormat.format(new Date(note.updatedAt))}
+                  {page.preview || "（本文なし）"} ・ {dateFormat.format(new Date(page.updatedAt))}
                 </span>
               </a>
             );

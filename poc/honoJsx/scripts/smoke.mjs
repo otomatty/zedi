@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 /**
- * Browser smoke test of the PoC features against a local `wrangler dev`:
- * virtual list, ⌘K palette, editor sync, `#tag`, `[[WikiLink]]`, `/` commands,
- * two-client collaboration and AI streaming. Run `bun run build` first.
- * PoC の主要機能をブラウザで一通り確認するスモークテスト。
+ * Browser smoke test against a local `wrangler dev` with a fresh D1:
+ * magic-link sign-in through the UI, page creation, editor sync, `#tag` / `[[WikiLink]]` /
+ * `/` commands, D1 projection + full-text search, infinite list, access control between
+ * two users (404 → viewer, read-only), sign-out and AI streaming. Run `bun run build` first.
+ * 空の D1 に対して、サインインから共有・検索・サインアウトまでをブラウザで確認するスモークテスト。
  */
 import assert from "node:assert/strict";
-import { launchBrowser, startWorker } from "./lib/harness.mjs";
+import { launchBrowser, signInViaApi, startWorker, addSessionCookies } from "./lib/harness.mjs";
 
 const PORT = 8789;
 const BASE = `http://127.0.0.1:${PORT}`;
+const OWNER = `owner-${Date.now()}@example.com`;
+const GUEST = `guest-${Date.now()}@example.com`;
 
 const worker = await startWorker(PORT);
 const browser = await launchBrowser();
@@ -22,33 +25,50 @@ const check = (name, fn) =>
       process.exitCode = 1;
     },
   );
+const apiFrom = (page, path, init) =>
+  page.evaluate(
+    async ([p, i]) => {
+      const res = await fetch(p, i);
+      return {
+        status: res.status,
+        body: res.status === 204 ? null : await res.json().catch(() => null),
+      };
+    },
+    [path, init],
+  );
 
 try {
-  const page = await browser.newPage();
+  const ownerContext = await browser.newContext();
+  const page = await ownerContext.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
+  let pageUrl = "";
 
-  await check("virtual list renders only the visible rows", async () => {
+  await check("unauthenticated visit shows the sign-in page and the API answers 401", async () => {
     await page.goto(`${BASE}/notes`);
-    await page.waitForSelector(".note-row");
-    const rows = await page.locator(".note-row").count();
-    assert.ok(rows > 0 && rows < 50, `rows in DOM: ${rows}`);
+    await page.waitForSelector("[data-testid=sign-in-email]");
+    assert.equal((await apiFrom(page, "/api/me")).status, 401);
   });
 
-  await check("⌘K palette filters and navigates to a page", async () => {
-    await page.keyboard.press("Control+k");
-    await page.waitForSelector("dialog.palette[open]");
-    await page.keyboard.type("Hono");
-    await page.keyboard.press("Enter");
-    await page.waitForURL(/\/notes\/note-\d+$/);
+  await check("magic-link sign-in through the UI lands on the notes list", async () => {
+    await page.fill("[data-testid=sign-in-email]", OWNER);
+    await page.click("[data-testid=sign-in-submit]");
+    await page.click("[data-testid=dev-magic-link]");
+    await page.waitForSelector("[data-testid=account-email]");
+    assert.equal(await page.locator("[data-testid=account-email]").textContent(), OWNER);
+    assert.match(await page.locator(".notes h1").textContent(), /0 件/);
+  });
+
+  await check("creating a page opens the editor connected to its Durable Object", async () => {
+    await page.click("[data-testid=new-page]");
+    await page.waitForURL(/\/notes\/[0-9a-f-]{36}$/);
     await page.waitForSelector("[data-status=synced]", { timeout: 10_000 });
+    pageUrl = page.url();
   });
 
   await check("#tag, [[WikiLink]] and / commands work in the editor", async () => {
-    // Rooms persist in .wrangler state between runs, so start from an empty document.
-    await page.evaluate(() => window.__zediPoc.editor.commands.clearContent());
     await page.locator(".prose").click();
-    await page.keyboard.type("メモ #zedi ");
-    await page.keyboard.type("[[Hono");
+    await page.keyboard.type("スモーク検証用の本文 #zedi ");
+    await page.keyboard.type("[[");
     await page.waitForSelector(".suggestion-popup .suggestion-option");
     await page.keyboard.press("Enter");
     await page.keyboard.press("Enter");
@@ -57,35 +77,84 @@ try {
     await page.keyboard.press("Enter");
     await page.keyboard.type("見出し");
     assert.equal(await page.locator(".prose span.tag").first().textContent(), "#zedi");
-    assert.match(await page.locator(".prose .wiki-chip").first().textContent(), /Hono/);
+    assert.equal(await page.locator(".prose .wiki-chip").count(), 1);
     assert.equal(await page.locator(".prose h1").first().textContent(), "見出し");
   });
 
-  await check("edits sync between two clients through the Durable Object", async () => {
-    const other = await browser.newPage();
-    await other.goto(page.url());
-    await other.waitForSelector("[data-status=synced]", { timeout: 10_000 });
-    assert.match(await other.locator(".prose").textContent(), /見出し/);
-    await other.locator(".prose h1").click();
-    await other.keyboard.press("End");
-    await other.keyboard.type("-from-other");
-    await page.waitForFunction(() =>
-      document.querySelector(".prose")?.textContent.includes("-from-other"),
-    );
-    await other.close();
+  await check(
+    "edited text is projected to D1 and found by full-text search in the palette",
+    async () => {
+      await page.waitForTimeout(2_500); // PageRoom saves with a 2 s debounce
+      await page.keyboard.press("Control+k");
+      await page.waitForSelector("dialog.palette[open]");
+      await page.keyboard.type("スモーク検証");
+      await page.waitForSelector(".palette-option");
+      assert.equal(await page.locator(".palette-option").count(), 1);
+      await page.keyboard.press("Escape");
+    },
+  );
+
+  await check("the list loads more pages from D1 while scrolling (keyset pagination)", async () => {
+    const seeded = await apiFrom(page, "/api/dev/seed", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ count: 300 }),
+    });
+    assert.equal(seeded.body.inserted, 300);
+    await page.goto(`${BASE}/notes`);
+    await page.waitForSelector(".note-row");
+    assert.match(await page.locator(".notes h1").textContent(), /301 件/);
+    const listRequests = [];
+    page.on("request", (r) => r.url().includes("/pages?limit=") && listRequests.push(r.url()));
+    await page
+      .locator("[data-testid=note-scroll]")
+      .evaluate((el) => (el.scrollTop = el.scrollHeight));
+    await page.waitForTimeout(500);
+    await page
+      .locator("[data-testid=note-scroll]")
+      .evaluate((el) => (el.scrollTop = el.scrollHeight));
+    await page.waitForTimeout(500);
+    assert.ok(listRequests.length >= 1, "expected follow-up page requests");
+    assert.ok(listRequests.every((u) => u.includes("cursor=")));
   });
 
-  for (const strategy of ["direct", "blocks", "state"]) {
-    await check(`AI streaming renders every token (${strategy})`, async () => {
-      await page.goto(`${BASE}/ai?tokens=300&interval=1&strategy=${strategy}`);
-      await page.click("[data-testid=ai-start]");
-      await page.waitForFunction(() => window.__zediPoc?.aiDone === true, null, {
-        timeout: 30_000,
-      });
-      assert.equal(await page.evaluate(() => window.__zediPoc.aiTokens), 300);
-      assert.ok((await page.locator("[data-testid=ai-output]").textContent()).length > 300);
+  await check("another user gets 404 until shared, then sees the page read-only", async () => {
+    const guestContext = await browser.newContext();
+    await addSessionCookies(guestContext, BASE, await signInViaApi(BASE, GUEST));
+    const guest = await guestContext.newPage();
+    guest.on("pageerror", (e) => errors.push(e.message));
+    await guest.goto(pageUrl);
+    await guest.waitForSelector("text=ページが見つかりません。");
+
+    const { body } = await apiFrom(page, "/api/me");
+    const share = await apiFrom(page, `/api/notes/${body.defaultNoteId}/members`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: GUEST, role: "viewer" }),
     });
-  }
+    assert.equal(share.status, 204);
+
+    await guest.goto(pageUrl);
+    await guest.waitForSelector("[data-status=synced]", { timeout: 10_000 });
+    assert.match(await guest.locator("[data-testid=sync-status]").textContent(), /閲覧のみ/);
+    assert.match(await guest.locator(".prose").textContent(), /スモーク検証用の本文/);
+    assert.equal(await guest.locator(".prose").getAttribute("contenteditable"), "false");
+    await guestContext.close();
+  });
+
+  await check("AI streaming works for a signed-in user", async () => {
+    await page.goto(`${BASE}/ai?tokens=300&interval=1&strategy=blocks`);
+    await page.click("[data-testid=ai-start]");
+    await page.waitForFunction(() => window.__zediPoc?.aiDone === true, null, { timeout: 30_000 });
+    assert.equal(await page.evaluate(() => window.__zediPoc.aiTokens), 300);
+  });
+
+  await check("sign-out returns to the sign-in page and revokes API access", async () => {
+    await page.goto(`${BASE}/notes`);
+    await page.getByRole("button", { name: "サインアウト" }).click();
+    await page.waitForSelector("[data-testid=sign-in-email]");
+    assert.equal((await apiFrom(page, "/api/me")).status, 401);
+  });
 
   await check("no uncaught page errors", async () => assert.deepEqual(errors, []));
 } finally {

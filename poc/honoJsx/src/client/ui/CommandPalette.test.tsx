@@ -69,3 +69,26 @@ describe("CommandPalette", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("CommandPalette with server-side search", () => {
+  it("reports the query and shows the given items without filtering them locally", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const onQueryChange = vi.fn();
+    render(
+      <CommandPalette
+        open
+        items={items}
+        filterLocally={false}
+        onQueryChange={onQueryChange}
+        onSelect={vi.fn()}
+        onClose={vi.fn()}
+      />,
+      container,
+    );
+    const input = await findByRole(container, "combobox");
+    fireEvent.input(input, { target: { value: "zzz" } });
+    expect(onQueryChange).toHaveBeenCalledWith("zzz");
+    await waitFor(() => expect(getAllByRole(container, "option")).toHaveLength(3));
+  });
+});

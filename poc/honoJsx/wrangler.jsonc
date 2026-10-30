@@ -4,7 +4,7 @@
   "main": "src/worker/index.ts",
   // Worker TSX uses hono/jsx (server); the client SPA uses hono/jsx/dom via vite.config.ts.
   "tsconfig": "./tsconfig.worker.json",
-  "compatibility_date": "2026-10-01",
+  "compatibility_date": "2026-08-15",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./dist/client",
@@ -16,5 +16,16 @@
     "bindings": [{ "name": "PageRoom", "class_name": "PageRoom" }],
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PageRoom"] }],
+  // Local only in this PoC (`wrangler d1 migrations apply DB --local`); the id is a placeholder.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "zedi-poc",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+  // BETTER_AUTH_SECRET comes from `.dev.vars` locally (see .dev.vars.example).
+  "vars": { "ENVIRONMENT": "development" },
   "observability": { "enabled": true },
 }

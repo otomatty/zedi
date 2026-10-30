@@ -12,6 +12,8 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.{ts,tsx}"],
+    // *.worker.test.ts run inside workerd via vitest.config.worker.ts.
+    exclude: ["src/**/*.worker.test.ts"],
     environment: "node",
   },
 });

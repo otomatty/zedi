@@ -6,6 +6,9 @@ export interface CommandPaletteProps<T extends ListItem> {
   open: boolean;
   items: readonly T[];
   placeholder?: string;
+  /** Set to false when `items` are already filtered by the server (e.g. full-text search). */
+  filterLocally?: boolean;
+  onQueryChange?(query: string): void;
   onSelect(item: T): void;
   onClose(): void;
 }
@@ -21,7 +24,11 @@ export function CommandPalette<T extends ListItem>(props: CommandPaletteProps<T>
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const baseId = useId();
-  const visible = useMemo(() => filterItems(props.items, query), [props.items, query]);
+  const filterLocally = props.filterLocally ?? true;
+  const visible = useMemo(
+    () => (filterLocally ? filterItems(props.items, query) : [...props.items]),
+    [props.items, query, filterLocally],
+  );
   const optionId = (index: number) => `${baseId}-opt-${index}`;
 
   useEffect(() => {
@@ -72,8 +79,10 @@ export function CommandPalette<T extends ListItem>(props: CommandPaletteProps<T>
         placeholder={props.placeholder ?? "ページを検索…"}
         value={query}
         onInput={(e: Event) => {
-          setQuery((e.target as HTMLInputElement).value);
+          const value = (e.target as HTMLInputElement).value;
+          setQuery(value);
           setActive(0);
+          props.onQueryChange?.(value);
         }}
         onKeyDown={onKeyDown}
       />

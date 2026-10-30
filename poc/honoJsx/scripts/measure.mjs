@@ -1,19 +1,37 @@
 #!/usr/bin/env node
 /**
- * Runtime measurements for the PoC in headless Chromium against a local `wrangler dev`.
- * Requires Playwright with Chromium (`npx playwright install chromium` if missing).
+ * Measurements against a local `wrangler dev` with a fresh D1 seeded with 10,000 pages:
+ * API latency and D1 cost (rows read, SQL time) from Node, then runtime metrics in headless
+ * Chromium as a signed-in user. Requires Playwright with Chromium (`CHROMIUM_PATH` to reuse one).
  * Run `bun run build` first; this script starts `wrangler dev` itself on port 8788.
  *
- * ローカルの `wrangler dev` に対し、ヘッドレス Chromium で実行時性能を計測する。
+ * 1 万ページを投入した D1 に対し、API の遅延と D1 コスト、ブラウザでの実行時性能を計測する。
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { launchBrowser, startWorker } from "./lib/harness.mjs";
+import { addSessionCookies, launchBrowser, signInViaApi, startWorker } from "./lib/harness.mjs";
 
 const root = join(import.meta.dirname, "..");
 const PORT = 8788;
 const BASE = `http://127.0.0.1:${PORT}`;
 const CPU_RATES = (process.env.CPU_RATES ?? "1,4").split(",").map(Number);
+const SEED_PAGES = Number(process.env.SEED_PAGES ?? 10_000);
+let cookie = "";
+let noteId = "";
+
+const apiFetch = (path, init = {}) =>
+  fetch(`${BASE}${path}`, {
+    ...init,
+    headers: { cookie, origin: BASE, "content-type": "application/json", ...(init.headers ?? {}) },
+  });
+
+async function createPageViaApi(title) {
+  const res = await apiFetch(`/api/notes/${noteId}/pages`, {
+    method: "POST",
+    body: JSON.stringify({ title }),
+  });
+  return (await res.json()).id;
+}
 
 const percentile = (values, p) => {
   const sorted = [...values].sort((a, b) => a - b);
@@ -27,7 +45,9 @@ const summary = (values) => ({
 });
 
 async function newPage(browser, cpuRate) {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await addSessionCookies(context, BASE, cookie);
+  const page = await context.newPage();
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: cpuRate });
   await page.addInitScript(() => {
@@ -74,6 +94,8 @@ async function measureNotes(browser, cpuRate) {
     () => performance.getEntriesByName("notes:first-render")[0].startTime,
   );
   const rowsInDom = await page.locator(".note-row").count();
+  let pageRequests = 0;
+  page.on("request", (r) => r.url().includes("/pages?limit=") && (pageRequests += 1));
   const scroll = await page.evaluate(async () => {
     const el = document.querySelector("[data-testid=note-scroll]");
     const start = performance.now();
@@ -94,12 +116,17 @@ async function measureNotes(browser, cpuRate) {
   const heapMB = await page.evaluate(
     () => +(performance.memory?.usedJSHeapSize / 1048576).toFixed(1),
   );
+  const scrolledRows = await page.evaluate(() =>
+    Math.round(document.querySelector("[data-testid=note-scroll]").scrollTop / 72),
+  );
   await page.close();
   return {
     firstRenderMs: +firstRenderMs.toFixed(1),
     rowsInDom,
     scrollFps: scroll.fps,
     scrollLongTasks,
+    scrolledRows,
+    pageRequestsWhileScrolling: pageRequests,
     heapMB,
   };
 }
@@ -112,7 +139,7 @@ async function openEditor(browser, cpuRate, room, query = "") {
 }
 
 async function measureTyping(browser, cpuRate, { paragraphs, collab = true }) {
-  const room = `bench-${Date.now()}-${paragraphs}-${cpuRate}`;
+  const room = await createPageViaApi(`bench ${paragraphs} x${cpuRate}`);
   const page = await openEditor(browser, cpuRate, room, collab ? "" : "?collab=0");
   // Navigation start → lazy editor chunk loaded, editor mounted and Y.js synced.
   const readyMs = await page.evaluate(
@@ -139,7 +166,7 @@ async function measureTyping(browser, cpuRate, { paragraphs, collab = true }) {
 }
 
 async function measureCollab(browser, cpuRate) {
-  const room = `collab-${Date.now()}-${cpuRate}`;
+  const room = await createPageViaApi(`collab x${cpuRate}`);
   const a = await openEditor(browser, cpuRate, room);
   const b = await openEditor(browser, cpuRate, room);
   await a.locator(".prose").click();
@@ -191,10 +218,58 @@ async function measureAi(browser, cpuRate, strategy, tokens = 2000) {
   return { ...result, longTasks };
 }
 
+async function timeRequest(path, iterations = 30) {
+  const latency = [];
+  const d1 = [];
+  let rowsRead = 0;
+  for (let i = 0; i < iterations; i += 1) {
+    const t0 = performance.now();
+    const res = await apiFetch(path);
+    await res.arrayBuffer();
+    latency.push(performance.now() - t0);
+    const timing = /d1;dur=([\d.]+)/.exec(res.headers.get("server-timing") ?? "");
+    if (timing) d1.push(Number(timing[1]));
+    rowsRead = Number(res.headers.get("x-d1-rows-read") ?? 0);
+  }
+  return { latencyMs: summary(latency), d1SqlMs: d1.length ? summary(d1) : null, rowsRead };
+}
+
+async function measureApi() {
+  const first = await (await apiFetch(`/api/notes/${noteId}/pages?limit=100`)).json();
+  let cursor = first.nextCursor;
+  for (let i = 1; i < 50 && cursor; i += 1) {
+    cursor = (
+      await (await apiFetch(`/api/notes/${noteId}/pages?limit=100&cursor=${cursor}`)).json()
+    ).nextCursor;
+  }
+  const anyPage = first.items[0].id;
+  return {
+    me: await timeRequest("/api/me"),
+    pageDetail: await timeRequest(`/api/pages/${anyPage}`),
+    listFirst100: await timeRequest(`/api/notes/${noteId}/pages?limit=100`),
+    listAfter5000: await timeRequest(`/api/notes/${noteId}/pages?limit=100&cursor=${cursor}`),
+    searchFtsJapanese: await timeRequest(`/api/search?q=${encodeURIComponent("ネットワーク")}`),
+    searchFtsEnglish: await timeRequest(`/api/search?q=Durable`),
+    searchFtsNoHit: await timeRequest(`/api/search?q=${encodeURIComponent("存在しない語句")}`),
+    searchLikeTwoChars: await timeRequest(`/api/search?q=${encodeURIComponent("設計")}`),
+    // Worst case for short terms: no match, so LIKE scans every accessible page.
+    searchLikeTwoCharsNoHit: await timeRequest(`/api/search?q=${encodeURIComponent("皆無")}`),
+  };
+}
+
 const worker = await startWorker(PORT);
 const browser = await launchBrowser();
-const results = { measuredAt: new Date().toISOString(), runs: [] };
+const results = { measuredAt: new Date().toISOString(), seedPages: SEED_PAGES, runs: [] };
 try {
+  cookie = await signInViaApi(BASE, `bench-${Date.now()}@example.com`);
+  noteId = (await (await apiFetch("/api/me")).json()).defaultNoteId;
+  const t0 = performance.now();
+  const seeded = await (
+    await apiFetch("/api/dev/seed", { method: "POST", body: JSON.stringify({ count: SEED_PAGES }) })
+  ).json();
+  results.seed = { ...seeded, clientMs: Math.round(performance.now() - t0) };
+  console.error(`seeded ${seeded.inserted} pages in ${seeded.ms} ms`);
+  results.api = await measureApi();
   for (const cpuRate of CPU_RATES) {
     console.error(`CPU throttle x${cpuRate}…`);
     results.runs.push({

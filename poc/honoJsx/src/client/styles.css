@@ -307,3 +307,67 @@ h1 {
   font-family: var(--font);
   line-height: 1.7;
 }
+
+/* Auth & list additions */
+.splash {
+  padding: 2rem;
+}
+.sign-in {
+  max-width: 24rem;
+  margin: 6rem auto;
+  padding: 0 1rem;
+}
+.sign-in form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sign-in label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+.sign-in input,
+.sign-in button,
+.primary-button {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: inherit;
+}
+.sign-in button,
+.primary-button {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+.dev-link {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+.link-button {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+}
+.notes-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
