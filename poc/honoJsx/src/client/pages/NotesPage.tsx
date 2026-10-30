@@ -1,9 +1,10 @@
-import { useContext, useEffect, useRef, useState } from "hono/jsx/dom";
-import type { PageListResponse } from "../../shared/types";
-import { createPage, fetchPageList } from "../api";
+import { useContext, useEffect, useMemo, useRef } from "hono/jsx/dom";
+import type { PageListItem, PageListResponse } from "../../shared/types";
+import { fetchPageList } from "../api";
 import { useInfiniteQuery } from "../lib/infiniteQuery";
 import { QueryClientContext } from "../lib/query";
 import { useVirtualizer } from "../lib/virtual";
+import { pageOutbox, pendingPageDetail, syncPendingPages, usePendingPages } from "../offline";
 import { router } from "../routing";
 
 const ROW_HEIGHT = 72;
@@ -18,14 +19,23 @@ const dateFormat = new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium", timeS
 export function NotesPage({ noteId }: { noteId: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const client = useContext(QueryClientContext);
-  const [creating, setCreating] = useState(false);
+  const allPending = usePendingPages();
   const list = useInfiniteQuery<PageListResponse, string | null>({
     queryKey: ["pages", noteId],
     initialPageParam: null,
     queryFn: ({ pageParam }) => fetchPageList(noteId, pageParam),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
-  const items = list.data?.pages.flatMap((p) => p.items) ?? [];
+  // Pages created on this device but not yet on the server are listed first.
+  const pending = useMemo(
+    () => allPending.filter((p) => p.noteId === noteId).map(pendingPageDetail),
+    [allPending, noteId],
+  );
+  const pendingIds = useMemo(() => new Set(pending.map((p) => p.id)), [pending]);
+  const items: (PageListItem & { pending?: boolean })[] = [
+    ...pending.map((p) => ({ ...p, pending: true })),
+    ...(list.data?.pages.flatMap((p) => p.items) ?? []).filter((p) => !pendingIds.has(p.id)),
+  ];
   const firstPage = list.data?.pages[0];
   const virtualizer = useVirtualizer({
     count: items.length + (list.hasNextPage ? 1 : 0),
@@ -52,16 +62,14 @@ export function NotesPage({ noteId }: { noteId: string }) {
     }
   }, [list.status]);
 
-  const create = async () => {
-    setCreating(true);
-    try {
-      const time = new Intl.DateTimeFormat("ja-JP", { timeStyle: "medium" }).format(new Date());
-      const { id } = await createPage(noteId, `新しいページ ${time}`);
-      await client?.invalidateQueries({ queryKey: ["pages", noteId] });
-      router.navigate(`/notes/${id}`);
-    } finally {
-      setCreating(false);
-    }
+  // Creation always goes through the outbox (client-generated id), online or offline:
+  // the editor opens at once and the page is sent now or when the connection is back.
+  const create = () => {
+    const time = new Intl.DateTimeFormat("ja-JP", { timeStyle: "medium" }).format(new Date());
+    const id = crypto.randomUUID();
+    pageOutbox.add({ id, noteId, title: `新しいページ ${time}`, createdAt: Date.now() });
+    if (client) void syncPendingPages(client);
+    router.navigate(`/notes/${id}`);
   };
 
   if (list.status === "pending") return <p class="muted">読み込み中…</p>;
@@ -71,16 +79,13 @@ export function NotesPage({ noteId }: { noteId: string }) {
     <section class="notes">
       <header class="notes-header">
         <h1>
-          ノート一覧 <span class="muted">{(firstPage?.total ?? 0).toLocaleString()} 件</span>
+          ノート一覧{" "}
+          <span class="muted">
+            {((firstPage?.total ?? 0) + pending.length).toLocaleString()} 件
+          </span>
         </h1>
         {firstPage && firstPage.role !== "viewer" && (
-          <button
-            type="button"
-            class="primary-button"
-            disabled={creating}
-            onClick={() => void create()}
-            data-testid="new-page"
-          >
+          <button type="button" class="primary-button" onClick={create} data-testid="new-page">
             新規ページ
           </button>
         )}
@@ -107,7 +112,10 @@ export function NotesPage({ noteId }: { noteId: string }) {
                 class="note-row"
                 style={{ transform: `translateY(${row.start}px)`, height: `${ROW_HEIGHT}px` }}
               >
-                <span class="note-title">{page.title}</span>
+                <span class="note-title">
+                  {page.title}
+                  {page.pending && <span class="badge">未同期</span>}
+                </span>
                 <span class="note-meta">
                   {page.preview || "（本文なし）"} ・ {dateFormat.format(new Date(page.updatedAt))}
                 </span>

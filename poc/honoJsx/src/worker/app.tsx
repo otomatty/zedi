@@ -26,6 +26,9 @@ interface SessionUser {
 
 type AppEnv = { Bindings: Env; Variables: { user: SessionUser } };
 
+/** Page ids are UUIDs; clients may generate them when creating pages offline. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Routes realtime (`/parties/*`) requests to a Durable Object; injected so the app does
  * not import `cloudflare:workers`-only modules directly.
@@ -107,13 +110,25 @@ export function createApp({ routeRealtime }: { routeRealtime?: RealtimeRouter } 
     const access = await getNoteAccess(c.env.DB, c.get("user").id, c.req.param("noteId"));
     if (!access) return c.notFound();
     if (!canEdit(access.role)) return c.json({ error: "forbidden" }, 403);
-    const body = await c.req.json<{ title?: unknown }>().catch(() => ({}) as { title?: unknown });
+    type Body = { id?: unknown; title?: unknown };
+    const body = await c.req.json<Body>().catch(() => ({}) as Body);
     const title = typeof body.title === "string" ? body.title.trim() : "";
     if (title.length === 0 || title.length > 200) return c.json({ error: "invalid title" }, 400);
+    // Optional client-generated id (offline creation); retries with the same id are safe.
+    if (body.id !== undefined && !(typeof body.id === "string" && UUID.test(body.id))) {
+      return c.json({ error: "invalid id" }, 400);
+    }
     const cost = newCost();
-    const id = await createPage(c.env.DB, access.noteId, title, cost);
+    const result = await createPage(
+      c.env.DB,
+      access.noteId,
+      title,
+      cost,
+      typeof body.id === "string" ? body.id.toLowerCase() : undefined,
+    );
     withCost(c, cost);
-    return c.json({ id }, 201);
+    if ("conflict" in result) return c.json({ error: "id already in use" }, 409);
+    return c.json({ id: result.id }, result.created ? 201 : 200);
   });
 
   api.post("/notes/:noteId/members", async (c) => {

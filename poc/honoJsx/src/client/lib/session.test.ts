@@ -20,6 +20,21 @@ describe("createSessionStore", () => {
     expect(store.get()).toEqual({ status: "signedOut" });
   });
 
+  it("reports the session as unavailable when /api/me cannot be reached, and recovers", async () => {
+    let online = false;
+    const store = createSessionStore(async () => {
+      if (!online) throw new TypeError("Failed to fetch");
+      return me;
+    });
+
+    await store.refresh();
+    expect(store.get()).toEqual({ status: "unavailable" });
+
+    online = true;
+    await store.refresh();
+    expect(store.get()).toEqual({ status: "signedIn", me });
+  });
+
   it("can be reset to signed out (after sign-out)", async () => {
     const store = createSessionStore(async () => me);
     await store.refresh();

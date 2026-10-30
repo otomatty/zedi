@@ -37,24 +37,34 @@ export async function listPages(
 
 /**
  * Creates a page; FTS indexing and the note's page count are handled by triggers.
- * ページを作る。全文検索索引とページ数はトリガーが更新する。
+ * A client-generated `id` makes the call idempotent so an offline creation can be retried:
+ * `created` is false when this note already has the page, and `conflict` when the id belongs
+ * to another note.
+ * ページを作る（全文検索索引とページ数はトリガーが更新）。クライアント生成の `id` で
+ * 冪等にし、オフライン作成を再送できるようにする。
  */
 export async function createPage(
   db: D1Database,
   noteId: string,
   title: string,
   cost: D1Cost,
-): Promise<string> {
-  const id = crypto.randomUUID();
+  id: string = crypto.randomUUID(),
+): Promise<{ id: string; created: boolean } | { conflict: true }> {
   const now = Date.now();
-  const result = await db
-    .prepare(
-      "INSERT INTO pages (id, note_id, title, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)",
-    )
-    .bind(id, noteId, title, now)
-    .run();
-  addCost(cost, result.meta);
-  return id;
+  const [insert, existing] = await db.batch([
+    db
+      .prepare(
+        `INSERT INTO pages (id, note_id, title, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)
+         ON CONFLICT (id) DO NOTHING`,
+      )
+      .bind(id, noteId, title, now),
+    db.prepare("SELECT note_id AS noteId FROM pages WHERE id = ?1").bind(id),
+  ]);
+  if (insert) addCost(cost, insert.meta);
+  if (existing) addCost(cost, existing.meta);
+  const owner = (existing?.results[0] as { noteId: string } | undefined)?.noteId;
+  if (owner !== noteId) return { conflict: true };
+  return { id, created: (insert?.meta.changes ?? 0) > 0 };
 }
 
 /**

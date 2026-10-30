@@ -126,6 +126,48 @@ describe("pages API on D1", () => {
     ).toBe(201);
   });
 
+  it("creates a page under a client-generated id exactly once, so offline creations can be retried", async () => {
+    const cookie = await signIn(uniqueEmail("offline"));
+    const { defaultNoteId } = await me(cookie);
+    const id = crypto.randomUUID();
+    const post = () =>
+      api(`/api/notes/${defaultNoteId}/pages`, cookie, {
+        method: "POST",
+        body: { id, title: "オフラインで作ったページ" },
+      });
+
+    const first = await post();
+    const retry = await post();
+
+    expect(first.status).toBe(201);
+    expect(await first.json()).toEqual({ id });
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual({ id });
+    const list = (await (
+      await api(`/api/notes/${defaultNoteId}/pages`, cookie)
+    ).json()) as PageList;
+    expect(list.items.map((i) => i.id)).toEqual([id]);
+    expect(list.total).toBe(1);
+  });
+
+  it("refuses a client-generated id that is malformed or already used in another note", async () => {
+    const owner = await signIn(uniqueEmail("taken"));
+    const other = await signIn(uniqueEmail("taker"));
+    const { defaultNoteId: ownerNote } = await me(owner);
+    const { defaultNoteId: otherNote } = await me(other);
+    const id = crypto.randomUUID();
+    const create = (cookie: string, noteId: string, pageId: string) =>
+      api(`/api/notes/${noteId}/pages`, cookie, {
+        method: "POST",
+        body: { id: pageId, title: "x" },
+      });
+    expect((await create(owner, ownerNote, id)).status).toBe(201);
+
+    expect((await create(other, otherNote, id)).status).toBe(409);
+    expect((await create(other, otherNote, "not-a-uuid")).status).toBe(400);
+    expect((await api(`/api/pages/${id}`, other)).status).toBe(404);
+  });
+
   it("seeds pages in multi-row batches within D1's bound-parameter limit", async () => {
     const cookie = await signIn(uniqueEmail("seed"));
     const { defaultNoteId } = await me(cookie);

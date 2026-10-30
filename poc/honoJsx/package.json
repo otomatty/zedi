@@ -33,6 +33,7 @@
     "hono": "^4.13.14",
     "marked": "^18.1.2",
     "partyserver": "^0.5.10",
+    "y-indexeddb": "^9.0.12",
     "y-partyserver": "^2.2.0",
     "yjs": "^13.6.33"
   },
@@ -40,6 +41,7 @@
     "@cloudflare/vitest-plugin": "^1.4.11",
     "@cloudflare/workers-types": "^5.20261030.1",
     "@testing-library/dom": "^10.4.2",
+    "fake-indexeddb": "^6.2.7",
     "happy-dom": "^21.0.4",
     "lib0": "^0.2.117",
     "typescript": "^7.0.2",

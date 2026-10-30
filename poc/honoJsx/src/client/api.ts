@@ -43,10 +43,13 @@ export const fetchPage = (id: string) =>
 export const searchPages = (q: string) =>
   request<SearchResponse>(`/api/search?q=${encodeURIComponent(q)}`);
 
-/** Creates a page in a note and returns its id. */
-export const createPage = (noteId: string, title: string) =>
+/**
+ * Creates a page in a note under a client-generated id (safe to retry) and returns the id.
+ * クライアント生成 id でページを作る（再送しても 1 件だけ作られる）。
+ */
+export const createPage = (noteId: string, title: string, id: string) =>
   request<{ id: string }>(`/api/notes/${encodeURIComponent(noteId)}/pages`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({ id, title }),
   });

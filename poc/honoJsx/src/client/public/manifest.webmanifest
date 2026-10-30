@@ -1,0 +1,15 @@
+{
+  "name": "Zedi PoC",
+  "short_name": "Zedi",
+  "description": "Zedi PoC: notes and collaborative editing on hono/jsx/dom and Cloudflare Workers",
+  "lang": "ja",
+  "start_url": "/notes",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

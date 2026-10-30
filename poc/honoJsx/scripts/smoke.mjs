@@ -3,7 +3,9 @@
  * Browser smoke test against a local `wrangler dev` with a fresh D1:
  * magic-link sign-in through the UI, page creation, editor sync, `#tag` / `[[WikiLink]]` /
  * `/` commands, D1 projection + full-text search, infinite list, access control between
- * two users (404 → viewer, read-only), sign-out and AI streaming. Run `bun run build` first.
+ * two users (404 → viewer, read-only), AI streaming, offline use through the service worker
+ * (app shell, cached list, local page copies, pages created offline) and sign-out.
+ * Run `bun run build` first.
  * 空の D1 に対して、サインインから共有・検索・サインアウトまでをブラウザで確認するスモークテスト。
  */
 import assert from "node:assert/strict";
@@ -170,11 +172,104 @@ try {
     assert.equal(await output.locator(".md-live").count(), 0);
   });
 
+  await check("the service worker controls the app after the first visit", async () => {
+    await page.goto(`${BASE}/notes`);
+    await page.waitForFunction(() => navigator.serviceWorker?.controller != null, null, {
+      timeout: 10_000,
+    });
+    // Visit the page and the list once online so their data is on the device.
+    await page.goto(pageUrl);
+    await page.waitForSelector("[data-status=synced]", { timeout: 10_000 });
+    await page.goto(`${BASE}/notes`);
+    await page.waitForSelector(".note-row");
+  });
+
+  let offlinePageUrl = "";
+  await check("offline, the list and a visited page reopen from the device", async () => {
+    await ownerContext.setOffline(true);
+    await page.goto(`${BASE}/notes`);
+    await page.waitForSelector("[data-testid=offline-banner]");
+    await page.waitForSelector(".note-row");
+    assert.match(await page.locator(".notes h1").textContent(), /301 件/);
+    assert.equal(await page.getByRole("button", { name: "サインアウト" }).isDisabled(), true);
+    await page.goto(pageUrl);
+    await page.waitForFunction(
+      () => document.querySelector(".prose")?.textContent.includes("スモーク検証用の本文"),
+      null,
+      { timeout: 10_000 },
+    );
+    assert.equal(
+      await page.locator("[data-testid=sync-status]").getAttribute("data-status"),
+      "offline",
+    );
+  });
+
+  await check(
+    "offline, a new page can be written, is listed as unsynced and is searchable",
+    async () => {
+      await page.goto(`${BASE}/notes`);
+      await page.click("[data-testid=new-page]");
+      await page.waitForURL(/\/notes\/[0-9a-f-]{36}$/);
+      await page.waitForSelector("[data-status=local]");
+      offlinePageUrl = page.url();
+      await page.locator(".prose").click();
+      await page.keyboard.type("オフラインで書いた本文");
+      await page.waitForTimeout(300);
+      await page.click(".sidebar a[href='/notes']");
+      await page.waitForSelector(".note-row .badge");
+      assert.match(await page.locator(".notes h1").textContent(), /302 件/);
+      await page.keyboard.press("Control+k");
+      await page.waitForSelector("dialog.palette[open]");
+      await page.keyboard.type("新しいページ");
+      await page.waitForSelector(".palette-option");
+      await page.keyboard.press("Escape");
+    },
+  );
+
+  await check(
+    "back online, the page is created and the offline text reaches the server",
+    async () => {
+      await ownerContext.setOffline(false);
+      const id = offlinePageUrl.split("/").at(-1);
+      await page.waitForFunction(
+        async (pageId) => (await fetch(`/api/pages/${pageId}`)).status === 200,
+        id,
+        { polling: 250, timeout: 10_000 },
+      );
+      await page.waitForFunction(() => !document.querySelector(".note-row .badge"));
+      // Opening the page connects it; Y.js merges the local copy into the Durable Object.
+      await page.goto(offlinePageUrl);
+      await page.waitForSelector("[data-status=synced]", { timeout: 10_000 });
+      // A fresh browser has no local copy, so it can only see the text through the server.
+      const fresh = await browser.newContext();
+      await fresh.addCookies(await ownerContext.cookies());
+      const other = await fresh.newPage();
+      await other.goto(offlinePageUrl);
+      await other.waitForSelector("[data-status=synced]", { timeout: 10_000 });
+      await other.waitForFunction(
+        () => document.querySelector(".prose")?.textContent.includes("オフラインで書いた本文"),
+        null,
+        { timeout: 10_000 },
+      );
+      await fresh.close();
+    },
+  );
+
   await check("sign-out returns to the sign-in page and revokes API access", async () => {
     await page.goto(`${BASE}/notes`);
     await page.getByRole("button", { name: "サインアウト" }).click();
     await page.waitForSelector("[data-testid=sign-in-email]");
     assert.equal((await apiFrom(page, "/api/me")).status, 401);
+  });
+
+  await check("sign-out removes cached API data and local page copies", async () => {
+    const left = await page.evaluate(async () => ({
+      caches: (await caches.keys()).filter((n) => n.startsWith("zedi-api-")),
+      databases: (await indexedDB.databases())
+        .map((db) => db.name)
+        .filter((n) => n?.startsWith("zedi:page:")),
+    }));
+    assert.deepEqual(left, { caches: [], databases: [] });
   });
 
   await check("no uncaught page errors", async () => assert.deepEqual(errors, []));

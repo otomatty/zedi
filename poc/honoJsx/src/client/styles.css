@@ -7,6 +7,8 @@
   --border: #e5e7eb;
   --accent: #2563eb;
   --accent-soft: #dbeafe;
+  --warn: #92400e;
+  --warn-soft: #fef3c7;
   --radius: 8px;
   --font: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
   color-scheme: light dark;
@@ -20,6 +22,8 @@
     --border: #2a2f3a;
     --accent: #60a5fa;
     --accent-soft: #1e3a5f;
+    --warn: #fcd34d;
+    --warn-soft: #3b2f12;
   }
 }
 
@@ -190,6 +194,31 @@ h1 {
 .hint {
   font-size: 0.85rem;
   margin: 0 0 8px;
+}
+.offline-banner {
+  font-size: 0.85rem;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.badge {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  vertical-align: middle;
+}
+.long-page {
+  font-size: 0.85rem;
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--warn-soft);
+  color: var(--warn);
 }
 .editor-host {
   flex: 1;

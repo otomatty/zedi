@@ -8,7 +8,9 @@ export interface Me {
 export type SessionState =
   | { status: "loading" }
   | { status: "signedOut" }
-  | { status: "signedIn"; me: Me };
+  | { status: "signedIn"; me: Me }
+  /** `/api/me` could not be reached and nothing was cached (offline before the first visit). */
+  | { status: "unavailable" };
 
 /**
  * Tiny observable session store; `fetchMe` resolves null when there is no session.
@@ -28,8 +30,12 @@ export function createSessionStore(fetchMe: () => Promise<Me | null>) {
       return () => listeners.delete(listener);
     },
     async refresh() {
-      const me = await fetchMe();
-      set(me ? { status: "signedIn", me } : { status: "signedOut" });
+      try {
+        const me = await fetchMe();
+        set(me ? { status: "signedIn", me } : { status: "signedOut" });
+      } catch {
+        set({ status: "unavailable" });
+      }
     },
     signOut() {
       set({ status: "signedOut" });

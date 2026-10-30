@@ -17,6 +17,8 @@ const browserHistory: HistoryLike = {
 /** The app-wide router instance (History API). */
 export const router = createRouter<PageId>(
   [
+    // `/` is the Worker's SSR landing page online; offline the cached app shell lands here.
+    { path: "/", value: "notes" },
     { path: "/notes", value: "notes" },
     { path: "/notes/:id", value: "editor" },
     { path: "/ai", value: "ai" },
