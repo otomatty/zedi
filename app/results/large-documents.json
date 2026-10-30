@@ -195,16 +195,6 @@
       },
       "rowsRead": 11
     },
-    "listAfter5000": {
-      "latencyMs": {
-        "n": 30,
-        "p50": 10.2,
-        "p95": 13.2,
-        "max": 16.4
-      },
-      "d1SqlMs": null,
-      "rowsRead": 0
-    },
     "searchFtsJapanese": {
       "latencyMs": {
         "n": 30,

@@ -67,10 +67,10 @@ The manifest and icon live in `src/client/public/`. The service worker (`src/cli
 On top of that:
 
 - **Page content**: each opened page keeps a Y.js copy in IndexedDB (`y-indexeddb`, `zedi:page:<id>`). It reopens and accepts edits offline, and Y.js merges the edits when the WebSocket reconnects.
-- **Creating pages**: always through a persistent outbox (`src/client/lib/outbox.ts`) with a client-generated UUID, online or not. `POST /api/notes/:noteId/pages` accepts the id and is idempotent (201 created, 200 retry, 409 if the id belongs to another note, 400 if malformed). The editor opens at once; a page the server does not know yet is shown as "unsynced", and its room connects once the page exists. The queue is sent at start-up, when the connection returns, and after each creation; a refusal (4xx) is shown to the user.
+- **Creating pages**: always through a persistent outbox (`src/client/lib/outbox.ts`) with a client-generated UUID, online or not. `POST /api/notes/:noteId/pages` accepts the id and is idempotent (201 created, 200 retry, 409 if the id belongs to another note, 400 if malformed). The editor opens at once; a page the server does not know yet is shown as "unsynced", and its room connects once the page exists. The queue is sent at start-up, when the connection returns, and after each creation (a page created while a sync runs goes out in the same run). Refusals a retry cannot fix (400, 403, 404, 409, 410, 413, 422) leave the queue and are shown to the user; 401 (the session expired offline), 408, 425, 429, 5xx and network errors keep the page for the next sync.
 - **Queries** run in TanStack Query's `offlineFirst` mode so the service worker can answer them; when search cannot reach the server, `⌘K` matches the titles and previews already on the device.
 - **Session**: `/api/me` comes from the cache offline. If nothing is cached, the app says it cannot connect and offers a retry.
-- **Sign-out** is disabled offline (it would discard unsynced edits) and deletes the API cache and every local page copy.
+- **Sign-out** is disabled offline (it would discard unsynced edits). Once the server confirms the session has ended, it deletes the API cache, every local page copy and the queue of unsent pages; if the server refuses, the user stays signed in and is told so.
 
 ### Long content (`src/shared/import/splitDocument.ts`)
 
@@ -100,7 +100,7 @@ Spec for splitting web clips and PDF text into pages, based on the large-documen
 bun install
 cp .dev.vars.example .dev.vars   # local BETTER_AUTH_SECRET and ENVIRONMENT=development
 bun run test          # unit tests (Node / happy-dom) + integration tests (workerd with D1 and DOs)
-bun run typecheck     # client (hono/jsx/dom) and worker (hono/jsx) are checked separately
+bun run typecheck     # client (hono/jsx/dom), worker (hono/jsx) and Node-run tests are checked separately
 bun run build         # build the SPA into dist/client
 bun run db:migrate    # apply migrations to the local D1
 bun run dev:worker    # wrangler dev (http://127.0.0.1:8787)
@@ -111,9 +111,12 @@ bun run measure       # seed 10,000 pages, measure the API and the browser -> re
 ONLY=largeDoc CPU_RATES=4 OUTPUT=results/large-documents.json bun run measure
 # CPU profile while typing (build without minification first)
 bunx vite build --minify false && node scripts/profileTyping.mjs
-# Before/after the y-tiptap patch: build once with the patch reverted and once with it,
-# then run this for each bundle, alternating -> results/y-tiptap-patch.json
-ONLY=largeDocPatch CPU_RATES=4 SEED_PAGES=10 bun run measure
+# Before/after the y-tiptap patch: build once with the patch reverted and once with it, and
+# run each bundle in turn with its own OUTPUT (N = run number) so no run overwrites another.
+# Then copy each run's `largeDocPatch` into `runs.orig` / `runs.patched` of
+# results/y-tiptap-patch.json and recompute `medianP50` from them.
+ONLY=largeDocPatch CPU_RATES=4 SEED_PAGES=10 OUTPUT=results/raw/patch-orig-N.json bun run measure
+ONLY=largeDocPatch CPU_RATES=4 SEED_PAGES=10 OUTPUT=results/raw/patch-on-N.json bun run measure
 ```
 
 `smoke` and `measure` use Playwright with Chromium; `CHROMIUM_PATH` can point at an existing Chromium. Each run starts from an empty local D1 (`.wrangler/runs/`).
@@ -129,23 +132,25 @@ For investigation, the editor URL accepts these switches:
 
 | Kind                                          | Count     | Scope                                       |
 | --------------------------------------------- | --------- | ------------------------------------------- |
-| Unit (Vitest, Node / happy-dom)               | 136       | See below                                   |
-| Integration (Vitest, workerd with D1 and DOs) | 19        | Migrations apply the same SQL as production |
-| Browser (`bun run smoke`)                     | 17 checks | See below                                   |
+| Unit (Vitest, Node / happy-dom)               | 164       | See below                                   |
+| Integration (Vitest, workerd with D1 and DOs) | 20        | Migrations apply the same SQL as production |
+| Browser (`bun run smoke`)                     | 18 checks | See below                                   |
 
 Unit tests cover:
 
-- The router, data and virtualizer adapters, the SSE parser and per-frame appending
+- The router (malformed percent-encoding does not stop it), data and virtualizer adapters, the SSE parser and per-frame appending
+- Lazy page loading (an error with a retry when the import fails)
 - The search planner, cursors, 100-parameter chunking and text extraction from Y.js
 - Markdown
   - Block splitting: equivalence with a full render, and the same result even when streamed one character at a time
-  - Renderer safety: raw HTML, `javascript:` links
+  - Renderer safety: raw HTML, `javascript:` links, `//host` and `/\host` links
   - Freezing completed blocks
 - Caret publish scheduling
 - Collaborative selection with the patched binding: the caret stays on the same characters after remote edits and after an editor change shares a transaction with a direct Yjs edit, undo/redo restore the caret, and typing within one undo step converts no selection
 - Splitting long content (heading levels, packing, even cuts, lists kept whole, index and links) and the long-page count
-- Offline: service-worker routing, the outbox (persistence, order, retry vs refusal, overlapping flushes), local search, the session's unavailable state, sign-out cleanup of local copies
-- `hono/jsx/dom` components (Testing Library)
+- Offline: service-worker routing and network-first responses (failed cache writes, no-store, 401), the outbox (persistence, order, which refusals are permanent, overlapping flushes, pages added mid-flush, clearing), local search, the session's unavailable state, sign-out (device data cleared only after the server confirms), refreshed search results after a sync
+- `hono/jsx/dom` components (Testing Library): the command palette, the search palette (starts empty when reopened), the list (a failed later page and its retry), the editor (viewers stay read-only with `?collab=0`)
+- Config: the deployable `wrangler.jsonc` never turns development mode on
 
 Integration tests cover:
 
@@ -157,6 +162,7 @@ Integration tests cover:
 - Creating a page under a client id exactly once (retry returns 200), and refusing a malformed id or one used in another note
 - WebSocket authorization (401 without a session, 404 without access, the owner connects) and viewer updates being ignored
 - DO-to-D1 projection, found afterwards by full-text search
+- A `null` JSON body answering 400, not 500
 
 Browser checks:
 
@@ -166,6 +172,7 @@ Browser checks:
 - The other tab shows a remote caret
 - Finding the projected text with full-text search in the palette
 - Loading more rows during infinite scroll
+- At 375px wide, the list and the editor get most of the screen width
 - 404 for an unshared user, then a read-only view once shared
 - AI streaming (plain text, and Markdown headings, lists, code, tables and quotes)
 - The service worker takes control; offline, the list and a visited page reopen, sign-out is disabled

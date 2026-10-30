@@ -39,6 +39,18 @@ describe("mockMarkdownTokens", () => {
     expect(mockMarkdownTokens(500, 3)).toEqual(tokens);
   });
 
+  it("mixes token sizes from 1 to 4 characters, as the benchmark workload says", () => {
+    // 計測用の負荷が 1 文字の断片ばかりに偏らないこと（シード 1 は計測スクリプトの既定値）。
+    // The benchmark workload must not collapse into one-character tokens (seed 1 is the default).
+    const sizes = new Map<number, number>();
+    for (const token of mockMarkdownTokens(2_000, 1)) {
+      sizes.set(token.length, (sizes.get(token.length) ?? 0) + 1);
+    }
+    for (const size of [1, 2, 3, 4]) {
+      expect(sizes.get(size) ?? 0, `${size}-character tokens`).toBeGreaterThan(200);
+    }
+  });
+
   it("streams a realistic Markdown answer (headings, lists, code, tables, quotes)", () => {
     const text = mockMarkdownTokens(2_000, 1).join("");
     expect(text).toMatch(/^## /m);

@@ -67,10 +67,10 @@ Y.js のエディタ連携（`@tiptap/y-tiptap`）には小さなパッチを当
 このほか:
 
 - **ページ本文**: 開いたページごとに Y.js の複製を IndexedDB に保持します（`y-indexeddb`、`zedi:page:<id>`）。オフラインでも開いて編集でき、WebSocket が再接続すると Y.js が編集を統合します。
-- **ページ作成**: オンラインかどうかにかかわらず、クライアント生成の UUID で永続キュー（`src/client/lib/outbox.ts`）を通します。`POST /api/notes/:noteId/pages` はこの id を受け付け、冪等です（新規 201、再送 200、別ノートの id は 409、不正な形式は 400）。エディタはすぐに開き、サーバーがまだ知らないページは「未同期」と表示して、ページができてからルームに接続します。キューは起動時・接続回復時・作成のたびに送り、拒否（4xx）は利用者に表示します。
+- **ページ作成**: オンラインかどうかにかかわらず、クライアント生成の UUID で永続キュー（`src/client/lib/outbox.ts`）を通します。`POST /api/notes/:noteId/pages` はこの id を受け付け、冪等です（新規 201、再送 200、別ノートの id は 409、不正な形式は 400）。エディタはすぐに開き、サーバーがまだ知らないページは「未同期」と表示して、ページができてからルームに接続します。キューは起動時・接続回復時・作成のたびに送ります（送信中に作ったページも同じ回で送る）。再試行で直らない拒否（400・403・404・409・410・413・422）はキューから外して利用者に表示し、401（オフライン中のセッション切れ）・408・425・429・5xx・通信失敗では次の同期まで保持します。
 - **クエリ**は TanStack Query の `offlineFirst` モードで実行し、Service Worker が応答できるようにしています。検索がサーバーに届かないときは、`⌘K` が端末にあるページのタイトルと冒頭を照合します。
 - **セッション**: オフラインでは `/api/me` をキャッシュから返します。キャッシュもなければ、接続できない旨と再試行ボタンを表示します。
-- **サインアウト**はオフライン中は無効です（未同期の編集が失われるため）。実行すると API キャッシュとページのローカル複製をすべて削除します。
+- **サインアウト**はオフライン中は無効です（未同期の編集が失われるため）。サーバーがセッションの終了を確認してから、API キャッシュ・ページのローカル複製・未送信のページの一覧をすべて削除します。失敗したときはサインイン状態のまま、その旨を表示します。
 
 ### 長いコンテンツ（`src/shared/import/splitDocument.ts`）
 
@@ -100,7 +100,7 @@ Y.js のエディタ連携（`@tiptap/y-tiptap`）には小さなパッチを当
 bun install
 cp .dev.vars.example .dev.vars   # BETTER_AUTH_SECRET と ENVIRONMENT=development（ローカル用）
 bun run test          # 単体テスト（Node / happy-dom）+ 統合テスト（workerd 上で D1・DO を使用）
-bun run typecheck     # クライアント（hono/jsx/dom）とワーカー（hono/jsx）を別々に型チェック
+bun run typecheck     # クライアント（hono/jsx/dom）・ワーカー（hono/jsx）・Node で動くテストを別々に型チェック
 bun run build         # SPA を dist/client にビルド
 bun run db:migrate    # ローカル D1 にマイグレーションを適用
 bun run dev:worker    # wrangler dev（http://127.0.0.1:8787）
@@ -111,9 +111,11 @@ bun run measure       # D1 に 1 万ページを投入して API とブラウザ
 ONLY=largeDoc CPU_RATES=4 OUTPUT=results/large-documents.json bun run measure
 # 入力中の CPU プロファイル（圧縮なしでビルドしてから）
 bunx vite build --minify false && node scripts/profileTyping.mjs
-# y-tiptap パッチの前後比較: パッチを戻したビルドと当てたビルドを用意し、
-# それぞれで交互に実行 → results/y-tiptap-patch.json
-ONLY=largeDocPatch CPU_RATES=4 SEED_PAGES=10 bun run measure
+# y-tiptap パッチの前後比較: パッチを戻したビルドと当てたビルドを用意し、上書きしないよう
+# 回ごとに別の OUTPUT（N は回数）で交互に実行する。各回の `largeDocPatch` を
+# results/y-tiptap-patch.json の `runs.orig` / `runs.patched` にまとめ、`medianP50` を計算し直す。
+ONLY=largeDocPatch CPU_RATES=4 SEED_PAGES=10 OUTPUT=results/raw/patch-orig-N.json bun run measure
+ONLY=largeDocPatch CPU_RATES=4 SEED_PAGES=10 OUTPUT=results/raw/patch-on-N.json bun run measure
 ```
 
 `smoke` と `measure` は Playwright と Chromium を使います。`CHROMIUM_PATH` で既存の Chromium を指定できます。どちらも実行のたびに空のローカル D1（`.wrangler/runs/`）を用意します。
@@ -129,23 +131,25 @@ ONLY=largeDocPatch CPU_RATES=4 SEED_PAGES=10 bun run measure
 
 | 種類                                       | 件数    | 内容                                    |
 | ------------------------------------------ | ------- | --------------------------------------- |
-| 単体（Vitest、Node / happy-dom）           | 136     | 下記                                    |
-| 統合（Vitest、workerd 上で D1・DO を使用） | 19      | マイグレーションは本番と同じ SQL を適用 |
-| ブラウザ（`bun run smoke`）                | 17 項目 | 下記                                    |
+| 単体（Vitest、Node / happy-dom）           | 164     | 下記                                    |
+| 統合（Vitest、workerd 上で D1・DO を使用） | 20      | マイグレーションは本番と同じ SQL を適用 |
+| ブラウザ（`bun run smoke`）                | 18 項目 | 下記                                    |
 
 単体テストの対象:
 
-- ルーター、データ取得や仮想リストのアダプタ、SSE パーサー、フレーム単位の追記
+- ルーター（不正なパーセントエンコードで止まらないこと）、データ取得や仮想リストのアダプタ、SSE パーサー、フレーム単位の追記
+- ページの遅延読み込み（失敗時のエラー表示と再試行）
 - 検索方法の判定、カーソル、100 パラメータ分割、Y.js からのテキスト抽出
 - Markdown
   - ブロック分割: 全文の描画との一致、1 文字ずつ流しても同じ結果になること
-  - 描画の安全性: 生の HTML、`javascript:` リンク
+  - 描画の安全性: 生の HTML、`javascript:` リンク、`//host` と `/\host` のリンク
   - 確定ブロックの固定
 - カーソル送信のスケジューリング
 - パッチ後の共同編集の選択範囲: 相手の編集後や、エディタの変更と Yjs の直接編集が 1 つのトランザクションにまとまった場合もカーソルが同じ文字の位置に残ること、undo/redo でカーソルが戻ること、1 つの undo ステップ内の入力では選択範囲を変換しないこと
 - 長いコンテンツの分割（見出しレベル、詰め込み、均等分割、リストを分けない、目次とリンク）と長文の数え方
-- オフライン: Service Worker の振り分け、送信キュー（永続化・順序・再試行と拒否の区別・同時実行）、ローカル検索、セッションの「接続不可」状態、サインアウト時のローカル複製の削除
-- `hono/jsx/dom` のコンポーネント（Testing Library）
+- オフライン: Service Worker の振り分けとネットワーク優先の応答（キャッシュ失敗・no-store・401）、送信キュー（永続化・順序・恒久的な拒否の判定・同時実行・送信中の追加・削除）、ローカル検索、セッションの「接続不可」状態、サインアウト（サーバーの確認後に端末のデータを削除）、同期後の検索結果の更新
+- `hono/jsx/dom` のコンポーネント（Testing Library）: コマンドパレット、検索パレット（開き直すと空から始まる）、一覧（途中のページの失敗と再試行）、エディタ（`?collab=0` でも閲覧者は編集不可）
+- 設定: デプロイされる `wrangler.jsonc` で開発モードが有効にならないこと
 
 統合テストの対象:
 
@@ -157,6 +161,7 @@ ONLY=largeDocPatch CPU_RATES=4 SEED_PAGES=10 bun run measure
 - クライアント id でのページ作成が 1 回だけ行われること（再送は 200）と、不正な id・別ノートで使用済みの id の拒否
 - WebSocket の認可（未ログインは 401、権限なしは 404、所有者は接続可）と、閲覧者の更新が無視されること
 - DO から D1 への書き戻しと、それを全文検索で見つけられること
+- JSON 本文が `null` のときに 500 ではなく 400 を返すこと
 
 ブラウザテストの項目:
 
@@ -166,10 +171,11 @@ ONLY=largeDocPatch CPU_RATES=4 SEED_PAGES=10 bun run measure
 - 別タブに相手のカーソルが表示されること
 - 書き戻した本文をパレットの全文検索で見つける
 - 無限スクロールでの追加読み込み
+- 幅 375px の画面で一覧とエディタが画面幅のほとんどを使えること
 - 未共有ユーザーへの 404 と、共有後の閲覧専用表示
 - AI ストリーミング（テキスト / Markdown の見出し・リスト・コード・表・引用）
 - Service Worker が制御を始めること。オフラインで一覧と開いたことのあるページが開け、サインアウトが無効になること
 - オフラインで新しいページを書け、「未同期」として一覧に出て、ローカル検索で見つかること
 - オンラインに戻るとページが作成され、ローカル複製のない別ブラウザからも本文が見えること
-- サインアウトと、それに伴う API キャッシュとページのローカル複製の削除
+- サインアウトと、それに伴う API キャッシュ・ページのローカル複製の削除
 - ページエラーがないこと

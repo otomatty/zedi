@@ -64,6 +64,8 @@ For reference, the current React app's initial JS is 4.46 MB raw / 1.31 MB gzip.
 
 The 4x Markdown figures are the range over three runs. The current React app's `react-markdown` re-parses the whole message on every update, the same approach as `md-naive`.
 
+Note: during these runs the mock stream (`mockMarkdownTokens`) had a PRNG bug and produced almost only one-character tokens (1–4 was intended). Token (event) counts were right, but the text was shorter than intended. With the fix the same token count yields about 2.5 times the text, which should make `md-naive` (whole text every frame) slower still, so the gap should widen. The runs have not been repeated with the fixed workload.
+
 ### Large documents (4x, input latency p50, three runs)
 
 Typing at the end of a 2,000-paragraph document:

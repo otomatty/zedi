@@ -71,8 +71,10 @@ export function mockMarkdownTokens(count: number, seed: number): string[] {
     const text = markdownSection(section);
     section += 1;
     for (let i = 0; i < text.length && tokens.length < count; ) {
-      state = (state * 1103515245 + 12345) >>> 0;
-      const size = 1 + (state % 4);
+      // 32-bit LCG: Math.imul keeps the product exact (a float product loses the low bits), and
+      // the high bits are used because an LCG's low bits repeat with a short period.
+      state = (Math.imul(state, 1103515245) + 12345) >>> 0;
+      const size = 1 + ((state >>> 16) % 4);
       tokens.push(text.slice(i, i + size));
       i += size;
     }

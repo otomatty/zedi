@@ -5,7 +5,7 @@
  * first so function names survive: `bunx vite build --minify false`.
  * 調査用: 大きな共同編集文書に入力する間の CPU プロファイルを取り、関数ごとの自己時間を出す。
  */
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { addSessionCookies, launchBrowser, signInViaApi, startWorker } from "./lib/harness.mjs";
 
@@ -74,11 +74,11 @@ try {
     `paragraphs=${PARAGRAPHS} collab=${COLLAB} cpu=x${CPU_RATE} sampled=${total.toFixed(0)}ms busy(excl idle/program/gc)=${(total - idle).toFixed(0)}ms`,
   );
   for (const [k, v] of top) console.log(`${v.toFixed(1).padStart(8)} ms  ${k}`);
+  // results/raw/ is gitignored, so it does not exist on a clean checkout.
+  const rawDir = join(import.meta.dirname, "../results/raw");
+  mkdirSync(rawDir, { recursive: true });
   writeFileSync(
-    join(
-      import.meta.dirname,
-      `../results/raw/profile-${COLLAB ? "collab" : "local"}-${PARAGRAPHS}.cpuprofile`,
-    ),
+    join(rawDir, `profile-${COLLAB ? "collab" : "local"}-${PARAGRAPHS}.cpuprofile`),
     JSON.stringify(profile),
   );
 } finally {

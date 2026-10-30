@@ -236,6 +236,8 @@ async function timeRequest(path, iterations = 30) {
     const t0 = performance.now();
     const res = await apiFetch(path);
     await res.arrayBuffer();
+    // Never record the timing of a request the API refused.
+    if (!res.ok) throw new Error(`${path} answered ${res.status}`);
     latency.push(performance.now() - t0);
     const timing = /d1;dur=([\d.]+)/.exec(res.headers.get("server-timing") ?? "");
     if (timing) d1.push(Number(timing[1]));
@@ -247,17 +249,22 @@ async function timeRequest(path, iterations = 30) {
 async function measureApi() {
   const first = await (await apiFetch(`/api/notes/${noteId}/pages?limit=100`)).json();
   let cursor = first.nextCursor;
-  for (let i = 1; i < 50 && cursor; i += 1) {
+  let pagesWalked = 1;
+  for (; pagesWalked < 50 && cursor; pagesWalked += 1) {
     cursor = (
       await (await apiFetch(`/api/notes/${noteId}/pages?limit=100&cursor=${cursor}`)).json()
     ).nextCursor;
   }
+  // Only meaningful with more than 5,000 seeded pages (SEED_PAGES); omitted otherwise.
+  const deepCursor = pagesWalked === 50 && cursor ? cursor : null;
   const anyPage = first.items[0].id;
   return {
     me: await timeRequest("/api/me"),
     pageDetail: await timeRequest(`/api/pages/${anyPage}`),
     listFirst100: await timeRequest(`/api/notes/${noteId}/pages?limit=100`),
-    listAfter5000: await timeRequest(`/api/notes/${noteId}/pages?limit=100&cursor=${cursor}`),
+    listAfter5000: deepCursor
+      ? await timeRequest(`/api/notes/${noteId}/pages?limit=100&cursor=${deepCursor}`)
+      : undefined,
     searchFtsJapanese: await timeRequest(`/api/search?q=${encodeURIComponent("ネットワーク")}`),
     searchFtsEnglish: await timeRequest(`/api/search?q=Durable`),
     searchFtsNoHit: await timeRequest(`/api/search?q=${encodeURIComponent("存在しない語句")}`),
