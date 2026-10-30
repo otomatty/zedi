@@ -43,7 +43,7 @@ If you discover a security vulnerability, **do not report it as a public Issue**
 #### Data storage
 
 - Local-only mode may use IndexedDB in the browser
-- Authenticated user data is stored in PostgreSQL (via `server/api`)
+- Authenticated user data is stored in Cloudflare D1 (via the Worker in `app/`)
 - All remote communication uses HTTPS
 
 #### Authentication

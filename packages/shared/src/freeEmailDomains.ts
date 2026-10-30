@@ -4,24 +4,13 @@
  *
  * ドメイン招待は社内 OSS / WG など閉じた組織のメールドメインを対象とした機能なので、
  * 誰でも取得できる Gmail / Outlook / Yahoo 等のドメインを許可してしまうと事実上
- * `unlisted` と区別がつかなくなる。本ファイルが「真実の値」となり、`server/api`
- * 側が同じ値を二重定義し、`src/lib/freeEmailDomainsSync.test.ts` が CI で同期を担保する。
+ * `unlisted` と区別がつかなくなる。
  *
  * Source-of-truth deny-list of free-webmail providers + domain-input
  * validation helpers used by the `note_domain_access` flow (#663). Domain
  * invitations are intended for closed organisational domains, so allowing
  * "anyone can register" providers (Gmail, Outlook, Yahoo, …) would collapse
- * the feature into `unlisted`. This file owns the canonical values; the
- * `server/api` package duplicates them in its own copy because it lives
- * outside the workspace, and `src/lib/freeEmailDomainsSync.test.ts` keeps
- * the two in sync via a CI drift detector.
- *
- * 同期義務 / Sync obligation:
- * - 本ファイルを編集したら `server/api/src/services/freeEmailDomains.ts` も同じ値で更新する。
- *   ドリフト検知テストが失敗したらどちらか片側しか更新していないので、もう片方を揃える。
- * - When this file changes, also update
- *   `server/api/src/services/freeEmailDomains.ts`. If the drift test fails, only
- *   one side was edited — sync the other.
+ * the feature into `unlisted`.
  */
 
 /**

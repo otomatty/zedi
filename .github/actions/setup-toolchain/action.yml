@@ -48,10 +48,10 @@ inputs:
   install-deps:
     description: >
       `"false"` を渡すとルートの `bun install --frozen-lockfile` をスキップする。
-      `server/mcp` など個別ワークスペースで install するジョブ向け。
+      `app` など個別ディレクトリで install するジョブ向け。
       / Set to `"false"` to skip the root `bun install --frozen-lockfile`,
       useful for jobs that install dependencies inside a specific workspace
-      (e.g. `server/mcp`).
+      (e.g. `app`).
     required: false
     default: "true"
 

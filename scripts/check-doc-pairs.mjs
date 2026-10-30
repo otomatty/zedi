@@ -14,7 +14,6 @@ const DOC_PAIRS = [
   { en: "CONTRIBUTING.md", ja: "CONTRIBUTING.ja.md" },
   { en: "SECURITY.md", ja: "SECURITY.ja.md" },
 
-  { en: "server/mcp/README.md", ja: "server/mcp/README.ja.md" },
   { en: "admin/README.md", ja: "admin/README.ja.md" },
   { en: "app/README.md", ja: "app/README.ja.md" },
   { en: "app/docs/verification.md", ja: "app/docs/verification.ja.md" },

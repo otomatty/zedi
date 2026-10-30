@@ -106,11 +106,11 @@ jobs:
 
 ### 2. 履歴が必要なジョブ / Jobs that need full git history
 
-PR のベースとの diff を取る `drizzle-migration-check` や `security` などは
+PR のベースとの diff を取る `security` などは
 checkout の `with:` で `fetch-depth: 0` を渡す。
 
-Jobs that diff against the PR base (e.g. `drizzle-migration-check` /
-`security`) pass `fetch-depth: 0` to the inner checkout:
+Jobs that diff against the PR base (e.g. `security`) pass `fetch-depth: 0`
+to the inner checkout:
 
 ```yaml
 steps:
@@ -128,12 +128,10 @@ steps:
 
 ### 3. Node のみのジョブ / Node-only jobs
 
-`drizzle-migration-check` / `drizzle-schema-drift-check` のように Node
-スクリプトだけ動かすジョブは `setup-bun: "false"` を渡せば Bun のセット
-アップと `bun install` を丸ごとスキップできる。
+Node スクリプトだけ動かすジョブは `setup-bun: "false"` を渡せば Bun の
+セットアップと `bun install` を丸ごとスキップできる。
 
-Node-only jobs (e.g. `drizzle-migration-check` /
-`drizzle-schema-drift-check`) can skip the Bun setup and the root install
+Jobs that only run Node scripts can skip the Bun setup and the root install
 entirely:
 
 ```yaml
@@ -152,11 +150,11 @@ steps:
 
 ### 4. ワークスペース個別 install / Workspace-only install
 
-`server/mcp` のようにルートでは install せず特定ワークスペースだけ install
+`app` のようにルートでは install せず特定ディレクトリだけ install
 するジョブは `install-deps: "false"` を渡し、後段で個別に install する。
 
 For jobs that skip the root install and instead install inside a specific
-workspace (e.g. `server/mcp`):
+directory (e.g. `app`):
 
 ```yaml
 steps:
@@ -171,8 +169,8 @@ steps:
     with:
       install-deps: "false"
 
-  - name: Install MCP dependencies
-    working-directory: server/mcp
+  - name: Install app dependencies
+    working-directory: app
     run: bun install --frozen-lockfile
 ```
 

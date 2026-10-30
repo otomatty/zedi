@@ -41,7 +41,7 @@
 ```
 /spec-test src/lib/validateEmail.ts
 # profile をチャットに貼り付けたうえで:
-/spec-test server/api/src/services/foo.ts
+/spec-test app/src/worker/foo.ts
 ```
 
 profile 無し + 未知リポジトリ → Phase 0 で短縮検出を実行し、不確実ならユーザーに確認。

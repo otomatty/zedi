@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-/** @type {Array<{ name: string; cwd?: string; args: string[]; preInstall?: boolean }>} */
+/** @type {Array<{ name: string; cwd?: string; args: string[] }>} */
 const workspaces = [
   { name: "src/ (frontend)", args: ["vitest", "run", "--coverage"] },
   {
@@ -28,30 +28,6 @@ const workspaces = [
     args: ["vitest", "run", "--coverage", "--config", "packages/ui/vitest.config.ts"],
   },
 ];
-
-const serverWorkspaces = [
-  {
-    name: "server/hocuspocus",
-    cwd: "server/hocuspocus",
-    preInstall: true,
-    args: ["vitest", "run", "--coverage", "--config", "vitest.config.ts"],
-  },
-  {
-    name: "server/mcp",
-    cwd: "server/mcp",
-    preInstall: true,
-    args: ["vitest", "run", "--coverage", "--config", "vitest.config.ts"],
-  },
-  {
-    name: "server/api",
-    cwd: "server/api",
-    preInstall: true,
-    args: ["vitest", "run", "--coverage"],
-  },
-];
-
-const includeServers = process.argv.includes("--with-servers");
-const targets = includeServers ? [...workspaces, ...serverWorkspaces] : workspaces;
 
 const spawnShell = process.platform === "win32";
 
@@ -84,17 +60,6 @@ function run(label, command, cwd) {
   exitOnSpawnFailure(result);
 }
 
-for (const workspace of targets) {
-  const cwd = path.join(repoRoot, workspace.cwd ?? ".");
-  if (workspace.preInstall) {
-    console.log(`\n--- Installing dependencies for ${workspace.name} ---\n`);
-    const install = spawnSync("bun", ["install", "--frozen-lockfile"], {
-      cwd,
-      stdio: "inherit",
-      env: process.env,
-      shell: spawnShell,
-    });
-    exitOnSpawnFailure(install);
-  }
-  run(workspace.name, workspace.args, cwd);
+for (const workspace of workspaces) {
+  run(workspace.name, workspace.args, path.join(repoRoot, workspace.cwd ?? "."));
 }

@@ -18,19 +18,15 @@ name: Dependabot bun.lock sync
 on:
   pull_request:
     # bun.lock を持つ全ディレクトリの package.json を監視する。
-    # dependabot.yml は現在 root / server/api / server/hocuspocus を対象にしているが、
-    # 過去 (PR #374) には admin/package.json も dependabot に更新されており、
-    # 将来 dependabot.yml が拡張されてもカバーできるよう全ロックを対象にする。
-    # Watch every package.json that has a sibling bun.lock. Although the
-    # current dependabot.yml only tracks root / server/api / server/hocuspocus,
-    # admin/package.json was once updated by Dependabot (PR #374), and this
-    # list also future-proofs the workflow against expansions of dependabot.yml.
+    # dependabot.yml の定期更新はルートだけだが、セキュリティ更新は admin/ や app/ の
+    # package.json も書き換える（過去には PR #374）。bun.lock を持つ全ディレクトリを対象にする。
+    # Watch every package.json that has a sibling bun.lock. dependabot.yml only
+    # schedules the root, but security updates also touch admin/ and app/
+    # (admin/package.json was updated in PR #374).
     paths:
       - "package.json"
       - "admin/package.json"
-      - "server/api/package.json"
-      - "server/hocuspocus/package.json"
-      - "server/mcp/package.json"
+      - "app/package.json"
 
 # bun install で書き戻すため contents: write が必要。
 # Needs `contents: write` to push the regenerated lockfile back to the PR branch.
@@ -83,9 +79,7 @@ jobs:
           for path in \
             "package.json" \
             "admin/package.json" \
-            "server/api/package.json" \
-            "server/hocuspocus/package.json" \
-            "server/mcp/package.json"; do
+            "app/package.json"; do
             if printf '%s\n' "$changed" | grep -Fxq "$path"; then
               dir=$(dirname "$path")
               dirs+=("$dir")

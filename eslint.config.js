@@ -179,9 +179,9 @@ export default tseslint.config(
       "react/no-multi-comp": "off",
     },
   },
-  // スクリプト・e2e・サーバー: console 可、行数制限は緩め
+  // スクリプト・e2e: console 可、行数制限は緩め
   {
-    files: ["scripts/**/*.ts", "e2e/**/*.ts", "server/**/*.ts", "terraform/**/*.ts"],
+    files: ["scripts/**/*.ts", "e2e/**/*.ts", "terraform/**/*.ts"],
     rules: {
       "no-console": "off",
       "max-lines-per-function": "off",

@@ -22,7 +22,7 @@ npm run dev:admin
 
 ## ローカル動作確認
 
-バックエンド（`docker-compose -f docker-compose.dev.yml up --build`）起動後、管理画面を起動し、以下を確認する。
+旧バックエンド（`server/api`）は削除済みのため、管理機能を `app/` に移すまではログインと以下の確認はできない。移したときの確認項目として残している。
 
 - [ ] `http://localhost:30001` で管理画面が表示される
 - [ ] ログイン（Google/GitHub）後、管理者ユーザーなら AI モデル一覧が表示される

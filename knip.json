@@ -5,7 +5,6 @@
   },
   "vitest": true,
   "playwright": true,
-  "ignoreBinaries": ["docker-compose"],
   "ignore": ["app/**"],
   "workspaces": {
     ".": {
@@ -24,18 +23,6 @@
     },
     "packages/ui": {
       "project": ["src/**/*.{ts,tsx}"]
-    },
-    "server/api": {
-      "entry": ["scripts/**/*.ts", "src/agents/index.ts", "src/__tests__/**/*.test.ts"],
-      "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts"],
-      "vitest": false
-    },
-    "server/hocuspocus": {
-      "project": ["src/**/*.ts"]
-    },
-    "server/mcp": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.ts"]
     }
   },
   "ignoreDependencies": [
@@ -89,16 +76,9 @@
     "tailwind-merge",
     "vaul",
     "y-websocket",
-    "aws-jwt-verify",
-    "ioredis",
     "@types/sql.js",
     "@vitejs/plugin-react",
-    "wrangler",
-    "@langchain/openai",
-    "@langchain/anthropic",
-    "@langchain/google-genai",
-    "@vitest/coverage-v8",
-    "cloudflare"
+    "wrangler"
   ],
   "ignoreExportsUsedInFile": {
     "interface": true,

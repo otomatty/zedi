@@ -150,54 +150,9 @@ bun run dev
 
 If the port is in use, the next available port is chosen automatically.
 
-### Parallel Development with Docker (Optional)
-
-To run multiple application instances in parallel:
-
-```bash
-# Build Docker image
-bun run docker:build
-
-# Start all instances (3 at once)
-bun run docker:up
-
-# Start in background
-bun run docker:up:d
-
-# Stop
-bun run docker:down
-
-# View logs
-bun run docker:logs
-```
-
-After startup, access:
-
-- Instance 1: http://localhost:30000
-- Instance 2: http://localhost:30001
-- Instance 3: http://localhost:30002
-
-When running multiple Docker instances, offset ports as needed (share the procedure within your team).
-
-> **Note:** Docker requires at least 8 GB RAM (16 GB+ recommended). For lightweight parallel dev, port configuration via environment variables is simpler.
-
 ### Environment Variables (Optional)
 
-For AI features, authentication, and API integration, create `.env.local`. See [.env.example](.env.example).
-
-```bash
-# REST API (Hono on Bun: server/api). Base URL the frontend calls.
-VITE_API_BASE_URL=http://localhost:3000
-
-# Real-time collaboration (Hocuspocus / Y.js: server/hocuspocus)
-VITE_REALTIME_URL=ws://localhost:1234   # Production: wss://realtime.zedi-note.app etc.
-
-# Pro plan billing (Polar, optional)
-# VITE_POLAR_PRO_MONTHLY_PRODUCT_ID=...
-# VITE_POLAR_PRO_YEARLY_PRODUCT_ID=...
-```
-
-On the server (`server/api`), configure Better Auth (`BETTER_AUTH_SECRET` / `BETTER_AUTH_URL`), PostgreSQL, Polar `POLAR_ACCESS_TOKEN`, email `RESEND_API_KEY`, etc. See [.env.example](.env.example).
+The old backend (`server/api`, `server/hocuspocus`, `server/mcp`) has been removed, so the current frontend has no API to sign in to or sync with. [.env.example](.env.example) only holds the values it needs to build. The rebuilt app in `app/` keeps its settings in `app/.dev.vars` (see [app/README.md](app/README.md)).
 
 > **Note:** The frontend runs locally without env vars (some data in IndexedDB). AI features can use provider API keys entered in the app settings.
 
@@ -205,30 +160,25 @@ On the server (`server/api`), configure Better Auth (`BETTER_AUTH_SECRET` / `BET
 
 ## 🛠 Tech Stack
 
-| Category          | Technology                                                                                              |
-| ----------------- | ------------------------------------------------------------------------------------------------------- |
-| **Frontend**      | React 19 + TypeScript 6 / React Router v7                                                               |
-| **Build Tool**    | Vite 8 (`@vitejs/plugin-react-swc`) / Bun                                                               |
-| **Editor**        | Tiptap 3 (ProseMirror) — tables / math (KaTeX) / code (lowlight) / collaboration (Y.js)                 |
-| **Styling**       | Tailwind CSS v4 + shadcn/ui (Radix UI primitives) / `next-themes`                                       |
-| **State / Data**  | Zustand 5 + TanStack Query 5 / React Hook Form + Zod                                                    |
-| **i18n**          | i18next + react-i18next                                                                                 |
-| **Visualization** | Recharts / `@xyflow/react` (React Flow) / Mermaid / KaTeX / Tesseract.js (OCR)                          |
-| **Auth**          | [Better Auth](https://better-auth.com/) (OAuth / session cookies)                                       |
-| **API**           | `server/api` — Hono on Bun + Drizzle ORM (PostgreSQL)                                                   |
-| **Database**      | PostgreSQL (Drizzle migrations: `server/api/drizzle/`) / IndexedDB (local browser)                      |
-| **Realtime**      | `server/hocuspocus` — Hocuspocus (Y.js) real-time collaboration                                         |
-| **MCP**           | `server/mcp` — Claude Code integration (stdio / HTTP; see [server/mcp/README.md](server/mcp/README.md)) |
-| **Storage**       | AWS S3 (upload via API, `@aws-sdk/client-s3`)                                                           |
-| **Billing**       | [Polar](https://polar.sh/) (`@polar-sh/sdk`) — Pro plan                                                 |
-| **Email**         | Resend                                                                                                  |
-| **AI**            | OpenAI / Anthropic / Google Gemini (pricing via OpenRouter)                                             |
-| **Admin**         | `admin/` — separate Vite + React app                                                                    |
-| **Workspaces**    | Bun workspaces: `packages/ui` (shadcn), `packages/shared` / `admin`                                     |
-| **Deploy**        | Cloudflare Workers Static Assets (dev) / Pages (prod) for frontend and admin                            |
-| **CI/CD**         | GitHub Actions (lint / typecheck / test / mutation / deploy)                                            |
-| **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker (mutation testing)                                    |
-| **Tooling**       | ESLint 9 / Prettier / Husky + lint-staged / commitlint / Knip                                           |
+| Category          | Technology                                                                                           |
+| ----------------- | ---------------------------------------------------------------------------------------------------- |
+| **Frontend**      | React 19 + TypeScript 6 / React Router v7                                                            |
+| **Build Tool**    | Vite 8 (`@vitejs/plugin-react-swc`) / Bun                                                            |
+| **Editor**        | Tiptap 3 (ProseMirror) — tables / math (KaTeX) / code (lowlight) / collaboration (Y.js)              |
+| **Styling**       | Tailwind CSS v4 + shadcn/ui (Radix UI primitives) / `next-themes`                                    |
+| **State / Data**  | Zustand 5 + TanStack Query 5 / React Hook Form + Zod                                                 |
+| **i18n**          | i18next + react-i18next                                                                              |
+| **Visualization** | Recharts / `@xyflow/react` (React Flow) / Mermaid / KaTeX / Tesseract.js (OCR)                       |
+| **Auth**          | [Better Auth](https://better-auth.com/) (OAuth / session cookies)                                    |
+| **Backend**       | `app/` (rebuild) — one Cloudflare Worker: Hono + Better Auth + D1 (Drizzle) + Durable Objects (Y.js) |
+| **Database**      | D1 (migrations: `app/migrations/`) / IndexedDB (local browser)                                       |
+| **AI**            | OpenAI / Anthropic / Google Gemini (pricing via OpenRouter)                                          |
+| **Admin**         | `admin/` — separate Vite + React app                                                                 |
+| **Workspaces**    | Bun workspaces: `packages/ui` (shadcn), `packages/shared` / `admin`                                  |
+| **Deploy**        | Cloudflare Workers Static Assets (dev) / Pages (prod) for frontend and admin                         |
+| **CI/CD**         | GitHub Actions (lint / typecheck / test / mutation / deploy)                                         |
+| **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker (mutation testing)                                 |
+| **Tooling**       | ESLint 9 / Prettier / Husky + lint-staged / commitlint / Knip                                        |
 
 ---
 
@@ -276,7 +226,7 @@ Quality metrics, testing policy (TDD / mutation), and how to write specification
 
 ## 📁 Project Structure
 
-Zedi is being rebuilt in `app/` on a single Cloudflare Worker (hono/jsx/dom, Hono, Better Auth, D1, Durable Objects). Once it covers the current app's features it replaces `src/`, `server/*` and `admin/`. See [app/README.md](app/README.md).
+Zedi is being rebuilt in `app/` on a single Cloudflare Worker (hono/jsx/dom, Hono, Better Auth, D1, Durable Objects). Once it covers the current app's features it replaces `src/` and `admin/`. The old backend (`server/*`) has been removed. See [app/README.md](app/README.md).
 
 ```
 app/                     # The rebuilt app (one Worker; outside the root workspace)
@@ -288,16 +238,10 @@ src/                     # Frontend (React + Vite)
 ├── stores/              # Zustand stores
 └── types/               # TypeScript types
 
-server/                  # Bun projects (separate installs; not deployed after the Railway removal)
-├── api/                 # REST / Auth API (Hono on Bun + Better Auth + Drizzle ORM)
-├── hocuspocus/          # Real-time collaboration (Hocuspocus / Y.js)
-└── mcp/                 # MCP server — Claude Code (stdio / HTTP). See [server/mcp/README.md](server/mcp/README.md)
-
 packages/                # Bun workspaces (shared libraries)
 └── ui/                  # `@zedi/ui` — shadcn/ui shared components
 
 admin/                   # Admin SPA (separate Vite + React + Tailwind / `@zedi/ui`)
-server/api/drizzle/      # PostgreSQL migrations (drizzle-kit source of truth)
 terraform/cloudflare/    # Cloudflare infrastructure
 e2e/                     # Playwright E2E tests
 scripts/                 # Setup / Stryker / maintenance scripts
@@ -330,9 +274,9 @@ This project is released under the **Business Source License 1.1 (BSL 1.1)** (so
 
 - [Tiptap](https://tiptap.dev/) — Editor framework (ProseMirror)
 - [shadcn/ui](https://ui.shadcn.com/) / [Radix UI](https://www.radix-ui.com/) — UI components
-- [Hocuspocus](https://hocuspocus.dev/) / [Y.js](https://yjs.dev/) — Real-time collaboration
+- [Y.js](https://yjs.dev/) / [PartyServer](https://github.com/cloudflare/partykit) — Real-time collaboration
 - [Better Auth](https://better-auth.com/) — Authentication (OAuth / session cookies)
-- [Hono](https://hono.dev/) — API framework (on Bun)
+- [Hono](https://hono.dev/) — API framework (on Cloudflare Workers)
 - [Drizzle ORM](https://orm.drizzle.team/) — TypeScript ORM
 - [Polar](https://polar.sh/) — Pro plan billing
 - [Cloudflare](https://www.cloudflare.com/) — Hosting

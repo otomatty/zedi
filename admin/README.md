@@ -22,7 +22,7 @@ npm run dev:admin
 
 ## Local verification
 
-After starting the backend (`docker-compose -f docker-compose.dev.yml up --build`), start the admin app and verify:
+The old backend (`server/api`) has been removed, so sign-in and the checks below cannot run until the admin features move to `app/`. Kept as the list of what to check then:
 
 - [ ] Admin UI loads at `http://localhost:30001`
 - [ ] After login (Google/GitHub), admin users see the AI model list

@@ -47,14 +47,13 @@ Zedi は **TDD を徹底**する。実装を先に書いてテストを後付け
 
 - 実装を読んで期待値を合わせる「写し絵テスト」（バグを仕様として固定化する）。
 - テスト失敗時に、根拠なく期待値だけを実装に合わせて書き換えること。
-- `server/api` / `server/mcp` への colocated テスト新規追加（配置規則を守る）。
 
 ### 品質指標 / Quality metrics
 
 | 指標                           | 方針                                                                                                                |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
 | **Mutation score（第一指標）** | Stryker。PR の `mutation-light` は `stryker.config.mjs` の `thresholds.break: 70`。目標は golden list で 85%+。     |
-| **行カバレッジ**               | 80% 以上を目標。Mutation が取れないスコープ（例: `server/api`）では coverage + 強いアサーションで担保。             |
+| **行カバレッジ**               | 80% 以上を目標。Mutation が取れないスコープ（例: `app/`）では coverage + 強いアサーションで担保。                   |
 | **CI**                         | `mutation-light`（限定 mutate）/ nightly（観測、`break: null`）。コマンドは `package.json` と `.github/workflows`。 |
 
 ### コマンド / Commands
@@ -70,7 +69,7 @@ bun run test:mutation:changed:list
 ```
 
 - フロント変更の Mutation: `.agents/skills/stryker-mutation-diff/SKILL.md` または `scripts/stryker-mutate-changed.mjs`。
-- `server/api` は Stryker 対象外 → coverage とアサーション強度で検証。
+- `app/` は Stryker 対象外 → coverage とアサーション強度で検証。
 
 ### エージェント用パイプライン / Agent test pipeline
 
@@ -87,23 +86,20 @@ _Overlay: `.agents/skills/spec-test/references/overlays/zedi.md`._
 
 ### テスト配置 / Test placement
 
-| スコープ                                            | 配置                                                      |
-| --------------------------------------------------- | --------------------------------------------------------- |
-| `src/`, `admin/`, `packages/*`, `server/hocuspocus` | 実装と同階層（`foo.ts` → `foo.test.ts`）                  |
-| `app/`                                              | 実装と同階層。workerd 上の統合テストは `*.worker.test.ts` |
-| `server/api`, `server/mcp`                          | `src/__tests__/` にソースツリーをミラー。同居禁止         |
-| E2E                                                 | `e2e/*.spec.ts`（Playwright）                             |
+| スコープ                       | 配置                                                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `src/`, `admin/`, `packages/*` | 実装と同階層（`foo.ts` → `foo.test.ts`）                                                                |
+| `app/`                         | 実装と同階層。workerd 上の統合テストは `*.worker.test.ts`、Node でしか動かないテストは `*.node.test.ts` |
+| E2E                            | `e2e/*.spec.ts`（Playwright）                                                                           |
 
 ---
 
 ## 技術スタック / Stack
 
-- **新アプリ（作り直し中）**: `app/`。`hono/jsx/dom` のクライアント、Hono の API、Better Auth、D1、Durable Objects（共同編集）を Cloudflare Worker 1 本で配信する。現行の `src/`・`server/*`・`admin/` の機能をここへ移し、揃ったらドメインを切り替えてリポジトリ直下へ移す（本番データはないので移行なし）。詳細は [`app/README.ja.md`](app/README.ja.md)、構成を決めた検証は [`app/docs/verification.ja.md`](app/docs/verification.ja.md)
+- **新アプリ（作り直し中）**: `app/`。`hono/jsx/dom` のクライアント、Hono の API、Better Auth、D1、Durable Objects（共同編集）を Cloudflare Worker 1 本で配信する。現行の `src/`・`admin/` の機能をここへ移し、揃ったらドメインを切り替えてリポジトリ直下へ移す（本番データはないので移行なし）。詳細は [`app/README.ja.md`](app/README.ja.md)、構成を決めた検証は [`app/docs/verification.ja.md`](app/docs/verification.ja.md)
 - **フロント（現行）**: React, TypeScript, Vite（`src/`）
 - **ランタイム**: Bun（Node ≥ 24 / Bun ≥ 1）
-- **API**: `server/api`（Hono on Bun）
-- **リアルタイム**: `server/hocuspocus`（Y.js）
-- **MCP**: `server/mcp`（stdio / HTTP。詳細: [`server/mcp/README.md`](server/mcp/README.md)）
+- **旧バックエンド**: `server/api`・`server/hocuspocus`・`server/mcp` は削除済み。API・認証・共同編集は `app/` の Worker が持つ。現行の `src/`・`admin/` は接続先がなく、作り直しの参照用に残している
 - **管理画面**: `admin/`
 - **共有パッケージ**: `packages/ui`（`@zedi/ui`）、`packages/shared`（`@zedi/shared`）
 - **対応プラットフォーム**: Web アプリ（PWA）のみ。Tauri のデスクトップ版は廃止済み
@@ -122,10 +118,6 @@ admin/               # 管理画面
 packages/
   ui/                # @zedi/ui
   shared/            # @zedi/shared（ピュア TS 定数）
-server/
-  api/               # Hono API（ルート workspace 外）
-  hocuspocus/        # リアルタイム（ルート workspace 外）
-  mcp/               # MCP（ルート workspace 外）
 e2e/                 # Playwright
 terraform/           # Cloudflare 旧 IaC（廃止予定。正本は各サービスの wrangler.jsonc）
 .agents/             # Agent Skills / サブエージェント正本（`bun run init` でミラー）
@@ -148,7 +140,6 @@ aidlc/               # AI-DLC workspace shell
 - 同一ドメインのフックが **2 つ以上** → `src/hooks/<domain>/`。汎用フックは `src/hooks/` 直下。テストは同居。
 - フック関連の import は相対パスではなく `@/`。
 - `src/lib/` も同一ドメインが 2 つ以上ならサブディレクトリ化。
-- `server/api`: ドメインロジック → `src/services/`、汎用ヘルパー → `src/lib/`。`*Service.ts` は `services/`。
 
 ---
 
@@ -159,35 +150,29 @@ aidlc/               # AI-DLC workspace shell
 - **目標**: API / MCP / リアルタイム / フロント / admin / オブジェクトストレージを **Cloudflare に集約**。Pages・Terraform は段階的に廃止（Railway は削除済み）。
 - **構成の正本**: 各サービスの `wrangler.jsonc`（Terraform ステートは使わない）。
 - **フロント / admin**: Pages → **Workers Static Assets**。
-- **CI/CD**: lint / test / typecheck / drizzle-check は GitHub Actions。デプロイ・プレビューは `wrangler deploy` / `wrangler versions upload`。
+- **CI/CD**: lint / test / typecheck は GitHub Actions。デプロイ・プレビューは `wrangler deploy` / `wrangler versions upload`。
 - **データ切替**: ビッグバン・カットオーバー（デュアルライトしない）。フェーズ・検証は `cloudflare-zedi` スキルと [#1088](https://github.com/otomatty/zedi/issues/1088) を正とする。
 - Cloudflare 作業時は汎用 Cloudflare 知識より **[`.agents/skills/cloudflare-zedi/SKILL.md`](.agents/skills/cloudflare-zedi/SKILL.md)** を先に読む。
 
 ### 現状（移行中） / Current (transitional)
 
-- ルート `workspaces` は **`packages/*` と `admin` のみ**。`server/api`・`hocuspocus`・`mcp` は **workspace 外**（サービス単位の `bun.lock`）。
-- ルート `bun install` では `server/*` の依存は入らない → 各サービスで `cd server/<service> && bun install`。
-- CI もサービスごとに install → typecheck / test（`api-typecheck`, `api-test`, `mcp-test`, `hocuspocus-test`）。`app/` は `app-test`（型チェック・単体・workerd 統合・ビルド）と `app-smoke`（ブラウザのスモークテスト）。
-- **デプロイ**: フロント / admin は dev が Workers Static Assets、本番が Pages（`deploy-dev.yml` / `deploy-prod.yml`）。`server/*` の Railway デプロイと DB マイグレーションの自動適用は削除済み。API / MCP の Worker 版は `deploy-api-worker-dev.yml` / `deploy-mcp-worker-dev.yml` で dev にだけデプロイされる。
-- `server/mcp`: ヘルス `/health`。必須 env: `ZEDI_API_URL`, `BETTER_AUTH_SECRET`（API と同値）。API 側に `MCP_REDIRECT_URI_ALLOW`。関連: [#564](https://github.com/otomatty/zedi/issues/564)。
+- ルート `workspaces` は **`packages/*` と `admin` のみ**。`app/` は **workspace 外**（独自の `bun.lock`）→ `cd app && bun install`。
+- CI: ルートは lint / typecheck / test / build / E2E。`app/` は `app-test`（型チェック・単体・workerd 統合・ビルド）と `app-smoke`（ブラウザのスモークテスト）。
+- **デプロイ**: フロント / admin は dev が Workers Static Assets、本番が Pages（`deploy-dev.yml` / `deploy-prod.yml`）。旧バックエンドとそのデプロイ（Railway・dev の API / MCP Worker）は削除済み。
 
-### `@zedi/shared` とサーバ二重定義 / Shared constants drift
+### `@zedi/shared` / Shared constants
 
 - `packages/shared` は React / Node 専用 API に依存しないピュア TS。
 - フロント・admin は `import { … } from "@zedi/shared/…"`。
-- `server/*` は workspace 外のため **直接 import 不可** → サーバ内に同値を二重定義し、フロントの vitest が `fs.readFileSync` で文字列一致を検証（例: `src/lib/tagCharacterClassSync.test.ts`）。
-- 値の更新は **shared とサーバ側を同時に**。ドリフトテストが落ちたら片方未更新。
 
 ---
 
 ## DB スキーマ変更（必読） / Database schema changes
 
-- **TS スキーマと SQL マイグレーションは常に対**。`server/api/src/schema/**/*.ts` を編集したら `server/api/drizzle/NNNN_*.sql` を追加し、`server/api/drizzle/meta/_journal.json` に追記。  
-  _Skipping this caused production 500s in PR #728._
-- **正本は `server/api/drizzle/` のみ**。他場所の SQL は適用されない。
-- 書き方: `--> statement-breakpoint`、原則 `IF NOT EXISTS` / `ON CONFLICT DO NOTHING`、必要なら同一ファイルでバックフィル。`drizzle-kit generate` の巨大 diff は手で削減（snapshot は当面コミットしない）。
-- CI: `drizzle-migration-check`。SQL 不要な変更のみ `[skip drizzle-check]`。
-- 自動適用はしない（Railway の PostgreSQL とともに `deploy-dev.yml` / `deploy-prod.yml` の migrate ジョブを削除した）。
+- DB は `app/` の D1 だけ。**正本は `app/migrations/NNNN_*.sql`**（`wrangler d1 migrations apply`）。
+- **Drizzle のスキーマ（`app/src/worker/db/schema.ts`）と SQL は常に対**。表や列を変えたら同じ PR で SQL を追加する。FTS5 とトリガーは SQL にだけある。  
+  _Skipping this caused production 500s in PR #728（旧 API で）._
+- 適用済みのマイグレーションは書き換えず、新しいファイルを足す。
 
 ---
 
