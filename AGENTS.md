@@ -105,7 +105,7 @@ _Overlay: `.agents/skills/spec-test/references/overlays/zedi.md`._
 - **対応プラットフォーム**: Web アプリ（PWA）のみ。Tauri のデスクトップ版は廃止済み
 - **Lint / Format**: ESLint, Prettier
 - **テスト**: Vitest, Playwright, Stryker
-- **インフラ（方針）**: **Cloudflare へ完全移行予定**（Workers / Static Assets / R2 / D1・KV 等。Issue [#1088](https://github.com/otomatty/zedi/issues/1088)）。構成の正本は `wrangler.jsonc`。**Railway は使用しない**（デプロイ設定は削除済み）。**Terraform は廃止予定**。品質ゲートは GitHub Actions、デプロイは `wrangler deploy` へ寄せる。詳細は [`.agents/skills/cloudflare-zedi/SKILL.md`](.agents/skills/cloudflare-zedi/SKILL.md)。
+- **インフラ（方針）**: **Cloudflare へ完全移行予定**（Workers / Static Assets / R2 / D1・KV 等。Issue [#1088](https://github.com/otomatty/zedi/issues/1088)）。構成の正本は `app/wrangler.jsonc`。**Railway は使用しない**（デプロイ設定は削除済み）。**Terraform は廃止予定**。品質ゲートは GitHub Actions、デプロイは `wrangler deploy` へ寄せる。詳細は [`.agents/skills/cloudflare-zedi/SKILL.md`](.agents/skills/cloudflare-zedi/SKILL.md)。
 
 ---
 
@@ -119,7 +119,7 @@ packages/
   ui/                # @zedi/ui
   shared/            # @zedi/shared（ピュア TS 定数）
 e2e/                 # Playwright
-terraform/           # Cloudflare 旧 IaC（廃止予定。正本は各サービスの wrangler.jsonc）
+terraform/           # Cloudflare 旧 IaC（廃止予定。正本は app/wrangler.jsonc）
 .agents/             # Agent Skills / サブエージェント正本（`bun run init` でミラー）
 .codex/              # AI-DLC エンジン（Codex harness）
 aidlc/               # AI-DLC workspace shell
@@ -147,18 +147,17 @@ aidlc/               # AI-DLC workspace shell
 
 ### 移行方針 / Migration target（Cloudflare）
 
-- **目標**: API / MCP / リアルタイム / フロント / admin / オブジェクトストレージを **Cloudflare に集約**。Pages・Terraform は段階的に廃止（Railway は削除済み）。
-- **構成の正本**: 各サービスの `wrangler.jsonc`（Terraform ステートは使わない）。
-- **フロント / admin**: Pages → **Workers Static Assets**。
-- **CI/CD**: lint / test / typecheck は GitHub Actions。デプロイ・プレビューは `wrangler deploy` / `wrangler versions upload`。
-- **データ切替**: ビッグバン・カットオーバー（デュアルライトしない）。フェーズ・検証は `cloudflare-zedi` スキルと [#1088](https://github.com/otomatty/zedi/issues/1088) を正とする。
+- **目標**: `app/` の Worker 1 本（Static Assets + API + D1 + Durable Objects）で配信する。Pages・Terraform は廃止（Railway は削除済み）。
+- **構成の正本**: `app/wrangler.jsonc`（Terraform ステートは使わない）。
+- **CI/CD**: lint / test / typecheck は GitHub Actions。デプロイ・プレビューは `wrangler deploy` / `wrangler versions upload`（`app/` のデプロイは未作成）。
+- **カットオーバー**: 本番データがないので移行はせず、ドメインを `app/` の Worker に切り替える。手順は `cloudflare-zedi` スキルと [#1088](https://github.com/otomatty/zedi/issues/1088) を正とする。
 - Cloudflare 作業時は汎用 Cloudflare 知識より **[`.agents/skills/cloudflare-zedi/SKILL.md`](.agents/skills/cloudflare-zedi/SKILL.md)** を先に読む。
 
 ### 現状（移行中） / Current (transitional)
 
 - ルート `workspaces` は **`packages/*` と `admin` のみ**。`app/` は **workspace 外**（独自の `bun.lock`）→ `cd app && bun install`。
 - CI: ルートは lint / typecheck / test / build / E2E。`app/` は `app-test`（型チェック・単体・workerd 統合・ビルド）と `app-smoke`（ブラウザのスモークテスト）。
-- **デプロイ**: フロント / admin は dev が Workers Static Assets、本番が Pages（`deploy-dev.yml` / `deploy-prod.yml`）。旧バックエンドとそのデプロイ（Railway・dev の API / MCP Worker）は削除済み。
+- **デプロイ**: なし。旧バックエンドとそのデプロイ（Railway・dev の API / MCP Worker）、現行フロント / admin のデプロイ（`deploy-dev.yml` / `deploy-prod.yml`）は削除済み。`app/` のデプロイは D1 などの本番リソースを用意してから追加する。
 
 ### `@zedi/shared` / Shared constants
 

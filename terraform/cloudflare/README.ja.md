@@ -16,7 +16,7 @@ dev と prod の適用タイミングを分離するため、Cloudflare リソ�
 
 - **shared**: 変更は少ない想定。PR で plan、**手動で workflow_dispatch の Apply Shared** のみ実行。
 - **dev**: `develop` への push（かつ `terraform/cloudflare/dev/**` の変更）で自動 apply。PR で plan。
-- **prod**: `main` への push（かつ `terraform/cloudflare/prod/**` の変更）で自動 apply。PR で plan。`deploy-prod` の Deploy Admin は apply-cloudflare-prod の後に実行される。
+- **prod**: `main` への push（かつ `terraform/cloudflare/prod/**` の変更）で自動 apply。PR で plan。
 
 ## Cloudflare トークンと Account ID の設定
 

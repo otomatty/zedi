@@ -16,7 +16,7 @@ Cloudflare resources are split into **shared / dev / prod** stacks so dev and pr
 
 - **shared**: Infrequent changes. Plan on PR; run **Apply Shared** via manual `workflow_dispatch` only.
 - **dev**: Auto-apply on push to `develop` when `terraform/cloudflare/dev/**` changes. Plan on PR.
-- **prod**: Auto-apply on push to `main` when `terraform/cloudflare/prod/**` changes. Plan on PR. `deploy-prod` Deploy Admin runs after `apply-cloudflare-prod`.
+- **prod**: Auto-apply on push to `main` when `terraform/cloudflare/prod/**` changes. Plan on PR.
 
 ## Cloudflare token and Account ID
 

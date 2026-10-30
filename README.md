@@ -175,8 +175,8 @@ The old backend (`server/api`, `server/hocuspocus`, `server/mcp`) has been remov
 | **AI**            | OpenAI / Anthropic / Google Gemini (pricing via OpenRouter)                                          |
 | **Admin**         | `admin/` — separate Vite + React app                                                                 |
 | **Workspaces**    | Bun workspaces: `packages/ui` (shadcn), `packages/shared` / `admin`                                  |
-| **Deploy**        | Cloudflare Workers Static Assets (dev) / Pages (prod) for frontend and admin                         |
-| **CI/CD**         | GitHub Actions (lint / typecheck / test / mutation / deploy)                                         |
+| **Deploy**        | None at the moment; the rebuilt `app/` will deploy as one Cloudflare Worker (`wrangler deploy`)      |
+| **CI/CD**         | GitHub Actions (lint / typecheck / test / mutation)                                                  |
 | **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker (mutation testing)                                 |
 | **Tooling**       | ESLint 9 / Prettier / Husky + lint-staged / commitlint / Knip                                        |
 
@@ -245,7 +245,7 @@ admin/                   # Admin SPA (separate Vite + React + Tailwind / `@zedi/
 terraform/cloudflare/    # Cloudflare infrastructure
 e2e/                     # Playwright E2E tests
 scripts/                 # Setup / Stryker / maintenance scripts
-.github/workflows/       # GitHub Actions (lint / typecheck / test / mutation / deploy)
+.github/workflows/       # GitHub Actions (lint / typecheck / test / mutation)
 ```
 
 ---

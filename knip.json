@@ -77,8 +77,7 @@
     "vaul",
     "y-websocket",
     "@types/sql.js",
-    "@vitejs/plugin-react",
-    "wrangler"
+    "@vitejs/plugin-react"
   ],
   "ignoreExportsUsedInFile": {
     "interface": true,

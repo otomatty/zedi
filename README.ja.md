@@ -175,8 +175,8 @@ bun run dev
 | **AI**            | OpenAI / Anthropic / Google Gemini（OpenRouter で価格情報を取得）                                        |
 | **Admin**         | `admin/` — 別 Vite + React アプリ                                                                        |
 | **Workspaces**    | Bun workspaces: `packages/ui`（shadcn）, `packages/shared` / `admin`                                     |
-| **Deploy**        | フロントと admin は Cloudflare Workers Static Assets（dev）/ Pages（本番）                               |
-| **CI/CD**         | GitHub Actions（lint / typecheck / test / mutation / deploy）                                            |
+| **Deploy**        | 現在はなし。作り直した `app/` を Cloudflare Worker 1 本としてデプロイする予定（`wrangler deploy`）       |
+| **CI/CD**         | GitHub Actions（lint / typecheck / test / mutation）                                                     |
 | **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker（Mutation Testing）                                    |
 | **Tooling**       | ESLint 9 / Prettier / Husky + lint-staged / commitlint / Knip                                            |
 
@@ -245,7 +245,7 @@ admin/                   # 管理画面アプリ（別 Vite + React + Tailwind /
 terraform/cloudflare/    # Cloudflare 関連インフラ定義
 e2e/                     # Playwright E2E テスト
 scripts/                 # セットアップ / Stryker / 保守用スクリプト
-.github/workflows/       # GitHub Actions（lint / typecheck / test / mutation / deploy）
+.github/workflows/       # GitHub Actions（lint / typecheck / test / mutation）
 ```
 
 ---

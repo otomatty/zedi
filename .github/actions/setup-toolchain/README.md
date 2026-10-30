@@ -40,7 +40,6 @@ callers should wrap `actions/checkout` with `Wandalen/wretry.action@v3`
 | `README.md`     | 使用方法・引数の文書化 / usage and input documentation |
 
 呼び出し元 / called from: `.github/workflows/ci.yml`,
-`.github/workflows/deploy-dev.yml`, `.github/workflows/deploy-prod.yml`,
 `.github/workflows/nightly-mutation.yml`.
 
 ---
@@ -218,12 +217,11 @@ first try.
   / Composite wrapper that retries `uses:`-style actions. Tracked by the
   repository's existing `github-actions` Dependabot configuration.
 
-シェルレベルのコマンドリトライには既に `nick-fields/retry@v4` を使っているが
-（`deploy-*.yml`）、本 action のターゲットは `uses:` の JS アクションなので
-`wretry` のほうが適切。
+シェルレベルのコマンドリトライなら `nick-fields/retry` が使えるが、本 action の
+ターゲットは `uses:` の JS アクションなので `wretry` のほうが適切。
 
-`nick-fields/retry@v4` is already used elsewhere for shell-command retries
-(`deploy-*.yml`), but it cannot wrap `uses:` invocations — hence `wretry`.
+`nick-fields/retry` handles shell-command retries, but it cannot wrap `uses:`
+invocations — hence `wretry`.
 
 ---
 

@@ -145,14 +145,10 @@ jobs:
       # admin の production build (`tsc -b && vite build`) は `@zedi/ui` の
       # barrel export まで型チェックするため、ルート build や `tsc --noEmit`
       # では落ちない型不整合（例: Issue #913 の react-day-picker v10）を拾える。
-      # deploy-prod.yml / deploy-dev.yml の deploy-admin と同じコマンドに揃え、
-      # deploy 前に regressions を検知する。
       #
       # The admin production build runs `tsc -b && vite build`, which type
       # checks `@zedi/ui` through its barrel export and catches issues the
-      # root build / root `tsc --noEmit` miss (see Issue #913). Keep this in
-      # sync with the deploy-admin step in deploy-prod.yml / deploy-dev.yml
-      # so regressions are caught before deploy.
+      # root build / root `tsc --noEmit` miss (see Issue #913).
       - name: Build admin (production)
         working-directory: admin
         run: bun run build
