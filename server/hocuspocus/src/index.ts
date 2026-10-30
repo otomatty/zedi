@@ -19,6 +19,7 @@ import {
   type NoteAccessFacts,
 } from "./pageEditPermission.js";
 import { maybeCreateSnapshot } from "./snapshotUtils.js";
+import { migrateDesktopOnlyContent } from "./desktopContentMigration.js";
 import { applyWikiLinkMarksToYDoc } from "./ydocWikiLinkNormalizer.js";
 import { coalescePerKey } from "./coalescePerKey.js";
 
@@ -332,6 +333,26 @@ async function loadDocumentFromDb(pageId: string): Promise<Y.Doc> {
     const row = result.rows[0];
     if (row?.ydoc_state) {
       Y.applyUpdate(doc, new Uint8Array(row.ydoc_state));
+    }
+
+    // デスクトップ版の廃止で削除したノード・マーク（実行可能コードブロック、MCP リソース、
+    // fileReference）を Web 版のスキーマへ変換する。クライアントの y-tiptap は未知の型を
+    // 共有ドキュメントから削除するため、クライアントに届く前に必ず変換する。変更は
+    // onStoreDocument の通常の保存で永続化される。失敗してもロードは続ける。
+    //
+    // Convert nodes and marks removed with the desktop app (executable code blocks, MCP
+    // resources, fileReference) to the web schema. The client's y-tiptap deletes unknown
+    // types from the shared document, so this must happen before any client sees it. The
+    // change is persisted by the normal onStoreDocument path. Best-effort: load continues.
+    try {
+      const { nodesConverted, marksRemoved } = migrateDesktopOnlyContent(doc);
+      if (nodesConverted > 0 || marksRemoved > 0) {
+        console.log(
+          `[DesktopContentMigration] page=${pageId} nodes=${nodesConverted} marks=${marksRemoved}`,
+        );
+      }
+    } catch (error) {
+      console.error(`[DesktopContentMigration] Failed for page=${pageId}:`, error);
     }
 
     // Issue #880 Phase B リグレッション対応: 未 mark の `[[Title]]` プレーンテキスト
