@@ -221,10 +221,9 @@ app.post("/revoke-session", authRequired, async (c) => {
 });
 
 // ── POST /clip ──────────────────────────────────────────────────────────────
-// MCP 権限で URL をクリップしてページを生成する。Chrome 拡張用 `/api/ext/clip-and-create` の MCP 版。
-// 本体ロジックは `clipAndCreate` を共有するため重複実装はしない。
+// MCP 権限で URL をクリップしてページを生成する。本体ロジックは `clipAndCreate`。
 //
-// MCP-authenticated wrapper around clipAndCreate (shares the same implementation as /api/ext/clip-and-create).
+// MCP-authenticated wrapper around clipAndCreate.
 app.post("/clip", mcpWriteRequired, clipRateLimit, async (c) => {
   const userId = c.get("userId");
   const db = c.get("db");

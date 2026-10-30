@@ -30,7 +30,6 @@ export const csrfOriginCheck = createMiddleware<AppEnv>(async (c, next) => {
   }
 
   const path = c.req.path;
-  // Only exclude routes that use Bearer/no cookie; /api/ext/authorize-code (cookie) stays protected.
   // `/api/internal/` は Hocuspocus からのサーバ間呼び出し用で、Origin/Referer は
   // 付かない代わりに `x-internal-secret` (BETTER_AUTH_SECRET) で認証する。
   // CSRF オリジン検証を残すと、本番 (`CORS_ORIGIN` 非ワイルドカード) で全件 403 に
@@ -41,9 +40,7 @@ export const csrfOriginCheck = createMiddleware<AppEnv>(async (c, next) => {
   // would 403 in production where `CORS_ORIGIN` is not wildcard. Each internal
   // route is responsible for validating the secret header itself.
   const excludedPrefixes = ["/api/webhooks/", "/api/internal/"];
-  const exactExcluded = ["/api/ext/session", "/api/ext/clip-and-create"];
   if (excludedPrefixes.some((prefix) => path.startsWith(prefix))) return next();
-  if (exactExcluded.includes(path)) return next();
 
   const allowed = getAllowedOrigins();
   if (allowed.length === 0) {

@@ -77,11 +77,10 @@ Never commit secret values; use `wrangler secret put` for Workers._
 | `GITHUB_DISPATCH_REPOSITORY`                                              | dispatch 先 `owner/repo`            | 未設定時 dispatch スキップ                                                     |
 | `MONITORING_NOTIFY_EMAIL` / `ADMIN_BASE_URL`                              | エラー通知メール                    |                                                                                |
 | `GOOGLE_CUSTOM_SEARCH_API_KEY` / `GOOGLE_CUSTOM_SEARCH_ENGINE_ID`         | サムネ画像検索                      |                                                                                |
-| `YOUTUBE_DATA_API_KEY`                                                    | クリップ / ext                      |                                                                                |
+| `YOUTUBE_DATA_API_KEY`                                                    | クリップ                            |                                                                                |
 | `SYNC_AI_MODELS_SECRET`                                                   | admin モデル sync                   |                                                                                |
 | `HOCUSPOCUS_INTERNAL_URL`                                                 | Y.js 無効化通知                     | Phase 4 まで Railway internal URL                                              |
 | `TRUST_PROXY`                                                             | `true` when behind CF/Railway proxy | Worker では通常 `true`                                                         |
-| `EXTENSION_ORIGIN`                                                        | ブラウザ拡張 origin                 | 本番のみ                                                                       |
 
 ### Railway のみ（Worker では不要）
 

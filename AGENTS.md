@@ -105,7 +105,6 @@ _Overlay: `.agents/skills/spec-test/references/overlays/zedi.md`._
 - **管理画面**: `admin/`
 - **共有パッケージ**: `packages/ui`（`@zedi/ui`）、`packages/shared`（`@zedi/shared`）
 - **対応プラットフォーム**: Web アプリ（PWA）のみ。Tauri のデスクトップ版は廃止済み
-- **ブラウザ拡張**: `extension/`
 - **Lint / Format**: ESLint, Prettier
 - **テスト**: Vitest, Playwright, Stryker
 - **インフラ（方針）**: **Cloudflare へ完全移行予定**（Workers / Static Assets / R2 / D1・KV 等。Issue [#1088](https://github.com/otomatty/zedi/issues/1088)）。構成の正本は `wrangler.jsonc`。**Terraform と Railway は廃止予定**（移行完了まで暫定稼働あり）。品質ゲートは GitHub Actions、デプロイは `wrangler deploy` へ寄せる。詳細は [`.agents/skills/cloudflare-zedi/SKILL.md`](.agents/skills/cloudflare-zedi/SKILL.md)。
@@ -125,7 +124,6 @@ server/
   hocuspocus/        # リアルタイム（ルート workspace 外）
   mcp/               # MCP（ルート workspace 外）
 e2e/                 # Playwright
-extension/           # ブラウザ拡張
 terraform/           # Cloudflare 旧 IaC（廃止予定。正本は各サービスの wrangler.jsonc）
 .agents/             # Agent Skills / サブエージェント正本（`bun run init` でミラー）
 .codex/              # AI-DLC エンジン（Codex harness）

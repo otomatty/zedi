@@ -1,11 +1,11 @@
 /**
  * RedisKvStore — ioredis を KvStore に適合させるアダプタ (#1093)
  *
- * Railway (Node) ランタイム用。既存の invite / extAuth / mcpAuth で使われていた
+ * Railway (Node) ランタイム用。既存の invite / mcpAuth で使われていた
  * Lua スクリプト（GET+DEL、INCR+EXPIRE-on-create）をここに集約する。
  *
  * ioredis-backed KvStore adapter for the Node/Railway runtime. Centralises the
- * Lua scripts previously scattered across invite / extAuth / mcpAuth.
+ * Lua scripts previously scattered across invite / mcpAuth.
  */
 import type { Redis } from "ioredis";
 import type { KvStore } from "./types.js";

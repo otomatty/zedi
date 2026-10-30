@@ -223,7 +223,6 @@ VITE_REALTIME_URL=ws://localhost:1234   # 本番は wss://realtime.zedi-note.app
 | **Billing**       | [Polar](https://polar.sh/) (`@polar-sh/sdk`) — Pro プラン                                                  |
 | **Email**         | Resend                                                                                                     |
 | **AI**            | OpenAI / Anthropic / Google Gemini（OpenRouter で価格情報を取得）                                          |
-| **Browser Ext.**  | `extension/` — Manifest v3 (Chrome 拡張)                                                                   |
 | **Admin**         | `admin/` — 別 Vite + React アプリ                                                                          |
 | **Workspaces**    | Bun workspaces: `packages/ui`（shadcn）, `packages/shared` / `admin`                                       |
 | **Deploy**        | Cloudflare Pages（フロント） + Railway（`server/api`, `hocuspocus`, `mcp`） / Terraform (Cloudflare)       |
@@ -295,11 +294,10 @@ packages/                # Bun workspaces（共有ライブラリ）
 └── ui/                  # `@zedi/ui` — shadcn/ui ベースの共有 UI コンポーネント
 
 admin/                   # 管理画面アプリ（別 Vite + React + Tailwind / `@zedi/ui` 利用）
-extension/               # ブラウザ拡張（Manifest v3、Web Clipper）
 server/api/drizzle/      # PostgreSQL マイグレーション（drizzle-kit が読む正本 / source of truth）
 terraform/cloudflare/    # Cloudflare 関連インフラ定義
 e2e/                     # Playwright E2E テスト
-scripts/                 # セットアップ / Stryker / 拡張ビルド等のスクリプト
+scripts/                 # セットアップ / Stryker / 保守用スクリプト
 .github/workflows/       # GitHub Actions（lint / typecheck / test / mutation / deploy）
 ```
 

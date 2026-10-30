@@ -1,8 +1,8 @@
 /**
  * clip-and-create: URL → fetch → Readability → Tiptap JSON → Y.Doc → DB
  *
- * Server-side web clipping pipeline for Chrome extension.
- * Chrome 拡張向けのサーバー側 Web クリッピングパイプライン。
+ * Server-side web clipping pipeline used by the MCP `/clip` endpoint.
+ * MCP の `/clip` エンドポイントが使うサーバー側 Web クリッピングパイプライン。
  *
  * Since sub-issue otomatty/zedi#595 (Karpathy "LLM Wiki" ingest flow), the
  * URL → Tiptap JSON extraction is delegated to {@link extractArticleFromUrl}

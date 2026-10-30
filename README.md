@@ -223,7 +223,6 @@ On the server (`server/api`), configure Better Auth (`BETTER_AUTH_SECRET` / `BET
 | **Billing**       | [Polar](https://polar.sh/) (`@polar-sh/sdk`) — Pro plan                                                 |
 | **Email**         | Resend                                                                                                  |
 | **AI**            | OpenAI / Anthropic / Google Gemini (pricing via OpenRouter)                                             |
-| **Browser Ext.**  | `extension/` — Manifest v3 (Chrome extension)                                                           |
 | **Admin**         | `admin/` — separate Vite + React app                                                                    |
 | **Workspaces**    | Bun workspaces: `packages/ui` (shadcn), `packages/shared` / `admin`                                     |
 | **Deploy**        | Cloudflare Pages (frontend) + Railway (`server/api`, `hocuspocus`, `mcp`) / Terraform (Cloudflare)      |
@@ -295,11 +294,10 @@ packages/                # Bun workspaces (shared libraries)
 └── ui/                  # `@zedi/ui` — shadcn/ui shared components
 
 admin/                   # Admin SPA (separate Vite + React + Tailwind / `@zedi/ui`)
-extension/               # Browser extension (Manifest v3, Web Clipper)
 server/api/drizzle/      # PostgreSQL migrations (drizzle-kit source of truth)
 terraform/cloudflare/    # Cloudflare infrastructure
 e2e/                     # Playwright E2E tests
-scripts/                 # Setup / Stryker / extension build scripts
+scripts/                 # Setup / Stryker / maintenance scripts
 .github/workflows/       # GitHub Actions (lint / typecheck / test / mutation / deploy)
 ```
 

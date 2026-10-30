@@ -53,7 +53,6 @@ OAuth プロバイダの実値は sign-in を実際に試すとき（#1090 後�
 - **値**: dev で API を叩くフロント/admin のオリジンをカンマ区切りで新規指定。
   - 例: `https://zedi-dev.pages.dev,https://zedi-admin-dev.pages.dev`
   - ローカルから叩くなら `http://localhost:5173,http://localhost:30001` を足す。
-- Chrome 拡張を使うなら `chrome-extension://<id>`（`chrome://extensions` で ID 確認）。
 
 ### GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
 

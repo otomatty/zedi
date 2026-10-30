@@ -4,7 +4,7 @@
  * - 状態変更メソッド (POST/PUT/PATCH/DELETE) は Origin / Referer を検証する。
  * - 安全メソッド (GET/HEAD/OPTIONS) は素通りする。
  * - CORS_ORIGIN が未設定 / "*" のときは検証をスキップする (=後続のヘッダで拒否)。
- * - 除外パス (/api/webhooks/*, /api/ext/session, /api/ext/clip-and-create) は検査されない。
+ * - 除外パス (/api/webhooks/*, /api/internal/*) は検査されない。
  *
  * Unit tests for the `csrfOriginCheck` Hono middleware. Verifies that
  * mutation requests are gated by Origin / Referer matching the CORS allow-list,
@@ -22,13 +22,7 @@ import { csrfOriginCheck } from "../../middleware/csrfOrigin.js";
 function createApp() {
   const app = new Hono<AppEnv>();
   app.use("*", csrfOriginCheck);
-  for (const path of [
-    "/api/state",
-    "/api/webhooks/stripe",
-    "/api/ext/session",
-    "/api/ext/clip-and-create",
-    "/api/ext/authorize-code",
-  ]) {
+  for (const path of ["/api/state", "/api/webhooks/stripe", "/api/ext/session"]) {
     app.get(path, (c) => c.json({ ok: true }));
     app.post(path, (c) => c.json({ ok: true }));
     app.put(path, (c) => c.json({ ok: true }));
@@ -170,20 +164,10 @@ describe("csrfOriginCheck", () => {
       expect(res.status).toBe(200);
     });
 
-    it("does not validate Origin for /api/ext/session (Bearer-only)", async () => {
+    it("validates the removed browser-extension token endpoint like any other path", async () => {
+      // ブラウザ拡張の廃止で `/api/ext/*` の除外はなくなった。
+      // The browser extension is gone, so `/api/ext/*` is no longer exempt.
       const res = await createApp().request("/api/ext/session", { method: "POST" });
-      expect(res.status).toBe(200);
-    });
-
-    it("does not validate Origin for /api/ext/clip-and-create (Bearer-only)", async () => {
-      const res = await createApp().request("/api/ext/clip-and-create", { method: "POST" });
-      expect(res.status).toBe(200);
-    });
-
-    it("STILL validates /api/ext/authorize-code (cookie-based, not exempt)", async () => {
-      // /api/ext/authorize-code は Cookie 認証のため CSRF 対象に残す必要がある。
-      // The authorize-code endpoint uses cookie auth, so it must remain protected.
-      const res = await createApp().request("/api/ext/authorize-code", { method: "POST" });
       expect(res.status).toBe(403);
     });
   });

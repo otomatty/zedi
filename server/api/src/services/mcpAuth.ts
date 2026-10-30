@@ -5,11 +5,11 @@
  * - PKCE 検証
  * - JWT 発行・検証 (scope: mcp:read / mcp:write, audience: zedi-mcp)
  *
- * 既存の拡張用認証 (`extAuth.ts`) と並行した独立系統として提供する。
- * `BETTER_AUTH_SECRET` は共有するが、`audience` と KV key prefix で blast radius を分離する。
+ * `BETTER_AUTH_SECRET` はセッション認証と共有するが、`audience` と KV key prefix で
+ * blast radius を分離する。
  *
  * MCP auth library: PKCE, one-time code storage, JWT issuance/verification.
- * Shares `BETTER_AUTH_SECRET` with extension auth but isolates audience and KV namespace.
+ * Shares `BETTER_AUTH_SECRET` with session auth but isolates audience and KV namespace.
  */
 import { createHash } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
@@ -33,7 +33,7 @@ export const MCP_SCOPE_READ = "mcp:read";
 /** 書き込み系操作用スコープ / Scope for write MCP tools. */
 export const MCP_SCOPE_WRITE = "mcp:write";
 
-/** KV key prefix (extAuth の `ext:code:` と分離) / KV namespace distinct from ext codes. */
+/** KV key prefix for MCP one-time codes. / MCP ワンタイムコード用の KV key prefix。 */
 const KV_CODE_PREFIX = "mcp:code:";
 
 /**
