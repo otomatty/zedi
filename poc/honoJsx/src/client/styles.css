@@ -371,3 +371,39 @@ h1 {
   align-items: baseline;
   justify-content: space-between;
 }
+
+/* Streaming Markdown output */
+.ai-output.markdown {
+  white-space: normal;
+}
+.ai-output.markdown h2 {
+  font-size: 1.1rem;
+  margin: 1em 0 0.4em;
+}
+.ai-output.markdown pre {
+  background: var(--surface);
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+.ai-output.markdown table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+}
+.ai-output.markdown th,
+.ai-output.markdown td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+}
+.ai-output.markdown blockquote {
+  margin: 0.5em 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+
+/* Investigation: skip layout/paint of off-screen blocks in long documents (?cv=1). */
+.editor-host.cv .prose > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1.75em;
+}

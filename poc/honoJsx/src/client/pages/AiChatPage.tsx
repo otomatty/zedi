@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from "hono/jsx/dom";
 import { createFrameBatcher } from "../lib/frameBatcher";
 import { createSseParser } from "../lib/sseParser";
 
-type Strategy = "direct" | "blocks" | "state";
+import { createMarkdownStream, createNaiveMarkdownStream } from "../markdown/markdownStream";
 
-const STRATEGIES: readonly Strategy[] = ["direct", "blocks", "state"];
+type Strategy = "direct" | "blocks" | "state" | "md-blocks" | "md-naive";
+
+const STRATEGIES: readonly Strategy[] = ["direct", "blocks", "state", "md-blocks", "md-naive"];
+const isMarkdown = (s: Strategy) => s === "md-blocks" || s === "md-naive";
 
 async function streamTokens(
   url: string,
@@ -66,7 +69,7 @@ export default function AiChatPage() {
   const [interval, setIntervalMs] = useState(Number(params.get("interval") ?? 5));
   const [running, setRunning] = useState(false);
   const [stateText, setStateText] = useState("");
-  const outputRef = useRef<HTMLPreElement>(null);
+  const outputRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -81,16 +84,24 @@ export default function AiChatPage() {
     const out = outputRef.current;
     const textNode = document.createTextNode("");
     out?.replaceChildren(strategy === "direct" ? textNode : "");
+    const markdown =
+      out && strategy === "md-blocks"
+        ? createMarkdownStream(out)
+        : out && strategy === "md-naive"
+          ? createNaiveMarkdownStream(out)
+          : null;
     const append =
       strategy === "blocks" && out
         ? createBlockAppender(out)
         : (chunk: string) => textNode.appendData(chunk);
-    const batcher = createFrameBatcher(append);
+    const batcher = markdown
+      ? { push: markdown.append, flushNow: markdown.finish, dispose: () => undefined }
+      : createFrameBatcher(append);
     let count = 0;
     performance.mark("ai:start");
     try {
       await streamTokens(
-        `/api/ai/chat?tokens=${tokens}&interval=${interval}`,
+        `/api/ai/chat?tokens=${tokens}&interval=${interval}${isMarkdown(strategy) ? "&format=markdown" : ""}`,
         (t) => {
           count += 1;
           if (strategy === "state") setStateText((prev) => prev + t);
@@ -125,6 +136,8 @@ export default function AiChatPage() {
           >
             <option value="direct">direct（フレームごとに追記）</option>
             <option value="blocks">blocks（段落ブロックへ追記）</option>
+            <option value="md-blocks">md-blocks（Markdown・確定ブロック固定）</option>
+            <option value="md-naive">md-naive（Markdown・毎フレーム全文描画）</option>
             <option value="state">state（トークンごとに再描画）</option>
           </select>
         </label>
@@ -155,7 +168,11 @@ export default function AiChatPage() {
           {stateText}
         </pre>
       ) : (
-        <pre ref={outputRef} class="ai-output" data-testid="ai-output" />
+        <div
+          ref={outputRef}
+          class={isMarkdown(strategy) ? "ai-output markdown" : "ai-output plain"}
+          data-testid="ai-output"
+        />
       )}
     </section>
   );

@@ -5,7 +5,7 @@ import { decodeCursor, encodeCursor } from "./db/cursor";
 import { buildSearchPlan } from "./db/searchPlan";
 import { isDevelopment, type Env } from "./env";
 import { Landing } from "./landing";
-import { createSseStream, mockTokens } from "./mockStream";
+import { createSseStream, mockMarkdownTokens, mockTokens } from "./mockStream";
 import { canEdit, getNoteAccess, getPageAccess } from "./services/access";
 import { getDefaultNoteId, upsertMember } from "./services/notes";
 import {
@@ -162,7 +162,9 @@ export function createApp({ routeRealtime }: { routeRealtime?: RealtimeRouter } 
   api.get("/ai/chat", (c) => {
     const count = Math.min(Number(c.req.query("tokens") ?? 400) || 400, 20_000);
     const interval = Math.min(Number(c.req.query("interval") ?? 10) || 0, 1_000);
-    return new Response(createSseStream(mockTokens(count, 1), interval), {
+    const tokens =
+      c.req.query("format") === "markdown" ? mockMarkdownTokens(count, 1) : mockTokens(count, 1);
+    return new Response(createSseStream(tokens, interval), {
       headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache" },
     });
   });

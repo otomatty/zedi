@@ -8,7 +8,7 @@
  * 1 万ページを投入した D1 に対し、API の遅延と D1 コスト、ブラウザでの実行時性能を計測する。
  */
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { addSessionCookies, launchBrowser, signInViaApi, startWorker } from "./lib/harness.mjs";
 
 const root = join(import.meta.dirname, "..");
@@ -138,9 +138,15 @@ async function openEditor(browser, cpuRate, room, query = "") {
   return page;
 }
 
-async function measureTyping(browser, cpuRate, { paragraphs, collab = true }) {
+async function measureTyping(
+  browser,
+  cpuRate,
+  { paragraphs, collab = true, query = "", at = "end" },
+) {
   const room = await createPageViaApi(`bench ${paragraphs} x${cpuRate}`);
-  const page = await openEditor(browser, cpuRate, room, collab ? "" : "?collab=0");
+  const params = new URLSearchParams(query);
+  if (!collab) params.set("collab", "0");
+  const page = await openEditor(browser, cpuRate, room, params.size > 0 ? `?${params}` : "");
   // Navigation start → lazy editor chunk loaded, editor mounted and Y.js synced.
   const readyMs = await page.evaluate(
     () => performance.getEntriesByName("editor:synced")[0]?.startTime ?? null,
@@ -156,7 +162,11 @@ async function measureTyping(browser, cpuRate, { paragraphs, collab = true }) {
     }, paragraphs);
   }
   await page.locator(".prose").click();
-  await page.evaluate(() => window.__zediPoc.editor.commands.focus("end"));
+  await page.evaluate((where) => window.__zediPoc.editor.commands.focus(where), at);
+  // Warm up: let the post-setContent layout settle so it does not land in the samples.
+  await page.waitForTimeout(1_000);
+  await page.keyboard.type("warm", { delay: 30 });
+  await page.waitForTimeout(500);
   await installLatencyProbe(page);
   await page.keyboard.type("hono/jsx/dom で入力遅延を計測しています。".repeat(4), { delay: 30 });
   await page.waitForTimeout(300);
@@ -257,6 +267,55 @@ async function measureApi() {
   };
 }
 
+/**
+ * Browser scenarios per CPU rate. `ONLY=aiMd,typing` runs a subset (prefix match);
+ * `ONLY=largeDoc CPU_RATES=4 OUTPUT=results/large-documents.json` runs the large-document analyses.
+ */
+const browserScenarios = {
+  notes: (b, rate) => measureNotes(b, rate),
+  typingSmallDoc: (b, rate) => measureTyping(b, rate, { paragraphs: 0 }),
+  typingLargeDoc: (b, rate) => measureTyping(b, rate, { paragraphs: 2000 }),
+  typingLargeDocNoCollab: (b, rate) => measureTyping(b, rate, { paragraphs: 2000, collab: false }),
+  collabPropagationMs: (b, rate) => measureCollab(b, rate),
+  aiDirect: (b, rate) => measureAi(b, rate, "direct"),
+  aiState: (b, rate) => measureAi(b, rate, "state"),
+  aiBlocks: (b, rate) => measureAi(b, rate, "blocks"),
+  aiDirect10k: (b, rate) => measureAi(b, rate, "direct", 10_000),
+  aiBlocks10k: (b, rate) => measureAi(b, rate, "blocks", 10_000),
+  aiState10k: (b, rate) => measureAi(b, rate, "state", 10_000),
+  // Large-document matrix: which part of the cost comes from carets, layout or the Y.js binding.
+  largeDocMatrix: async (b, rate) => ({
+    tiptapCarets: await measureTyping(b, rate, { paragraphs: 2000, query: "caret=tiptap" }),
+    tiptapCaretsAtStart: await measureTyping(b, rate, {
+      paragraphs: 2000,
+      query: "caret=tiptap",
+      at: "start",
+    }),
+    sharedCarets: await measureTyping(b, rate, { paragraphs: 2000 }),
+    noCarets: await measureTyping(b, rate, { paragraphs: 2000, query: "caret=0" }),
+    tiptapCaretsCv: await measureTyping(b, rate, { paragraphs: 2000, query: "caret=tiptap&cv=1" }),
+    local: await measureTyping(b, rate, { paragraphs: 2000, collab: false }),
+    localCv: await measureTyping(b, rate, { paragraphs: 2000, collab: false, query: "cv=1" }),
+  }),
+  // Latency vs document size (shared carets vs no collaboration).
+  largeDocScale: async (b, rate) => {
+    const out = {};
+    for (const paragraphs of [250, 500, 1000, 2000, 4000]) {
+      out[paragraphs] = {
+        collab: (await measureTyping(b, rate, { paragraphs })).latencyMs,
+        local: (await measureTyping(b, rate, { paragraphs, collab: false })).latencyMs,
+      };
+    }
+    return out;
+  },
+  aiMdNaive: (b, rate) => measureAi(b, rate, "md-naive"),
+  aiMdBlocks: (b, rate) => measureAi(b, rate, "md-blocks"),
+  aiMdNaive10k: (b, rate) => measureAi(b, rate, "md-naive", 10_000),
+  aiMdBlocks10k: (b, rate) => measureAi(b, rate, "md-blocks", 10_000),
+};
+const ONLY = process.env.ONLY ? process.env.ONLY.split(",") : null;
+const OUTPUT = process.env.OUTPUT ?? "results/measurements.json";
+
 const worker = await startWorker(PORT);
 const browser = await launchBrowser();
 const results = { measuredAt: new Date().toISOString(), seedPages: SEED_PAGES, runs: [] };
@@ -272,29 +331,20 @@ try {
   results.api = await measureApi();
   for (const cpuRate of CPU_RATES) {
     console.error(`CPU throttle x${cpuRate}…`);
-    results.runs.push({
-      cpuRate,
-      notes: await measureNotes(browser, cpuRate),
-      typingSmallDoc: await measureTyping(browser, cpuRate, { paragraphs: 0 }),
-      typingLargeDoc: await measureTyping(browser, cpuRate, { paragraphs: 2000 }),
-      typingLargeDocNoCollab: await measureTyping(browser, cpuRate, {
-        paragraphs: 2000,
-        collab: false,
-      }),
-      collabPropagationMs: await measureCollab(browser, cpuRate),
-      aiDirect: await measureAi(browser, cpuRate, "direct"),
-      aiState: await measureAi(browser, cpuRate, "state"),
-      aiBlocks: await measureAi(browser, cpuRate, "blocks"),
-      aiDirect10k: await measureAi(browser, cpuRate, "direct", 10_000),
-      aiBlocks10k: await measureAi(browser, cpuRate, "blocks", 10_000),
-      aiState10k: await measureAi(browser, cpuRate, "state", 10_000),
-    });
+    const run = { cpuRate };
+    for (const [key, scenario] of Object.entries(browserScenarios)) {
+      // The large-document analyses are long; they run only when requested via ONLY.
+      if (ONLY ? !ONLY.some((prefix) => key.startsWith(prefix)) : key.startsWith("largeDoc"))
+        continue;
+      run[key] = await scenario(browser, cpuRate);
+    }
+    results.runs.push(run);
   }
 } finally {
   await browser.close();
   worker.kill();
 }
 
-mkdirSync(join(root, "results"), { recursive: true });
-writeFileSync(join(root, "results/measurements.json"), `${JSON.stringify(results, null, 2)}\n`);
+mkdirSync(dirname(join(root, OUTPUT)), { recursive: true });
+writeFileSync(join(root, OUTPUT), `${JSON.stringify(results, null, 2)}\n`);
 console.log(JSON.stringify(results, null, 2));

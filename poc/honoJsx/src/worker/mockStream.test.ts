@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSseStream, mockTokens } from "./mockStream";
+import { createSseStream, mockMarkdownTokens, mockTokens } from "./mockStream";
 
 describe("mockTokens", () => {
   it("returns the requested number of non-empty tokens", () => {
@@ -28,5 +28,23 @@ describe("createSseStream", () => {
     };
     await new Response(createSseStream(["a", "b", "c"], 15, sleep)).text();
     expect(waits).toEqual([15, 15, 15]);
+  });
+});
+
+describe("mockMarkdownTokens", () => {
+  it("returns the requested number of small, deterministic tokens", () => {
+    const tokens = mockMarkdownTokens(500, 3);
+    expect(tokens).toHaveLength(500);
+    expect(tokens.every((t) => t.length >= 1 && t.length <= 4)).toBe(true);
+    expect(mockMarkdownTokens(500, 3)).toEqual(tokens);
+  });
+
+  it("streams a realistic Markdown answer (headings, lists, code, tables, quotes)", () => {
+    const text = mockMarkdownTokens(2_000, 1).join("");
+    expect(text).toMatch(/^## /m);
+    expect(text).toMatch(/^- /m);
+    expect(text).toMatch(/^```ts$/m);
+    expect(text).toMatch(/^\| .* \|$/m);
+    expect(text).toMatch(/^> /m);
   });
 });

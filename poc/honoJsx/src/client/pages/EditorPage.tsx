@@ -8,6 +8,9 @@ import { useQuery } from "../lib/query";
 const COLORS = ["#2563eb", "#db2777", "#16a34a", "#ea580c", "#7c3aed"];
 const STATUS_LABEL = { connecting: "接続中", synced: "同期済み", offline: "オフライン" } as const;
 
+const caretMode = (value: string | null) =>
+  value === "0" ? "off" : value === "tiptap" ? "tiptap" : "shared";
+
 /**
  * WikiLink suggestions: full-text search for a query, the note's recent pages otherwise.
  * WikiLink 候補。入力があれば全文検索、なければノートの最近のページ。
@@ -37,8 +40,11 @@ export default function EditorPage({ id, defaultNoteId }: { id: string; defaultN
     const element = hostRef.current;
     if (!element || page.status !== "success") return;
 
-    // `?collab=0` runs the same editor without Y.js, to separate binding cost from UI cost.
-    if (new URLSearchParams(location.search).get("collab") === "0") {
+    // Investigation switches: `?collab=0` (no Y.js), `?caret=0|tiptap` (no carets / Tiptap's),
+    // `?cv=1` (content-visibility on blocks) — used by scripts/measure.mjs.
+    const params = new URLSearchParams(location.search);
+    element.classList.toggle("cv", params.get("cv") === "1");
+    if (params.get("collab") === "0") {
       const editor = createEditor({ element, searchTargets: (q) => searchTargets(noteId, q) });
       window.__zediPoc = { ...window.__zediPoc, editor };
       setStatus("synced");
@@ -57,7 +63,7 @@ export default function EditorPage({ id, defaultNoteId }: { id: string; defaultN
     };
     const editor = createEditor({
       element,
-      collaboration: { doc, provider, user },
+      collaboration: { doc, provider, user, carets: caretMode(params.get("caret")) },
       searchTargets: (q) => searchTargets(noteId, q),
     });
     editor.setEditable(!readOnly);

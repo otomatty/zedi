@@ -81,6 +81,16 @@ try {
     assert.equal(await page.locator(".prose h1").first().textContent(), "見出し");
   });
 
+  await check("another tab of the same page sees the remote caret (shared carets)", async () => {
+    const other = await ownerContext.newPage();
+    await other.goto(pageUrl);
+    await other.waitForSelector("[data-status=synced]", { timeout: 10_000 });
+    await other.locator(".prose h1").click();
+    await other.keyboard.press("End");
+    await page.waitForSelector(".prose .collaboration-carets__caret", { timeout: 5_000 });
+    await other.close();
+  });
+
   await check(
     "edited text is projected to D1 and found by full-text search in the palette",
     async () => {
@@ -147,6 +157,17 @@ try {
     await page.click("[data-testid=ai-start]");
     await page.waitForFunction(() => window.__zediPoc?.aiDone === true, null, { timeout: 30_000 });
     assert.equal(await page.evaluate(() => window.__zediPoc.aiTokens), 300);
+  });
+
+  await check("streaming Markdown renders headings, lists, code and tables", async () => {
+    await page.goto(`${BASE}/ai?tokens=600&interval=1&strategy=md-blocks`);
+    await page.click("[data-testid=ai-start]");
+    await page.waitForFunction(() => window.__zediPoc?.aiDone === true, null, { timeout: 30_000 });
+    const output = page.locator("[data-testid=ai-output]");
+    for (const selector of ["h2", "ul li", "pre code.language-ts", "table th", "blockquote"]) {
+      assert.ok((await output.locator(selector).count()) > 0, `missing ${selector}`);
+    }
+    assert.equal(await output.locator(".md-live").count(), 0);
   });
 
   await check("sign-out returns to the sign-in page and revokes API access", async () => {

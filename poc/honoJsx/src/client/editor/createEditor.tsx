@@ -15,6 +15,8 @@ import Suggestion from "@tiptap/suggestion";
 import { createRoot } from "hono/jsx/dom/client";
 import type * as Y from "yjs";
 import { SLASH_ITEMS, filterSlashItems, type SlashItem } from "./slashItems";
+import type { Awareness } from "y-protocols/awareness";
+import { SharedCarets } from "./sharedCarets";
 import { createSuggestionRenderer } from "./suggestionPopup";
 import { TAG_INPUT_PATTERN } from "./tagPattern";
 import { WikiLinkChip } from "./WikiLinkChip";
@@ -165,8 +167,13 @@ export function createEditor(options: {
   /** Omit to run a local-only editor (used to isolate the cost of the Y.js binding). */
   collaboration?: {
     doc: Y.Doc;
-    provider: { awareness: unknown };
+    provider: { awareness: Awareness };
     user: { name: string; color: string };
+    /**
+     * Caret sharing: `shared` (default, debounced — see sharedCarets.ts), `tiptap`
+     * (Tiptap's CollaborationCaret, publishes on every keystroke) or `off`.
+     */
+    carets?: "shared" | "tiptap" | "off";
   };
   searchTargets: (query: string) => Promise<LinkTarget[]>;
 }): Editor {
@@ -178,7 +185,16 @@ export function createEditor(options: {
         ? [
             StarterKit.configure({ undoRedo: false }),
             Collaboration.configure({ document: collab.doc }),
-            CollaborationCaret.configure({ provider: collab.provider, user: collab.user }),
+            ...(collab.carets === "off"
+              ? []
+              : collab.carets === "tiptap"
+                ? [CollaborationCaret.configure({ provider: collab.provider, user: collab.user })]
+                : [
+                    SharedCarets.configure({
+                      awareness: collab.provider.awareness,
+                      user: collab.user,
+                    }),
+                  ]),
           ]
         : [StarterKit]),
       WikiLink.configure({ searchTargets: options.searchTargets }),
