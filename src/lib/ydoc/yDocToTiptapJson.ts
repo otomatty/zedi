@@ -5,11 +5,10 @@
 import * as Y from "yjs";
 
 /**
- * Content removed together with the desktop app may still be in old snapshots. The server
- * converts it when it loads a live document (`server/hocuspocus/src/desktopContentMigration.ts`);
- * previews of old snapshots apply the same rules so the editor can render them.
- * デスクトップ版とともに削除した内容は古いスナップショットに残っている場合がある。
- * 現在のドキュメントはサーバーがロード時に変換し、スナップショットのプレビューは同じ規則で変換する。
+ * Content removed together with the desktop app may still be in old snapshots; previews
+ * convert it to web nodes so the editor can render them.
+ * デスクトップ版とともに削除した内容は古いスナップショットに残っている場合があるため、
+ * プレビューでは Web 版のノードに変換する。
  */
 const FILE_REFERENCE_MARK = /^fileReference(--.+)?$/;
 

@@ -16,8 +16,7 @@
 # Callers must run `actions/checkout` first (wrap it with
 # `Wandalen/wretry.action` to also get checkout-level retry). See `README.md`.
 #
-# CI ワークフロー (`ci.yml` / `deploy-dev.yml` / `deploy-prod.yml` /
-# `nightly-mutation.yml`) で繰り返し使われる「Node → Bun → bun install」を
+# CI ワークフロー (`ci.yml` / `nightly-mutation.yml`) で繰り返し使われる「Node → Bun → bun install」を
 # まとめ、GitHub API の一過性失敗（401 など）に対してリトライを効かせる。
 # 詳細は Issue #937 を参照。
 name: Setup toolchain
@@ -48,10 +47,10 @@ inputs:
   install-deps:
     description: >
       `"false"` を渡すとルートの `bun install --frozen-lockfile` をスキップする。
-      `server/mcp` など個別ワークスペースで install するジョブ向け。
+      `app` など個別ディレクトリで install するジョブ向け。
       / Set to `"false"` to skip the root `bun install --frozen-lockfile`,
       useful for jobs that install dependencies inside a specific workspace
-      (e.g. `server/mcp`).
+      (e.g. `app`).
     required: false
     default: "true"
 

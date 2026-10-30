@@ -19,9 +19,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // Set VITE_E2E_TEST=true to enable mock authentication in the app
-    // Using cross-platform syntax (works on Windows, macOS, Linux)
-    command: "npx cross-env VITE_E2E_TEST=true bun run dev -- --port 5173",
+    // VITE_E2E_TEST=true enables mock authentication in the app. Playwright passes `env`
+    // to the command itself, so this works the same on Windows, macOS and Linux.
+    command: "bun run dev -- --port 5173",
+    env: { VITE_E2E_TEST: "true" },
     url: "http://localhost:5173",
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,

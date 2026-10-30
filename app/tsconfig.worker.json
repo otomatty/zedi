@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "jsxImportSource": "hono/jsx",
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"]
+  },
+  "include": ["src/worker", "src/shared"],
+  "exclude": ["src/**/*.node.test.ts"]
+}

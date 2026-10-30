@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "zedi-app",
+  "main": "src/worker/index.ts",
+  // Worker TSX uses hono/jsx (server); the client SPA uses hono/jsx/dom via vite.config.ts.
+  "tsconfig": "./tsconfig.worker.json",
+  "compatibility_date": "2026-08-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist/client",
+    "not_found_handling": "single-page-application",
+    // `/` is the server-rendered landing page; API and realtime are Worker routes.
+    "run_worker_first": ["/", "/api/*", "/parties/*"],
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "PageRoom", "class_name": "PageRoom" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PageRoom"] }],
+  // Local only for now (`wrangler d1 migrations apply DB --local`); the id is a placeholder.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "zedi-app",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+  // BETTER_AUTH_SECRET and ENVIRONMENT=development come from `.dev.vars` locally (see
+  // .dev.vars.example). Development mode exposes the magic-link outbox, so never set it here.
+  "observability": { "enabled": true },
+}

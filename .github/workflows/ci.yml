@@ -110,8 +110,8 @@ jobs:
 
       - uses: ./.github/actions/setup-toolchain
 
-      # Root workspaces only; standalone server/* jobs run their own coverage below.
-      # ルート配下のワークスペースのみ。server/* は各専用 job で coverage を計測する。
+      # Root workspaces (src, packages, admin); app/ runs its own tests in app-test.
+      # ルート配下のワークスペース（src・packages・admin）。app/ は app-test で実行する。
       - run: node scripts/run-workspace-coverage.mjs
 
       - name: Upload coverage report
@@ -145,14 +145,10 @@ jobs:
       # admin の production build (`tsc -b && vite build`) は `@zedi/ui` の
       # barrel export まで型チェックするため、ルート build や `tsc --noEmit`
       # では落ちない型不整合（例: Issue #913 の react-day-picker v10）を拾える。
-      # deploy-prod.yml / deploy-dev.yml の deploy-admin と同じコマンドに揃え、
-      # deploy 前に regressions を検知する。
       #
       # The admin production build runs `tsc -b && vite build`, which type
       # checks `@zedi/ui` through its barrel export and catches issues the
-      # root build / root `tsc --noEmit` miss (see Issue #913). Keep this in
-      # sync with the deploy-admin step in deploy-prod.yml / deploy-dev.yml
-      # so regressions are caught before deploy.
+      # root build / root `tsc --noEmit` miss (see Issue #913).
       - name: Build admin (production)
         working-directory: admin
         run: bun run build
@@ -258,232 +254,6 @@ jobs:
           path: admin/playwright-report/
           retention-days: 7
 
-  api-typecheck:
-    name: API Type Check
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
-        with:
-          action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-          attempt_limit: 3
-          attempt_delay: 5000
-
-      - uses: ./.github/actions/setup-toolchain
-
-      # Bun workspaces are not used due to Railway build constraints.
-      # Consider migrating to workspaces if Railway adds Bun workspace support.
-      - name: Install API dependencies
-        working-directory: server/api
-        run: bun install --frozen-lockfile
-
-      - name: Type check
-        working-directory: server/api
-        run: bunx tsc --noEmit
-
-      # Worker バンドル検査 (#1091 FR-1.2): dry-run（資格情報不要）で
-      # LangGraph / @hono/node-server / @sentry/node / ioredis の不在を fail-fast。
-      # Credential-free Worker bundle guard (dry-run) — forbidden deps must be absent.
-      - name: Worker bundle check
-        working-directory: server/api
-        run: bun run worker:bundle:check
-
-  api-test:
-    name: API Tests
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
-        with:
-          action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-          attempt_limit: 3
-          attempt_delay: 5000
-
-      - uses: ./.github/actions/setup-toolchain
-        with:
-          # server/api 配下で個別に install するため、ルートの install は不要。
-          # The job installs deps inside server/api instead of the root.
-          install-deps: "false"
-
-      # server/api はルートの Bun workspace に含まれないため、テストの前に
-      # ローカルで依存関係をインストールする (api-typecheck / mcp-test と同じ構成)。
-      # server/api is not part of the root Bun workspace; install its
-      # dependencies locally before running the vitest suite.
-      - name: Install API dependencies
-        working-directory: server/api
-        run: bun install --frozen-lockfile
-
-      - name: Run tests
-        working-directory: server/api
-        run: bunx vitest run --coverage
-
-      # workerd 実行テスト (#1091 FR-5): Worker エントリを実ランタイムで検証。
-      # Worker-runtime tests on workerd via vitest-pool-workers.
-      - name: Run worker-runtime tests
-        working-directory: server/api
-        run: bun run test:worker
-
-      - name: Upload API coverage report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: coverage-report-api
-          path: server/api/coverage/
-          retention-days: 7
-
-  drizzle-migration-check:
-    name: Drizzle Migration Check
-    # Drizzle TS スキーマを変更したら必ずマイグレーション SQL を追加するルールの強制。
-    # PR #728 のように TS スキーマだけ更新して `server/api/drizzle/*.sql` を忘れると、
-    # 本番 DB がスキーマに追いつかず 500 エラーになるため、PR 段階で検出する。
-    # PR 限定（push にはマージベースの計算対象が無い）。
-    #
-    # Enforce: any change under `server/api/src/schema/**` must come with a new
-    # migration SQL file and an updated `_journal.json`. Detects PR #728-style
-    # regressions where production drifts from the application schema.
-    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
-    runs-on: ubuntu-latest
-    steps:
-      # PR ベースとの diff を取るため履歴を全部取得する。
-      # Need full history so the script can diff against the PR base.
-      - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
-        with:
-          action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-          with: |
-            fetch-depth: 0
-          attempt_limit: 3
-          attempt_delay: 5000
-
-      - uses: ./.github/actions/setup-toolchain
-        with:
-          # Node スクリプトしか実行しないため Bun は不要。
-          # The job only runs a Node script, so Bun is unnecessary.
-          setup-bun: "false"
-
-      - name: Run drizzle migration consistency check
-        env:
-          DRIZZLE_DIFF_BASE: origin/${{ github.base_ref }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: node scripts/check-drizzle-migrations.mjs
-
-  drizzle-schema-drift-check:
-    name: Drizzle Schema Drift Check
-    # `pgTable("name", ...)` で宣言された全テーブルが、checked-in な
-    # `server/api/drizzle/*.sql` の `CREATE TABLE` に対応しているかをリポジトリ
-    # 全体で検査する。`drizzle-migration-check` は同一 PR 内のペア漏れしか
-    # 拾えなかったため、本ジョブは push / PR 双方で実行し、過去から放置されて
-    # いた drift（例: Issue #878 の `page_snapshots`）も検出する。
-    #
-    # Repo-wide audit ensuring every `pgTable("name", ...)` is actually created
-    # by a checked-in migration. `drizzle-migration-check` only covers
-    # within-PR pair omissions, so this job runs on push + PR to also catch
-    # historical drift like the `page_snapshots` regression in Issue #878.
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
-        with:
-          action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-          attempt_limit: 3
-          attempt_delay: 5000
-
-      - uses: ./.github/actions/setup-toolchain
-        with:
-          # Node スクリプトしか実行しないため Bun は不要。
-          # The job only runs Node scripts, so Bun is unnecessary.
-          setup-bun: "false"
-
-      - name: Unit-test drift extractors (regex + allowlist logic)
-        run: node --test scripts/check-drizzle-schema-drift.test.mjs
-
-      - name: Audit repository schema ↔ migration drift
-        run: node scripts/check-drizzle-schema-drift.mjs
-
-  mcp-test:
-    name: MCP Server Tests
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
-        with:
-          action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-          attempt_limit: 3
-          attempt_delay: 5000
-
-      - uses: ./.github/actions/setup-toolchain
-        with:
-          # server/mcp 配下で個別に install するため、ルートの install は不要。
-          # The job installs deps inside server/mcp instead of the root.
-          install-deps: "false"
-
-      # server/mcp is not part of the root Bun workspace; install its
-      # dependencies locally before type-checking and testing.
-      # server/mcp はルートの Bun workspace に含まれないため、
-      # 型チェックとテストの前にローカルで依存関係をインストールする。
-      - name: Install MCP dependencies
-        working-directory: server/mcp
-        run: bun install --frozen-lockfile
-
-      - name: Type check
-        working-directory: server/mcp
-        run: bun run typecheck
-
-      - name: Run tests
-        working-directory: server/mcp
-        run: bun run test:coverage
-
-      - name: Upload MCP coverage report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: coverage-report-mcp
-          path: server/mcp/coverage/
-          retention-days: 7
-
-  hocuspocus-test:
-    name: Hocuspocus Server Tests
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout (with retry)
-        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
-        with:
-          action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-          attempt_limit: 3
-          attempt_delay: 5000
-
-      - uses: ./.github/actions/setup-toolchain
-        with:
-          # server/hocuspocus 配下で個別に install するため、ルートの install は不要。
-          # The job installs deps inside server/hocuspocus instead of the root.
-          install-deps: "false"
-
-      # server/hocuspocus はルートの Bun workspace に含まれないため、
-      # テストの前にローカルで依存関係をインストールする。
-      # server/hocuspocus is not part of the root Bun workspace; install its
-      # dependencies locally before running the vitest suite.
-      - name: Install Hocuspocus dependencies
-        working-directory: server/hocuspocus
-        run: bun install --frozen-lockfile
-
-      - name: Run tests
-        working-directory: server/hocuspocus
-        run: bun run test:coverage
-
-      - name: Upload Hocuspocus coverage report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: coverage-report-hocuspocus
-          path: server/hocuspocus/coverage/
-          retention-days: 7
-
   mutation-light:
     name: Mutation (light)
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
@@ -527,6 +297,88 @@ jobs:
           elapsed=$((end - MUTATION_START))
           echo "### Mutation (light)" >> "$GITHUB_STEP_SUMMARY"
           echo "Duration: ${elapsed}s ($((elapsed / 60))m)" >> "$GITHUB_STEP_SUMMARY"
+
+  app-test:
+    name: App (rebuild) — types, tests, build
+    # app/ はルート workspace 外の独立パッケージ（Worker 1 本の作り直し）。
+    # 単体テスト（Node / happy-dom）と workerd 上の統合テスト（D1・Durable Objects）を実行する。
+    # app/ is a standalone package (the one-Worker rebuild) outside the root workspace.
+    # Runs unit tests (Node / happy-dom) and integration tests in workerd (D1, Durable Objects).
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
+        with:
+          action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+          attempt_limit: 3
+          attempt_delay: 5000
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          install-deps: "false"
+
+      - name: Install app dependencies
+        working-directory: app
+        run: bun install --frozen-lockfile
+
+      - name: Type check (client, worker, Node tests)
+        working-directory: app
+        run: bun run typecheck
+
+      - name: Unit and workerd integration tests
+        working-directory: app
+        run: bun run test
+
+      - name: Build
+        working-directory: app
+        run: bun run build
+
+  app-smoke:
+    name: App (rebuild) — browser smoke test
+    # 空のローカル D1 で wrangler dev を起動し、サインインからオフライン同期・サインアウトまでを
+    # ヘッドレス Chromium で確認する（外部サービスへの通信なし）。
+    # Starts wrangler dev on an empty local D1 and drives sign-in through offline sync and
+    # sign-out in headless Chromium (no external services).
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
+        with:
+          action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+          attempt_limit: 3
+          attempt_delay: 5000
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          install-deps: "false"
+
+      - name: Install app dependencies
+        working-directory: app
+        run: bun install --frozen-lockfile
+
+      # Same install as e2e-web (see the note there on Playwright and Node 24.16+).
+      - name: Install Playwright browsers (with retry)
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
+        with:
+          command: cd app && timeout 300 npx playwright install --with-deps chromium
+          attempt_limit: 3
+          attempt_delay: 10000
+
+      - name: Build
+        working-directory: app
+        run: bun run build
+
+      - name: Smoke test
+        working-directory: app
+        run: |
+          cp .dev.vars.example .dev.vars
+          bun run smoke
 
   security:
     name: Security

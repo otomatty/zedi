@@ -7,8 +7,6 @@
 
 # Infrastructure & CI
 /.github/ @otomatty
-/docker-compose*.yml @otomatty
-/Dockerfile* @otomatty
 
 # Docs / agent policy (spec + TDD live in AGENTS.md; local docs/ is gitignored)
 /journal/ @otomatty

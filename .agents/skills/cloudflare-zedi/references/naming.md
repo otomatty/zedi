@@ -1,64 +1,64 @@
 # 命名・ドメイン固定値 / Naming & domains
 
-移行前（Terraform 管理）の固定値と、移行後（Wrangler 管理）の方針。
-出典: `terraform/cloudflare/{shared,dev,prod}/`（Phase 5 で削除予定）。
-
 ## ゾーン / Zone
 
 - DNS ゾーン: `zedi-note.app`（単一アカウント・単一ゾーン。dev/prod 同一トークンで可）
 
-## ドメイン対応 / Domains
+## ドメイン / Domains
 
-| 用途     | prod                     | dev                       |
-| -------- | ------------------------ | ------------------------- |
-| フロント | `zedi-note.app` (apex)   | `dev.zedi-note.app`       |
-| 管理画面 | `admin.zedi-note.app`    | `admin-dev.zedi-note.app` |
-| API      | `api.zedi-note.app`      | （dev 設定に従う）        |
-| Realtime | `realtime.zedi-note.app` | （dev 設定に従う）        |
+`app/` の Worker 1 本がフロント・API・共同編集を同じオリジンで配信するため、`api` / `realtime` の
+サブドメインは使わない。
 
-> 移行前は `api` / `realtime` は Railway への CNAME（proxied）。Workers 化後は各 Worker の
-> `routes` に `{ pattern: "api.zedi-note.app", custom_domain: true }` を設定し、DNS を
-> Cloudflare に自動生成させる。旧 Railway CNAME と検証 TXT はカットオーバー後に撤去。
+| 用途          | prod                  | dev                       |
+| ------------- | --------------------- | ------------------------- |
+| アプリ        | `zedi-note.app`       | `dev.zedi-note.app`       |
+| 管理画面（※） | `admin.zedi-note.app` | `admin-dev.zedi-note.app` |
 
-## プロジェクト/Worker 名 / Project & Worker names
+> ※ 管理画面を `app/` の Worker に含めるか別にするかは、管理機能を移すときに決める。
+>
+> 上の 4 つには、旧 Pages プロジェクトへの CNAME と Pages のカスタムドメインが残っている
+> （Terraform で作ったもの。Terraform は削除済み）。Worker の `custom_domain` に移す前に、
+> ダッシュボードで外す。Railway 向けの `api` / `realtime` の CNAME と検証用 TXT も残っているので削除する。
 
-移行前 Pages プロジェクト名（参考。Workers 化で置換）:
+## Worker 名 / Worker names
 
-| 環境 | フロント   | 管理画面         |
-| ---- | ---------- | ---------------- |
-| prod | `zedi`     | `zedi-admin`     |
-| dev  | `zedi-dev` | `zedi-admin-dev` |
+| 環境 | Worker 名        | 備考                                                           |
+| ---- | ---------------- | -------------------------------------------------------------- |
+| prod | `zedi-app`       | `app/wrangler.jsonc` の `name`                                 |
+| dev  | `zedi-app` + env | `env.dev` で分けるか `-dev` サフィックスにするかは初回に決める |
 
-移行後 Worker 名（提案。`wrangler.jsonc` の `name` + `env`）:
+旧構成で使っていた名前（削除済み、またはダッシュボードで削除する対象）:
 
-| サービス      | 提案 Worker 名  | 環境分離                     |
-| ------------- | --------------- | ---------------------------- |
-| フロント      | `zedi-web`      | `env.dev` / `env.production` |
-| 管理画面      | `zedi-admin`    | `env.dev` / `env.production` |
-| API           | `zedi-api`      | `env.dev` / `env.production` |
-| MCP           | `zedi-mcp`      | `env.dev` / `env.production` |
-| Realtime (DO) | `zedi-realtime` | `env.dev` / `env.production` |
+| 種類               | 名前                                                             |
+| ------------------ | ---------------------------------------------------------------- |
+| Pages プロジェクト | `zedi`, `zedi-admin`, `zedi-dev`, `zedi-admin-dev`               |
+| dev の Worker      | `zedi-web-dev`, `zedi-admin-dev`, `zedi-api-dev`, `zedi-mcp-dev` |
 
-> Worker 名は Cloudflare の名前制約（長さ等）に従う。環境は単一 Worker を `env.*` で分けるか、
-> 名前サフィックス（`-dev`）で分けるかを Phase 2 着手時に確定する。
+## D1
+
+| 環境  | データベース名 | 状態                                                     |
+| ----- | -------------- | -------------------------------------------------------- |
+| local | `zedi-app`     | `app/wrangler.jsonc`（`database_id` はプレースホルダー） |
+| dev   | 未作成         |                                                          |
+| prod  | 未作成         |                                                          |
 
 ## R2 バケット / R2 buckets (#1089)
 
-メディア / サムネイル / PDF ハイライトを単一バケットに格納する（現状の `STORAGE_BUCKET_NAME`
-1 個構成を踏襲）。環境ごとに 1 バケット。
+旧 API 向けに作ったバケット。`app/` はまだ R2 を使っていない。メディアを扱うときに使うか、
+不要なら削除する。
 
 | 環境 | バケット名          | 状態                       |
 | ---- | ------------------- | -------------------------- |
 | dev  | `zedi-storage-dev`  | 作成済み (APAC / Standard) |
 | prod | `zedi-storage-prod` | 作成済み (APAC / Standard) |
 
-- S3 互換エンドポイント: `https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com`
-- R2 API トークン（Access Key ID / Secret）はダッシュボード R2 → Manage R2 API Tokens で発行
-  （MCP では発行不可）。`STORAGE_*` env に設定する。
+## GitHub の変数・Secrets / GitHub vars & secrets
 
-## 環境変数の対応 / Env vars
-
-GitHub Environments（development / production）の既存 `vars` / `secrets`:
+GitHub Environments（development / production）に残っているもの:
 
 - `vars`: `API_BASE_URL`, `REALTIME_URL`, `MAIN_APP_URL`, `MCP_BASE_URL`, `POLAR_MONTHLY_ID`, `POLAR_YEARLY_ID`
-- `secrets`: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `DATABASE_URL`（D1 移行で不要化予定）, `TF_API_TOKEN`（Terraform 廃止で削除）
+  — 旧フロント / admin のビルド用。デプロイを止めたので不要。
+- `secrets`:
+  - `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` — 今後の `app/` のデプロイで使う。
+  - `DATABASE_URL` — 旧 API の Postgres 用。不要。
+  - `TF_API_TOKEN` — Terraform を削除したので不要。

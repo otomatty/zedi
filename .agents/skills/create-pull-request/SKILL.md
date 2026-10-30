@@ -100,8 +100,8 @@ git diff ${BASE_BRANCH}..HEAD --name-only -- '**/routes/**' '**/api/**'
 # 2f. CI / workflow changes
 git diff ${BASE_BRANCH}..HEAD --name-only -- '.github/**'
 
-# 2g. Terraform / infra changes
-git diff ${BASE_BRANCH}..HEAD --name-only -- '**/terraform/**'
+# 2g. Infra changes (Cloudflare Worker config)
+git diff ${BASE_BRANCH}..HEAD --name-only -- '**/wrangler.jsonc'
 ```
 
 ### Phase 3: Read the PR template
@@ -135,15 +135,15 @@ Using the investigation results, fill in the PR template. Follow these rules:
 
 ### 変更点 (Changes)
 
-- Group changes by area (e.g., `admin/`, `server/api/`, `terraform/`).（ローカル専用の `docs/` はコミットに含まれないため PR の変更一覧には通常出ない）
+- Group changes by area (e.g., `admin/`, `app/`, `.github/`).（ローカル専用の `docs/` はコミットに含まれないため PR の変更一覧には通常出ない）
 - Each group: 1-line heading + bullet list of key changes.
 - For large PRs (>30 files), use a table format:
 
 ```markdown
-| 領域          | 主な変更                             |
-| ------------- | ------------------------------------ |
-| `admin/`      | 管理画面UI、認証ガード、AIモデル管理 |
-| `server/api/` | admin用ミドルウェア、ロール追加      |
+| 領域     | 主な変更                             |
+| -------- | ------------------------------------ |
+| `admin/` | 管理画面UI、認証ガード、AIモデル管理 |
+| `app/`   | admin用ミドルウェア、ロール追加      |
 ```
 
 ### 変更の種類 (Change type)

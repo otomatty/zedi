@@ -22,7 +22,7 @@ npm run dev:admin
 
 ## Local verification
 
-After starting the backend (`docker-compose -f docker-compose.dev.yml up --build`), start the admin app and verify:
+The old backend (`server/api`) has been removed, so sign-in and the checks below cannot run until the admin features move to `app/`. Kept as the list of what to check then:
 
 - [ ] Admin UI loads at `http://localhost:30001`
 - [ ] After login (Google/GitHub), admin users see the AI model list
@@ -35,22 +35,12 @@ After starting the backend (`docker-compose -f docker-compose.dev.yml up --build
 cd admin && npm install && npm run build
 ```
 
-Output is `admin/dist`. Deployments:
-
-| Environment | URL                       | Cloudflare Pages | Workflow          |
-| ----------- | ------------------------- | ---------------- | ----------------- |
-| Production  | `admin.zedi-note.app`     | `zedi-admin`     | `deploy-prod.yml` |
-| Development | `admin-dev.zedi-note.app` | `zedi-admin-dev` | `deploy-dev.yml`  |
-
-Both are managed by Terraform (`terraform/cloudflare/prod` and `terraform/cloudflare/dev`).
+Output is `admin/dist`. It is no longer deployed: the `deploy-dev.yml` / `deploy-prod.yml` workflows were removed with the old backend. The old Cloudflare Pages projects (`zedi-admin`, `zedi-admin-dev`) still exist in the Cloudflare dashboard until they are deleted there.
 
 ## Environment variables
 
-- **Development (local):** Set `ZEDI_API_PROXY_TARGET=http://localhost:3000` in `.env` to proxy `/api` to that API.
-- **Production:** GitHub Actions production environment passes `VITE_API_BASE_URL`, `VITE_MAIN_APP_URL`, and `VITE_ENV_LABEL=production` at build time.
-- **Development (deployed):** GitHub Actions development environment passes `VITE_API_BASE_URL` (dev API), `VITE_MAIN_APP_URL` (`https://dev.zedi-note.app`), and `VITE_ENV_LABEL=development`. The sidebar shows a **Development** badge to prevent mistaken operations against prod.
-
-After the first dev admin deploy, update Railway **api-dev** `CORS_ORIGIN` to include `https://admin-dev.zedi-note.app` and set `ADMIN_BASE_URL=https://admin-dev.zedi-note.app`. Add GitHub **development** variable `MAIN_APP_URL=https://dev.zedi-note.app` if not already set.
+- **Development (local):** Set `ZEDI_API_PROXY_TARGET` in `.env` to proxy `/api` to an API.
+- **Build:** `VITE_API_BASE_URL`, `VITE_MAIN_APP_URL` and `VITE_ENV_LABEL` (`production` / `development`; `development` shows a **Development** badge in the sidebar).
 
 ## Specification
 

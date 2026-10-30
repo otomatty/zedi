@@ -1,0 +1,274 @@
+{
+  "measuredAt": "2026-10-30T06:24:28.021Z",
+  "seedPages": 10,
+  "runs": [
+    {
+      "cpuRate": 4,
+      "largeDocMatrix": {
+        "tiptapCarets": {
+          "readyMs": 1076,
+          "latencyMs": {
+            "n": 52,
+            "p50": 388.6,
+            "p95": 1270.6,
+            "max": 1433.1
+          }
+        },
+        "tiptapCaretsAtStart": {
+          "readyMs": 1314,
+          "latencyMs": {
+            "n": 52,
+            "p50": 276.2,
+            "p95": 996.6,
+            "max": 1100
+          }
+        },
+        "sharedCarets": {
+          "readyMs": 1204.2,
+          "latencyMs": {
+            "n": 52,
+            "p50": 175.5,
+            "p95": 379.9,
+            "max": 497.5
+          }
+        },
+        "noCarets": {
+          "readyMs": 999.6,
+          "latencyMs": {
+            "n": 52,
+            "p50": 214.5,
+            "p95": 521.6,
+            "max": 591.8
+          }
+        },
+        "tiptapCaretsCv": {
+          "readyMs": 1010.7,
+          "latencyMs": {
+            "n": 52,
+            "p50": 414.6,
+            "p95": 1152.9,
+            "max": 1223.4
+          }
+        },
+        "local": {
+          "readyMs": 1078.2,
+          "latencyMs": {
+            "n": 52,
+            "p50": 67,
+            "p95": 236.7,
+            "max": 278.9
+          }
+        },
+        "localCv": {
+          "readyMs": 987,
+          "latencyMs": {
+            "n": 52,
+            "p50": 145.6,
+            "p95": 531.6,
+            "max": 787.1
+          }
+        }
+      },
+      "largeDocScale": {
+        "250": {
+          "collab": {
+            "n": 52,
+            "p50": 45.9,
+            "p95": 238.6,
+            "max": 243.9
+          },
+          "local": {
+            "n": 52,
+            "p50": 29.9,
+            "p95": 56.3,
+            "max": 123.3
+          }
+        },
+        "500": {
+          "collab": {
+            "n": 52,
+            "p50": 44.9,
+            "p95": 113.7,
+            "max": 185
+          },
+          "local": {
+            "n": 52,
+            "p50": 41.4,
+            "p95": 115.3,
+            "max": 119.9
+          }
+        },
+        "1000": {
+          "collab": {
+            "n": 52,
+            "p50": 70.7,
+            "p95": 235.5,
+            "max": 271.3
+          },
+          "local": {
+            "n": 52,
+            "p50": 55.7,
+            "p95": 145,
+            "max": 146.3
+          }
+        },
+        "2000": {
+          "collab": {
+            "n": 52,
+            "p50": 151.4,
+            "p95": 595.4,
+            "max": 672.1
+          },
+          "local": {
+            "n": 52,
+            "p50": 88.4,
+            "p95": 347.9,
+            "max": 486.1
+          }
+        },
+        "4000": {
+          "collab": {
+            "n": 52,
+            "p50": 4651.7,
+            "p95": 11740.3,
+            "max": 11944.9
+          },
+          "local": {
+            "n": 52,
+            "p50": 283.2,
+            "p95": 972.8,
+            "max": 1208.8
+          }
+        }
+      }
+    }
+  ],
+  "seed": {
+    "inserted": 10,
+    "ms": 5,
+    "rowsWritten": 50,
+    "clientMs": 31
+  },
+  "api": {
+    "me": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 14.6,
+        "p95": 20.9,
+        "max": 21
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 0,
+        "max": 1
+      },
+      "rowsRead": 1
+    },
+    "pageDetail": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 13.6,
+        "p95": 17.7,
+        "max": 19.5
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 0,
+        "max": 1
+      },
+      "rowsRead": 2
+    },
+    "listFirst100": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 17.2,
+        "p95": 22.2,
+        "max": 26.1
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 1,
+        "max": 1
+      },
+      "rowsRead": 11
+    },
+    "searchFtsJapanese": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 13.1,
+        "p95": 20.8,
+        "max": 21.6
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 1,
+        "max": 1
+      },
+      "rowsRead": 6
+    },
+    "searchFtsEnglish": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 12.8,
+        "p95": 19,
+        "max": 20.4
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 1,
+        "max": 1
+      },
+      "rowsRead": 6
+    },
+    "searchFtsNoHit": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 13.7,
+        "p95": 18.4,
+        "max": 20.9
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 1,
+        "max": 1
+      },
+      "rowsRead": 0
+    },
+    "searchLikeTwoChars": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 13.2,
+        "p95": 19.5,
+        "max": 19.8
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 1,
+        "max": 1
+      },
+      "rowsRead": 14
+    },
+    "searchLikeTwoCharsNoHit": {
+      "latencyMs": {
+        "n": 30,
+        "p50": 16.4,
+        "p95": 21.4,
+        "max": 21.7
+      },
+      "d1SqlMs": {
+        "n": 30,
+        "p50": 0,
+        "p95": 1,
+        "max": 1
+      },
+      "rowsRead": 14
+    }
+  }
+}
