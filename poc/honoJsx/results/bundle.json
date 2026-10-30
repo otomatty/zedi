@@ -1,18 +1,18 @@
 {
   "assets": [
     {
-      "path": "assets/AiChatPage-B17SW2-e.js",
+      "path": "assets/AiChatPage-C1PpBIcS.js",
       "initial": false,
-      "raw": 54513,
-      "gzip": 17004,
-      "brotli": 15398
+      "raw": 54530,
+      "gzip": 17024,
+      "brotli": 15444
     },
     {
-      "path": "assets/EditorPage-BYpDenp7.js",
+      "path": "assets/EditorPage-BCtuC0zp.js",
       "initial": false,
-      "raw": 556951,
-      "gzip": 175635,
-      "brotli": 149371
+      "raw": 561587,
+      "gzip": 177317,
+      "brotli": 150733
     },
     {
       "path": "assets/authClient-KmrCVLrO.js",
@@ -22,23 +22,23 @@
       "brotli": 10261
     },
     {
-      "path": "assets/index-CuC5twsl.css",
+      "path": "assets/index-CKaym_ED.css",
       "initial": true,
-      "raw": 5951,
-      "gzip": 1772,
-      "brotli": 1496
+      "raw": 6438,
+      "gzip": 1882,
+      "brotli": 1596
     },
     {
-      "path": "assets/index-OQG9bCS0.js",
+      "path": "assets/index-CjOBNWF7.js",
       "initial": true,
-      "raw": 92734,
-      "gzip": 30022,
-      "brotli": 26744
+      "raw": 96821,
+      "gzip": 31571,
+      "brotli": 27995
     }
   ],
   "initialJs": {
-    "raw": 92734,
-    "gzip": 30022,
-    "brotli": 26744
+    "raw": 96821,
+    "gzip": 31571,
+    "brotli": 27995
   }
 }

@@ -220,5 +220,74 @@
       "orig": 3197.8,
       "patched": 1168.2
     }
+  },
+  "finalBuild": {
+    "note": "Final build with y-indexeddb persistence and offline support; two runs, 4x",
+    "runs": [
+      {
+        "sharedCarets": {
+          "n": 52,
+          "p50": 63.6,
+          "p95": 263.3,
+          "max": 319.7
+        },
+        "tiptapCarets": {
+          "n": 52,
+          "p50": 371.9,
+          "p95": 744.4,
+          "max": 819.2
+        },
+        "noCarets": {
+          "n": 52,
+          "p50": 114.9,
+          "p95": 337.6,
+          "max": 439.3
+        },
+        "local": {
+          "n": 52,
+          "p50": 77,
+          "p95": 197.7,
+          "max": 319.4
+        },
+        "sharedCarets4000": {
+          "n": 52,
+          "p50": 964.1,
+          "p95": 2617,
+          "max": 2817.1
+        }
+      },
+      {
+        "sharedCarets": {
+          "n": 52,
+          "p50": 69.8,
+          "p95": 232.3,
+          "max": 363.5
+        },
+        "tiptapCarets": {
+          "n": 52,
+          "p50": 141.1,
+          "p95": 391.9,
+          "max": 473.5
+        },
+        "noCarets": {
+          "n": 52,
+          "p50": 168.4,
+          "p95": 412.9,
+          "max": 429.8
+        },
+        "local": {
+          "n": 52,
+          "p50": 56.7,
+          "p95": 148,
+          "max": 161.1
+        },
+        "sharedCarets4000": {
+          "n": 52,
+          "p50": 895.8,
+          "p95": 1438.1,
+          "max": 1906.2
+        }
+      }
+    ]
   }
 }

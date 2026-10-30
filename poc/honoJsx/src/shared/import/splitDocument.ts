@@ -3,7 +3,7 @@
  * 長い取り込みコンテンツ（Web クリップ・PDF のテキスト）を複数のリンクされたページに分ける。
  *
  * Measured in this PoC: collaborative typing stays close to a local editor up to about
- * 1,000 text blocks, doubles at 2,000 and falls behind at 4,000 (README, finding 18).
+ * 1,000 text blocks, doubles at 2,000 and falls behind at 4,000 (README, "Large documents").
  * 計測では約 1,000 ブロックまでローカル編集並み、2,000 で 2 倍、4,000 で入力が追いつかない。
  */
 
