@@ -2,7 +2,9 @@
 
 # Dropping Tauri: inventory of desktop-only features (current app)
 
-Decision: Zedi becomes a web app only (PWA, with offline support). This document lists everything in the current app (`/`, not this PoC) that depends on Tauri or exists only for the desktop app, so each item can be kept, ported or deleted. Nothing has been deleted yet.
+Decision: Zedi becomes a web app only (PWA, with offline support). This document lists everything in the current app (`/`, not this PoC) that depends on Tauri or exists only for the desktop app.
+
+**Status: everything below has been deleted**, including the items that needed a product decision (the owner chose to delete them too). Stored documents keep their content: hocuspocus converts executable code blocks, MCP resource embeds and `@file:` marks into web nodes when it loads a document (`server/hocuspocus/src/desktopContentMigration.ts`). Migration `0034_remove_desktop_pdf_reader.sql` drops PDF highlights and `pdf_local` sources when it is deployed.
 
 How it is wired today: every Tauri call in the front end sits behind `isTauriDesktop()` (`src/lib/platform.ts`, about 40 call sites; `src/lib/storageAdapter/createStorageAdapter.ts` has its own copy of the check). Web users therefore never see these features. The real coupling is in node types stored in documents, the server's PDF tables, and build/CI.
 
