@@ -276,7 +276,10 @@ Quality metrics, testing policy (TDD / mutation), and how to write specification
 
 ## 📁 Project Structure
 
+Zedi is being rebuilt in `app/` on a single Cloudflare Worker (hono/jsx/dom, Hono, Better Auth, D1, Durable Objects). Once it covers the current app's features it replaces `src/`, `server/*` and `admin/`. See [app/README.md](app/README.md).
+
 ```
+app/                     # The rebuilt app (one Worker; outside the root workspace)
 src/                     # Frontend (React + Vite)
 ├── components/          # React components (editor / page / search / layout / ui etc.)
 ├── hooks/               # Custom hooks

@@ -87,17 +87,19 @@ _Overlay: `.agents/skills/spec-test/references/overlays/zedi.md`._
 
 ### テスト配置 / Test placement
 
-| スコープ                                            | 配置                                              |
-| --------------------------------------------------- | ------------------------------------------------- |
-| `src/`, `admin/`, `packages/*`, `server/hocuspocus` | 実装と同階層（`foo.ts` → `foo.test.ts`）          |
-| `server/api`, `server/mcp`                          | `src/__tests__/` にソースツリーをミラー。同居禁止 |
-| E2E                                                 | `e2e/*.spec.ts`（Playwright）                     |
+| スコープ                                            | 配置                                                      |
+| --------------------------------------------------- | --------------------------------------------------------- |
+| `src/`, `admin/`, `packages/*`, `server/hocuspocus` | 実装と同階層（`foo.ts` → `foo.test.ts`）                  |
+| `app/`                                              | 実装と同階層。workerd 上の統合テストは `*.worker.test.ts` |
+| `server/api`, `server/mcp`                          | `src/__tests__/` にソースツリーをミラー。同居禁止         |
+| E2E                                                 | `e2e/*.spec.ts`（Playwright）                             |
 
 ---
 
 ## 技術スタック / Stack
 
-- **フロント**: React, TypeScript, Vite（`src/`）
+- **新アプリ（作り直し中）**: `app/`。`hono/jsx/dom` のクライアント、Hono の API、Better Auth、D1、Durable Objects（共同編集）を Cloudflare Worker 1 本で配信する。現行の `src/`・`server/*`・`admin/` の機能をここへ移し、揃ったらドメインを切り替えてリポジトリ直下へ移す（本番データはないので移行なし）。詳細は [`app/README.ja.md`](app/README.ja.md)、構成を決めた検証は [`app/docs/verification.ja.md`](app/docs/verification.ja.md)
+- **フロント（現行）**: React, TypeScript, Vite（`src/`）
 - **ランタイム**: Bun（Node ≥ 24 / Bun ≥ 1）
 - **API**: `server/api`（Hono on Bun）
 - **リアルタイム**: `server/hocuspocus`（Y.js）
@@ -114,7 +116,8 @@ _Overlay: `.agents/skills/spec-test/references/overlays/zedi.md`._
 ## ディレクトリ構成 / Layout
 
 ```
-src/                 # フロントエンド
+app/                 # 作り直し中のアプリ（Worker 1 本。ルート workspace 外、独自の bun.lock）
+src/                 # フロントエンド（現行）
 admin/               # 管理画面
 packages/
   ui/                # @zedi/ui

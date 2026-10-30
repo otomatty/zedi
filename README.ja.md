@@ -276,7 +276,10 @@ bun run test:mutation
 
 ## 📁 Project Structure
 
+Zedi は `app/` で Cloudflare Worker 1 本の構成（hono/jsx/dom、Hono、Better Auth、D1、Durable Objects）に作り直しています。現行アプリの機能が揃ったら `src/`・`server/*`・`admin/` を置き換えます。詳細は [app/README.ja.md](app/README.ja.md)。
+
 ```
+app/                     # 作り直し中のアプリ（Worker 1 本。ルート workspace 外）
 src/                     # フロントエンド本体（React + Vite）
 ├── components/          # React コンポーネント（editor / page / search / layout / ui ほか）
 ├── hooks/               # カスタムフック

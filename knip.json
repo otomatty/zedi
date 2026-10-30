@@ -6,7 +6,7 @@
   "vitest": true,
   "playwright": true,
   "ignoreBinaries": ["docker-compose"],
-  "ignore": ["poc/**"],
+  "ignore": ["app/**"],
   "workspaces": {
     ".": {
       "entry": ["scripts/**/*.ts", "e2e/**/*.ts"],
