@@ -52,17 +52,19 @@ export function createBlockSplitter(): BlockSplitter {
     return kind !== null && (INDENTED.test(line) || listKind(line) === kind);
   };
 
+  /** Inside a fence every line belongs to it; a matching closing fence ends the block. */
+  const handleFenceLine = (open: { marker: string; standalone: boolean }, line: string) => {
+    lines.push(line);
+    const char = open.marker[0] === "`" ? "`" : "~";
+    if (new RegExp(`^ {0,3}${char}{${open.marker.length},} *$`).test(line)) {
+      fence = null;
+      if (open.standalone) emit();
+    }
+  };
+
   const handleLine = (line: string) => {
     if (fence) {
-      lines.push(line);
-      const closing = new RegExp(
-        `^ {0,3}${fence.marker[0] === "`" ? "`" : "~"}{${fence.marker.length},} *$`,
-      );
-      if (closing.test(line)) {
-        const standalone = fence.standalone;
-        fence = null;
-        if (standalone) emit();
-      }
+      handleFenceLine(fence, line);
       return;
     }
     if (line.trim() === "") {
