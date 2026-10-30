@@ -27,6 +27,15 @@ function splitPath(path: string): string[] {
   return path.split("/").filter((segment) => segment.length > 0);
 }
 
+/** Decodes a path segment; null for malformed percent-encoding (e.g. `%E0%A4%A`). */
+function decodeSegment(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Finds the first route whose segments match `pathname`.
  * `pathname` に一致する最初のルートを返す。
@@ -43,7 +52,9 @@ export function matchRoute<T>(
     const ok = expected.every((segment, i) => {
       const value = actual[i] as string;
       if (segment.startsWith(":")) {
-        params[segment.slice(1)] = decodeURIComponent(value);
+        const decoded = decodeSegment(value);
+        if (decoded === null) return false;
+        params[segment.slice(1)] = decoded;
         return true;
       }
       return segment === value;

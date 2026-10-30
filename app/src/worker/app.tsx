@@ -44,6 +44,18 @@ function parseIntParam(raw: string | undefined, fallback: number, max: number): 
 }
 
 /** Exposes D1's own accounting so measurements can compare query plans across runs. */
+/**
+ * Parses a JSON request body as an object of unknown fields; a missing, malformed or non-object
+ * body (`null`, an array, a number) reads as `{}`, so validation answers 400 rather than 500.
+ * JSON 本文をオブジェクトとして読む。欠落・不正・オブジェクト以外は `{}` にして 400 で返せるようにする。
+ */
+async function readJsonObject(c: Context): Promise<Record<string, unknown>> {
+  const body: unknown = await c.req.json().catch(() => null);
+  return typeof body === "object" && body !== null && !Array.isArray(body)
+    ? (body as Record<string, unknown>)
+    : {};
+}
+
 function withCost(c: Context, cost: D1Cost) {
   c.header("x-d1-rows-read", String(cost.rowsRead));
   c.header("x-d1-rows-written", String(cost.rowsWritten));
@@ -110,8 +122,7 @@ export function createApp({ routeRealtime }: { routeRealtime?: RealtimeRouter } 
     const access = await getNoteAccess(c.env.DB, c.get("user").id, c.req.param("noteId"));
     if (!access) return c.notFound();
     if (!canEdit(access.role)) return c.json({ error: "forbidden" }, 403);
-    type Body = { id?: unknown; title?: unknown };
-    const body = await c.req.json<Body>().catch(() => ({}) as Body);
+    const body = await readJsonObject(c);
     const title = typeof body.title === "string" ? body.title.trim() : "";
     if (title.length === 0 || title.length > 200) return c.json({ error: "invalid title" }, 400);
     // Optional client-generated id (offline creation); retries with the same id are safe.
@@ -135,9 +146,7 @@ export function createApp({ routeRealtime }: { routeRealtime?: RealtimeRouter } 
     const access = await getNoteAccess(c.env.DB, c.get("user").id, c.req.param("noteId"));
     if (!access) return c.notFound();
     if (access.role !== "owner") return c.json({ error: "forbidden" }, 403);
-    const body = await c.req
-      .json<{ email?: unknown; role?: unknown }>()
-      .catch(() => ({}) as Record<string, unknown>);
+    const body = await readJsonObject(c);
     if (typeof body.email !== "string" || (body.role !== "viewer" && body.role !== "editor")) {
       return c.json({ error: "invalid member" }, 400);
     }
@@ -163,7 +172,7 @@ export function createApp({ routeRealtime }: { routeRealtime?: RealtimeRouter } 
 
   api.post("/dev/seed", async (c) => {
     if (!isDevelopment(c.env)) return c.notFound();
-    const body = await c.req.json<{ count?: unknown }>().catch(() => ({}) as { count?: unknown });
+    const body = await readJsonObject(c);
     const count = typeof body.count === "number" && Number.isInteger(body.count) ? body.count : 0;
     if (count < 1 || count > 50_000) return c.json({ error: "count must be 1..50000" }, 400);
     const noteId = await getDefaultNoteId(c.env.DB, c.get("user").id);

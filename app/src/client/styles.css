@@ -436,3 +436,44 @@ h1 {
   content-visibility: auto;
   contain-intrinsic-size: auto 1.75em;
 }
+
+/* Phone-sized screens: the sidebar becomes a wrapping top bar so pages get the full width. */
+@media (max-width: 640px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .sidebar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 8px 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand {
+    margin-bottom: 0;
+  }
+  .search-button {
+    margin-top: 0;
+  }
+  .account {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 0 auto;
+  }
+  .account [data-testid="account-email"] {
+    display: none;
+  }
+  .content {
+    padding: 12px;
+  }
+  .editor-host {
+    padding: 12px;
+  }
+  .editor-header {
+    flex-wrap: wrap;
+  }
+}

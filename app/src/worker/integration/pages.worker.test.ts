@@ -181,3 +181,15 @@ describe("pages API on D1", () => {
     expect(list.items).toHaveLength(10);
   });
 });
+
+describe("request bodies", () => {
+  it("answers 400, not 500, when a JSON body is null instead of an object", async () => {
+    const cookie = await signIn(uniqueEmail("nullbody"));
+    const { defaultNoteId } = await me(cookie);
+    const post = (path: string) => api(path, cookie, { method: "POST", body: null });
+
+    expect((await post(`/api/notes/${defaultNoteId}/pages`)).status).toBe(400);
+    expect((await post(`/api/notes/${defaultNoteId}/members`)).status).toBe(400);
+    expect((await post("/api/dev/seed")).status).toBe(400);
+  });
+});

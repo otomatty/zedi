@@ -5,6 +5,7 @@
  * Service Worker。インストール時にアプリシェルとビルド成果物を保存し、データ API は
  * オフライン用に最後の応答を保持する。保存一覧とバージョンはビルド時に埋め込む。
  */
+import { networkFirst } from "./networkFirst";
 import { API_CACHE, strategyFor, type Strategy } from "./strategy";
 
 declare const self: ServiceWorkerGlobalScope;
@@ -30,22 +31,6 @@ async function activate() {
   await self.clients.claim();
 }
 
-async function networkFirst(request: Request): Promise<Response> {
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(API_CACHE);
-      await cache.put(request, response.clone());
-    } else if (response.status === 401) {
-      // The session ended: data cached for this user must not outlive it.
-      await caches.delete(API_CACHE);
-    }
-    return response;
-  } catch {
-    return (await caches.match(request, { cacheName: API_CACHE })) ?? Response.error();
-  }
-}
-
 async function respond(strategy: Exclude<Strategy, "network">, request: Request) {
   switch (strategy) {
     case "cacheFirst":
@@ -57,7 +42,11 @@ async function respond(strategy: Exclude<Strategy, "network">, request: Request)
         return (await caches.match(SHELL_URL, { cacheName: SHELL_CACHE })) ?? Response.error();
       }
     case "networkFirst":
-      return networkFirst(request);
+      return networkFirst(request, {
+        fetch: (r) => fetch(r),
+        caches,
+        cacheName: API_CACHE,
+      });
   }
 }
 

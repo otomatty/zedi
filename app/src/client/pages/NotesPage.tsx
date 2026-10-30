@@ -46,12 +46,21 @@ export function NotesPage({ noteId }: { noteId: string }) {
   const virtualItems = virtualizer.getVirtualItems();
   const lastIndex = virtualItems.at(-1)?.index ?? 0;
 
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = list;
+  const { hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = list;
   useEffect(() => {
+    // After a failed page, wait for the retry button instead of refetching on every scroll.
+    if (isFetchNextPageError) return;
     if (hasNextPage && !isFetchingNextPage && lastIndex >= items.length - PREFETCH_ROWS) {
       void fetchNextPage();
     }
-  }, [lastIndex, items.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [
+    lastIndex,
+    items.length,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetchNextPageError,
+    fetchNextPage,
+  ]);
 
   useEffect(() => {
     if (
@@ -73,7 +82,17 @@ export function NotesPage({ noteId }: { noteId: string }) {
   };
 
   if (list.status === "pending") return <p class="muted">読み込み中…</p>;
-  if (list.status === "error") return <p role="alert">読み込みに失敗しました。</p>;
+  // Only a failed first page replaces the list; a failed later page keeps the loaded rows.
+  if (list.status === "error" && !list.data) {
+    return (
+      <div role="alert">
+        <p>読み込みに失敗しました。</p>
+        <button type="button" onClick={() => void list.refetch()}>
+          再読み込み
+        </button>
+      </div>
+    );
+  }
 
   return (
     <section class="notes">
@@ -99,9 +118,23 @@ export function NotesPage({ noteId }: { noteId: string }) {
                 <div
                   key="loader"
                   class="note-row muted"
+                  role={isFetchNextPageError ? "alert" : undefined}
                   style={{ transform: `translateY(${row.start}px)`, height: `${ROW_HEIGHT}px` }}
                 >
-                  読み込み中…
+                  {isFetchNextPageError ? (
+                    <>
+                      続きを読み込めませんでした。{" "}
+                      <button
+                        type="button"
+                        class="link-button"
+                        onClick={() => void fetchNextPage()}
+                      >
+                        続きを再読み込み
+                      </button>
+                    </>
+                  ) : (
+                    "読み込み中…"
+                  )}
                 </div>
               );
             }

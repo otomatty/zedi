@@ -130,6 +130,24 @@ try {
     assert.ok(listRequests.every((u) => u.includes("cursor=")));
   });
 
+  await check("on a phone-sized screen the list and the editor get most of the width", async () => {
+    const phone = await ownerContext.newPage();
+    await phone.setViewportSize({ width: 375, height: 800 });
+    await phone.goto(`${BASE}/notes`);
+    await phone.waitForSelector(".note-row");
+    const listWidth = await phone
+      .locator("[data-testid=note-scroll]")
+      .evaluate((el) => el.clientWidth);
+    assert.ok(listWidth >= 320, `list is ${listWidth}px wide at 375px`);
+    await phone.goto(pageUrl);
+    await phone.waitForSelector(".ProseMirror");
+    const editorWidth = await phone.locator(".ProseMirror").evaluate((el) => el.clientWidth);
+    assert.ok(editorWidth >= 280, `editor is ${editorWidth}px wide at 375px`);
+    const overflow = await phone.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    assert.ok(overflow <= 0, `page scrolls sideways by ${overflow}px`);
+    await phone.close();
+  });
+
   await check("another user gets 404 until shared, then sees the page read-only", async () => {
     const guestContext = await browser.newContext();
     await addSessionCookies(guestContext, BASE, await signInViaApi(BASE, GUEST));

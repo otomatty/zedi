@@ -4,8 +4,9 @@ import type { PageListItem, PageListResponse } from "../shared/types";
 import { ApiError, searchPages } from "./api";
 import { lazyPage } from "./lib/lazy";
 import { searchLoadedPages } from "./lib/localSearch";
-import { QueryClientContext, useQuery } from "./lib/query";
+import { QueryClientContext } from "./lib/query";
 import { shouldInterceptClick } from "./lib/router";
+import { signOut as signOutFlow } from "./lib/signOut";
 import type { Me } from "./lib/session";
 import {
   clearOfflineData,
@@ -18,7 +19,7 @@ import { NotesPage } from "./pages/NotesPage";
 import { SignInPage } from "./pages/SignInPage";
 import { router, useRoute } from "./routing";
 import { session, useSession } from "./session";
-import { CommandPalette } from "./ui/CommandPalette";
+import { SearchPalette } from "./ui/SearchPalette";
 
 const EditorPage = lazyPage<{ id: string; defaultNoteId: string }>(
   () => import("./pages/EditorPage"),
@@ -88,29 +89,13 @@ function useLinkInterception() {
   }, []);
 }
 
-/** Debounces a fast-changing value (palette input) before it hits the search API. */
-function useDebounced<T>(value: T, ms: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), ms);
-    return () => clearTimeout(timer);
-  }, [value, ms]);
-  return debounced;
-}
-
 /** The persistent shell: sidebar, ⌘K palette and the routed page stay mounted across navigation. */
 function Shell({ me }: { me: Me }) {
   const route = useRoute();
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const [refused, setRefused] = useState<string[]>([]);
+  const [signOutFailed, setSignOutFailed] = useState(false);
   const online = useOnline();
-  const debouncedQuery = useDebounced(query.trim(), 150);
-  const results = useQuery({
-    queryKey: ["search", debouncedQuery],
-    queryFn: () => searchWithFallback(me.defaultNoteId, debouncedQuery),
-    staleTime: 10_000,
-  });
   useLinkInterception();
   usePendingPageSync(setRefused);
 
@@ -126,15 +111,16 @@ function Shell({ me }: { me: Me }) {
   }, []);
 
   const signOut = async () => {
-    const { authClient } = await import("./authClient");
-    await authClient.signOut();
-    await clearOfflineData();
-    queryClient.clear();
-    session.signOut();
-    router.navigate("/notes", { replace: true });
+    setSignOutFailed(false);
+    const done = await signOutFlow({
+      endServerSession: async () => (await import("./authClient")).authClient.signOut(),
+      clearOfflineData,
+      clearQueries: () => queryClient.clear(),
+      endLocalSession: () => session.signOut(),
+    });
+    if (done) router.navigate("/notes", { replace: true });
+    else setSignOutFailed(true);
   };
-
-  const paletteItems = (results.data?.items ?? []).map((p) => ({ id: p.id, label: p.title }));
 
   return (
     <div class="shell">
@@ -174,6 +160,11 @@ function Shell({ me }: { me: Me }) {
             オフラインです。編集とページ作成はこの端末に保存され、接続が戻ると同期されます。
           </p>
         )}
+        {signOutFailed && (
+          <p role="alert" class="offline-banner">
+            サインアウトできませんでした。時間をおいて再度お試しください。
+          </p>
+        )}
         {refused.length > 0 && (
           <p role="alert" class="offline-banner">
             次のページはサーバーに作成できませんでした: {refused.join("、")}
@@ -187,20 +178,13 @@ function Shell({ me }: { me: Me }) {
         {!route && <p class="muted">ページが見つかりません。</p>}
       </main>
       {paletteOpen && (
-        <CommandPalette
-          open
-          items={paletteItems}
-          filterLocally={false}
-          placeholder={
-            online
-              ? "全文検索（3 文字以上は索引、2 文字以下は部分一致）"
-              : "オフライン検索（読み込み済みページのタイトルと冒頭のみ）"
-          }
-          onQueryChange={setQuery}
+        <SearchPalette
+          search={(query) => searchWithFallback(me.defaultNoteId, query)}
+          online={online}
           onClose={() => setPaletteOpen(false)}
-          onSelect={(item) => {
+          onSelect={(page) => {
             setPaletteOpen(false);
-            router.navigate(`/notes/${item.id}`);
+            router.navigate(`/notes/${page.id}`);
           }}
         />
       )}

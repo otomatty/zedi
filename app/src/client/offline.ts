@@ -49,8 +49,8 @@ if (typeof window !== "undefined") {
 }
 
 /**
- * Sends queued page creations and refreshes the lists and pages they affect.
- * 未送信のページ作成を送り、影響する一覧とページを再取得させる。
+ * Sends queued page creations and refreshes the lists, pages and search results they affect.
+ * 未送信のページ作成を送り、影響する一覧・ページ・検索結果を再取得させる。
  */
 export async function syncPendingPages(client: QueryClient): Promise<FlushResult> {
   const result = await pageOutbox.flush(async (page) => {
@@ -60,6 +60,8 @@ export async function syncPendingPages(client: QueryClient): Promise<FlushResult
     void client.invalidateQueries({ queryKey: ["pages", page.noteId] });
     void client.invalidateQueries({ queryKey: ["page", page.id] });
   }
+  // New titles are searchable at once, so cached results (kept 10 s) must not hide them.
+  if (result.sent.length > 0) void client.invalidateQueries({ queryKey: ["search"] });
   return result;
 }
 

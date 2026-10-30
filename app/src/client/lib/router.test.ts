@@ -50,6 +50,10 @@ describe("matchRoute", () => {
     });
   });
 
+  it("treats a param that is not valid percent-encoding as no match instead of throwing", () => {
+    expect(matchRoute(routes, "/notes/%E0%A4%A")).toBeNull();
+  });
+
   it("returns null when no route matches or a param segment is empty", () => {
     expect(matchRoute(routes, "/unknown")).toBeNull();
     expect(matchRoute(routes, "/notes/a/b")).toBeNull();
@@ -57,6 +61,19 @@ describe("matchRoute", () => {
 });
 
 describe("createRouter", () => {
+  it("starts and follows navigation even on a malformed URL", () => {
+    const history = createMemoryHistory("/notes/%E0%A4%A");
+    const router = createRouter(routes, history);
+    expect(router.current()).toBeNull();
+
+    history.pushState(null, "", "/notes/%zz");
+    history.back();
+    router.navigate("/notes/%zz");
+
+    expect(router.current()).toBeNull();
+    router.dispose();
+  });
+
   it("exposes the initial match and notifies subscribers on navigate", () => {
     const history = createMemoryHistory("/notes");
     const router = createRouter(routes, history);
