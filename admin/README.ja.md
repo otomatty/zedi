@@ -50,7 +50,7 @@ cd admin && npm install && npm run build
 - **本番:** GitHub Actions の production environment から `VITE_API_BASE_URL`・`VITE_MAIN_APP_URL`・`VITE_ENV_LABEL=production` を渡してビルドする。
 - **開発（デプロイ）:** GitHub Actions の development environment から dev API の `VITE_API_BASE_URL`、`VITE_MAIN_APP_URL`（`https://dev.zedi-note.app`）、`VITE_ENV_LABEL=development` を渡す。サイドバーに **開発環境** バッジを表示し、本番への誤操作を防ぐ。
 
-初回の dev 管理画面デプロイ後、Railway **api-dev** の `CORS_ORIGIN` に `https://admin-dev.zedi-note.app` を追加し、`ADMIN_BASE_URL=https://admin-dev.zedi-note.app` を設定すること。GitHub **development** 変数 `MAIN_APP_URL=https://dev.zedi-note.app` も未設定なら追加する。
+初回の dev 管理画面デプロイ後、dev API の `CORS_ORIGIN` に `https://admin-dev.zedi-note.app` を追加し、`ADMIN_BASE_URL=https://admin-dev.zedi-note.app` を設定すること。GitHub **development** 変数 `MAIN_APP_URL=https://dev.zedi-note.app` も未設定なら追加する。
 
 ## 仕様
 

@@ -272,8 +272,7 @@ jobs:
 
       - uses: ./.github/actions/setup-toolchain
 
-      # Bun workspaces are not used due to Railway build constraints.
-      # Consider migrating to workspaces if Railway adds Bun workspace support.
+      # server/api is outside the root Bun workspace and has its own bun.lock.
       - name: Install API dependencies
         working-directory: server/api
         run: bun install --frozen-lockfile

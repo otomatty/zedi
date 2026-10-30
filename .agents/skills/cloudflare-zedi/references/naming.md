@@ -16,7 +16,8 @@
 | API      | `api.zedi-note.app`      | （dev 設定に従う）        |
 | Realtime | `realtime.zedi-note.app` | （dev 設定に従う）        |
 
-> 移行前は `api` / `realtime` は Railway への CNAME（proxied）。Workers 化後は各 Worker の
+> 以前は `api` / `realtime` が Railway への CNAME（proxied）だった。Terraform の定義は削除済みで、
+> 次の Apply Shared でゾーンからも消える。Workers 化後は各 Worker の
 > `routes` に `{ pattern: "api.zedi-note.app", custom_domain: true }` を設定し、DNS を
 > Cloudflare に自動生成させる。旧 Railway CNAME と検証 TXT はカットオーバー後に撤去。
 

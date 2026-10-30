@@ -8,7 +8,7 @@ Cloudflare resources are split into **shared / dev / prod** stacks so dev and pr
 
 | Stack      | Directory | Terraform Cloud Workspace | Resources managed                                                                                |
 | ---------- | --------- | ------------------------- | ------------------------------------------------------------------------------------------------ |
-| **shared** | `shared/` | `cloudflare-shared`       | Zone reference; api/realtime DNS (CNAME + Railway verification TXT)                              |
+| **shared** | `shared/` | `cloudflare-shared`       | Zone reference only (the api/realtime Railway records were removed)                              |
 | **dev**    | `dev/`    | `cloudflare-dev`          | Pages `zedi-dev` and `zedi-admin-dev`; DNS for `dev.zedi-note.app` and `admin-dev.zedi-note.app` |
 | **prod**   | `prod/`   | `cloudflare-prod`         | Pages `zedi` and `zedi-admin`; DNS for `zedi-note.app` and `admin.zedi-note.app`                 |
 
@@ -30,21 +30,9 @@ Cloudflare resources are split into **shared / dev / prod** stacks so dev and pr
 
 See [HashiCorp Terraform Cloud docs](https://developer.hashicorp.com/terraform/cloud-docs) for workspace variables and token creation (no long in-repo guide).
 
-## Railway verification TXT tokens (shared only)
+## Removed Railway records (shared)
 
-The `shared` stack requires Railway custom-domain verification TXT tokens (`api_railway_verify_txt` / `realtime_railway_verify_txt`).
-
-These are secrets — do not commit plaintext. Pass via one of:
-
-| Method                                       | Example                                                     |
-| -------------------------------------------- | ----------------------------------------------------------- |
-| Terraform Cloud workspace vars (recommended) | Register as **Sensitive** in `cloudflare-shared` workspace  |
-| `TF_VAR_*` env vars                          | `export TF_VAR_api_railway_verify_txt="railway-verify=..."` |
-| `terraform.tfvars` (gitignored)              | Copy from `terraform.tfvars.example` and fill in            |
-
-Obtain values from the Railway dashboard for `api.zedi-note.app` / `realtime.zedi-note.app`.
-
-**Rotate any tokens previously committed in plaintext.**
+Railway is no longer used, so the `api` / `realtime` CNAME records and their `_railway-verify` TXT records were removed from the `shared` stack. The next manual **Apply Shared** deletes them from the zone. Remove the `*_railway_verify_txt` variables from the `cloudflare-shared` workspace as well.
 
 ## Local execution
 
@@ -57,9 +45,6 @@ terraform init
 # If unset, pass via env:
 # export TF_VAR_cloudflare_api_token="..."
 # export TF_VAR_cloudflare_account_id="..."
-# shared stack also needs Railway verification TXT:
-# export TF_VAR_api_railway_verify_txt="railway-verify=..."
-# export TF_VAR_realtime_railway_verify_txt="railway-verify=..."
 terraform plan
 ```
 

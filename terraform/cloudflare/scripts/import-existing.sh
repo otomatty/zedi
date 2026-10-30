@@ -58,40 +58,10 @@ get_id() {
 }
 
 # name は Cloudflare が返す FQDN
-ID_API_CNAME=$(get_id "api.zedi-note.app" "CNAME")
-ID_API_TXT=$(get_id "_railway-verify.api.zedi-note.app" "TXT")
-ID_REALTIME_CNAME=$(get_id "realtime.zedi-note.app" "CNAME")
-ID_REALTIME_TXT=$(get_id "_railway-verify.realtime.zedi-note.app" "TXT")
 ID_DEV_CNAME=$(get_id "dev.zedi-note.app" "CNAME")
 ID_ADMIN_DEV_CNAME=$(get_id "admin-dev.zedi-note.app" "CNAME")
 ID_APEX_CNAME=$(get_id "zedi-note.app" "CNAME")
 ID_ADMIN_CNAME=$(get_id "admin.zedi-note.app" "CNAME")
-
-import_shared() {
-  echo "--- shared ---"
-  cd "$ROOT_DIR/shared"
-  terraform init -input=false
-  if [ -n "$ID_API_CNAME" ]; then
-    terraform import -input=false 'cloudflare_record.api_cname' "$ZONE_ID/$ID_API_CNAME" || true
-  else
-    echo "Skip api CNAME (not found)"
-  fi
-  if [ -n "$ID_API_TXT" ]; then
-    terraform import -input=false 'cloudflare_record.api_railway_verify' "$ZONE_ID/$ID_API_TXT" || true
-  else
-    echo "Skip _railway-verify.api TXT (not found)"
-  fi
-  if [ -n "$ID_REALTIME_CNAME" ]; then
-    terraform import -input=false 'cloudflare_record.realtime_cname' "$ZONE_ID/$ID_REALTIME_CNAME" || true
-  else
-    echo "Skip realtime CNAME (not found)"
-  fi
-  if [ -n "$ID_REALTIME_TXT" ]; then
-    terraform import -input=false 'cloudflare_record.realtime_railway_verify' "$ZONE_ID/$ID_REALTIME_TXT" || true
-  else
-    echo "Skip _railway-verify.realtime TXT (not found)"
-  fi
-}
 
 import_dev() {
   echo "--- dev ---"
@@ -134,7 +104,6 @@ import_prod() {
   terraform import -input=false 'cloudflare_pages_domain.zedi_admin' "$ACCOUNT_ID/zedi-admin/admin.zedi-note.app" 2>/dev/null || echo "Skip pages_domain zedi_admin (optional)"
 }
 
-import_shared
 import_dev
 import_prod
 

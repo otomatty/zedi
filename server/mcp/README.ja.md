@@ -9,7 +9,7 @@ Zedi の Model Context Protocol (MCP) サーバー。Claude Code などの外部
 ## 概要
 
 - **stdio transport** (`zedi-mcp-stdio`): ローカルの Claude Code などに登録する用の stdio エントリポイント。環境変数または `~/.config/zedi/mcp.json` からトークンを読む。
-- **HTTP transport** (`zedi-mcp-http`): Railway などにデプロイして、リモートからも MCP 接続を受け付けるストリーマブル HTTP サーバー。`Authorization: Bearer <MCP JWT>` ヘッダでユーザを識別する。
+- **HTTP transport** (`zedi-mcp-http`): Cloudflare Workers にデプロイして、リモートからも MCP 接続を受け付けるストリーマブル HTTP サーバー。`Authorization: Bearer <MCP JWT>` ヘッダでユーザを識別する。
 - **CLI** (`zedi-mcp-cli`): PKCE フローで MCP JWT を取得し、ユーザー設定ファイルに保存する補助 CLI。
 
 関連 PR / Issue: #554, #555, #556, #558.
@@ -145,49 +145,9 @@ Claude Code の設定ファイル（`~/.claude.json`）の `mcpServers` に以�
 
 ---
 
-## 3. HTTP サーバーを Railway にデプロイする
+## 3. HTTP サーバーを Cloudflare Workers にデプロイする
 
-リモートから Claude Code に MCP を接続したい場合は、`server/mcp` ディレクトリを Railway サービスとして切り出し、HTTP transport をデプロイする。
-
-### 3a. Railway 側の設定
-
-1. 新規サービスを作成し、**Root Directory** を `server/mcp` に設定する（付属 `railway.json` と `Dockerfile` が自動で使われる）。
-2. 環境変数:
-
-   | 変数           | 必須 | 用途                                                                                          |
-   | -------------- | ---- | --------------------------------------------------------------------------------------------- |
-   | `ZEDI_API_URL` | 推奨 | バックエンド REST API の URL。例: `http://api.railway.internal:3000` / `https://api.zedi.app` |
-   | `PORT`         | 任意 | 待ち受けポート（デフォルト `3100`、Railway は自動で注入）                                     |
-   | `MCP_HOST`     | 任意 | バインドホスト（デフォルト `0.0.0.0`）                                                        |
-
-3. **Healthcheck**: `railway.json` にて `/health` を 30 秒タイムアウトで監視する設定を同梱済み。
-4. **Start command**: `node dist/http.js`（Dockerfile の `CMD` と `railway.json` の `startCommand` で二重指定済み）。
-
-デプロイ後、クライアントからの接続先は `https://<railway-domain>/mcp` になる。ヘルスチェック用に `/health` も利用可。
-
-### 3b. クライアント側（HTTP transport 経由で使う場合）
-
-Claude Code の `mcpServers` では、HTTP transport 向け設定を使う。`Authorization` ヘッダに JWT を入れる点に注意。
-
-```json
-{
-  "mcpServers": {
-    "zedi-remote": {
-      "type": "http",
-      "url": "https://<railway-domain>/mcp",
-      "headers": {
-        "Authorization": "Bearer <paste access_token here>"
-      }
-    }
-  }
-}
-```
-
-サーバーはステートレス（リクエストごとに新しい `McpServer` を生成）なので、同じ JWT を複数クライアントから同時に使ってもセッションが競合しない。
-
-### 3c. Cloudflare Workers へのデプロイ（#1092 / Railway から移行中）
-
-Railway の代わりに Cloudflare Workers としてデプロイできる（Issue [#1088](https://github.com/otomatty/zedi/issues/1088) の移行先。Railway は暫定稼働）。エントリポイントは `src/worker.ts`、構成の正本は `wrangler.jsonc`（`env.dev` = `zedi-mcp-dev` / `env.production` = `zedi-mcp`）。
+リモートから Claude Code に MCP を接続したい場合は、HTTP transport を Cloudflare Worker としてデプロイする。エントリポイントは `src/worker.ts`、構成の正本は `wrangler.jsonc`（`env.dev` = `zedi-mcp-dev` / `env.production` = `zedi-mcp`）。ローカルでは `node dist/http.js` で同じアプリを Node 上で起動できる（`PORT` 既定 `3100`、`MCP_HOST` 既定 `0.0.0.0`、`ZEDI_API_URL`）。
 
 ```bash
 cd server/mcp
@@ -200,8 +160,29 @@ bun run worker:deploy:production   # 本番デプロイ
 - `ZEDI_API_URL` は `wrangler.jsonc` の `vars`（production）またはデプロイ時の `--var`（dev は CI が GitHub Environment 変数 `API_BASE_URL` から注入）で設定する。
 - CI: `develop` への push（`server/mcp/**` 変更時）で `.github/workflows/deploy-mcp-worker-dev.yml` が `wrangler deploy --env dev` を実行し、`/health` の疎通を確認する。`/health` はデプロイ検証用に `git_commit_sha` を返す。
 - JWT の検証・失効（deny-list）は API 側（`server/api`、#1093 で KV/Durable Objects 化）の責務のため、この Worker に `BETTER_AUTH_SECRET` や Redis/KV は不要。Bearer トークンをそのまま API へ転送する。
-- ステートレスな Streamable HTTP（リクエスト毎に応答を返し、常駐 SSE ストリームを持たない）なので長時間接続の問題は回避できる。ただしリクエスト単位の Workers 制限（CPU 時間・メモリ・サブリクエスト数）は通常どおり適用される。API の Workers 本番切替（#1091）後は Service Bindings 化を検討。
-- クライアント設定は 3b と同じ。`url` を Worker のドメイン（`https://<worker-name>.<account-subdomain>.workers.dev/mcp`、例: `https://zedi-mcp.<account-subdomain>.workers.dev/mcp`、またはカスタムドメイン）に差し替える。
+- ステートレスな Streamable HTTP（リクエスト毎に応答を返し、常駐 SSE ストリームを持たない）なので長時間接続の問題は回避できる。ただしリクエスト単位の Workers 制限（CPU 時間・メモリ・サブリクエスト数）は通常どおり適用される。API が Workers で動くようになったら（#1091）Service Bindings 化を検討。
+
+接続先は `https://<worker-domain>/mcp`（例: `https://zedi-mcp.<account-subdomain>.workers.dev/mcp`、またはカスタムドメイン）。ヘルスチェック用に `/health` も利用可。
+
+### 3a. クライアント側（HTTP transport 経由で使う場合）
+
+Claude Code の `mcpServers` では、HTTP transport 向け設定を使う。`Authorization` ヘッダに JWT を入れる点に注意。
+
+```json
+{
+  "mcpServers": {
+    "zedi-remote": {
+      "type": "http",
+      "url": "https://<worker-domain>/mcp",
+      "headers": {
+        "Authorization": "Bearer <paste access_token here>"
+      }
+    }
+  }
+}
+```
+
+サーバーはステートレス（リクエストごとに新しい `McpServer` を生成）なので、同じ JWT を複数クライアントから同時に使ってもセッションが競合しない。
 
 ---
 
@@ -278,9 +259,9 @@ bun run worker:deploy:production   # 本番デプロイ
 
 ### HTTP transport に接続できない / Claude Code から見えない
 
-- `curl https://<railway-domain>/health` が `{ "ok": true, ... }` を返すか確認。返らない場合はデプロイが立ち上がっていない。
+- `curl https://<worker-domain>/health` が `{ "ok": true, ... }` を返すか確認。返らない場合はデプロイが立ち上がっていない。
 - Claude Code の設定で `type: "http"` と `Authorization` ヘッダが両方指定されているか確認。
-- Railway の内部通信を使うとき、`ZEDI_API_URL` は内部 URL（`http://api.railway.internal:3000` 等）を指す必要がある。外向き URL を設定すると自己呼び出しでループする可能性がある。
+- `ZEDI_API_URL` がトークンを発行した API を指しているか確認。
 
 ### HTTPS でない stdio 出力でクライアントが壊れる
 

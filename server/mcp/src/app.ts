@@ -112,15 +112,13 @@ function buildApp<E extends Env>(resolve: (c: Context<E>) => RequestContextInfo)
 }
 
 /**
- * Node エントリ用アプリ。API URL は起動時に固定し、コミット SHA は
- * `GIT_COMMIT_SHA` (CI) → `RAILWAY_GIT_COMMIT_SHA` (Railway) の順で解決する。
- * App for the Node entry: fixed API URL, commit SHA from process.env.
+ * Node エントリ用アプリ。API URL は起動時に固定し、コミット SHA は `GIT_COMMIT_SHA` から読む。
+ * App for the Node entry: fixed API URL, commit SHA from `GIT_COMMIT_SHA`.
  */
 export function createHttpApp(apiUrl: string): Hono {
   return buildApp(() => ({
     apiUrl,
-    gitCommitSha:
-      normalize(process.env.GIT_COMMIT_SHA) ?? normalize(process.env.RAILWAY_GIT_COMMIT_SHA),
+    gitCommitSha: normalize(process.env.GIT_COMMIT_SHA),
   }));
 }
 

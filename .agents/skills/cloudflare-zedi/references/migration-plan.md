@@ -1,5 +1,9 @@
 # 移行フェーズ計画 / Migration phases
 
+> **2026-10 更新:** Railway のデプロイ設定は削除済みで、Phase 2b〜4 の段階移行は行わない
+> （アプリを作り直すため。[SKILL.md](../SKILL.md) の「現状」）。以下は経緯として残す。
+> _Railway deploy config is gone and phases 2b–4 are superseded by the rebuild._
+
 1 フェーズ = 1 PR を基本。各 PR で「実装 → MCP で状態確認 → health/SHA 検証」を回す。
 出典: [Issue #1088](https://github.com/otomatty/zedi/issues/1088) のロードマップ。
 
@@ -62,7 +66,7 @@
 - `drizzle-migration-check` ガードを D1 用に更新。
 - **検証**: MCP `d1_database_query`、DO 動作、observability でエラー率。
 
-## Phase 5: Terraform / Railway 完全撤去 / Teardown
+## Phase 5: Terraform / Railway 完全撤去 / Teardown（Railway のリポジトリ側は削除済み）
 
 - `terraform/cloudflare/**` 削除、`terraform-cloudflare-{shared,dev,prod}.yml` 3 本削除。
 - Terraform Cloud ワークスペース（shared/dev/prod）削除、`TF_API_TOKEN` Secret 整理。

@@ -225,7 +225,7 @@ On the server (`server/api`), configure Better Auth (`BETTER_AUTH_SECRET` / `BET
 | **AI**            | OpenAI / Anthropic / Google Gemini (pricing via OpenRouter)                                             |
 | **Admin**         | `admin/` — separate Vite + React app                                                                    |
 | **Workspaces**    | Bun workspaces: `packages/ui` (shadcn), `packages/shared` / `admin`                                     |
-| **Deploy**        | Cloudflare Pages (frontend) + Railway (`server/api`, `hocuspocus`, `mcp`) / Terraform (Cloudflare)      |
+| **Deploy**        | Cloudflare Workers Static Assets (dev) / Pages (prod) for frontend and admin                            |
 | **CI/CD**         | GitHub Actions (lint / typecheck / test / mutation / deploy)                                            |
 | **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker (mutation testing)                                    |
 | **Tooling**       | ESLint 9 / Prettier / Husky + lint-staged / commitlint / Knip                                           |
@@ -285,7 +285,7 @@ src/                     # Frontend (React + Vite)
 ├── stores/              # Zustand stores
 └── types/               # TypeScript types
 
-server/                  # Bun projects deployed separately on Railway
+server/                  # Bun projects (separate installs; not deployed after the Railway removal)
 ├── api/                 # REST / Auth API (Hono on Bun + Better Auth + Drizzle ORM)
 ├── hocuspocus/          # Real-time collaboration (Hocuspocus / Y.js)
 └── mcp/                 # MCP server — Claude Code (stdio / HTTP). See [server/mcp/README.md](server/mcp/README.md)
@@ -332,7 +332,7 @@ This project is released under the **Business Source License 1.1 (BSL 1.1)** (so
 - [Hono](https://hono.dev/) — API framework (on Bun)
 - [Drizzle ORM](https://orm.drizzle.team/) — TypeScript ORM
 - [Polar](https://polar.sh/) — Pro plan billing
-- [Cloudflare Pages](https://pages.cloudflare.com/) / [Railway](https://railway.com/) — Hosting
+- [Cloudflare](https://www.cloudflare.com/) — Hosting
 
 ---
 

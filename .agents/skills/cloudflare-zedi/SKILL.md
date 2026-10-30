@@ -20,6 +20,19 @@ Zedi 固有の前提**を確認する。汎用知識は古い可能性がある�
 _Before any Cloudflare work in Zedi, load this skill for project-specific facts.
 Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in knowledge._
 
+## 現状（2026-10） / Status
+
+- **Railway は使用しない。** `server/*` の Railway デプロイ設定（`railway.json`、MCP の Dockerfile）、
+  `deploy-dev.yml` / `deploy-prod.yml` の DB migrate とヘルスチェック、Terraform の Railway 向け
+  DNS は削除済み。Railway 側のサービス・Postgres・Redis の停止はダッシュボードで行う。
+  _Railway is not used; its deploy config has been removed from the repo._
+- **現行アプリの段階移行（下記フェーズ 2b〜4）は行わない。** PoC（hono/jsx/dom + D1 +
+  Durable Objects を 1 つの Worker に載せる構成）を土台にアプリを作り直し、本番データが
+  ないためドメインを切り替えるだけでカットオーバーする。以下の資料のうち Railway からの
+  移行手順は経緯として残している。
+  _The phased migration of the current app is superseded by the rebuild; Railway-specific
+  steps below are kept for history only._
+
 ## 方針（決定済み） / Decisions
 
 - **Terraform は全廃する。** 構成の正本はリポジトリ内の `wrangler.jsonc`。DNS とドメインは
@@ -75,10 +88,9 @@ Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in know
 
 フェーズごとに **何を登録・更新・削除してよいか** のチェックリストは
 [references/secrets-template.md](references/secrets-template.md) を正とする。
-Worker 切替 PR を出す前に、Railway Variables と `wrangler secret list` を突合すること。
+Worker の secrets は `wrangler secret list` で確認する。
 
-_Secrets lifecycle per phase: [secrets-template.md](references/secrets-template.md).
-Reconcile Railway vars with `wrangler secret list` before each cutover PR._
+_Secrets lifecycle per phase: [secrets-template.md](references/secrets-template.md)._
 
 ## やってはいけないこと / Guardrails
 

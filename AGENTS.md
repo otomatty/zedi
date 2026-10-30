@@ -107,7 +107,7 @@ _Overlay: `.agents/skills/spec-test/references/overlays/zedi.md`._
 - **対応プラットフォーム**: Web アプリ（PWA）のみ。Tauri のデスクトップ版は廃止済み
 - **Lint / Format**: ESLint, Prettier
 - **テスト**: Vitest, Playwright, Stryker
-- **インフラ（方針）**: **Cloudflare へ完全移行予定**（Workers / Static Assets / R2 / D1・KV 等。Issue [#1088](https://github.com/otomatty/zedi/issues/1088)）。構成の正本は `wrangler.jsonc`。**Terraform と Railway は廃止予定**（移行完了まで暫定稼働あり）。品質ゲートは GitHub Actions、デプロイは `wrangler deploy` へ寄せる。詳細は [`.agents/skills/cloudflare-zedi/SKILL.md`](.agents/skills/cloudflare-zedi/SKILL.md)。
+- **インフラ（方針）**: **Cloudflare へ完全移行予定**（Workers / Static Assets / R2 / D1・KV 等。Issue [#1088](https://github.com/otomatty/zedi/issues/1088)）。構成の正本は `wrangler.jsonc`。**Railway は使用しない**（デプロイ設定は削除済み）。**Terraform は廃止予定**。品質ゲートは GitHub Actions、デプロイは `wrangler deploy` へ寄せる。詳細は [`.agents/skills/cloudflare-zedi/SKILL.md`](.agents/skills/cloudflare-zedi/SKILL.md)。
 
 ---
 
@@ -153,7 +153,7 @@ aidlc/               # AI-DLC workspace shell
 
 ### 移行方針 / Migration target（Cloudflare）
 
-- **目標**: API / MCP / リアルタイム / フロント / admin / オブジェクトストレージを **Cloudflare に集約**。Pages・Terraform・Railway は段階的に廃止。
+- **目標**: API / MCP / リアルタイム / フロント / admin / オブジェクトストレージを **Cloudflare に集約**。Pages・Terraform は段階的に廃止（Railway は削除済み）。
 - **構成の正本**: 各サービスの `wrangler.jsonc`（Terraform ステートは使わない）。
 - **フロント / admin**: Pages → **Workers Static Assets**。
 - **CI/CD**: lint / test / typecheck / drizzle-check は GitHub Actions。デプロイ・プレビューは `wrangler deploy` / `wrangler versions upload`。
@@ -162,10 +162,10 @@ aidlc/               # AI-DLC workspace shell
 
 ### 現状（移行中） / Current (transitional)
 
-- ルート `workspaces` は **`packages/*` と `admin` のみ**。`server/api`・`hocuspocus`・`mcp` は **workspace 外**（サービス単位の `bun.lock`。旧 Railway build context 由来。Workers 化後もサービス単位のまま扱う想定）。
+- ルート `workspaces` は **`packages/*` と `admin` のみ**。`server/api`・`hocuspocus`・`mcp` は **workspace 外**（サービス単位の `bun.lock`）。
 - ルート `bun install` では `server/*` の依存は入らない → 各サービスで `cd server/<service> && bun install`。
 - CI もサービスごとに install → typecheck / test（`api-typecheck`, `api-test`, `mcp-test`, `hocuspocus-test`）。
-- **暫定デプロイ**: `server/*` の一部はまだ Railway。フロントは Cloudflare Pages。DB migrate は `deploy-dev.yml` / `deploy-prod.yml`（`develop` → dev DB、`main` → prod DB）。API Worker 骨格は `server/api/wrangler.jsonc` と `deploy-api-worker-dev.yml` が先行。
+- **デプロイ**: フロント / admin は dev が Workers Static Assets、本番が Pages（`deploy-dev.yml` / `deploy-prod.yml`）。`server/*` の Railway デプロイと DB マイグレーションの自動適用は削除済み。API / MCP の Worker 版は `deploy-api-worker-dev.yml` / `deploy-mcp-worker-dev.yml` で dev にだけデプロイされる。
 - `server/mcp`: ヘルス `/health`。必須 env: `ZEDI_API_URL`, `BETTER_AUTH_SECRET`（API と同値）。API 側に `MCP_REDIRECT_URI_ALLOW`。関連: [#564](https://github.com/otomatty/zedi/issues/564)。
 
 ### `@zedi/shared` とサーバ二重定義 / Shared constants drift
@@ -181,10 +181,10 @@ aidlc/               # AI-DLC workspace shell
 
 - **TS スキーマと SQL マイグレーションは常に対**。`server/api/src/schema/**/*.ts` を編集したら `server/api/drizzle/NNNN_*.sql` を追加し、`server/api/drizzle/meta/_journal.json` に追記。  
   _Skipping this caused production 500s in PR #728._
-- **正本は `server/api/drizzle/` のみ**。CI は `bunx drizzle-kit migrate` のみ。他場所の SQL は本番に効かない。
+- **正本は `server/api/drizzle/` のみ**。他場所の SQL は適用されない。
 - 書き方: `--> statement-breakpoint`、原則 `IF NOT EXISTS` / `ON CONFLICT DO NOTHING`、必要なら同一ファイルでバックフィル。`drizzle-kit generate` の巨大 diff は手で削減（snapshot は当面コミットしない）。
 - CI: `drizzle-migration-check`。SQL 不要な変更のみ `[skip drizzle-check]`。
-- 自動適用: `develop` → `deploy-dev.yml`、`main` → `deploy-prod.yml` のみ。
+- 自動適用はしない（Railway の PostgreSQL とともに `deploy-dev.yml` / `deploy-prod.yml` の migrate ジョブを削除した）。
 
 ---
 

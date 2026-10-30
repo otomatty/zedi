@@ -1,5 +1,7 @@
 # リソース対応表 / Resource map (Issue #1088)
 
+> **2026-10 更新:** Railway のデプロイ設定は削除済み。表の「現在のサービス」は移行前の構成を指す。
+
 現状の Railway 等のサービスと Cloudflare 移行先・サブ Issue・確認用 MCP の対応。
 出典: [Issue #1088](https://github.com/otomatty/zedi/issues/1088)。
 

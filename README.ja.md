@@ -225,7 +225,7 @@ VITE_REALTIME_URL=ws://localhost:1234   # 本番は wss://realtime.zedi-note.app
 | **AI**            | OpenAI / Anthropic / Google Gemini（OpenRouter で価格情報を取得）                                          |
 | **Admin**         | `admin/` — 別 Vite + React アプリ                                                                          |
 | **Workspaces**    | Bun workspaces: `packages/ui`（shadcn）, `packages/shared` / `admin`                                       |
-| **Deploy**        | Cloudflare Pages（フロント） + Railway（`server/api`, `hocuspocus`, `mcp`） / Terraform (Cloudflare)       |
+| **Deploy**        | フロントと admin は Cloudflare Workers Static Assets（dev）/ Pages（本番）                                 |
 | **CI/CD**         | GitHub Actions（lint / typecheck / test / mutation / deploy）                                              |
 | **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker（Mutation Testing）                                      |
 | **Tooling**       | ESLint 9 / Prettier / Husky + lint-staged / commitlint / Knip                                              |
@@ -285,7 +285,7 @@ src/                     # フロントエンド本体（React + Vite）
 ├── stores/              # Zustand ストア
 └── types/               # TypeScript 型定義
 
-server/                  # Railway で個別デプロイされる Bun プロジェクト群
+server/                  # 個別 install の Bun プロジェクト群（Railway 削除後はデプロイしない）
 ├── api/                 # REST / Auth API（Hono on Bun + Better Auth + Drizzle ORM）
 ├── hocuspocus/          # リアルタイム共同編集サーバー（Hocuspocus / Y.js）
 └── mcp/                 # MCP サーバー — Claude Code 連携（stdio / HTTP）。詳細は [server/mcp/README.ja.md](server/mcp/README.ja.md)
@@ -332,7 +332,7 @@ scripts/                 # セットアップ / Stryker / 保守用スクリプ�
 - [Hono](https://hono.dev/) — API フレームワーク（Bun 上）
 - [Drizzle ORM](https://orm.drizzle.team/) — TypeScript ORM
 - [Polar](https://polar.sh/) — Pro プランの課金基盤
-- [Cloudflare Pages](https://pages.cloudflare.com/) / [Railway](https://railway.com/) — ホスティング
+- [Cloudflare](https://www.cloudflare.com/) — ホスティング
 
 ---
 

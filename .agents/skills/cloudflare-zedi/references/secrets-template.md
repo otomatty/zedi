@@ -1,5 +1,9 @@
 # Secrets / Bindings 一覧テンプレート / Secrets lifecycle template
 
+> **2026-10 更新:** Railway は使用しない（デプロイ設定は削除済み）。Railway 列・Railway からの
+> コピー手順は経緯として残している。Railway 側の Variables・サービスはダッシュボードで削除する。
+> _Railway is not used; Railway columns and copy steps are kept for history only._
+
 移行フェーズ（[migration-plan.md](migration-plan.md)）ごとに **何を登録・削除してよいか** を追跡するための
 チェックリスト。正本は `.env.example` と実装の `getEnv` / `process.env` 参照。
 Worker への秘密値は **リポジトリに置かず** `wrangler secret put` で設定する。
@@ -87,7 +91,7 @@ Never commit secret values; use `wrangler secret put` for Workers._
 | 名前                     | 用途             | 削除タイミング                     |
 | ------------------------ | ---------------- | ---------------------------------- |
 | `PORT`                   | 待ち受けポート   | Phase 5 Railway 撤去               |
-| `RAILWAY_GIT_COMMIT_SHA` | Railway 注入 SHA | Phase 5                            |
+| `RAILWAY_GIT_COMMIT_SHA` | Railway 注入 SHA | 削除済み（コードは参照しない）     |
 | `NODE_ENV`               | Node ランタイム  | Worker は `ENVIRONMENT` var を使用 |
 
 ---

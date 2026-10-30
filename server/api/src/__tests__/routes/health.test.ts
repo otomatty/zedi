@@ -47,8 +47,8 @@ describe("GET /health", () => {
     expect(res.status).toBe(200);
   });
 
-  it("returns git_commit_sha null when RAILWAY_GIT_COMMIT_SHA is unset", async () => {
-    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", "");
+  it("returns git_commit_sha null when GIT_COMMIT_SHA is unset", async () => {
+    vi.stubEnv("GIT_COMMIT_SHA", "");
     const app = createHealthApp();
 
     const res = await app.request("/health");
@@ -58,8 +58,8 @@ describe("GET /health", () => {
     expect(body.git_commit_sha).toBeNull();
   });
 
-  it("returns git_commit_sha from RAILWAY_GIT_COMMIT_SHA when set", async () => {
-    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", "abc123def456");
+  it("returns git_commit_sha from GIT_COMMIT_SHA when set", async () => {
+    vi.stubEnv("GIT_COMMIT_SHA", "abc123def456");
     const app = createHealthApp();
 
     const res = await app.request("/health");
@@ -67,5 +67,16 @@ describe("GET /health", () => {
 
     expect(res.status).toBe(200);
     expect(body.git_commit_sha).toBe("abc123def456");
+  });
+
+  it("ignores RAILWAY_GIT_COMMIT_SHA now that Railway is not used", async () => {
+    vi.stubEnv("GIT_COMMIT_SHA", "");
+    vi.stubEnv("RAILWAY_GIT_COMMIT_SHA", "railway-sha-789");
+    const app = createHealthApp();
+
+    const res = await app.request("/health");
+    const body = (await res.json()) as { git_commit_sha: string | null };
+
+    expect(body.git_commit_sha).toBeNull();
   });
 });

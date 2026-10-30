@@ -50,7 +50,7 @@ Both are managed by Terraform (`terraform/cloudflare/prod` and `terraform/cloudf
 - **Production:** GitHub Actions production environment passes `VITE_API_BASE_URL`, `VITE_MAIN_APP_URL`, and `VITE_ENV_LABEL=production` at build time.
 - **Development (deployed):** GitHub Actions development environment passes `VITE_API_BASE_URL` (dev API), `VITE_MAIN_APP_URL` (`https://dev.zedi-note.app`), and `VITE_ENV_LABEL=development`. The sidebar shows a **Development** badge to prevent mistaken operations against prod.
 
-After the first dev admin deploy, update Railway **api-dev** `CORS_ORIGIN` to include `https://admin-dev.zedi-note.app` and set `ADMIN_BASE_URL=https://admin-dev.zedi-note.app`. Add GitHub **development** variable `MAIN_APP_URL=https://dev.zedi-note.app` if not already set.
+After the first dev admin deploy, update the dev API `CORS_ORIGIN` to include `https://admin-dev.zedi-note.app` and set `ADMIN_BASE_URL=https://admin-dev.zedi-note.app`. Add GitHub **development** variable `MAIN_APP_URL=https://dev.zedi-note.app` if not already set.
 
 ## Specification
 

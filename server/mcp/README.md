@@ -9,7 +9,7 @@ Model Context Protocol (MCP) server for Zedi. Exposes MCP tools so external clie
 ## Overview
 
 - **stdio transport** (`zedi-mcp-stdio`): stdio entry point for local Claude Code registration. Reads tokens from environment variables or `~/.config/zedi/mcp.json`.
-- **HTTP transport** (`zedi-mcp-http`): Streamable HTTP server for Railway deployment. Identifies users via `Authorization: Bearer <MCP JWT>`.
+- **HTTP transport** (`zedi-mcp-http`): Streamable HTTP server for remote access (deployed as a Cloudflare Worker). Identifies users via `Authorization: Bearer <MCP JWT>`.
 - **CLI** (`zedi-mcp-cli`): Helper CLI that obtains an MCP JWT via PKCE and saves it to the user config file.
 
 Related PRs / issues: #554, #555, #556, #558.
@@ -145,49 +145,9 @@ Success returns user info as JSON.
 
 ---
 
-## 3. Deploy HTTP transport on Railway
+## 3. Deploy the HTTP transport on Cloudflare Workers
 
-For remote MCP access, deploy `server/mcp` as a Railway service with HTTP transport.
-
-### 3a. Railway configuration
-
-1. Create a service with **Root Directory** `server/mcp` (uses bundled `railway.json` and `Dockerfile`).
-2. Environment variables:
-
-   | Variable       | Required    | Purpose                                                                                 |
-   | -------------- | ----------- | --------------------------------------------------------------------------------------- |
-   | `ZEDI_API_URL` | Recommended | Backend REST API URL, e.g. `http://api.railway.internal:3000` or `https://api.zedi.app` |
-   | `PORT`         | Optional    | Listen port (default `3100`; Railway injects automatically)                             |
-   | `MCP_HOST`     | Optional    | Bind host (default `0.0.0.0`)                                                           |
-
-3. **Healthcheck**: `railway.json` monitors `/health` with 30s timeout.
-4. **Start command**: `node dist/http.js` (set in Dockerfile `CMD` and `railway.json`).
-
-Client endpoint: `https://<railway-domain>/mcp`. Health: `/health`.
-
-### 3b. Client (HTTP transport)
-
-Use HTTP transport settings in Claude Code `mcpServers`. Set `Authorization` header with JWT:
-
-```json
-{
-  "mcpServers": {
-    "zedi-remote": {
-      "type": "http",
-      "url": "https://<railway-domain>/mcp",
-      "headers": {
-        "Authorization": "Bearer <paste access_token here>"
-      }
-    }
-  }
-}
-```
-
-The server is stateless (new `McpServer` per request), so the same JWT can be used from multiple clients without session conflicts.
-
-### 3c. Deploy on Cloudflare Workers (#1092 / migrating from Railway)
-
-The HTTP transport can also be deployed as a Cloudflare Worker (the migration target per issue [#1088](https://github.com/otomatty/zedi/issues/1088); Railway remains transitional). Entry point is `src/worker.ts`; the source of truth for configuration is `wrangler.jsonc` (`env.dev` = `zedi-mcp-dev` / `env.production` = `zedi-mcp`).
+For remote MCP access, deploy the HTTP transport as a Cloudflare Worker. Entry point is `src/worker.ts`; the source of truth for configuration is `wrangler.jsonc` (`env.dev` = `zedi-mcp-dev` / `env.production` = `zedi-mcp`). For local runs, `node dist/http.js` starts the same app on Node (`PORT`, default `3100`; `MCP_HOST`, default `0.0.0.0`; `ZEDI_API_URL`).
 
 ```bash
 cd server/mcp
@@ -200,8 +160,29 @@ bun run worker:deploy:production   # deploy to production
 - `ZEDI_API_URL` comes from `wrangler.jsonc` `vars` (production) or a deploy-time `--var` (dev CI injects it from the `API_BASE_URL` GitHub Environment variable).
 - CI: pushes to `develop` touching `server/mcp/**` run `.github/workflows/deploy-mcp-worker-dev.yml`, which executes `wrangler deploy --env dev` and probes `/health`. `/health` reports `git_commit_sha` for deploy verification.
 - JWT verification and the revocation deny-list live in the API (`server/api`, moved to KV/Durable Objects in #1093), so this Worker needs no `BETTER_AUTH_SECRET` and no Redis/KV binding — it forwards the bearer token to the API as-is.
-- The transport is stateless Streamable HTTP (each request gets a response; no long-lived SSE stream), so it avoids long-lived-connection issues — though each request still runs under the usual per-request Worker limits (CPU time, memory, subrequests). Once the API cuts over to Workers (#1091), consider Service Bindings for the internal hop.
-- Client configuration is the same as 3b — point `url` at the Worker domain (`https://<worker-name>.<account-subdomain>.workers.dev/mcp`, e.g. `https://zedi-mcp.<account-subdomain>.workers.dev/mcp`, or a custom domain).
+- The transport is stateless Streamable HTTP (each request gets a response; no long-lived SSE stream), so it avoids long-lived-connection issues — though each request still runs under the usual per-request Worker limits (CPU time, memory, subrequests). Once the API runs on Workers (#1091), consider Service Bindings for the internal hop.
+
+Client endpoint: `https://<worker-domain>/mcp` (e.g. `https://zedi-mcp.<account-subdomain>.workers.dev/mcp`, or a custom domain). Health: `/health`.
+
+### 3a. Client (HTTP transport)
+
+Use HTTP transport settings in Claude Code `mcpServers`. Set `Authorization` header with JWT:
+
+```json
+{
+  "mcpServers": {
+    "zedi-remote": {
+      "type": "http",
+      "url": "https://<worker-domain>/mcp",
+      "headers": {
+        "Authorization": "Bearer <paste access_token here>"
+      }
+    }
+  }
+}
+```
+
+The server is stateless (new `McpServer` per request), so the same JWT can be used from multiple clients without session conflicts.
 
 ---
 
@@ -278,9 +259,9 @@ Neither `ZEDI_MCP_TOKEN` nor `~/.config/zedi/mcp.json` is set. Run `zedi-mcp-cli
 
 ### Cannot connect to HTTP transport
 
-- Verify `curl https://<railway-domain>/health` returns `{ "ok": true, ... }`.
+- Verify `curl https://<worker-domain>/health` returns `{ "ok": true, ... }`.
 - Confirm Claude Code config has `type: "http"` and `Authorization` header.
-- For Railway internal API, set `ZEDI_API_URL` to internal URL (e.g. `http://api.railway.internal:3000`).
+- Check that `ZEDI_API_URL` points to the API that issued the token.
 
 ### Do not log to stdout on stdio
 

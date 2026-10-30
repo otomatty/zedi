@@ -8,7 +8,7 @@ dev と prod の適用タイミングを分離するため、Cloudflare リソ�
 
 | スタック   | ディレクトリ | Terraform Cloud Workspace | 管理リソース                                                                              |
 | ---------- | ------------ | ------------------------- | ----------------------------------------------------------------------------------------- |
-| **shared** | `shared/`    | `cloudflare-shared`       | ゾーン参照・api/realtime の DNS（CNAME + Railway 検証 TXT）                               |
+| **shared** | `shared/`    | `cloudflare-shared`       | ゾーン参照のみ（api/realtime の Railway 向けレコードは削除済み）                          |
 | **dev**    | `dev/`       | `cloudflare-dev`          | Pages `zedi-dev`・`zedi-admin-dev`、`dev.zedi-note.app`・`admin-dev.zedi-note.app` の DNS |
 | **prod**   | `prod/`      | `cloudflare-prod`         | Pages `zedi`・`zedi-admin`、`zedi-note.app`・`admin.zedi-note.app` の DNS                 |
 
@@ -30,19 +30,9 @@ dev と prod の適用タイミングを分離するため、Cloudflare リソ�
 
 Terraform Cloud の Workspace 変数・トークン作成は [HashiCorp Terraform Cloud ドキュメント](https://developer.hashicorp.com/terraform/cloud-docs) を参照（リポジトリ内の長文ガイドは持たない）。
 
-## Railway 検証 TXT トークン（shared 専用）
+## 削除した Railway 向けレコード（shared）
 
-`shared` スタックは Railway カスタムドメイン用の検証 TXT トークン（`api_railway_verify_txt` / `realtime_railway_verify_txt`）を必須変数として要求する。
-これらは機密値であり、リポジトリには平文で含めない。次のいずれかで渡すこと（**推奨は Terraform Cloud Workspace 変数**）。
-
-| 渡し方                                 | 設定例                                                             |
-| -------------------------------------- | ------------------------------------------------------------------ |
-| Terraform Cloud Workspace 変数（推奨） | `cloudflare-shared` Workspace の Variables に **Sensitive** で登録 |
-| 環境変数 `TF_VAR_*`                    | `export TF_VAR_api_railway_verify_txt="railway-verify=..."`        |
-| `terraform.tfvars`（gitignored）       | `terraform.tfvars.example` をコピーして記入                        |
-
-値は Railway ダッシュボードの該当ドメイン設定画面（`api.zedi-note.app` / `realtime.zedi-note.app`）から取得する。
-**過去にリポジトリへ平文 commit されていたトークンはローテーションすること。**
+Railway は使わないため、`shared` スタックから `api` / `realtime` の CNAME と `_railway-verify` の TXT を削除した。次に手動で **Apply Shared** を実行するとゾーンからも削除される。`cloudflare-shared` Workspace の `*_railway_verify_txt` 変数も削除すること。
 
 ## ローカルでの実行
 
@@ -55,9 +45,6 @@ terraform init
 # 未設定なら環境変数で渡す:
 # export TF_VAR_cloudflare_api_token="..."
 # export TF_VAR_cloudflare_account_id="..."
-# shared スタックでは追加で Railway 検証 TXT も必要:
-# export TF_VAR_api_railway_verify_txt="railway-verify=..."
-# export TF_VAR_realtime_railway_verify_txt="railway-verify=..."
 terraform plan
 ```
 
