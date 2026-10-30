@@ -15,5 +15,11 @@ export default defineConfig({
     // *.worker.test.ts run inside workerd via vitest.config.worker.ts.
     exclude: ["src/**/*.worker.test.ts"],
     environment: "node",
+    server: {
+      deps: {
+        // Processed by Vite so tests can observe the Yjs calls the binding makes.
+        inline: ["@tiptap/y-tiptap", "@tiptap/extension-collaboration"],
+      },
+    },
   },
 });

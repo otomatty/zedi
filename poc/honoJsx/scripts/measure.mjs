@@ -297,6 +297,15 @@ const browserScenarios = {
     local: await measureTyping(b, rate, { paragraphs: 2000, collab: false }),
     localCv: await measureTyping(b, rate, { paragraphs: 2000, collab: false, query: "cv=1" }),
   }),
+  // Before/after the y-tiptap selection patch: run once per bundle (see README). `local` does not
+  // use the Y.js binding, so it shows how much the machine itself drifted between runs.
+  largeDocPatch: async (b, rate) => ({
+    sharedCarets: await measureTyping(b, rate, { paragraphs: 2000 }),
+    tiptapCarets: await measureTyping(b, rate, { paragraphs: 2000, query: "caret=tiptap" }),
+    noCarets: await measureTyping(b, rate, { paragraphs: 2000, query: "caret=0" }),
+    local: await measureTyping(b, rate, { paragraphs: 2000, collab: false }),
+    sharedCarets4000: await measureTyping(b, rate, { paragraphs: 4000 }),
+  }),
   // Latency vs document size (shared carets vs no collaboration).
   largeDocScale: async (b, rate) => {
     const out = {};

@@ -47,5 +47,8 @@
     "vitest": "4.1.10",
     "wrangler": "^4.156.0",
     "y-protocols": "^1.0.7"
+  },
+  "patchedDependencies": {
+    "@tiptap/y-tiptap@3.0.11": "patches/@tiptap%2Fy-tiptap@3.0.11.patch"
   }
 }

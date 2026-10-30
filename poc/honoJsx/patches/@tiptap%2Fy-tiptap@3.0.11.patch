@@ -1,0 +1,236 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 05ac7997c9bb43763b190cb422f9103e8f7a0822..e43057aa5d6b29aeed4303a9bc03a4ea7f69cc29 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -1416,6 +1416,21 @@ var ProsemirrorBinding = class {
+ 	get projectionError() {
+ 		return this._projectionError;
+ 	}
++	/**
++	* [zedi patch] Selection captured before the running Yjs transactions, as relative positions.
++	* A local edit only marks it as pending; it is converted the first time it is needed.
++	*/
++	get beforeTransactionSelection() {
++		if (this._selectionCapturePending) {
++			this._selectionCapturePending = false;
++			this._beforeTransactionSelection = this.prosemirrorView != null ? getRelativeSelection(this, this.view.state) : null;
++		}
++		return this._beforeTransactionSelection;
++	}
++	set beforeTransactionSelection(selection) {
++		this._selectionCapturePending = false;
++		this._beforeTransactionSelection = selection;
++	}
+ 	constructor(yXmlFragment, mapping = /* @__PURE__ */ new Map()) {
+ 		this.prosemirrorView = null;
+ 		this.mux = (0, lib0_mutex.createMutex)();
+@@ -1430,8 +1445,15 @@ var ProsemirrorBinding = class {
+ 		if (yXmlFragment.doc === null) throw new Error("The Yjs fragment must belong to a document");
+ 		this.doc = yXmlFragment.doc;
+ 		this.beforeAllTransactions = () => {
++			// [zedi patch] A local edit captures its selection in _prosemirrorChanged.
++			const running = this.doc._transaction;
++			if (running !== null && running.origin === ySyncPluginKey) return;
+ 			if (this.projectionError === null && this.beforeTransactionSelection === null && this.prosemirrorView != null) this.beforeTransactionSelection = getRelativeSelection(this, this.view.state);
+ 		};
++		this.beforeTransaction = () => {
++			// [zedi patch] Convert a pending capture before a nested transaction changes the document.
++			if (this._selectionCapturePending) void this.beforeTransactionSelection;
++		};
+ 		this.afterAllTransactions = () => {
+ 			this.beforeTransactionSelection = null;
+ 		};
+@@ -1603,9 +1625,10 @@ var ProsemirrorBinding = class {
+ 		}
+ 		const isUndoRedoOperation = transaction.origin instanceof yjs.UndoManager;
+ 		const undoSelection = isUndoRedoOperation ? (_transaction$origin$c = transaction.origin.currStackItem) === null || _transaction$origin$c === void 0 ? void 0 : _transaction$origin$c.meta.get(this) : void 0;
+-		const selection = undoSelection || this.beforeTransactionSelection;
+-		const oldDoc = undoSelection ? void 0 : this.view.state.doc;
+ 		this.mux(() => {
++			// [zedi patch] Read inside the mutex: local edits skip this, so their capture stays pending.
++			const selection = undoSelection || this.beforeTransactionSelection;
++			const oldDoc = undoSelection ? void 0 : this.view.state.doc;
+ 			const delType = (_, type) => deleteMapping(this.mapping, type);
+ 			yjs.iterateDeletedStructs(transaction, transaction.deleteSet, (struct) => {
+ 				if (struct instanceof yjs.Item && struct.content instanceof yjs.ContentType) deleteMapping(this.mapping, struct.content.type);
+@@ -1631,13 +1654,18 @@ var ProsemirrorBinding = class {
+ 			updateYFragment(this.doc, this.type, doc, this);
+ 			if ((plan === null || plan === void 0 ? void 0 : plan.doc) === doc) applyPositionMigration(this.type, plan, this, getPositionMigrationStore(this.type));
+ 			this.syncedDoc = doc;
+-			this.beforeTransactionSelection = getRelativeSelection(this, this.view.state);
++			// [zedi patch] In the editor's own transaction nothing changes the document after this
++			// point, so the capture can wait until a nested transaction or a reader needs it.
++			const running = this.doc._transaction;
++			if (running !== null && running.origin === ySyncPluginKey) this._selectionCapturePending = true;
++			else this.beforeTransactionSelection = getRelativeSelection(this, this.view.state);
+ 		}, ySyncPluginKey);
+ 	}
+ 	initView(prosemirrorView) {
+ 		if (this.prosemirrorView != null) this.destroy();
+ 		this.prosemirrorView = prosemirrorView;
+ 		this.doc.on("beforeAllTransactions", this.beforeAllTransactions);
++		this.doc.on("beforeTransaction", this.beforeTransaction);
+ 		this.doc.on("afterAllTransactions", this.afterAllTransactions);
+ 		this.type.observeDeep(this._observeFunction);
+ 	}
+@@ -1646,6 +1674,7 @@ var ProsemirrorBinding = class {
+ 		this.prosemirrorView = null;
+ 		this.type.unobserveDeep(this._observeFunction);
+ 		this.doc.off("beforeAllTransactions", this.beforeAllTransactions);
++		this.doc.off("beforeTransaction", this.beforeTransaction);
+ 		this.doc.off("afterAllTransactions", this.afterAllTransactions);
+ 	}
+ };
+@@ -2062,6 +2091,15 @@ const redo = (state) => restoreHistory(state, "redo");
+ const defaultProtectedNodes = /* @__PURE__ */ new Set(["paragraph"]);
+ /** Keeps protected structural nodes when an undo operation would delete them. */
+ const defaultDeleteFilter = (item, protectedNodes) => !(item instanceof yjs.Item) || !(item.content instanceof yjs.ContentType) || !(item.content.type instanceof yjs.Text || item.content.type instanceof yjs.XmlElement && protectedNodes.has(item.content.type.nodeName)) || item.content.type._length === 0;
++/** [zedi patch] The Yjs transaction for this editor change will apply a remote change. */
++const isRemoteChange = (tr) => {
++	var _tr$getMeta;
++	return ((_tr$getMeta = tr.getMeta(ySyncPluginKey)) === null || _tr$getMeta === void 0 ? void 0 : _tr$getMeta.isChangeOrigin) === true;
++};
++/** [zedi patch] Leaves time for the editor change to reach the undo manager. */
++const UNDO_STEP_PREDICTION_MARGIN = 100;
++/** [zedi patch] Mirrors Y.UndoManager: a change joins the open step while it is still capturing. */
++const startsUndoStep = (manager) => !(manager.lastChange > 0 && Date.now() - manager.lastChange < manager.captureTimeout - UNDO_STEP_PREDICTION_MARGIN && manager.undoStack.length > 0);
+ /** Tracks local Yjs changes for undo and redo while preserving remote changes. */
+ const yUndoPlugin = ({ protectedNodes = defaultProtectedNodes, trackedOrigins = [], undoManager = null } = {}) => new prosemirror_state.Plugin({
+ 	key: yUndoPluginKey,
+@@ -2090,11 +2128,16 @@ const yUndoPlugin = ({ protectedNodes = defaultProtectedNodes, trackedOrigins =
+ 				destroyListeners
+ 			};
+ 		},
+-		apply: (_, value, oldState, state) => {
++		apply: (tr, value, oldState, state) => {
+ 			const binding = getSyncPluginState(state).binding;
++			let prevSel = value.prevSel;
++			// [zedi patch] Only the change that starts an undo step needs the selection from before it.
++			// A change predicted to join the open step stores null, so a misprediction only loses
++			// the caret restore for that step instead of restoring an older selection.
++			if (binding && tr.docChanged && !isRemoteChange(tr)) prevSel = startsUndoStep(value.undoManager) ? getRelativeSelection(binding, oldState) : null;
+ 			return {
+ 				...value,
+-				prevSel: binding ? getRelativeSelection(binding, oldState) : value.prevSel,
++				prevSel,
+ 				hasUndoOps: value.undoManager.undoStack.length > 0,
+ 				hasRedoOps: value.undoManager.redoStack.length > 0
+ 			};
+diff --git a/dist/index.js b/dist/index.js
+index 9eabfb3339de7a9f58fb5716625d63459a1aafa9..aefe8e12509a861f233aedb567d14e2bfa3a1461 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1383,6 +1383,21 @@ var ProsemirrorBinding = class {
+ 	get projectionError() {
+ 		return this._projectionError;
+ 	}
++	/**
++	* [zedi patch] Selection captured before the running Yjs transactions, as relative positions.
++	* A local edit only marks it as pending; it is converted the first time it is needed.
++	*/
++	get beforeTransactionSelection() {
++		if (this._selectionCapturePending) {
++			this._selectionCapturePending = false;
++			this._beforeTransactionSelection = this.prosemirrorView != null ? getRelativeSelection(this, this.view.state) : null;
++		}
++		return this._beforeTransactionSelection;
++	}
++	set beforeTransactionSelection(selection) {
++		this._selectionCapturePending = false;
++		this._beforeTransactionSelection = selection;
++	}
+ 	constructor(yXmlFragment, mapping = /* @__PURE__ */ new Map()) {
+ 		this.prosemirrorView = null;
+ 		this.mux = createMutex();
+@@ -1397,8 +1412,15 @@ var ProsemirrorBinding = class {
+ 		if (yXmlFragment.doc === null) throw new Error("The Yjs fragment must belong to a document");
+ 		this.doc = yXmlFragment.doc;
+ 		this.beforeAllTransactions = () => {
++			// [zedi patch] A local edit captures its selection in _prosemirrorChanged.
++			const running = this.doc._transaction;
++			if (running !== null && running.origin === ySyncPluginKey) return;
+ 			if (this.projectionError === null && this.beforeTransactionSelection === null && this.prosemirrorView != null) this.beforeTransactionSelection = getRelativeSelection(this, this.view.state);
+ 		};
++		this.beforeTransaction = () => {
++			// [zedi patch] Convert a pending capture before a nested transaction changes the document.
++			if (this._selectionCapturePending) void this.beforeTransactionSelection;
++		};
+ 		this.afterAllTransactions = () => {
+ 			this.beforeTransactionSelection = null;
+ 		};
+@@ -1570,9 +1592,10 @@ var ProsemirrorBinding = class {
+ 		}
+ 		const isUndoRedoOperation = transaction.origin instanceof Y.UndoManager;
+ 		const undoSelection = isUndoRedoOperation ? (_transaction$origin$c = transaction.origin.currStackItem) === null || _transaction$origin$c === void 0 ? void 0 : _transaction$origin$c.meta.get(this) : void 0;
+-		const selection = undoSelection || this.beforeTransactionSelection;
+-		const oldDoc = undoSelection ? void 0 : this.view.state.doc;
+ 		this.mux(() => {
++			// [zedi patch] Read inside the mutex: local edits skip this, so their capture stays pending.
++			const selection = undoSelection || this.beforeTransactionSelection;
++			const oldDoc = undoSelection ? void 0 : this.view.state.doc;
+ 			const delType = (_, type) => deleteMapping(this.mapping, type);
+ 			Y.iterateDeletedStructs(transaction, transaction.deleteSet, (struct) => {
+ 				if (struct instanceof Y.Item && struct.content instanceof Y.ContentType) deleteMapping(this.mapping, struct.content.type);
+@@ -1598,13 +1621,18 @@ var ProsemirrorBinding = class {
+ 			updateYFragment(this.doc, this.type, doc, this);
+ 			if ((plan === null || plan === void 0 ? void 0 : plan.doc) === doc) applyPositionMigration(this.type, plan, this, getPositionMigrationStore(this.type));
+ 			this.syncedDoc = doc;
+-			this.beforeTransactionSelection = getRelativeSelection(this, this.view.state);
++			// [zedi patch] In the editor's own transaction nothing changes the document after this
++			// point, so the capture can wait until a nested transaction or a reader needs it.
++			const running = this.doc._transaction;
++			if (running !== null && running.origin === ySyncPluginKey) this._selectionCapturePending = true;
++			else this.beforeTransactionSelection = getRelativeSelection(this, this.view.state);
+ 		}, ySyncPluginKey);
+ 	}
+ 	initView(prosemirrorView) {
+ 		if (this.prosemirrorView != null) this.destroy();
+ 		this.prosemirrorView = prosemirrorView;
+ 		this.doc.on("beforeAllTransactions", this.beforeAllTransactions);
++		this.doc.on("beforeTransaction", this.beforeTransaction);
+ 		this.doc.on("afterAllTransactions", this.afterAllTransactions);
+ 		this.type.observeDeep(this._observeFunction);
+ 	}
+@@ -1613,6 +1641,7 @@ var ProsemirrorBinding = class {
+ 		this.prosemirrorView = null;
+ 		this.type.unobserveDeep(this._observeFunction);
+ 		this.doc.off("beforeAllTransactions", this.beforeAllTransactions);
++		this.doc.off("beforeTransaction", this.beforeTransaction);
+ 		this.doc.off("afterAllTransactions", this.afterAllTransactions);
+ 	}
+ };
+@@ -2029,6 +2058,15 @@ const redo = (state) => restoreHistory(state, "redo");
+ const defaultProtectedNodes = /* @__PURE__ */ new Set(["paragraph"]);
+ /** Keeps protected structural nodes when an undo operation would delete them. */
+ const defaultDeleteFilter = (item, protectedNodes) => !(item instanceof Item) || !(item.content instanceof ContentType) || !(item.content.type instanceof Text || item.content.type instanceof XmlElement && protectedNodes.has(item.content.type.nodeName)) || item.content.type._length === 0;
++/** [zedi patch] The Yjs transaction for this editor change will apply a remote change. */
++const isRemoteChange = (tr) => {
++	var _tr$getMeta;
++	return ((_tr$getMeta = tr.getMeta(ySyncPluginKey)) === null || _tr$getMeta === void 0 ? void 0 : _tr$getMeta.isChangeOrigin) === true;
++};
++/** [zedi patch] Leaves time for the editor change to reach the undo manager. */
++const UNDO_STEP_PREDICTION_MARGIN = 100;
++/** [zedi patch] Mirrors Y.UndoManager: a change joins the open step while it is still capturing. */
++const startsUndoStep = (manager) => !(manager.lastChange > 0 && Date.now() - manager.lastChange < manager.captureTimeout - UNDO_STEP_PREDICTION_MARGIN && manager.undoStack.length > 0);
+ /** Tracks local Yjs changes for undo and redo while preserving remote changes. */
+ const yUndoPlugin = ({ protectedNodes = defaultProtectedNodes, trackedOrigins = [], undoManager = null } = {}) => new Plugin({
+ 	key: yUndoPluginKey,
+@@ -2057,11 +2095,16 @@ const yUndoPlugin = ({ protectedNodes = defaultProtectedNodes, trackedOrigins =
+ 				destroyListeners
+ 			};
+ 		},
+-		apply: (_, value, oldState, state) => {
++		apply: (tr, value, oldState, state) => {
+ 			const binding = getSyncPluginState(state).binding;
++			let prevSel = value.prevSel;
++			// [zedi patch] Only the change that starts an undo step needs the selection from before it.
++			// A change predicted to join the open step stores null, so a misprediction only loses
++			// the caret restore for that step instead of restoring an older selection.
++			if (binding && tr.docChanged && !isRemoteChange(tr)) prevSel = startsUndoStep(value.undoManager) ? getRelativeSelection(binding, oldState) : null;
+ 			return {
+ 				...value,
+-				prevSel: binding ? getRelativeSelection(binding, oldState) : value.prevSel,
++				prevSel,
+ 				hasUndoOps: value.undoManager.undoStack.length > 0,
+ 				hasRedoOps: value.undoManager.redoStack.length > 0
+ 			};
