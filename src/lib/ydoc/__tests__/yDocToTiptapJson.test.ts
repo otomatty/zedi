@@ -148,3 +148,64 @@ describe("textToInlineNodes", () => {
     expect(nodes[0]?.marks).toEqual([{ type: "link", attrs: { href: "https://example.com" } }]);
   });
 });
+
+describe("snapshots that contain content removed with the desktop app", () => {
+  const fragmentWith = (...nodes: Y.XmlElement[]) => {
+    const doc = new Y.Doc();
+    const fragment = doc.getXmlFragment("default");
+    fragment.insert(0, nodes);
+    return fragment;
+  };
+  const withText = (el: Y.XmlElement, value: string, attributes: Record<string, unknown> = {}) => {
+    const text = new Y.XmlText();
+    text.insert(0, value, attributes);
+    el.insert(0, [text]);
+    return el;
+  };
+
+  it("shows an executable code block as a code block, with its output after it", () => {
+    const cell = new Y.XmlElement("executableCodeBlock");
+    cell.setAttribute("language", "python");
+    cell.setAttribute("stdout", "1");
+    withText(cell, "print(1)");
+
+    expect(yXmlFragmentToTiptapJson(fragmentWith(cell)).content).toEqual([
+      {
+        type: "codeBlock",
+        attrs: { language: "python" },
+        content: [{ type: "text", text: "print(1)" }],
+      },
+      { type: "codeBlock", attrs: { language: "text" }, content: [{ type: "text", text: "1" }] },
+    ]);
+  });
+
+  it("shows an MCP resource as a paragraph naming it, with its fetched content after it", () => {
+    const resource = new Y.XmlElement("mcpResource");
+    resource.setAttribute("server", "github");
+    resource.setAttribute("resource", "repo://zedi/README.md");
+    resource.setAttribute("resolvedContent", "# Zedi");
+
+    expect(yXmlFragmentToTiptapJson(fragmentWith(resource)).content).toEqual([
+      { type: "paragraph", content: [{ type: "text", text: "MCP: github repo://zedi/README.md" }] },
+      {
+        type: "codeBlock",
+        attrs: { language: "text" },
+        content: [{ type: "text", text: "# Zedi" }],
+      },
+    ]);
+  });
+
+  it("drops file reference marks and keeps the text", () => {
+    const paragraph = withText(new Y.XmlElement("paragraph"), "src/a.ts", {
+      "fileReference--AbCd1234": { path: "src/a.ts" },
+      bold: true,
+    });
+
+    expect(yXmlFragmentToTiptapJson(fragmentWith(paragraph)).content).toEqual([
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: "src/a.ts", marks: [{ type: "bold" }] }],
+      },
+    ]);
+  });
+});

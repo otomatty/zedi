@@ -181,33 +181,6 @@ When running multiple Docker instances, offset ports as needed (share the proced
 
 > **Note:** Docker requires at least 8 GB RAM (16 GB+ recommended). For lightweight parallel dev, port configuration via environment variables is simpler.
 
-### Desktop App (Tauri)
-
-Zedi can also run as a desktop app via [Tauri 2.0](https://v2.tauri.app/).
-
-#### Desktop Prerequisites
-
-- [Rust](https://www.rust-lang.org/tools/install) (install stable via rustup)
-- **Windows**: Microsoft C++ Build Tools + Windows 11 SDK
-- **macOS**: Xcode Command Line Tools (`xcode-select --install`)
-- **Linux**: `libwebkit2gtk-4.1-dev`, `build-essential`, `libssl-dev`, etc. ([details](https://v2.tauri.app/guides/prerequisites/))
-
-#### Running the Desktop App
-
-```bash
-# Dev mode (Vite dev server + Tauri WebView)
-bun run tauri:dev
-
-# Production build (generates installer)
-bun run tauri:build
-```
-
-- **Claude Code sidecar** ([Issue #456](https://github.com/otomatty/zedi/issues/456)): Tauri bundles a compiled helper under `src-tauri/binaries/` (`externalBin`). On first `bun run tauri:dev`, a missing binary is built automatically; run `bun run sidecar:build` manually if needed.
-
-> **Windows + Git Bash**: If MSVC build tools are not on PATH, run from Developer Command Prompt for VS 2022 or set `LIB`, `INCLUDE`, and `PATH` in `.bashrc`. See [Issue #49](https://github.com/otomatty/zedi/issues/49).
->
-> **Note**: The desktop edition is currently Phase D (in development). Storage temporarily uses IndexedDB; Tauri-native storage (SQLite) is planned in [#50](https://github.com/otomatty/zedi/issues/50).
-
 ### Environment Variables (Optional)
 
 For AI features, authentication, and API integration, create `.env.local`. See [.env.example](.env.example).
@@ -236,7 +209,6 @@ On the server (`server/api`), configure Better Auth (`BETTER_AUTH_SECRET` / `BET
 | ----------------- | ------------------------------------------------------------------------------------------------------- |
 | **Frontend**      | React 19 + TypeScript 6 / React Router v7                                                               |
 | **Build Tool**    | Vite 8 (`@vitejs/plugin-react-swc`) / Bun                                                               |
-| **Desktop**       | Tauri 2.0 (Rust) — `src-tauri/`                                                                         |
 | **Editor**        | Tiptap 3 (ProseMirror) — tables / math (KaTeX) / code (lowlight) / collaboration (Y.js)                 |
 | **Styling**       | Tailwind CSS v4 + shadcn/ui (Radix UI primitives) / `next-themes`                                       |
 | **State / Data**  | Zustand 5 + TanStack Query 5 / React Hook Form + Zod                                                    |
@@ -253,7 +225,7 @@ On the server (`server/api`), configure Better Auth (`BETTER_AUTH_SECRET` / `BET
 | **AI**            | OpenAI / Anthropic / Google Gemini (pricing via OpenRouter)                                             |
 | **Browser Ext.**  | `extension/` — Manifest v3 (Chrome extension)                                                           |
 | **Admin**         | `admin/` — separate Vite + React app                                                                    |
-| **Workspaces**    | Bun workspaces: `packages/ui` (shadcn), `packages/claude-sidecar` / `admin`                             |
+| **Workspaces**    | Bun workspaces: `packages/ui` (shadcn), `packages/shared` / `admin`                                     |
 | **Deploy**        | Cloudflare Pages (frontend) + Railway (`server/api`, `hocuspocus`, `mcp`) / Terraform (Cloudflare)      |
 | **CI/CD**         | GitHub Actions (lint / typecheck / test / mutation / deploy)                                            |
 | **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker (mutation testing)                                    |
@@ -309,21 +281,10 @@ Quality metrics, testing policy (TDD / mutation), and how to write specification
 src/                     # Frontend (React + Vite)
 ├── components/          # React components (editor / page / search / layout / ui etc.)
 ├── hooks/               # Custom hooks
-├── lib/                 # Utilities (`claudeCode/` = Tauri↔Claude Code bridge)
+├── lib/                 # Utilities
 ├── pages/               # Route page components (React Router v7)
 ├── stores/              # Zustand stores
 └── types/               # TypeScript types
-
-src-tauri/               # Tauri 2.0 desktop backend (Rust)
-├── src/
-│   ├── main.rs          # Desktop entry point
-│   ├── lib.rs           # Tauri app + command definitions
-│   └── claude_sidecar.rs # Claude Code sidecar process (Issue #456)
-├── binaries/            # externalBin (`bun run sidecar:build`, gitignored)
-├── capabilities/        # Security capability definitions
-├── icons/               # App icons (per OS)
-├── Cargo.toml           # Rust dependencies
-└── tauri.conf.json      # Tauri config
 
 server/                  # Bun projects deployed separately on Railway
 ├── api/                 # REST / Auth API (Hono on Bun + Better Auth + Drizzle ORM)
@@ -331,15 +292,14 @@ server/                  # Bun projects deployed separately on Railway
 └── mcp/                 # MCP server — Claude Code (stdio / HTTP). See [server/mcp/README.md](server/mcp/README.md)
 
 packages/                # Bun workspaces (shared libraries)
-├── ui/                  # `@zedi/ui` — shadcn/ui shared components
-└── claude-sidecar/      # Claude Code client for Tauri sidecar
+└── ui/                  # `@zedi/ui` — shadcn/ui shared components
 
 admin/                   # Admin SPA (separate Vite + React + Tailwind / `@zedi/ui`)
 extension/               # Browser extension (Manifest v3, Web Clipper)
 server/api/drizzle/      # PostgreSQL migrations (drizzle-kit source of truth)
 terraform/cloudflare/    # Cloudflare infrastructure
 e2e/                     # Playwright E2E tests
-scripts/                 # Setup / sidecar build / Stryker / extension build scripts
+scripts/                 # Setup / Stryker / extension build scripts
 .github/workflows/       # GitHub Actions (lint / typecheck / test / mutation / deploy)
 ```
 
@@ -374,7 +334,6 @@ This project is released under the **Business Source License 1.1 (BSL 1.1)** (so
 - [Hono](https://hono.dev/) — API framework (on Bun)
 - [Drizzle ORM](https://orm.drizzle.team/) — TypeScript ORM
 - [Polar](https://polar.sh/) — Pro plan billing
-- [Tauri](https://tauri.app/) — Cross-platform desktop
 - [Cloudflare Pages](https://pages.cloudflare.com/) / [Railway](https://railway.com/) — Hosting
 
 ---

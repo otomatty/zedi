@@ -124,7 +124,6 @@ jobs:
             admin/coverage/
             packages/shared/coverage/
             packages/ui/coverage/
-            packages/claude-sidecar/coverage/
           retention-days: 7
 
   build:
@@ -175,15 +174,12 @@ jobs:
 
   e2e-web:
     name: E2E (web)
-    # Web (非 Tauri) 側の Playwright E2E をすべて実行する job (issue #1036)。
+    # Web の Playwright E2E をすべて実行する job (issue #1036)。
     # 各 spec はバックエンドを起動せず、REST は `page.route`、Hocuspocus は
     # `page.routeWebSocket`（e2e/support/ 配下のモック基盤）で決定化している。
     # 管理画面 SPA の spec (admin/e2e) も別ポート (30001) で本 job 内で実行する。
     #
-    # Phase 2 (issue #863 follow-up): Tauri デスクトップ E2E は `tauri-driver`
-    # を要するため、本 job ではなく専用の job (`e2e-tauri`) として追加予定。
-    #
-    # Runs the full web-side (non-Tauri) Playwright suite (issue #1036). Specs
+    # Runs the full web Playwright suite (issue #1036). Specs
     # never talk to a real backend: REST goes through `page.route` and the
     # Hocuspocus realtime sync through `page.routeWebSocket` (see e2e/support/).
     # The admin SPA spec (admin/e2e) runs in this job too, on its own port.

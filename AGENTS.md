@@ -103,8 +103,8 @@ _Overlay: `.agents/skills/spec-test/references/overlays/zedi.md`._
 - **リアルタイム**: `server/hocuspocus`（Y.js）
 - **MCP**: `server/mcp`（stdio / HTTP。詳細: [`server/mcp/README.md`](server/mcp/README.md)）
 - **管理画面**: `admin/`
-- **共有パッケージ**: `packages/ui`（`@zedi/ui`）、`packages/shared`（`@zedi/shared`）、`packages/claude-sidecar`
-- **デスクトップ**: Tauri（`src-tauri/`）
+- **共有パッケージ**: `packages/ui`（`@zedi/ui`）、`packages/shared`（`@zedi/shared`）
+- **対応プラットフォーム**: Web アプリ（PWA）のみ。Tauri のデスクトップ版は廃止済み
 - **ブラウザ拡張**: `extension/`
 - **Lint / Format**: ESLint, Prettier
 - **テスト**: Vitest, Playwright, Stryker
@@ -120,14 +120,12 @@ admin/               # 管理画面
 packages/
   ui/                # @zedi/ui
   shared/            # @zedi/shared（ピュア TS 定数）
-  claude-sidecar/
 server/
   api/               # Hono API（ルート workspace 外）
   hocuspocus/        # リアルタイム（ルート workspace 外）
   mcp/               # MCP（ルート workspace 外）
 e2e/                 # Playwright
 extension/           # ブラウザ拡張
-src-tauri/           # Tauri
 terraform/           # Cloudflare 旧 IaC（廃止予定。正本は各サービスの wrangler.jsonc）
 .agents/             # Agent Skills / サブエージェント正本（`bun run init` でミラー）
 .codex/              # AI-DLC エンジン（Codex harness）

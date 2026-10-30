@@ -10,7 +10,6 @@ import type {
 import type { AIServiceRequest } from "@/lib/aiService";
 import { loadAISettings } from "@/lib/aiSettings";
 import { buildSystemPrompt } from "@/lib/aiChat/aiChatPrompt";
-import { useMcpConfigStore } from "@/stores/mcpConfigStore";
 import { addMessageToTree, getActivePath, stripToChatMessage } from "@/lib/messageTree";
 import {
   buildApiPayload,
@@ -146,9 +145,7 @@ export async function executeSendMessage(params: ExecuteSendMessageParams): Prom
     ...basePath,
     stripToChatMessage(userMessage),
   ]);
-  const mcpServers =
-    effectiveSettings.provider === "claude-code" ? useMcpConfigStore.getState().servers : [];
-  const systemPrompt = buildSystemPrompt(context, existingPageTitles, uniqueRefs, mcpServers);
+  const systemPrompt = buildSystemPrompt(context, existingPageTitles, uniqueRefs);
 
   const apiMessages: AIServiceRequest["messages"] = [
     { role: "system", content: systemPrompt },
@@ -162,9 +159,6 @@ export async function executeSendMessage(params: ExecuteSendMessageParams): Prom
     options: {
       stream: true,
       feature: "chat",
-      ...(effectiveSettings.provider === "claude-code" && context?.claudeWorkspaceRoot
-        ? { cwd: context.claudeWorkspaceRoot }
-        : {}),
     },
   };
 

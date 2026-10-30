@@ -6,14 +6,10 @@
   "vitest": true,
   "playwright": true,
   "ignoreBinaries": ["docker-compose"],
+  "ignore": ["poc/**"],
   "workspaces": {
     ".": {
-      "entry": [
-        "scripts/**/*.ts",
-        "e2e/**/*.ts",
-        "src/lib/claudeCode/index.ts",
-        "src/lib/agentSlashCommands/index.ts"
-      ],
+      "entry": ["scripts/**/*.ts", "e2e/**/*.ts"],
       "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "e2e/**/*.{ts,tsx}"],
       "ignore": [
         "src/pages/Home.tsx",
@@ -28,9 +24,6 @@
     },
     "packages/ui": {
       "project": ["src/**/*.{ts,tsx}"]
-    },
-    "packages/claude-sidecar": {
-      "project": ["src/**/*.ts"]
     },
     "server/api": {
       "entry": ["scripts/**/*.ts", "src/agents/index.ts", "src/__tests__/**/*.test.ts"],
@@ -101,9 +94,6 @@
     "@types/sql.js",
     "@vitejs/plugin-react",
     "wrangler",
-    "@tauri-apps/plugin-shell",
-    "@tauri-apps/plugin-store",
-    "@tauri-apps/plugin-updater",
     "@langchain/openai",
     "@langchain/anthropic",
     "@langchain/google-genai",

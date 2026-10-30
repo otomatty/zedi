@@ -1,6 +1,6 @@
-import { Suspense, lazy, useCallback, useLayoutEffect, useState } from "react";
+import { Suspense, lazy, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { cn, useToast } from "@zedi/ui";
+import { useToast } from "@zedi/ui";
 import { AIChatHeader } from "./AIChatHeader";
 import { AIChatViewTabs } from "./AIChatViewTabs";
 import { AIChatInput } from "./AIChatInput";
@@ -11,14 +11,9 @@ import { PromoteToWikiDialog } from "./PromoteToWikiDialog";
 import { useAIChatPanelContentLogic } from "@/hooks/aiChat/useAIChatPanelContentLogic";
 import { useAIChatContext } from "@/contexts/AIChatContext";
 import { usePromoteToWiki } from "@/hooks/wiki/usePromoteToWiki";
-import { isTauriDesktop } from "@/lib/platform";
 
 const AIChatBranchTree = lazy(() =>
   import("./AIChatBranchTree").then((m) => ({ default: m.AIChatBranchTree })),
-);
-
-const AIChatWorkflowPanel = lazy(() =>
-  import("./AIChatWorkflowPanel").then((m) => ({ default: m.AIChatWorkflowPanel })),
 );
 
 /**
@@ -97,33 +92,6 @@ export function AIChatPanelContent({
   const promote = usePromoteToWiki(messages);
   const existingTitles = pageContext?.recentPageTitles ?? [];
 
-  /**
-   * Workflow タブは Claude Code を必要とするため、Web 環境ではタブ自体を非表示にしている（{@link AIChatViewTabs}）。
-   * 万一 web で activeViewTab === "workflow" になった場合でも、ここでマウントを抑制して安全側に倒す。
-   *
-   * The workflow tab is hidden on web because it requires Claude Code (see {@link AIChatViewTabs}).
-   * As a defensive guard, also suppress mounting here if `activeViewTab` somehow becomes "workflow" on web.
-   */
-  const workflowAvailable = isTauriDesktop();
-
-  /** After the workflow tab is visited once, keep the panel mounted so run state survives tab switches. / ワークフロータブを一度開いたらマウントを維持し、タブ切替で実行状態を失わない */
-  const [keepWorkflowMounted, setKeepWorkflowMounted] = useState(
-    () => workflowAvailable && activeViewTab === "workflow",
-  );
-  useLayoutEffect(() => {
-    if (workflowAvailable && activeViewTab === "workflow") {
-      // Latch: after first visit to the workflow tab, keep the panel mounted so run/pause state survives tab switches.
-      // 初回表示後はマウントを維持し、タブ切替で実行状態を失わない。
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-way latch from tab selection (not external sync)
-      setKeepWorkflowMounted(true);
-    } else if (!workflowAvailable && activeViewTab === "workflow") {
-      // Web など workflow が利用できない環境では、選択状態が残っていても chat に戻して行き止まりを防ぐ。
-      // If workflow is unavailable (e.g. web), fall back to chat to avoid an empty dead-end UI.
-
-      setActiveViewTab("chat");
-    }
-  }, [activeViewTab, setActiveViewTab, workflowAvailable]);
-
   return (
     <div className="bg-background relative flex h-full flex-col border-l">
       <AIChatHeader />
@@ -166,22 +134,9 @@ export function AIChatPanelContent({
             />
           </Suspense>
         ) : null}
-        {keepWorkflowMounted ? (
-          <div
-            className={cn(
-              "h-full min-h-0 flex-col",
-              activeViewTab === "workflow" ? "flex" : "hidden",
-            )}
-          >
-            <Suspense fallback={null}>
-              <AIChatWorkflowPanel />
-            </Suspense>
-          </div>
-        ) : null}
       </div>
 
-      {/* Stay mounted on workflow tab so uncontrolled input draft is not lost. / ワークフロー切替で下書きを失わない */}
-      <div className={cn("bg-background border-t p-4", activeViewTab === "workflow" && "hidden")}>
+      <div className="bg-background border-t p-4">
         <AIChatInput
           onSendMessage={handleSendMessage}
           onStopStreaming={stopStreaming}

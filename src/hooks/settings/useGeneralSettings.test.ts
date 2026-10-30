@@ -155,21 +155,6 @@ describe("useGeneralSettings", () => {
     expect(mockSaveGeneralSettings).toHaveBeenCalledWith(expect.objectContaining({ locale: "en" }));
   });
 
-  it("updateExecutableCodeConfirmBeforeRun toggles persisted flag", async () => {
-    const { result } = renderHook(() => useGeneralSettings());
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    mockSaveGeneralSettings.mockClear();
-
-    act(() => {
-      result.current.updateExecutableCodeConfirmBeforeRun(false);
-    });
-
-    expect(result.current.settings.executableCodeConfirmBeforeRun).toBe(false);
-    expect(mockSaveGeneralSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ executableCodeConfirmBeforeRun: false }),
-    );
-  });
-
   it("save returns true, persists via saveGeneralSettings, and toggles isSaving flag", async () => {
     const { result } = renderHook(() => useGeneralSettings());
     await waitFor(() => expect(result.current.isLoading).toBe(false));

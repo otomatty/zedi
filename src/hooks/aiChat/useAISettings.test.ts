@@ -232,22 +232,6 @@ describe("useAISettings - save", () => {
     expect(arg.isConfigured).toBe(true);
   });
 
-  it("save uses the special claude-code:default modelId when provider is claude-code", async () => {
-    const { result } = renderHook(() => useAISettings());
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-    act(() => {
-      result.current.updateSettings({ provider: "claude-code" });
-    });
-    await act(async () => {
-      await result.current.save();
-    });
-
-    const arg = mockSaveAISettings.mock.calls[0][0] as AISettings;
-    expect(arg.modelId).toBe("claude-code:default");
-    expect(arg.isConfigured).toBe(true);
-  });
-
   it("save marks isConfigured=false when API key is required but missing", async () => {
     const { result } = renderHook(() => useAISettings());
     await waitFor(() => expect(result.current.isLoading).toBe(false));

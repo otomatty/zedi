@@ -59,9 +59,9 @@ describe("streamAssistantCompletion", () => {
     vi.mocked(aiService.callAIService).mockReset();
   });
 
-  it("marks running tool executions completed when the service reports an error", async () => {
+  it("stops streaming and records the error when the service reports one", async () => {
     vi.mocked(aiService.callAIService).mockImplementation(async (_a, _b, callbacks) => {
-      callbacks.onToolUseStart?.("Bash");
+      callbacks.onChunk?.("partial");
       callbacks.onError?.(new Error("boom"));
     });
 
@@ -104,7 +104,7 @@ describe("streamAssistantCompletion", () => {
       },
     );
 
-    expect(state.messageMap.a1.toolExecutions).toEqual([{ toolName: "Bash", status: "completed" }]);
+    expect(state.messageMap.a1.content).toBe("partial");
     expect(state.messageMap.a1.isStreaming).toBe(false);
     expect(state.messageMap.a1.error).toBe("boom");
   });

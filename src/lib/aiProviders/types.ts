@@ -2,8 +2,8 @@
  * Unified AI provider runtime interface (Issue #457).
  * 統一 AI プロバイダーランタイムインターフェース（Issue #457）。
  *
- * Each concrete provider wraps either a direct-API SDK or the Claude Code sidecar.
- * 各具体プロバイダーは直接 API SDK または Claude Code sidecar をラップする。
+ * Each concrete provider wraps a direct-API SDK.
+ * 各具体プロバイダーは直接 API SDK をラップする。
  */
 
 import type { AICapabilities, AIProviderType } from "@/types/ai";

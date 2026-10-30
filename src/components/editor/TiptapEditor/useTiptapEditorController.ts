@@ -17,8 +17,6 @@ import { useEditorLifecycle } from "./useEditorLifecycle";
 import { useTiptapEditorStorageFeatures, useThumbnailController } from "./useTiptapEditorStorage";
 import { useSuggestionControllers } from "./useSuggestionControllers";
 import { useImageUploadController } from "./useImageUploadController";
-import { useClaudeAgentSlashAvailability } from "./useClaudeAgentSlashAvailability";
-import { useNoteWorkspaceOptional } from "@/contexts/NoteWorkspaceContext";
 import type { TiptapEditorProps } from "./types";
 import type { PageActionContext } from "../PageActionHub/types";
 
@@ -58,10 +56,6 @@ function useEditorControllers(args: {
   handleInsertImageClick: () => void;
   handleInsertCameraImageClick: () => void;
   handleImageUpload: (files: FileList | File[]) => void;
-  /** Note-linked workspace root for `@file:` (Issue #461). */
-  workspaceRoot: string | null;
-  /** Note id for Tauri workspace registry (Issue #461). */
-  noteId: string | null;
   /**
    * 編集中ページの noteId。WikiLink 存在確認のスコープに使用する
    * （Issue #713 Phase 4）。
@@ -107,8 +101,6 @@ function useEditorControllers(args: {
     suggestionRef: args.suggestionRef,
     slashRef: args.slashRef,
     tagSuggestionRef: args.tagSuggestionRef,
-    workspaceRoot: args.workspaceRoot,
-    noteId: args.noteId,
     getGhostCompletionCandidates: args.getGhostCompletionCandidates,
   });
 
@@ -166,9 +158,6 @@ export function useTiptapEditorController({
 }: TiptapEditorProps) {
   const { editorFontSizePx } = useGeneralSettings();
   const { isSignedIn } = useAuth();
-  const noteWorkspace = useNoteWorkspaceOptional();
-  const workspaceRoot = noteWorkspace?.workspaceRoot ?? null;
-  const noteIdForWorkspace = noteWorkspace?.noteId ?? null;
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Editor | null>(null);
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
@@ -207,8 +196,6 @@ export function useTiptapEditorController({
     handleDeleteFromStorage,
   } = useTiptapEditorStorageFeatures(content);
   const suggestionControllers = useSuggestionControllers();
-  const [slashAgentBusy, setSlashAgentBusy] = useState(false);
-  const claudeAgentSlashAvailable = useClaudeAgentSlashAvailability();
   const imageUpload = useImageUploadController({
     editorRef,
     onChange,
@@ -255,8 +242,6 @@ export function useTiptapEditorController({
     handleInsertImageClick: imageUpload.handleInsertImageClick,
     handleInsertCameraImageClick: imageUpload.handleInsertCameraImageClick,
     handleImageUpload: imageUpload.handleImageUpload,
-    workspaceRoot,
-    noteId: noteIdForWorkspace,
     pageNoteId,
     getGhostCompletionCandidates: () => ghostCompletionCandidatesRef.current,
   });
@@ -317,11 +302,6 @@ export function useTiptapEditorController({
     storageSetupDialogOpen,
     setStorageSetupDialogOpen,
     handleGoToStorageSettings,
-    slashAgentBusy,
-    claudeAgentSlashAvailable,
-    onSlashAgentBusyChange: setSlashAgentBusy,
-    claudeWorkspaceRoot: noteWorkspace?.workspaceRoot ?? null,
-    claudeWorkspaceNoteId: noteWorkspace?.noteId ?? null,
     pageNoteId,
     pageActionHubRef,
     pageActionContext,

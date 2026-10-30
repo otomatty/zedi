@@ -140,20 +140,6 @@ describe("aiClient", () => {
     });
   });
 
-  describe("createAIClient - claude-code", () => {
-    it("throws because Claude Code does not use a traditional client", () => {
-      expect(() =>
-        createAIClient({
-          provider: "claude-code",
-          apiKey: "",
-          model: "",
-          modelId: "",
-          isConfigured: true,
-        }),
-      ).toThrow(/Claude Code/);
-    });
-  });
-
   describe("getCachedModels - corrupt cache", () => {
     it("returns null when cache JSON is malformed", () => {
       localStorage.setItem(CACHE_KEY, "not json");
@@ -217,12 +203,6 @@ describe("aiClient", () => {
       const result = await testConnection("anthropic", "   ");
       expect(result.success).toBe(false);
       expect(result.message).toContain("APIキー");
-    });
-
-    it("returns Claude Code guidance when API key is empty (no API key required)", async () => {
-      const result = await testConnection("claude-code", "");
-      expect(result.success).toBe(false);
-      expect(result.message).toContain("Claude Code");
     });
   });
 

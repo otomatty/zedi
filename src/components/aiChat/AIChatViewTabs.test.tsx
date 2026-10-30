@@ -7,13 +7,6 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AIChatViewTabs } from "./AIChatViewTabs";
 
-vi.mock("@/lib/platform", () => ({
-  isTauriDesktop: vi.fn(() => true),
-}));
-
-const platformMod = () =>
-  import("@/lib/platform") as Promise<{ isTauriDesktop: ReturnType<typeof vi.fn> }>;
-
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -22,27 +15,16 @@ vi.mock("react-i18next", () => ({
 }));
 
 describe("AIChatViewTabs", () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    const { isTauriDesktop } = await platformMod();
-    isTauriDesktop.mockReturnValue(true);
   });
 
-  it("renders Chat, Branch, and Workflow tabs on desktop", () => {
-    const onTabChange = vi.fn();
-    render(<AIChatViewTabs activeTab="chat" onTabChange={onTabChange} />);
-    expect(screen.getByRole("tab", { name: "aiChat.viewTabs.chat" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "aiChat.viewTabs.branch" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "aiChat.viewTabs.workflow" })).toBeInTheDocument();
-  });
-
-  it("hides Workflow tab in non-desktop (web) environment", async () => {
-    const { isTauriDesktop } = await platformMod();
-    isTauriDesktop.mockReturnValue(false);
+  it("renders only the Chat and Branch tabs", () => {
     render(<AIChatViewTabs activeTab="chat" onTabChange={vi.fn()} />);
-    expect(screen.getByRole("tab", { name: "aiChat.viewTabs.chat" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "aiChat.viewTabs.branch" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "aiChat.viewTabs.workflow" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "aiChat.viewTabs.chat",
+      "aiChat.viewTabs.branch",
+    ]);
   });
 
   it("Branch tab is always enabled", () => {
@@ -65,13 +47,5 @@ describe("AIChatViewTabs", () => {
     render(<AIChatViewTabs activeTab="branch" onTabChange={onTabChange} />);
     await user.click(screen.getByRole("tab", { name: "aiChat.viewTabs.chat" }));
     expect(onTabChange).toHaveBeenCalledWith("chat");
-  });
-
-  it("calls onTabChange with workflow when Workflow tab is clicked", async () => {
-    const user = userEvent.setup();
-    const onTabChange = vi.fn();
-    render(<AIChatViewTabs activeTab="chat" onTabChange={onTabChange} />);
-    await user.click(screen.getByRole("tab", { name: "aiChat.viewTabs.workflow" }));
-    expect(onTabChange).toHaveBeenCalledWith("workflow");
   });
 });

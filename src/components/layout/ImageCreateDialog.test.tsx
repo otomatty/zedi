@@ -203,28 +203,6 @@ describe("ImageCreateDialog", () => {
     expect(describeImageMock).not.toHaveBeenCalled();
   });
 
-  it("shows unsupported-provider alert and disables create button for claude-code", async () => {
-    useAISettingsMock.settings.provider = "claude-code";
-    useAISettingsMock.settings.apiKey = "";
-    useAISettingsMock.settings.model = "";
-    useAISettingsMock.settings.modelId = "claude-code:default";
-    useAISettingsMock.settings.isConfigured = true;
-
-    const user = userEvent.setup();
-    render(<ImageCreateDialog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);
-
-    await advanceToPreview(user);
-    await user.click(await screen.findByLabelText(/画像の説明を生成/));
-
-    expect(
-      await screen.findByText(/Claude Code|claude-code|未対応|サポートしていません/i),
-    ).toBeInTheDocument();
-
-    const createButton = screen.getByRole("button", { name: /作成/ });
-    expect(createButton).toBeDisabled();
-    expect(describeImageMock).not.toHaveBeenCalled();
-  });
-
   it("passes neither extractedText nor description when 'none' is selected", async () => {
     const user = userEvent.setup();
     render(<ImageCreateDialog open={true} onOpenChange={onOpenChange} onCreated={onCreated} />);

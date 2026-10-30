@@ -79,16 +79,8 @@ export {
   type ApiErrorStatus,
   type ApiErrorSuspectedFile,
 } from "./apiErrors.js";
-export { sources, type Source, type NewSource, type PdfSourceMetadata } from "./sources.js";
+export { sources, type Source, type NewSource } from "./sources.js";
 export { pageSources, type PageSource, type NewPageSource } from "./pageSources.js";
-export {
-  pdfHighlights,
-  PDF_HIGHLIGHT_COLORS,
-  type PdfHighlight,
-  type NewPdfHighlight,
-  type PdfHighlightRect,
-  type PdfHighlightColor,
-} from "./pdfHighlights.js";
 export {
   lintFindings,
   type LintFinding,
@@ -137,7 +129,6 @@ export {
   aiMonthlyUsageRelations,
   sourcesRelations,
   pageSourcesRelations,
-  pdfHighlightsRelations,
   lintFindingsRelations,
   activityLogRelations,
 } from "./relations.js";

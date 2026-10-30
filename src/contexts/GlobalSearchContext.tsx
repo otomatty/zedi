@@ -37,22 +37,11 @@ interface GlobalSearchContextValue {
 const GlobalSearchContext = createContext<GlobalSearchContextValue | null>(null);
 
 /**
- * Builds the navigation URL for a search result item. Exported pure helper so
- * URL composition (Issue #864 acceptance criteria) can be unit-tested without
- * spinning up React Router.
- *
- * 検索結果アイテムから遷移先 URL を組み立てる純関数。URL 組み立てロジックを
- * テストから直接呼べるよう export している（Issue #864 受け入れ基準）。
+ * Builds the navigation URL for a search result item.
+ * 検索結果アイテムから遷移先 URL を組み立てる純関数。
  */
 export function resolveSearchResultUrl(item: GlobalSearchResultItem): string {
-  if (item.kind === "page") {
-    return `/notes/${item.noteId}/${item.pageId}`;
-  }
-  // kind === "pdf_highlight"
-  if (item.derivedPageId && item.derivedPageNoteId) {
-    return `/notes/${item.derivedPageNoteId}/${item.derivedPageId}`;
-  }
-  return `/sources/${item.sourceId}/pdf#page=${item.pdfPage}`;
+  return `/notes/${item.noteId}/${item.pageId}`;
 }
 
 /**

@@ -113,9 +113,7 @@ export function useWebClipper(options: UseWebClipperOptions = {}): UseWebClipper
           // AI 要約用の provider/model を取得（設定済みの場合のみ）
           // Fetch provider/model for AI summary (only if configured)
           // direct-API プロバイダー (openai/anthropic/google) のみ対応
-          // claude-code は iframe ベースなので対象外
           // Only direct-API providers (openai/anthropic/google) are supported
-          // claude-code is iframe-based so excluded
           let aiOptions: YouTubeClipOptions = {};
           try {
             aiOptions = resolveYouTubeClipOptions(await loadAISettings());

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { FileText, Link as LinkIcon, ArrowRight, BookOpen } from "lucide-react";
+import { FileText, Link as LinkIcon, ArrowRight } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { PopoverContent } from "@zedi/ui";
 import { cn } from "@zedi/ui";
@@ -36,19 +36,8 @@ export interface HeaderSearchDropdownContentProps {
   handleSearchSubmit: () => void;
 }
 
-/**
- * Issue #864 でグローバル検索結果に PDF ハイライト型 (`kind="pdf_highlight"`) が
- * 加わったので、`key` と `aria-label` をアイテム種別ごとに分岐して安定化させる。
- * 既存ノートページ / 個人ページの key 形式は維持し、追加分だけ別 prefix にする。
- *
- * Issue #864 introduced `kind="pdf_highlight"` rows; the React `key` and the
- * accessible label branch on `kind` so the existing page-row keys stay stable
- * and the new highlight rows get a distinct, collision-free namespace.
- */
+/** Stable React key for a search result row. / 検索結果行の安定した React key。 */
 function getResultKey(item: GlobalSearchResultItem): string {
-  if (item.kind === "pdf_highlight") {
-    return `pdf-${item.sourceId}-${item.highlightId}`;
-  }
   return item.noteId ? `shared-${item.noteId}-${item.pageId}` : `personal-${item.pageId}`;
 }
 
@@ -144,7 +133,6 @@ export function HeaderSearchDropdownContent({
               const index = virtualRow.index;
               const item = searchResults[index];
               if (!item) return null;
-              const isPdf = item.kind === "pdf_highlight";
               return (
                 <li
                   key={getResultKey(item)}
@@ -170,17 +158,12 @@ export function HeaderSearchDropdownContent({
                       setActiveIndex(index);
                     }}
                   >
-                    {isPdf ? (
-                      <BookOpen className="text-muted-foreground h-4 w-4 shrink-0" />
-                    ) : item.kind === "page" && item.sourceUrl ? (
+                    {item.sourceUrl ? (
                       <LinkIcon className="text-muted-foreground h-4 w-4 shrink-0" />
                     ) : (
                       <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
                     )}
                     <span className="flex-1 truncate font-medium">{item.title}</span>
-                    {isPdf && (
-                      <span className="text-muted-foreground shrink-0 text-[10px]">PDF</span>
-                    )}
                   </button>
                 </li>
               );

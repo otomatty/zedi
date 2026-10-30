@@ -17,6 +17,8 @@ const DOC_PAIRS = [
 
   { en: "server/mcp/README.md", ja: "server/mcp/README.ja.md" },
   { en: "admin/README.md", ja: "admin/README.ja.md" },
+  { en: "poc/honoJsx/README.md", ja: "poc/honoJsx/README.ja.md" },
+  { en: "poc/honoJsx/docs/tauriRemoval.md", ja: "poc/honoJsx/docs/tauriRemoval.ja.md" },
   {
     en: "terraform/cloudflare/README.md",
     ja: "terraform/cloudflare/README.ja.md",

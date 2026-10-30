@@ -232,6 +232,13 @@
       "when": 1780099200000,
       "tag": "0033_add_ai_model_system_default",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1780185600000,
+      "tag": "0034_remove_desktop_pdf_reader",
+      "breakpoints": true
     }
   ]
 }

@@ -27,10 +27,6 @@ const workspaces = [
     name: "@zedi/ui",
     args: ["vitest", "run", "--coverage", "--config", "packages/ui/vitest.config.ts"],
   },
-  {
-    name: "@zedi/claude-sidecar",
-    args: ["vitest", "run", "--coverage", "--config", "packages/claude-sidecar/vitest.config.ts"],
-  },
 ];
 
 const serverWorkspaces = [

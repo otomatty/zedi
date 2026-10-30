@@ -32,7 +32,6 @@ export default tseslint.config(
       // AI-DLC vendored harness (aidlc-workflows v2)
       ".codex",
       "aidlc",
-      "src-tauri/target",
       ".wrangler",
       "*.config.js",
       "*.config.mjs",

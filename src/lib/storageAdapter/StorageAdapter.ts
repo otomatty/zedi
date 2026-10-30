@@ -1,7 +1,7 @@
 /**
  * StorageAdapter interface (§6.1 zedi-rearchitecture-spec.md).
  * Platform abstraction for metadata, Y.Doc, links, search, and sync timestamp.
- * Web: IndexedDBStorageAdapter. Tauri: TauriStorageAdapter (Phase D).
+ * Backed by IndexedDBStorageAdapter.
  */
 
 import type { PageMetadata, Link, GhostLink, LinkType, SearchResult } from "./types";
@@ -9,11 +9,10 @@ import type { PageMetadata, Link, GhostLink, LinkType, SearchResult } from "./ty
 /**
  * ストレージアダプタインターフェース (§6.1 zedi-rearchitecture-spec.md)。
  * メタデータ、Y.Doc、リンク、検索、同期タイムスタンプのプラットフォーム抽象化。
- * Web は `IndexedDBStorageAdapter`、Tauri は `TauriStorageAdapter` (Phase D)。
+ * 実装は `IndexedDBStorageAdapter`。
  *
  * Platform abstraction for metadata, Y.Doc, links, search, and sync timestamp
- * (§6.1 zedi-rearchitecture-spec.md). Web is backed by `IndexedDBStorageAdapter`;
- * Tauri will use `TauriStorageAdapter` (Phase D).
+ * (§6.1 zedi-rearchitecture-spec.md), backed by `IndexedDBStorageAdapter`.
  */
 export interface StorageAdapter {
   // ── メタデータ ──

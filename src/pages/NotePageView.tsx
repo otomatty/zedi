@@ -33,9 +33,7 @@ import {
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { ContentWithAIChat } from "@/components/aiChat/ContentWithAIChat";
-import { NoteWorkspaceProvider, useNoteWorkspaceOptional } from "@/contexts/NoteWorkspaceContext";
 import { useAIChatContext } from "@/contexts/AIChatContext";
-import { NoteWorkspaceToolbar } from "@/components/note/NoteWorkspaceToolbar";
 import { useMarkdownExport } from "@/components/editor/PageEditor/useMarkdownExport";
 import { usePdfExport } from "@/components/editor/PageEditor/usePdfExport";
 import { usePagePublicContent } from "@/hooks/pages/usePagePublicContent";
@@ -186,8 +184,6 @@ function NotePageEditorEditable({
   const [title, setTitle] = useState(page.title);
   const { api } = useNoteApi();
   const { setPageContext, contentAppendHandlerRef, insertAtCursorRef } = useAIChatContext();
-  const noteWorkspace = useNoteWorkspaceOptional();
-  const workspaceRoot = noteWorkspace?.workspaceRoot ?? null;
   const editorInsertRef = useRef<((content: unknown) => boolean) | null>(null);
   const pageActionHubRef = useRef<PageActionHubHandle | null>(null);
   const { isSignedIn: editorIsSignedIn } = useAuth();
@@ -211,12 +207,11 @@ function NotePageEditorEditable({
       type: "editor",
       pageId: page.id,
       noteId: page.noteId,
-      claudeWorkspaceRoot: workspaceRoot ?? undefined,
       pageTitle: title,
       pageContent: editorContent.slice(0, 3000),
       pageFullContent: editorContent,
     });
-  }, [page.id, page.noteId, title, editorContent, setPageContext, workspaceRoot]);
+  }, [page.id, page.noteId, title, editorContent, setPageContext]);
 
   useEffect(() => {
     return () => setPageContext(null);
@@ -460,7 +455,6 @@ function NotePageEditorEditable({
           menuItems={menuItems}
           supplementalRightContent={supplementalRightContent}
         />
-        <NoteWorkspaceToolbar />
         <PageEditorContent
           content={editorContent}
           title={title}
@@ -968,32 +962,30 @@ const NotePageView: React.FC = () => {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className={bodyClassName}>
-        <NoteWorkspaceProvider key={note.id} noteId={note.id}>
-          {canEdit ? (
-            <NotePageEditorEditable
-              key={page.id}
-              noteId={note.id}
-              page={page}
-              collaboration={collaboration}
-              isCollaborationEnabled={isCollaborationEnabled}
-              isTitleEditable={isTitleEditable}
-              initialContent={pendingInitialContent}
-              onInitialContentApplied={handleInitialContentApplied}
-              onBack={handleBack}
-              onRequestDelete={handleRequestDelete}
-              isDeletePending={isDeletePending}
-              supplementalRightContent={supplementalRightContent}
-              cancelPendingTitleSaveRef={cancelPendingTitleSaveRef}
-            />
-          ) : (
-            <NotePageReadOnly
-              page={page}
-              onBack={handleBack}
-              supplementalRightContent={supplementalRightContent}
-              canViewHistory={isSignedIn}
-            />
-          )}
-        </NoteWorkspaceProvider>
+        {canEdit ? (
+          <NotePageEditorEditable
+            key={page.id}
+            noteId={note.id}
+            page={page}
+            collaboration={collaboration}
+            isCollaborationEnabled={isCollaborationEnabled}
+            isTitleEditable={isTitleEditable}
+            initialContent={pendingInitialContent}
+            onInitialContentApplied={handleInitialContentApplied}
+            onBack={handleBack}
+            onRequestDelete={handleRequestDelete}
+            isDeletePending={isDeletePending}
+            supplementalRightContent={supplementalRightContent}
+            cancelPendingTitleSaveRef={cancelPendingTitleSaveRef}
+          />
+        ) : (
+          <NotePageReadOnly
+            page={page}
+            onBack={handleBack}
+            supplementalRightContent={supplementalRightContent}
+            canViewHistory={isSignedIn}
+          />
+        )}
       </div>
       <NotePageDeleteConfirmDialog
         open={deleteConfirmOpen}

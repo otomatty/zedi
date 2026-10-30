@@ -9,7 +9,6 @@ import { NotesListView } from "@/components/note/NotesListView";
 import { NoteEditPermissionControls } from "@/components/note/NoteEditPermissionControls";
 import { allowedEditPermissions, visibilityKeys } from "@/lib/noteSettingsConfig";
 import { shouldConfirmPublicAnyLoggedInSave } from "@/lib/noteSharingRisk";
-import { OpenPdfButton } from "@/components/pdfReader/OpenPdfButton";
 import { Button } from "@zedi/ui";
 import {
   AlertDialog,
@@ -242,9 +241,6 @@ const Notes: React.FC = () => {
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{t("notes.title")}</h1>
         <div className="flex items-center gap-2">
-          {/* デスクトップ専用の PDF 取り込みエントリ。Web ビルドでは非表示。 */}
-          {/* Desktop-only "Open PDF" entry. Hidden on the web build. */}
-          <OpenPdfButton />
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button>

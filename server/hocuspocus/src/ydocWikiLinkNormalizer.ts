@@ -25,7 +25,7 @@
  * - スキップ条件:
  *     1. 既に `wikiLink` 属性を持つセグメント（再 mark 抑止）。
  *     2. `code` 属性を持つセグメント（インラインコード）。
- *     3. `codeBlock` / `code_block` / `executableCodeBlock` 配下のテキスト全体。
+ *     3. `codeBlock` / `code_block` 配下のテキスト全体。
  *     4. 空タイトル `[[   ]]`。
  * - 既存の他 mark（`bold` 等）は `format` の上書き挙動で温存される。Yjs の
  *   `format` は新しい attribute だけを差分適用するため、Quill の retain と
@@ -39,7 +39,7 @@
  * - Skip rules:
  *     1. Segments already carrying a `wikiLink` mark (no double-marking).
  *     2. Segments inside an inline `code` mark.
- *     3. Text inside `codeBlock` / `code_block` / `executableCodeBlock`.
+ *     3. Text inside `codeBlock` / `code_block`.
  *     4. Empty titles like `[[   ]]`.
  * - Other marks (e.g. `bold`) are preserved because `Y.XmlText.format` only
  *   touches the attributes it receives — analogous to a Quill `retain` with
@@ -65,7 +65,7 @@ const WIKI_LINK_TEXT_REGEX = /\[\[([^[\]]+)\]\]/g;
  * Tiptap node names treated as code containers — text inside is preserved
  * verbatim (no WikiLink promotion).
  */
-const CODE_CONTAINER_TYPES = new Set<string>(["codeBlock", "code_block", "executableCodeBlock"]);
+const CODE_CONTAINER_TYPES = new Set<string>(["codeBlock", "code_block"]);
 
 /**
  * 正規化結果のカウンタ。ログ・テスト・「変更ありか」判定で利用する。

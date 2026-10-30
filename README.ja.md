@@ -181,36 +181,6 @@ Docker で複数インスタンスを動かす場合は、ポートをずらし�
 
 > **Note:** Dockerを使う場合、最低8GBのRAM（推奨: 16GB以上）が必要です。軽量な並列開発が必要な場合は、環境変数によるポート設定の方が適しています。
 
-### デスクトップアプリ（Tauri）
-
-Zedi は [Tauri 2.0](https://v2.tauri.app/) によるデスクトップアプリとしても起動できます。
-
-#### 前提条件（Desktop）
-
-- [Rust](https://www.rust-lang.org/tools/install) (rustup で stable を導入)
-- **Windows**: Microsoft C++ Build Tools + Windows 11 SDK
-- **macOS**: Xcode Command Line Tools (`xcode-select --install`)
-- **Linux**: `libwebkit2gtk-4.1-dev`, `build-essential`, `libssl-dev` 等（[詳細](https://v2.tauri.app/guides/prerequisites/)）
-
-#### デスクトップアプリの起動
-
-```bash
-# 開発モード（Vite dev server + Tauri WebView）
-bun run tauri:dev
-
-# プロダクションビルド（インストーラー生成）
-bun run tauri:build
-```
-
-- **Claude Code sidecar** ([Issue #456](https://github.com/otomatty/zedi/issues/456)): `externalBin` 用の sidecar は `src-tauri/binaries/` に配置する。初回 `tauri:dev` で自動ビルド、手動は `bun run sidecar:build`。
-
-> **Windows + Git Bash の場合**: MSVC のビルドツールが PATH に含まれていない場合、
-> Developer Command Prompt for VS 2022 から実行するか、
-> `.bashrc` に `LIB`, `INCLUDE`, `PATH` を設定してください。
-> 詳細は [Issue #49](https://github.com/otomatty/zedi/issues/49) を参照。
-> **Note**: デスクトップ版は現在 Phase D（開発中）です。ストレージは暫定的に IndexedDB を使用しており、
-> Tauri 固有のストレージ (SQLite) は [#50](https://github.com/otomatty/zedi/issues/50) で対応予定です。
-
 ### 環境変数の設定（オプション）
 
 AI 機能・認証・API 連携を使う場合は、`.env.local` を作成してください。サンプルは [.env.example](.env.example) を参照してください。
@@ -239,7 +209,6 @@ VITE_REALTIME_URL=ws://localhost:1234   # 本番は wss://realtime.zedi-note.app
 | ----------------- | ---------------------------------------------------------------------------------------------------------- |
 | **Frontend**      | React 19 + TypeScript 6 / React Router v7                                                                  |
 | **Build Tool**    | Vite 8 (`@vitejs/plugin-react-swc`) / Bun                                                                  |
-| **Desktop**       | Tauri 2.0 (Rust) — `src-tauri/`                                                                            |
 | **Editor**        | Tiptap 3 (ProseMirror) — tables / math (KaTeX) / code (lowlight) / collaboration (Y.js)                    |
 | **Styling**       | Tailwind CSS v4 + shadcn/ui (Radix UI primitives) / `next-themes`                                          |
 | **State / Data**  | Zustand 5 + TanStack Query 5 / React Hook Form + Zod                                                       |
@@ -256,7 +225,7 @@ VITE_REALTIME_URL=ws://localhost:1234   # 本番は wss://realtime.zedi-note.app
 | **AI**            | OpenAI / Anthropic / Google Gemini（OpenRouter で価格情報を取得）                                          |
 | **Browser Ext.**  | `extension/` — Manifest v3 (Chrome 拡張)                                                                   |
 | **Admin**         | `admin/` — 別 Vite + React アプリ                                                                          |
-| **Workspaces**    | Bun workspaces: `packages/ui`（shadcn）, `packages/claude-sidecar` / `admin`                               |
+| **Workspaces**    | Bun workspaces: `packages/ui`（shadcn）, `packages/shared` / `admin`                                       |
 | **Deploy**        | Cloudflare Pages（フロント） + Railway（`server/api`, `hocuspocus`, `mcp`） / Terraform (Cloudflare)       |
 | **CI/CD**         | GitHub Actions（lint / typecheck / test / mutation / deploy）                                              |
 | **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker（Mutation Testing）                                      |
@@ -312,21 +281,10 @@ bun run test:mutation
 src/                     # フロントエンド本体（React + Vite）
 ├── components/          # React コンポーネント（editor / page / search / layout / ui ほか）
 ├── hooks/               # カスタムフック
-├── lib/                 # ユーティリティ（`claudeCode/` = Tauri↔Claude Code ブリッジ）
+├── lib/                 # ユーティリティ
 ├── pages/               # ルートに対応するページコンポーネント（React Router v7）
 ├── stores/              # Zustand ストア
 └── types/               # TypeScript 型定義
-
-src-tauri/               # Tauri 2.0 デスクトップバックエンド（Rust）
-├── src/
-│   ├── main.rs          # デスクトップ エントリポイント
-│   ├── lib.rs           # Tauri アプリ本体・Commands 定義
-│   └── claude_sidecar.rs # Claude Code sidecar プロセス管理（Issue #456）
-├── binaries/            # externalBin（`bun run sidecar:build`、gitignore）
-├── capabilities/        # セキュリティ権限定義
-├── icons/               # アプリアイコン（各 OS 用）
-├── Cargo.toml           # Rust 依存管理
-└── tauri.conf.json      # Tauri 設定
 
 server/                  # Railway で個別デプロイされる Bun プロジェクト群
 ├── api/                 # REST / Auth API（Hono on Bun + Better Auth + Drizzle ORM）
@@ -334,15 +292,14 @@ server/                  # Railway で個別デプロイされる Bun プロジ�
 └── mcp/                 # MCP サーバー — Claude Code 連携（stdio / HTTP）。詳細は [server/mcp/README.ja.md](server/mcp/README.ja.md)
 
 packages/                # Bun workspaces（共有ライブラリ）
-├── ui/                  # `@zedi/ui` — shadcn/ui ベースの共有 UI コンポーネント
-└── claude-sidecar/      # Tauri sidecar 用 Claude Code クライアント
+└── ui/                  # `@zedi/ui` — shadcn/ui ベースの共有 UI コンポーネント
 
 admin/                   # 管理画面アプリ（別 Vite + React + Tailwind / `@zedi/ui` 利用）
 extension/               # ブラウザ拡張（Manifest v3、Web Clipper）
 server/api/drizzle/      # PostgreSQL マイグレーション（drizzle-kit が読む正本 / source of truth）
 terraform/cloudflare/    # Cloudflare 関連インフラ定義
 e2e/                     # Playwright E2E テスト
-scripts/                 # セットアップ / sidecar ビルド / Stryker / 拡張ビルド等のスクリプト
+scripts/                 # セットアップ / Stryker / 拡張ビルド等のスクリプト
 .github/workflows/       # GitHub Actions（lint / typecheck / test / mutation / deploy）
 ```
 
@@ -377,7 +334,6 @@ scripts/                 # セットアップ / sidecar ビルド / Stryker / �
 - [Hono](https://hono.dev/) — API フレームワーク（Bun 上）
 - [Drizzle ORM](https://orm.drizzle.team/) — TypeScript ORM
 - [Polar](https://polar.sh/) — Pro プランの課金基盤
-- [Tauri](https://tauri.app/) — クロスプラットフォーム デスクトップ
 - [Cloudflare Pages](https://pages.cloudflare.com/) / [Railway](https://railway.com/) — ホスティング
 
 ---

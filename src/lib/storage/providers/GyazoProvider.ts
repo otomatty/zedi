@@ -29,8 +29,7 @@ interface GyazoResponse {
  * 3. アプリケーション情報を入力して作成
  *    - Callback URL: 以下のいずれかを入力（実際には使用されません）
  *      * `http://localhost:30000/callback` (ローカル開発用)
- *      * `urn:ietf:wg:oauth:2.0:oob` (デスクトップアプリ用)
- *      * `zedi://oauth/callback` (カスタムスキーム)
+ *      * `urn:ietf:wg:oauth:2.0:oob`
  * 4. "Your access token" の "Generate" をクリック
  * 5. Access Token をコピー
  */
