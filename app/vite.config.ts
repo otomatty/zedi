@@ -49,6 +49,9 @@ function serviceWorkerManifest(): Plugin {
 export default defineConfig({
   root: "src/client",
   publicDir: "public",
+  // Plain CSS, no PostCSS plugins. An inline config stops Vite from searching parent folders,
+  // where it would pick up the repository root's Tailwind config.
+  css: { postcss: {} },
   plugins: [serviceWorkerManifest()],
   oxc: {
     jsx: { runtime: "automatic", importSource: "hono/jsx/dom" },
