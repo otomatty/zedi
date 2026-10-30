@@ -1,6 +1,7 @@
 import { marked, type Token, type Tokens } from "marked";
 
-const SAFE_URL = /^(?:https?:|mailto:|\/(?!\/)|#)/i;
+// Root-relative paths only: `//host` and `/\host` (browsers read `\` as `/`) leave the site.
+const SAFE_URL = /^(?:https?:|mailto:|\/(?![/\\])|#)/i;
 
 function safeHref(href: string): string | null {
   const trimmed = href.trim();

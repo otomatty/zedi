@@ -33,6 +33,12 @@ describe("renderMarkdown (tokens → DOM, no innerHTML)", () => {
     );
   });
 
+  it("drops protocol-relative links, including the backslash form browsers treat as one", () => {
+    // ブラウザは http(s) URL の `\` を `/` とみなすため、`/\evil.com` は外部サイトに飛ぶ。
+    // Browsers treat `\` as `/` in http(s) URLs, so `/\evil.com` would leave the site.
+    expect(html("[x](/\\evil.com) [y](//evil.com)")).toBe("<p>x y</p>");
+  });
+
   it("renders ordered, unordered and task lists", () => {
     expect(html("3. c\n4. d")).toBe('<ol start="3"><li>c</li><li>d</li></ol>');
     expect(html("- [x] done\n- [ ] todo")).toBe(

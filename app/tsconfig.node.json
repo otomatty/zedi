@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  // Tests that read the repository with Node APIs (config checks); they import no app code.
+  "include": ["src/**/*.node.test.ts"]
+}

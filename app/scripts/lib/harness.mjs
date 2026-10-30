@@ -40,6 +40,9 @@ export function startWorker(port) {
       "0",
       "--persist-to",
       persistTo,
+      // The scripts sign in through the dev outbox, whatever `.dev.vars` says.
+      "--var",
+      "ENVIRONMENT:development",
     ],
     { cwd: root, stdio: ["ignore", "pipe", "pipe"] },
   );

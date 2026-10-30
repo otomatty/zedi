@@ -68,6 +68,7 @@ export default function EditorPage({ id, defaultNoteId }: { id: string; defaultN
     element.classList.toggle("cv", params.get("cv") === "1");
     if (params.get("collab") === "0") {
       const editor = createEditor({ element, searchTargets: (q) => searchTargets(noteId, q) });
+      editor.setEditable(!readOnly);
       const stopWatchingSize = watchPageSize(editor, setTextblocks);
       window.__zediApp = { ...window.__zediApp, editor };
       setStatus("synced");

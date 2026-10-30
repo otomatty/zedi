@@ -98,7 +98,7 @@ Spec for splitting web clips and PDF text into pages, based on the large-documen
 
 ```bash
 bun install
-cp .dev.vars.example .dev.vars   # local BETTER_AUTH_SECRET
+cp .dev.vars.example .dev.vars   # local BETTER_AUTH_SECRET and ENVIRONMENT=development
 bun run test          # unit tests (Node / happy-dom) + integration tests (workerd with D1 and DOs)
 bun run typecheck     # client (hono/jsx/dom) and worker (hono/jsx) are checked separately
 bun run build         # build the SPA into dist/client

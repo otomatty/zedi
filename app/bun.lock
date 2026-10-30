@@ -28,6 +28,7 @@
         "@cloudflare/vitest-plugin": "^1.4.11",
         "@cloudflare/workers-types": "^5.20261030.1",
         "@testing-library/dom": "^10.4.2",
+        "@types/node": "^26.6.6",
         "fake-indexeddb": "^6.2.7",
         "happy-dom": "^21.0.4",
         "lib0": "^0.2.117",

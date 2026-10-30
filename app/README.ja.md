@@ -98,7 +98,7 @@ Y.js のエディタ連携（`@tiptap/y-tiptap`）には小さなパッチを当
 
 ```bash
 bun install
-cp .dev.vars.example .dev.vars   # BETTER_AUTH_SECRET（ローカル用）
+cp .dev.vars.example .dev.vars   # BETTER_AUTH_SECRET と ENVIRONMENT=development（ローカル用）
 bun run test          # 単体テスト（Node / happy-dom）+ 統合テスト（workerd 上で D1・DO を使用）
 bun run typecheck     # クライアント（hono/jsx/dom）とワーカー（hono/jsx）を別々に型チェック
 bun run build         # SPA を dist/client にビルド

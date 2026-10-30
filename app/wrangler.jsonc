@@ -25,7 +25,7 @@
       "migrations_dir": "migrations",
     },
   ],
-  // BETTER_AUTH_SECRET comes from `.dev.vars` locally (see .dev.vars.example).
-  "vars": { "ENVIRONMENT": "development" },
+  // BETTER_AUTH_SECRET and ENVIRONMENT=development come from `.dev.vars` locally (see
+  // .dev.vars.example). Development mode exposes the magic-link outbox, so never set it here.
   "observability": { "enabled": true },
 }
