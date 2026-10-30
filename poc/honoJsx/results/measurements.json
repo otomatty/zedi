@@ -1,0 +1,205 @@
+{
+  "measuredAt": "2026-10-30T02:32:50.625Z",
+  "runs": [
+    {
+      "cpuRate": 1,
+      "notes": {
+        "firstRenderMs": 252.9,
+        "rowsInDom": 19,
+        "scrollFps": 58.7,
+        "scrollLongTasks": {
+          "count": 0,
+          "totalMs": 0
+        },
+        "heapMB": 9.5
+      },
+      "typingSmallDoc": {
+        "readyMs": 282.7,
+        "latencyMs": {
+          "n": 52,
+          "p50": 4.6,
+          "p95": 17.9,
+          "max": 18.7
+        }
+      },
+      "typingLargeDoc": {
+        "readyMs": 294.3,
+        "latencyMs": {
+          "n": 52,
+          "p50": 13.6,
+          "p95": 21.3,
+          "max": 32.7
+        }
+      },
+      "typingLargeDocNoCollab": {
+        "readyMs": 294,
+        "latencyMs": {
+          "n": 52,
+          "p50": 10.9,
+          "p95": 18.9,
+          "max": 25.8
+        }
+      },
+      "collabPropagationMs": {
+        "n": 20,
+        "p50": 33,
+        "p95": 52,
+        "max": 52
+      },
+      "aiDirect": {
+        "seconds": 6.66,
+        "fps": 60.1,
+        "tokens": 2000,
+        "longTasks": {
+          "count": 0,
+          "totalMs": 0
+        }
+      },
+      "aiState": {
+        "seconds": 6.62,
+        "fps": 60,
+        "tokens": 2000,
+        "longTasks": {
+          "count": 0,
+          "totalMs": 0
+        }
+      },
+      "aiBlocks": {
+        "seconds": 6.56,
+        "fps": 59.9,
+        "tokens": 2000,
+        "longTasks": {
+          "count": 0,
+          "totalMs": 0
+        }
+      },
+      "aiDirect10k": {
+        "seconds": 32.42,
+        "fps": 57.4,
+        "tokens": 10000,
+        "longTasks": {
+          "count": 0,
+          "totalMs": 0
+        }
+      },
+      "aiBlocks10k": {
+        "seconds": 32.41,
+        "fps": 59.9,
+        "tokens": 10000,
+        "longTasks": {
+          "count": 0,
+          "totalMs": 0
+        }
+      },
+      "aiState10k": {
+        "seconds": 32.66,
+        "fps": 57.4,
+        "tokens": 10000,
+        "longTasks": {
+          "count": 0,
+          "totalMs": 0
+        }
+      }
+    },
+    {
+      "cpuRate": 4,
+      "notes": {
+        "firstRenderMs": 631.5,
+        "rowsInDom": 19,
+        "scrollFps": 56.9,
+        "scrollLongTasks": {
+          "count": 0,
+          "totalMs": 0
+        },
+        "heapMB": 9.4
+      },
+      "typingSmallDoc": {
+        "readyMs": 929,
+        "latencyMs": {
+          "n": 52,
+          "p50": 22.4,
+          "p95": 39.1,
+          "max": 97.8
+        }
+      },
+      "typingLargeDoc": {
+        "readyMs": 859.6,
+        "latencyMs": {
+          "n": 52,
+          "p50": 107,
+          "p95": 184.4,
+          "max": 284.2
+        }
+      },
+      "typingLargeDocNoCollab": {
+        "readyMs": 829.1,
+        "latencyMs": {
+          "n": 52,
+          "p50": 47.3,
+          "p95": 78.5,
+          "max": 142.8
+        }
+      },
+      "collabPropagationMs": {
+        "n": 20,
+        "p50": 99,
+        "p95": 292,
+        "max": 292
+      },
+      "aiDirect": {
+        "seconds": 6.94,
+        "fps": 50,
+        "tokens": 2000,
+        "longTasks": {
+          "count": 1,
+          "totalMs": 134
+        }
+      },
+      "aiState": {
+        "seconds": 6.73,
+        "fps": 44.7,
+        "tokens": 2000,
+        "longTasks": {
+          "count": 1,
+          "totalMs": 54
+        }
+      },
+      "aiBlocks": {
+        "seconds": 6.99,
+        "fps": 57.5,
+        "tokens": 2000,
+        "longTasks": {
+          "count": 1,
+          "totalMs": 144
+        }
+      },
+      "aiDirect10k": {
+        "seconds": 33.28,
+        "fps": 23.7,
+        "tokens": 10000,
+        "longTasks": {
+          "count": 213,
+          "totalMs": 16350
+        }
+      },
+      "aiBlocks10k": {
+        "seconds": 33.25,
+        "fps": 58.3,
+        "tokens": 10000,
+        "longTasks": {
+          "count": 1,
+          "totalMs": 132
+        }
+      },
+      "aiState10k": {
+        "seconds": 32.87,
+        "fps": 21.3,
+        "tokens": 10000,
+        "longTasks": {
+          "count": 214,
+          "totalMs": 15994
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "assets": [
+    {
+      "path": "assets/AiChatPage-BSY8HkCE.js",
+      "initial": false,
+      "raw": 3109,
+      "gzip": 1604,
+      "brotli": 1384
+    },
+    {
+      "path": "assets/EditorPage-mV2-MhKv.js",
+      "initial": false,
+      "raw": 554477,
+      "gzip": 174748,
+      "brotli": 148673
+    },
+    {
+      "path": "assets/index-D3xPk6QJ.js",
+      "initial": true,
+      "raw": 87162,
+      "gzip": 28135,
+      "brotli": 25172
+    },
+    {
+      "path": "assets/index-x5IL89cT.css",
+      "initial": true,
+      "raw": 4555,
+      "gzip": 1473,
+      "brotli": 1232
+    }
+  ],
+  "initialJs": {
+    "raw": 87162,
+    "gzip": 28135,
+    "brotli": 25172
+  }
+}

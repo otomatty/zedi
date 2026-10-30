@@ -1,0 +1,41 @@
+{
+  "name": "zedi-poc-hono-jsx",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PoC: Zedi frontend rebuilt with hono/jsx/dom on a single Cloudflare Worker",
+  "scripts": {
+    "dev:client": "vite",
+    "dev:worker": "wrangler dev --port 8787",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.client.json && tsc --noEmit -p tsconfig.worker.json",
+    "test": "vitest run",
+    "bundle:report": "node scripts/bundleReport.mjs",
+    "measure": "node scripts/measure.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
+    "@tanstack/query-core": "^5.105.0",
+    "@tanstack/virtual-core": "^3.19.9",
+    "@tiptap/core": "^3.32.1",
+    "@tiptap/extension-collaboration": "^3.32.1",
+    "@tiptap/extension-collaboration-caret": "^3.32.1",
+    "@tiptap/pm": "^3.32.1",
+    "@tiptap/starter-kit": "^3.32.1",
+    "@tiptap/suggestion": "^3.32.1",
+    "hono": "^4.13.14",
+    "partyserver": "^0.5.10",
+    "y-partyserver": "^2.2.0",
+    "yjs": "^13.6.33"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261030.1",
+    "@testing-library/dom": "^10.4.2",
+    "happy-dom": "^21.0.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "4.1.10",
+    "wrangler": "^4.156.0"
+  }
+}
