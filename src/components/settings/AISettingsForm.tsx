@@ -1,5 +1,5 @@
 import React from "react";
-import { Bot, Loader2, Trash2, Server, Key, Terminal } from "lucide-react";
+import { Bot, Loader2, Trash2, Server, Key } from "lucide-react";
 import { Button } from "@zedi/ui";
 import { RadioGroup, RadioGroupItem } from "@zedi/ui";
 import { Label } from "@zedi/ui";
@@ -20,10 +20,7 @@ import { AISettingsFormServerSection } from "./AISettingsFormServerSection";
 import { AISettingsFormUserKeySection } from "./AISettingsFormUserKeySection";
 import { ProviderSelector } from "./ProviderSelector";
 import { SectionSaveStatus } from "./SectionSaveStatus";
-import { ClaudeCodePrerequisites } from "./ClaudeCodePrerequisites";
-import { McpServerSettings } from "./McpServerSettings";
 import { getProviderById, type AIInteractionMode } from "@/types/ai";
-import { isTauriDesktop } from "@/lib/platform";
 import { useTranslation } from "react-i18next";
 import { cn } from "@zedi/ui";
 
@@ -32,8 +29,8 @@ interface AISettingsFormProps {
 }
 
 /**
- * AI settings form with 3-mode segment control (Default / API Key / Claude Code).
- * 3モードセグメントコントロール付きAI設定フォーム。
+ * AI settings form with a mode segment control (Default / API Key).
+ * モード切り替え（既定 / API キー）付きの AI 設定フォーム。
  */
 export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false }) => {
   const { t } = useTranslation();
@@ -52,9 +49,7 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
     serverModelsLoading,
     serverModelsError,
     isServerMode,
-    isClaudeCode,
     interactionMode,
-    claudeCodeAvailable,
     loadServerModels,
     updateSettings,
     handleModeChange,
@@ -66,7 +61,6 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
   const currentProvider = getProviderById(settings.provider);
   const currentModelId = settings.modelId || `${settings.provider}:${settings.model}`;
   const saveStatus = isSaving ? "saving" : savedAt != null ? "saved" : "idle";
-  const isDesktop = isTauriDesktop();
 
   if (isLoading) {
     return (
@@ -97,8 +91,6 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
           value={interactionMode}
           onChange={handleModeChange}
           disabled={isSaving || isTesting}
-          showClaudeCode={isDesktop}
-          claudeCodeAvailable={claudeCodeAvailable}
         />
 
         {isServerMode && (
@@ -119,8 +111,6 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
               value={settings.provider}
               onChange={(p) => updateSettings({ provider: p })}
               disabled={isSaving || isTesting}
-              claudeCodeAvailable={claudeCodeAvailable}
-              apiProvidersOnly
             />
             <AISettingsFormUserKeySection
               apiKey={settings.apiKey}
@@ -138,9 +128,6 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
             />
           </>
         )}
-
-        {isClaudeCode && <ClaudeCodePrerequisites />}
-        {isClaudeCode && <McpServerSettings />}
       </CardContent>
 
       <CardFooter className="flex justify-between">
@@ -183,21 +170,17 @@ export const AISettingsForm: React.FC<AISettingsFormProps> = ({ embedded = false
 };
 
 /**
- * 3 モードセグメントコントロール（RadioGroup ベース）。
- * 3-mode segment control using RadioGroup for proper a11y semantics.
+ * モードのセグメントコントロール（RadioGroup ベース）。
+ * Mode segment control using RadioGroup for proper a11y semantics.
  */
 function ModeSelector({
   value,
   onChange,
   disabled,
-  showClaudeCode,
-  claudeCodeAvailable,
 }: {
   value: AIInteractionMode;
   onChange: (mode: AIInteractionMode) => void;
   disabled: boolean;
-  showClaudeCode: boolean;
-  claudeCodeAvailable: boolean | null;
 }) {
   const { t } = useTranslation();
 
@@ -220,15 +203,6 @@ function ModeSelector({
       description: t("aiSettings.modeApiKeyDescription"),
     },
   ];
-
-  if (showClaudeCode) {
-    modes.push({
-      id: "claude_code",
-      label: t("aiSettings.modeClaudeCode"),
-      icon: <Terminal className="h-4 w-4" />,
-      description: t("aiSettings.modeClaudeCodeDescription"),
-    });
-  }
 
   const modeGroupId = "ai-settings-interaction-mode";
 
@@ -267,19 +241,6 @@ function ModeSelector({
                 >
                   {mode.icon}
                   <span className="text-sm font-medium">{mode.label}</span>
-                  {mode.id === "claude_code" && claudeCodeAvailable === false && (
-                    <span className="bg-destructive/10 text-destructive rounded px-1.5 py-0.5 text-[10px]">
-                      {t("aiSettings.providerUnavailable")}
-                    </span>
-                  )}
-                  {mode.id === "claude_code" && claudeCodeAvailable === true && (
-                    <span className="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-[10px]">
-                      {t("aiSettings.providerAvailable")}
-                    </span>
-                  )}
-                  {mode.id === "claude_code" && claudeCodeAvailable === null && (
-                    <Loader2 className="text-muted-foreground h-3 w-3 animate-spin" />
-                  )}
                 </Label>
                 <p className="text-muted-foreground text-xs">{mode.description}</p>
               </div>

@@ -68,8 +68,6 @@ function resolveMediaType(file: File): SupportedMediaType | null {
  *
  * @throws AI 設定が未構成 (`AISettings.isConfigured === false`) の場合
  *         Throws when AI settings are not configured.
- * @throws claude-code プロバイダー（本ラッパー未対応）の場合
- *         Throws for the claude-code provider (not yet supported).
  */
 export async function describeImage(
   file: File,
@@ -87,11 +85,6 @@ export async function describeImage(
   throwIfAborted();
   if (!settings.isConfigured) {
     throw new Error("AI provider is not configured / AI 設定が未構成です");
-  }
-  if (settings.provider === "claude-code") {
-    throw new Error(
-      "claude-code provider does not support image description in this version / claude-code では画像説明は未対応です",
-    );
   }
   // 本 PR では server API 経由の Vision 呼び出しに未対応。バックエンド実装が必要なため
   // 明示的にエラーで弾いてユーザーに誘導する。

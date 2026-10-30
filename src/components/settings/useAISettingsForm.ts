@@ -5,12 +5,11 @@ import { useAISettings } from "@/hooks/aiChat/useAISettings";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import {
   useSavedIndicator,
-  useClaudeCodeAvailability,
   useServerModels,
   resolvePreferredForSettings,
 } from "./useAISettingsFormHelpers";
 import type { AIProviderType, AISettings, AIInteractionMode } from "@/types/ai";
-import { DEFAULT_AI_SETTINGS, getInteractionMode } from "@/types/ai";
+import { getInteractionMode } from "@/types/ai";
 
 /** Per-mode snapshot so switching modes does not lose provider/model/API key. / モード切替で値を失わないためのスナップショット */
 type ModeFieldsSnapshot = {
@@ -39,17 +38,14 @@ function buildInteractionModeUpdates(
 
   const snap = snapshotsRef.current[newMode];
 
-  const fallbackFromClaudeCode =
-    settings.provider === "claude-code" || settings.modelId.startsWith("claude-code:");
-
   switch (newMode) {
     case "default": {
       const base =
         snap ??
         ({
-          provider: settings.provider === "claude-code" ? "google" : settings.provider,
-          model: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.model : settings.model,
-          modelId: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.modelId : settings.modelId,
+          provider: settings.provider,
+          model: settings.model,
+          modelId: settings.modelId,
           apiKey: "",
         } satisfies ModeFieldsSnapshot);
       return {
@@ -64,12 +60,12 @@ function buildInteractionModeUpdates(
       const base =
         snap ??
         ({
-          provider: settings.provider === "claude-code" ? "google" : settings.provider,
-          model: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.model : settings.model,
-          modelId: fallbackFromClaudeCode ? DEFAULT_AI_SETTINGS.modelId : settings.modelId,
+          provider: settings.provider,
+          model: settings.model,
+          modelId: settings.modelId,
           // Preserve a previously stored key when legacy users opt back into user-key mode.
           // 旧設定ユーザーが user_api_key に戻したとき、保存済みキーを失わないよう保持する。
-          apiKey: settings.provider === "claude-code" ? "" : settings.apiKey,
+          apiKey: settings.apiKey,
         } satisfies ModeFieldsSnapshot);
       return {
         provider: base.provider,
@@ -77,23 +73,6 @@ function buildInteractionModeUpdates(
         modelId: base.modelId,
         apiMode: "user_api_key",
         apiKey: base.apiKey,
-      };
-    }
-    case "claude_code": {
-      const base =
-        snap ??
-        ({
-          provider: "claude-code",
-          model: "default",
-          modelId: "claude-code:default",
-          apiKey: "",
-        } satisfies ModeFieldsSnapshot);
-      return {
-        provider: "claude-code",
-        model: base.model,
-        modelId: base.modelId,
-        apiMode: "api_server",
-        apiKey: "",
       };
     }
   }
@@ -122,7 +101,6 @@ export function useAISettingsForm() {
   const { toast } = useToast();
 
   const { savedAt, clear: clearSavedIndicator, markSaved } = useSavedIndicator();
-  const claudeCodeAvailable = useClaudeCodeAvailability();
   const {
     models: serverModels,
     systemDefaultModelId,
@@ -133,7 +111,6 @@ export function useAISettingsForm() {
 
   const interactionMode: AIInteractionMode = isLoading ? "default" : getInteractionMode(settings);
   const isServerMode = interactionMode === "default";
-  const isClaudeCode = interactionMode === "claude_code";
   const useOwnKey = interactionMode === "user_api_key";
 
   const modeSnapshotsRef = useRef<Partial<Record<AIInteractionMode, ModeFieldsSnapshot>>>({});
@@ -257,9 +234,7 @@ export function useAISettingsForm() {
     serverModelsLoading,
     serverModelsError,
     isServerMode,
-    isClaudeCode,
     interactionMode,
-    claudeCodeAvailable,
     loadServerModels,
     updateSettings,
     handleModeChange,

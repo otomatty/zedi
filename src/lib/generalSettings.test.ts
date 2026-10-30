@@ -20,7 +20,6 @@ describe("generalSettings", () => {
         theme: "dark",
         editorFontSize: "large",
         locale: "en",
-        executableCodeConfirmBeforeRun: false,
       };
 
       saveGeneralSettings(settings);
@@ -53,7 +52,6 @@ describe("generalSettings", () => {
         theme: "light",
         editorFontSize: "small",
         locale: "en",
-        executableCodeConfirmBeforeRun: false,
       };
 
       saveGeneralSettings(settings);
@@ -114,20 +112,6 @@ describe("generalSettings", () => {
       localStorage.setItem(STORAGE_KEY, '{"customFontSizePx": null}');
 
       expect(loadGeneralSettings().customFontSizePx).toBeUndefined();
-    });
-
-    it("executableCodeConfirmBeforeRun が boolean の場合は保持する", () => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ executableCodeConfirmBeforeRun: false }));
-
-      expect(loadGeneralSettings().executableCodeConfirmBeforeRun).toBe(false);
-    });
-
-    it("executableCodeConfirmBeforeRun が boolean でない場合はデフォルト値になる", () => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ executableCodeConfirmBeforeRun: "yes" }));
-
-      expect(loadGeneralSettings().executableCodeConfirmBeforeRun).toBe(
-        DEFAULT_GENERAL_SETTINGS.executableCodeConfirmBeforeRun,
-      );
     });
 
     it("既知のフィールド（theme / locale）は parsed 値で上書きされる", () => {

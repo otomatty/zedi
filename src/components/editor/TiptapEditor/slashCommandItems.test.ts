@@ -1,18 +1,11 @@
 /**
- * slashCommandItems: filtering, platform-gated availability, and heading-level alignment.
- * slashCommandItems: フィルタリング、プラットフォーム依存の可用性判定、見出しレベル整合。
+ * slashCommandItems: filtering, availability, and heading-level alignment.
+ * slashCommandItems: フィルタリング、可用性判定、見出しレベル整合。
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { Editor } from "@tiptap/core";
 import { slashCommandItems, filterSlashCommandItems } from "./slashCommandItems";
-
-vi.mock("@/lib/platform", () => ({
-  isTauriDesktop: vi.fn(() => true),
-}));
-
-const platformMod = () =>
-  import("@/lib/platform") as Promise<{ isTauriDesktop: ReturnType<typeof vi.fn> }>;
 
 vi.mock("@/i18n", () => ({
   default: {
@@ -27,12 +20,10 @@ vi.mock("@/i18n", () => ({
 function makeEditorWithAllExtensions(): Editor {
   const extensions = [
     { name: "taskList" },
-    { name: "executableCodeBlock" },
     { name: "table" },
     { name: "mermaid" },
     { name: "mathematics" },
     { name: "htmlArtifact" },
-    { name: "mcpResource" },
   ];
   return {
     extensionManager: { extensions },
@@ -41,44 +32,18 @@ function makeEditorWithAllExtensions(): Editor {
 
 const tFunction = (key: string) => key;
 
-describe("slashCommandItems platform gating", () => {
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    const { isTauriDesktop } = await platformMod();
-    isTauriDesktop.mockReturnValue(true);
-  });
-
-  it("includes executableCodeBlock and mcpResource on desktop", async () => {
-    const { isTauriDesktop } = await platformMod();
-    isTauriDesktop.mockReturnValue(true);
-
+describe("slashCommandItems availability", () => {
+  it("never offers the blocks removed with the desktop app", () => {
     const editor = makeEditorWithAllExtensions();
-    const filtered = filterSlashCommandItems(slashCommandItems, "", editor, tFunction);
-    const ids = filtered.map((i) => i.id);
-
-    expect(ids).toContain("executableCodeBlock");
-    expect(ids).toContain("mcpResource");
-  });
-
-  it("hides executableCodeBlock and mcpResource on web (non-Tauri)", async () => {
-    const { isTauriDesktop } = await platformMod();
-    isTauriDesktop.mockReturnValue(false);
-
-    const editor = makeEditorWithAllExtensions();
-    const filtered = filterSlashCommandItems(slashCommandItems, "", editor, tFunction);
-    const ids = filtered.map((i) => i.id);
+    const ids = filterSlashCommandItems(slashCommandItems, "", editor, tFunction).map((i) => i.id);
 
     expect(ids).not.toContain("executableCodeBlock");
     expect(ids).not.toContain("mcpResource");
   });
 
-  it("still includes platform-agnostic items on web", async () => {
-    const { isTauriDesktop } = await platformMod();
-    isTauriDesktop.mockReturnValue(false);
-
+  it("offers the web blocks", () => {
     const editor = makeEditorWithAllExtensions();
-    const filtered = filterSlashCommandItems(slashCommandItems, "", editor, tFunction);
-    const ids = filtered.map((i) => i.id);
+    const ids = filterSlashCommandItems(slashCommandItems, "", editor, tFunction).map((i) => i.id);
 
     expect(ids).toContain("paragraph");
     expect(ids).toContain("heading2");

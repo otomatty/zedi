@@ -32,8 +32,6 @@ describe("createOpenAIProvider", () => {
     const p = createOpenAIProvider("key");
     expect(p.id).toBe("openai");
     expect(p.capabilities.textGeneration).toBe(true);
-    expect(p.capabilities.fileAccess).toBe(false);
-    expect(p.capabilities.commandExecution).toBe(false);
   });
 
   describe("isAvailable", () => {

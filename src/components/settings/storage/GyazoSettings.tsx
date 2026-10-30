@@ -87,9 +87,6 @@ const GyazoSettings: React.FC<GyazoSettingsProps> = ({
           <li>
             <code className="bg-muted rounded px-1">urn:ietf:wg:oauth:2.0:oob</code>
           </li>
-          <li>
-            <code className="bg-muted rounded px-1">zedi://oauth/callback</code>
-          </li>
         </ul>
       </div>
     </div>

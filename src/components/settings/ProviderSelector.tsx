@@ -2,26 +2,14 @@ import React from "react";
 import { type AIProviderType, type AICapabilities } from "@/types/ai";
 import { RadioGroup, RadioGroupItem } from "@zedi/ui";
 import { Label } from "@zedi/ui";
-import { Badge } from "@zedi/ui";
-import { Check, X, Monitor, Loader2 } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { getVisibleProviders } from "@/lib/aiProviders/registry";
-import { isTauriDesktop } from "@/lib/platform";
 import { useTranslation } from "react-i18next";
 
 interface ProviderSelectorProps {
   value: AIProviderType;
   onChange: (value: AIProviderType) => void;
   disabled?: boolean;
-  /**
-   * claude-code の利用可否（外部から注入）。
-   * Claude Code availability (injected from parent).
-   */
-  claudeCodeAvailable?: boolean | null;
-  /**
-   * true のとき API プロバイダー（openai / anthropic / google）のみ表示する。
-   * When true, only show API providers (hide claude-code).
-   */
-  apiProvidersOnly?: boolean;
 }
 
 /**
@@ -32,12 +20,9 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   value,
   onChange,
   disabled = false,
-  claudeCodeAvailable,
-  apiProvidersOnly = false,
 }) => {
   const { t } = useTranslation();
-  const allProviders = getVisibleProviders();
-  const providers = apiProvidersOnly ? allProviders.filter((p) => !p.desktopOnly) : allProviders;
+  const providers = getVisibleProviders();
 
   return (
     <div className="space-y-2">
@@ -50,54 +35,26 @@ export const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       >
         {providers.map((provider) => {
           const isSelected = value === provider.id;
-          const isClaudeCode = provider.id === "claude-code";
-          const isDesktop = isTauriDesktop();
-
-          const isUnavailable = isClaudeCode && (!isDesktop || claudeCodeAvailable === false);
-          const isChecking = isClaudeCode && claudeCodeAvailable === null;
 
           return (
             <div
               key={provider.id}
               className={`flex items-start space-x-3 rounded-lg border p-3 transition-colors ${
-                isSelected
-                  ? "border-primary bg-primary/5"
-                  : isUnavailable
-                    ? "border-border bg-muted/30 opacity-60"
-                    : "border-border hover:bg-muted/50"
+                isSelected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
               }`}
             >
               <RadioGroupItem
                 value={provider.id}
                 id={`provider-${provider.id}`}
-                disabled={disabled || isUnavailable}
+                disabled={disabled}
                 className="mt-1"
               />
               <div className="flex-1 space-y-2">
                 <Label
                   htmlFor={`provider-${provider.id}`}
-                  className={`flex cursor-pointer items-center gap-2 font-medium ${isUnavailable ? "cursor-not-allowed" : ""}`}
+                  className="flex cursor-pointer items-center gap-2 font-medium"
                 >
                   {t(`aiSettings.providers.${provider.id}.name`)}
-                  {provider.desktopOnly && (
-                    <Badge variant="outline" className="gap-1 text-xs">
-                      <Monitor className="h-3 w-3" />
-                      {t("aiSettings.desktopOnly")}
-                    </Badge>
-                  )}
-                  {isClaudeCode && isChecking && (
-                    <Loader2 className="text-muted-foreground h-3 w-3 animate-spin" />
-                  )}
-                  {isClaudeCode && claudeCodeAvailable === false && (
-                    <Badge variant="destructive" className="text-xs">
-                      {t("aiSettings.providerUnavailable")}
-                    </Badge>
-                  )}
-                  {isClaudeCode && claudeCodeAvailable === true && (
-                    <Badge variant="secondary" className="text-xs">
-                      {t("aiSettings.providerAvailable")}
-                    </Badge>
-                  )}
                 </Label>
                 <p className="text-muted-foreground text-xs">
                   {t(`aiSettings.providers.${provider.id}.description`)}
@@ -121,11 +78,7 @@ function CapabilityMatrix({ capabilities }: { capabilities: AICapabilities }) {
 
   const entries: Array<{ key: keyof AICapabilities; label: string }> = [
     { key: "textGeneration", label: t("aiSettings.capabilityTextGeneration") },
-    { key: "fileAccess", label: t("aiSettings.capabilityFileAccess") },
-    { key: "commandExecution", label: t("aiSettings.capabilityCommandExecution") },
     { key: "webSearch", label: t("aiSettings.capabilityWebSearch") },
-    { key: "mcpIntegration", label: t("aiSettings.capabilityMcpIntegration") },
-    { key: "agentLoop", label: t("aiSettings.capabilityAgentLoop") },
   ];
 
   return (

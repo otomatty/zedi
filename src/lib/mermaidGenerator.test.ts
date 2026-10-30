@@ -116,16 +116,6 @@ describe("mermaidGenerator", () => {
       expect(result.isConfigured).toBe(true);
     });
 
-    it("claude-code プロバイダーは apiKey 不要で返す", async () => {
-      mockedLoad.mockResolvedValue(
-        settings({ provider: "claude-code", apiMode: "user_api_key", apiKey: "" }),
-      );
-
-      const result = await getAISettingsOrThrow();
-
-      expect(result.isConfigured).toBe(true);
-    });
-
     it("user_api_key モードで apiKey が無い場合は AI_NOT_CONFIGURED を throw する", async () => {
       mockedLoad.mockResolvedValue(
         settings({ provider: "openai", apiMode: "user_api_key", apiKey: "", isConfigured: false }),

@@ -15,17 +15,14 @@ import { Color } from "@tiptap/extension-color";
 import { Mathematics } from "@tiptap/extension-mathematics";
 import { common, createLowlight } from "lowlight";
 import { CodeBlockWithCopy } from "../extensions/CodeBlockWithCopyExtension";
-import { ExecutableCodeBlock } from "../extensions/ExecutableCodeBlockExtension";
 import { ImageUpload, type ImageUploadOptions } from "../extensions/ImageUploadExtension";
 import { StorageImage, type StorageImageOptions } from "../extensions/StorageImageExtension";
 import { VideoExtension } from "../extensions/VideoExtension";
 import { MediaPlaceholderExtension } from "../extensions/MediaPlaceholderExtension";
 import { WikiLink } from "../extensions/WikiLinkExtension";
 import { Tag } from "../extensions/TagExtension";
-import { FileReference } from "../extensions/FileReferenceExtension";
 import { Mermaid } from "../extensions/MermaidExtension";
 import { YouTubeEmbed } from "../extensions/YouTubeEmbedExtension";
-import { McpResource } from "../extensions/McpResourceExtension";
 import { HtmlArtifact } from "../extensions/HtmlArtifactExtension";
 import { MarkdownPaste } from "../extensions/MarkdownPasteExtension";
 import {
@@ -153,14 +150,6 @@ export interface EditorExtensionsOptions {
   imageOptions: Partial<StorageImageOptions>;
   /** When set, enables Y.js collaboration and caret; StarterKit history is disabled */
   collaboration?: CollaborationExtensionsOptions;
-  /**
-   * Optional note-linked workspace for `@file:` and Claude cwd (Issue #461).
-   * `@file:` と Claude cwd 用のノート紐付けワークスペース（任意、Issue #461）。
-   */
-  fileReference?: {
-    getWorkspaceRoot: () => string | null;
-    getNoteId: () => string | null;
-  };
 }
 
 interface CommonEditorExtensionsOptions {
@@ -176,7 +165,6 @@ interface CommonEditorExtensionsOptions {
   onGhostCompletionStateChange?: (state: WikiLinkGhostCompletionState) => void;
   imageUploadOptions?: Partial<ImageUploadOptions>;
   imageOptions?: Partial<StorageImageOptions>;
-  fileReference?: EditorExtensionsOptions["fileReference"];
   includePlaceholder?: boolean;
   includeInteractionPlugins?: boolean;
   collaboration?: CollaborationExtensionsOptions;
@@ -250,7 +238,6 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
       lowlight,
       defaultLanguage: null,
     }),
-    ExecutableCodeBlock,
     // --- Phase 2: Table ---
     Table.configure({
       resizable: false,
@@ -277,10 +264,6 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
     // See issue #725 (Phase 1).
     Tag.configure({
       onTagClick: options.onTagClick ?? options.onLinkClick,
-    }),
-    FileReference.configure({
-      getWorkspaceRoot: options.fileReference?.getWorkspaceRoot ?? (() => null),
-      getNoteId: options.fileReference?.getNoteId ?? (() => null),
     }),
     ...(options.includeInteractionPlugins
       ? [
@@ -348,7 +331,6 @@ function createCommonEditorExtensions(options: CommonEditorExtensionsOptions): E
     MermaidCodeBlockNormalize,
     // --- YouTube Embed ---
     YouTubeEmbed,
-    McpResource,
     // --- HTML Artifact (Claude interactive HTML) ---
     HtmlArtifact,
     // Y.js リアルタイムコラボレーション（オプション）
@@ -391,7 +373,6 @@ export function createEditorExtensions(options: EditorExtensionsOptions): Extens
     onGhostCompletionStateChange: options.onGhostCompletionStateChange,
     imageUploadOptions: options.imageUploadOptions,
     imageOptions: options.imageOptions,
-    fileReference: options.fileReference,
     includePlaceholder: true,
     includeInteractionPlugins: true,
     collaboration: options.collaboration,

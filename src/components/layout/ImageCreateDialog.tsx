@@ -99,22 +99,17 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
   /**
    * describe モードが現時点で利用できない理由を返す。
    * - `not-configured`: AI 設定が未構成
-   * - `unsupported-provider`: 現在のプロバイダーは describe 未対応
    * - `api-server`: `api_server` モード（本 PR では Vision 非対応、ユーザー API キーモードが必要）
    *
    * Why the describe mode is currently unavailable. Covers:
    * - `not-configured`: AI settings are not configured
-   * - `unsupported-provider`: the selected provider cannot describe images yet
    * - `api-server`: `api_server` mode (server-side Vision not yet supported in this PR)
    */
-  const describeUnavailableReason: "not-configured" | "unsupported-provider" | "api-server" | null =
-    !aiSettings.isConfigured
-      ? "not-configured"
-      : aiSettings.provider === "claude-code"
-        ? "unsupported-provider"
-        : getEffectiveAPIMode(aiSettings) === "api_server"
-          ? "api-server"
-          : null;
+  const describeUnavailableReason: "not-configured" | "api-server" | null = !aiSettings.isConfigured
+    ? "not-configured"
+    : getEffectiveAPIMode(aiSettings) === "api_server"
+      ? "api-server"
+      : null;
 
   const clearPreviewUrl = useCallback((updateState = true) => {
     if (previewUrlRef.current) {
@@ -512,15 +507,6 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
                 </AlertDescription>
               </Alert>
             )}
-            {processingMode === "describe" &&
-              describeUnavailableReason === "unsupported-provider" && (
-                <Alert variant="destructive">
-                  <AlertDescription>
-                    Claude Code では現在この画像解析機能は未対応です。OpenAI、Anthropic、Google
-                    のいずれかを「ユーザー API キー」モードで選択してください。
-                  </AlertDescription>
-                </Alert>
-              )}
             {processingMode === "describe" && describeUnavailableReason === "api-server" && (
               <Alert variant="destructive">
                 <AlertDescription>

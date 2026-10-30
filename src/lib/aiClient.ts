@@ -30,10 +30,6 @@ export function createAIClient(settings: AISettings): AIClient {
       });
     case "google":
       return new GoogleGenAI({ apiKey: settings.apiKey });
-    case "claude-code":
-      throw new Error(
-        "Claude Code does not use a traditional AI client. Use the sidecar bridge instead.",
-      );
     default: {
       const _exhaustive: never = settings.provider;
       throw new Error(`Unknown provider: ${_exhaustive}`);
@@ -312,9 +308,7 @@ export async function testConnection(
   provider: AIProviderType,
   apiKey: string,
 ): Promise<ConnectionTestResult> {
-  // Claude Code は API キー不要のため、空キーでも専用メッセージへ進める。
-  // Claude Code does not use an API key; allow reaching the provider-specific branch.
-  if (provider !== "claude-code" && (!apiKey || apiKey.trim() === "")) {
+  if (!apiKey || apiKey.trim() === "") {
     return {
       success: false,
       message: i18n.t("errors.apiKeyRequired"),
@@ -328,11 +322,6 @@ export async function testConnection(
       return testAnthropicConnection(apiKey);
     case "google":
       return testGoogleConnection(apiKey);
-    case "claude-code":
-      return {
-        success: false,
-        message: i18n.t("errors.claudeCodeConnectionTestUnsupported"),
-      };
     default: {
       const _exhaustive: never = provider;
       return {

@@ -22,7 +22,6 @@ import AuthCallback from "./pages/AuthCallback";
 import ExtensionAuth from "./pages/ExtensionAuth";
 import ExtensionAuthCallback from "./pages/ExtensionAuthCallback";
 import McpAuthorize from "./pages/McpAuthorize";
-import PdfReaderPage from "./pages/PdfKnowledge/PdfReaderPage";
 import Settings from "./pages/Settings";
 import Account from "./pages/Account";
 import WikiSchemaPage from "./pages/WikiSchemaPage";
@@ -52,7 +51,6 @@ import { GlobalShortcutsProvider } from "./components/layout/GlobalShortcutsProv
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AIChatProvider } from "./contexts/AIChatContext";
 import { AIChatConversationsProvider } from "./hooks/aiChat/useAIChatConversations";
-import { FilePreviewDialogHost } from "./components/note/FilePreviewDialogHost";
 import { AppLayout } from "./components/layout/AppLayout";
 
 const queryClient = new QueryClient();
@@ -161,7 +159,6 @@ const App = () => (
         {/* unstable_useTransitions を無効化: リンク後の表示が遅れる問題を防ぐ（RR v7 は future 廃止）
             Disable unstable_useTransitions: prevents display delay after link navigation (RR v7 removed future flags) */}
         <BrowserRouter unstable_useTransitions={false}>
-          <FilePreviewDialogHost />
           <AIChatProvider>
             <AIChatConversationsProvider>
               <GlobalShortcutsProvider>
@@ -248,11 +245,6 @@ const App = () => (
                           ページのリンクが 404 にならないよう URL を確保する。 */}
                       <Route path="/notes/official-guide" element={<OfficialGuidePlaceholder />} />
                       <Route path="/notes" element={<Notes />} />
-                      {/* PDF 知識化ビューア (issue otomatty/zedi#389).
-                          Web から開いた場合は `PdfReaderUnsupported` を表示。
-                          PDF knowledge viewer; web falls back to the
-                          desktop-only placeholder. */}
-                      <Route path="/sources/:sourceId/pdf" element={<PdfReaderPage />} />
                       <Route path="/settings" element={<Settings />} />
                       {/* `/account` — mobile-friendly account hub. The
                           bottom-nav Account tab links here instead of

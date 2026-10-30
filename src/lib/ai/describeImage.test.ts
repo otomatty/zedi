@@ -56,15 +56,6 @@ describe("describeImage", () => {
     );
   });
 
-  it("throws for claude-code provider / claude-code は未対応として throw", async () => {
-    await expect(
-      describeImage(
-        imageFile(),
-        makeSettings({ provider: "claude-code", model: "", modelId: "claude-code:default" }),
-      ),
-    ).rejects.toThrow(/claude-code|claude code|not supported/i);
-  });
-
   it("throws when apiMode is api_server / api_server モードは本 PR 未対応として throw", async () => {
     await expect(
       describeImage(
