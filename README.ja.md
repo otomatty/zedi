@@ -242,7 +242,6 @@ packages/                # Bun workspaces（共有ライブラリ）
 └── ui/                  # `@zedi/ui` — shadcn/ui ベースの共有 UI コンポーネント
 
 admin/                   # 管理画面アプリ（別 Vite + React + Tailwind / `@zedi/ui` 利用）
-terraform/cloudflare/    # Cloudflare 関連インフラ定義
 e2e/                     # Playwright E2E テスト
 scripts/                 # セットアップ / Stryker / 保守用スクリプト
 .github/workflows/       # GitHub Actions（lint / typecheck / test / mutation）

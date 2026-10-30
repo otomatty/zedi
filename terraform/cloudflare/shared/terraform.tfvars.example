@@ -1,9 +1,0 @@
-# Copy to terraform.tfvars and fill in (terraform.tfvars is gitignored).
-# Or set in Terraform Cloud workspace as Terraform variables, or in CI as TF_VAR_*.
-
-# Required (sensitive in TFC)
-# cloudflare_api_token   = "your-api-token"
-# cloudflare_account_id  = "your-cloudflare-account-id"
-
-# Optional overrides
-# zone_domain            = "zedi-note.app"

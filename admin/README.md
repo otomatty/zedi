@@ -35,7 +35,7 @@ The old backend (`server/api`) has been removed, so sign-in and the checks below
 cd admin && npm install && npm run build
 ```
 
-Output is `admin/dist`. It is no longer deployed: the `deploy-dev.yml` / `deploy-prod.yml` workflows were removed with the old backend. The Cloudflare Pages projects (`zedi-admin`, `zedi-admin-dev`) are still defined in Terraform until it is removed.
+Output is `admin/dist`. It is no longer deployed: the `deploy-dev.yml` / `deploy-prod.yml` workflows were removed with the old backend. The old Cloudflare Pages projects (`zedi-admin`, `zedi-admin-dev`) still exist in the Cloudflare dashboard until they are deleted there.
 
 ## Environment variables
 

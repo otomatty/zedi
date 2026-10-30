@@ -22,7 +22,6 @@ nul
 
 # Editor directories and files
 .vscode/*
-!.vscode/extensions.json
 .idea
 .DS_Store
 *.suo
@@ -41,13 +40,6 @@ reports/mutation/
 playwright-report/
 test-results/
 
-
-# Terraform
-.terraform/
-*.tfstate
-*.tfstate.backup
-*.tfvars
-!*.tfvars.example
 
 # TypeScript build info
 *.tsbuildinfo

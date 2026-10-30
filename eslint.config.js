@@ -181,7 +181,7 @@ export default tseslint.config(
   },
   // スクリプト・e2e: console 可、行数制限は緩め
   {
-    files: ["scripts/**/*.ts", "e2e/**/*.ts", "terraform/**/*.ts"],
+    files: ["scripts/**/*.ts", "e2e/**/*.ts"],
     rules: {
       "no-console": "off",
       "max-lines-per-function": "off",

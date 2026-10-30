@@ -35,7 +35,7 @@ npm run dev:admin
 cd admin && npm install && npm run build
 ```
 
-出力は `admin/dist`。旧バックエンドとともに `deploy-dev.yml` / `deploy-prod.yml` を削除したため、デプロイはしていない。Cloudflare Pages のプロジェクト（`zedi-admin`・`zedi-admin-dev`）は Terraform を外すまで定義が残る。
+出力は `admin/dist`。旧バックエンドとともに `deploy-dev.yml` / `deploy-prod.yml` を削除したため、デプロイはしていない。旧 Cloudflare Pages のプロジェクト（`zedi-admin`・`zedi-admin-dev`）は、ダッシュボードで削除するまで残る。
 
 ## 環境変数
 

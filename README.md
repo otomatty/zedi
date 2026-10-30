@@ -242,7 +242,6 @@ packages/                # Bun workspaces (shared libraries)
 └── ui/                  # `@zedi/ui` — shadcn/ui shared components
 
 admin/                   # Admin SPA (separate Vite + React + Tailwind / `@zedi/ui`)
-terraform/cloudflare/    # Cloudflare infrastructure
 e2e/                     # Playwright E2E tests
 scripts/                 # Setup / Stryker / maintenance scripts
 .github/workflows/       # GitHub Actions (lint / typecheck / test / mutation)

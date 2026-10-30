@@ -105,7 +105,7 @@ _Overlay: `.agents/skills/spec-test/references/overlays/zedi.md`._
 - **対応プラットフォーム**: Web アプリ（PWA）のみ。Tauri のデスクトップ版は廃止済み
 - **Lint / Format**: ESLint, Prettier
 - **テスト**: Vitest, Playwright, Stryker
-- **インフラ（方針）**: **Cloudflare へ完全移行予定**（Workers / Static Assets / R2 / D1・KV 等。Issue [#1088](https://github.com/otomatty/zedi/issues/1088)）。構成の正本は `app/wrangler.jsonc`。**Railway は使用しない**（デプロイ設定は削除済み）。**Terraform は廃止予定**。品質ゲートは GitHub Actions、デプロイは `wrangler deploy` へ寄せる。詳細は [`.agents/skills/cloudflare-zedi/SKILL.md`](.agents/skills/cloudflare-zedi/SKILL.md)。
+- **インフラ（方針）**: **Cloudflare へ完全移行予定**（Workers / Static Assets / R2 / D1・KV 等。Issue [#1088](https://github.com/otomatty/zedi/issues/1088)）。構成の正本は `app/wrangler.jsonc`。**Railway・Terraform は使用しない**（どちらも削除済み）。品質ゲートは GitHub Actions、デプロイは `wrangler deploy` へ寄せる。詳細は [`.agents/skills/cloudflare-zedi/SKILL.md`](.agents/skills/cloudflare-zedi/SKILL.md)。
 
 ---
 
@@ -119,7 +119,6 @@ packages/
   ui/                # @zedi/ui
   shared/            # @zedi/shared（ピュア TS 定数）
 e2e/                 # Playwright
-terraform/           # Cloudflare 旧 IaC（廃止予定。正本は app/wrangler.jsonc）
 .agents/             # Agent Skills / サブエージェント正本（`bun run init` でミラー）
 .codex/              # AI-DLC エンジン（Codex harness）
 aidlc/               # AI-DLC workspace shell
@@ -147,8 +146,8 @@ aidlc/               # AI-DLC workspace shell
 
 ### 移行方針 / Migration target（Cloudflare）
 
-- **目標**: `app/` の Worker 1 本（Static Assets + API + D1 + Durable Objects）で配信する。Pages・Terraform は廃止（Railway は削除済み）。
-- **構成の正本**: `app/wrangler.jsonc`（Terraform ステートは使わない）。
+- **目標**: `app/` の Worker 1 本（Static Assets + API + D1 + Durable Objects）で配信する。Pages は使わない（Railway・Terraform は削除済み）。
+- **構成の正本**: `app/wrangler.jsonc`。DNS とドメインも Worker の `custom_domain` で管理する。
 - **CI/CD**: lint / test / typecheck は GitHub Actions。デプロイ・プレビューは `wrangler deploy` / `wrangler versions upload`（`app/` のデプロイは未作成）。
 - **カットオーバー**: 本番データがないので移行はせず、ドメインを `app/` の Worker に切り替える。手順は `cloudflare-zedi` スキルと [#1088](https://github.com/otomatty/zedi/issues/1088) を正とする。
 - Cloudflare 作業時は汎用 Cloudflare 知識より **[`.agents/skills/cloudflare-zedi/SKILL.md`](.agents/skills/cloudflare-zedi/SKILL.md)** を先に読む。

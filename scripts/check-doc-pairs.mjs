@@ -18,10 +18,6 @@ const DOC_PAIRS = [
   { en: "app/README.md", ja: "app/README.ja.md" },
   { en: "app/docs/verification.md", ja: "app/docs/verification.ja.md" },
   { en: "app/docs/tauriRemoval.md", ja: "app/docs/tauriRemoval.ja.md" },
-  {
-    en: "terraform/cloudflare/README.md",
-    ja: "terraform/cloudflare/README.ja.md",
-  },
 ];
 
 const EN_BANNER = /> \*\*Language:\*\* English \|/m;

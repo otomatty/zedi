@@ -16,9 +16,9 @@
 
 > ※ 管理画面を `app/` の Worker に含めるか別にするかは、管理機能を移すときに決める。
 >
-> 上の 4 つは今、Terraform（`terraform/cloudflare/{dev,prod}`）が旧 Pages プロジェクトへの CNAME と
-> Pages のカスタムドメインとして管理している。Worker の `custom_domain` に移す前に外す。
-> `api` / `realtime` の CNAME は Terraform の定義から削除済みで、次の Apply Shared でゾーンからも消える。
+> 上の 4 つには、旧 Pages プロジェクトへの CNAME と Pages のカスタムドメインが残っている
+> （Terraform で作ったもの。Terraform は削除済み）。Worker の `custom_domain` に移す前に、
+> ダッシュボードで外す。Railway 向けの `api` / `realtime` の CNAME と検証用 TXT も残っているので削除する。
 
 ## Worker 名 / Worker names
 
@@ -59,6 +59,6 @@ GitHub Environments（development / production）に残っているもの:
 - `vars`: `API_BASE_URL`, `REALTIME_URL`, `MAIN_APP_URL`, `MCP_BASE_URL`, `POLAR_MONTHLY_ID`, `POLAR_YEARLY_ID`
   — 旧フロント / admin のビルド用。デプロイを止めたので不要。
 - `secrets`:
-  - `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` — Terraform と、今後の `app/` のデプロイで使う。
+  - `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` — 今後の `app/` のデプロイで使う。
   - `DATABASE_URL` — 旧 API の Postgres 用。不要。
-  - `TF_API_TOKEN` — Terraform 廃止で削除。
+  - `TF_API_TOKEN` — Terraform を削除したので不要。

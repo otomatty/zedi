@@ -2,12 +2,12 @@
 name: cloudflare-zedi
 description: >
   Zedi 固有の Cloudflare 作業ガイド。作り直したアプリ（app/）を Worker 1 本
-  （Static Assets + Hono + D1 + Durable Objects）で配信する構成、Terraform の廃止、
+  （Static Assets + Hono + D1 + Durable Objects）で配信する構成、旧リソースの片付け、
   ツールの使い分け・命名・トークンスコープをまとめる。
   Use when working on Cloudflare for Zedi: deploying app/ (wrangler.jsonc, D1,
-  Durable Objects, secrets, custom domains), removing Terraform and the old Pages
-  projects, or reconfiguring CI/CD. Triggers: "Cloudflare", "デプロイ", "D1",
-  "Durable Objects", "Terraform 廃止", "wrangler", "#1088".
+  Durable Objects, secrets, custom domains), cleaning up the old Pages projects and
+  DNS records, or reconfiguring CI/CD. Triggers: "Cloudflare", "デプロイ", "D1",
+  "Durable Objects", "DNS", "wrangler", "#1088".
 ---
 
 # Cloudflare for Zedi
@@ -30,17 +30,20 @@ Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in know
   Railway、dev の API / MCP Worker、現行フロント / admin のデプロイ（`deploy-dev.yml` /
   `deploy-prod.yml`）はリポジトリから削除済み。
   _Nothing is deployed from the repository right now._
-- **Terraform は残っている（廃止予定）。** `terraform/cloudflare/{shared,dev,prod}` が旧フロント /
-  admin の Pages プロジェクト（`zedi` / `zedi-admin` / `zedi-dev` / `zedi-admin-dev`）と、その
-  カスタムドメインの CNAME を管理している。
+- **Terraform は削除済み。** ただし、Terraform が作ったリソースは Cloudflare に残っている
+  （コードを消してもリソースは消えない）。ダッシュボードで削除する:
+  - 旧フロント / admin の Pages プロジェクト（`zedi` / `zedi-admin` / `zedi-dev` / `zedi-admin-dev`）と、
+    そのカスタムドメインの CNAME（`zedi-note.app`・`admin`・`dev`・`admin-dev`）
+  - Railway 向けの `api` / `realtime` の CNAME と検証用 TXT（Apply Shared を実行しないまま
+    Terraform を消したため、ゾーンに残っている）
 - **本番データはない。** カットオーバーはドメインを `app/` の Worker に向けるだけで、データ移行や
   デュアルライトはしない。
 
 ## 方針（決定済み） / Decisions
 
-- **Terraform は全廃する。** DNS とドメインは Worker の `routes` の `custom_domain: true` に内包し、
-  Terraform Cloud のステート管理をやめる。
-  _Terraform is being removed. Source of truth = `app/wrangler.jsonc`._
+- **IaC は `app/wrangler.jsonc` だけ。** DNS とドメインは Worker の `routes` の
+  `custom_domain: true` に内包する。Terraform は使わない。
+  _Source of truth = `app/wrangler.jsonc`; Terraform has been removed._
 - **Pages は使わない。** 静的ファイルは `app/` の Worker の Static Assets で配信する。
 - **CI/CD はハイブリッド。** 品質ゲート（lint / vitest / typecheck / workerd 統合テスト /
   スモークテスト）は GitHub Actions、デプロイは `wrangler deploy`、PR プレビューは
@@ -72,7 +75,7 @@ Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in know
    またはトークンを env に設定（`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`）。
    必要スコープは [references/token-scopes.md](references/token-scopes.md)。
 3. GitHub Secrets `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` は **同一アカウント・同一ゾーン**。
-   今使っているのは Terraform のワークフローだけ。
+   今は使っているワークフローがない（`app/` のデプロイを足すときに使う）。
 
 ドメイン・Worker 名・バケット名の固定値は [references/naming.md](references/naming.md)。
 
@@ -83,24 +86,26 @@ Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in know
 2. Secrets を登録する（`wrangler secret put BETTER_AUTH_SECRET` など。必要な鍵は
    [`app/.dev.vars.example`](../../../app/.dev.vars.example) を参照）。`ENVIRONMENT=development` は
    マジックリンクの受信箱を公開するので、デプロイ先には絶対に設定しない。
-3. 使うドメインの旧 Pages カスタムドメインと Terraform の CNAME を先に外す。残っていると
-   `custom_domain` の作成が衝突する（以前の dev デプロイが失敗した原因の一つ）。
+3. 使うドメインに残っている旧 Pages のカスタムドメインと CNAME を、ダッシュボードで先に外す。
+   残っていると `custom_domain` の作成が衝突する（以前の dev デプロイが失敗した原因の一つ）。
 4. `routes` に `{ "pattern": "<domain>", "custom_domain": true }` を足して `wrangler deploy`。
 5. `wrangler tail` / observability でサインインと共同編集の疎通を確認する。
 
-## Terraform の廃止 / Removing Terraform
+## 旧リソースの片付け / Cleaning up old resources
 
-- Pages プロジェクトと CNAME を Terraform から外して Apply する（または `terraform state rm` で
-  ステートから外し、ダッシュボードで削除する）。
-- その後 `terraform/` と `terraform-cloudflare-*.yml` を削除し、GitHub Secret `TF_API_TOKEN` と
-  Terraform Cloud のワークスペース変数を消す。
+Terraform のコードとワークフローは削除済み。残りはダッシュボードと各サービスで行う:
+
+- Cloudflare: 上の「現状」に挙げた Pages プロジェクトと DNS レコード、dev の Worker
+  （名前は [references/naming.md](references/naming.md)）を削除する。
+- Terraform Cloud: 組織 `Saedgewell` のワークスペース `cloudflare-shared`・`cloudflare-dev`・`cloudflare-prod` を削除する。
+- GitHub: Secret `TF_API_TOKEN` を削除する。
 
 ## やってはいけないこと / Guardrails
 
-- **Terraform に新規リソースを足さない。** Workers / D1 / R2 / KV / DO はすべて
-  `app/wrangler.jsonc` で管理する。
-- **DNS を Terraform と Wrangler で二重管理しない。** ドメインを Worker の `custom_domain` に
-  移すときは、旧 Terraform レコードを同じ作業で外す。
+- **Workers / D1 / R2 / KV / DO はすべて `app/wrangler.jsonc` で管理する。** ダッシュボードで
+  作ったリソースは、作業の最後に設定へ反映する。
+- **DNS を手作業と Wrangler で二重管理しない。** ドメインは Worker の `custom_domain` に任せ、
+  同じ名前の手動レコードは残さない。
 - **Secrets をリポジトリに置かない。** Worker の秘密値は `wrangler secret put`、ローカルは
   `app/.dev.vars`（gitignore）。`.dev.vars.example` には鍵名とコメントのみ。
 - D1 のスキーマ変更は [AGENTS.md](../../../AGENTS.md) §DB スキーマ変更に従う

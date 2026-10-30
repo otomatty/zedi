@@ -7,15 +7,14 @@ _One account API token, used locally and as the `CLOUDFLARE_API_TOKEN` GitHub se
 
 ## 必要権限 / Required permissions
 
-| スコープ                            | レベル                 | 用途                                           | いつまで / until              |
-| ----------------------------------- | ---------------------- | ---------------------------------------------- | ----------------------------- |
-| Workers Scripts (Edit)              | Account                | `app/` の deploy / versions / secrets          | 継続                          |
-| D1 (Edit)                           | Account                | D1 作成・マイグレーション・クエリ              | 継続                          |
-| Workers Tail / Observability (Read) | Account                | ログ・メトリクス確認                           | 継続                          |
-| DNS (Edit)                          | Zone (`zedi-note.app`) | `custom_domain` による DNS 自動作成、Terraform | 継続                          |
-| Workers Routes (Edit)               | Zone (`zedi-note.app`) | カスタムドメインのルート設定                   | 継続                          |
-| Workers R2 Storage (Edit)           | Account                | R2 バケット操作                                | R2 を使う間                   |
-| Cloudflare Pages (Edit)             | Account                | Terraform が管理する旧 Pages プロジェクト      | Pages と Terraform を消すまで |
+| スコープ                            | レベル                 | 用途                                  | いつまで / until |
+| ----------------------------------- | ---------------------- | ------------------------------------- | ---------------- |
+| Workers Scripts (Edit)              | Account                | `app/` の deploy / versions / secrets | 継続             |
+| D1 (Edit)                           | Account                | D1 作成・マイグレーション・クエリ     | 継続             |
+| Workers Tail / Observability (Read) | Account                | ログ・メトリクス確認                  | 継続             |
+| DNS (Edit)                          | Zone (`zedi-note.app`) | `custom_domain` による DNS 自動作成   | 継続             |
+| Workers Routes (Edit)               | Zone (`zedi-note.app`) | カスタムドメインのルート設定          | 継続             |
+| Workers R2 Storage (Edit)           | Account                | R2 バケット操作                       | R2 を使う間      |
 
 KV など新しいバインディングを使うときは、その権限を足す。
 
@@ -46,4 +45,4 @@ KV など新しいバインディングを使うときは、その権限を足�
 - トークンは最小権限から始め、必要になった時点で拡張する。
 - ローカルでは `.env.local`（gitignore）に置く。リポジトリにはコミットしない。
 - `wrangler whoami` で有効性とアカウント ID を確認できる。
-- `TF_API_TOKEN`（Terraform Cloud 用）は Terraform を消すときに GitHub Secrets から削除する。
+- `TF_API_TOKEN`（Terraform Cloud 用）は Terraform を削除したので、GitHub Secrets から削除する。
