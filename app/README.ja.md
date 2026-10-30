@@ -129,9 +129,11 @@ ONLY=largeDocPatch CPU_RATES=4 SEED_PAGES=10 OUTPUT=results/raw/patch-on-N.json 
 
 ## テスト
 
+CI（`.github/workflows/ci.yml`）の `app-test` が型チェック・単体テスト・統合テスト・ビルドを、`app-smoke` がブラウザのスモークテストを実行します。
+
 | 種類                                       | 件数    | 内容                                    |
 | ------------------------------------------ | ------- | --------------------------------------- |
-| 単体（Vitest、Node / happy-dom）           | 164     | 下記                                    |
+| 単体（Vitest、Node / happy-dom）           | 165     | 下記                                    |
 | 統合（Vitest、workerd 上で D1・DO を使用） | 20      | マイグレーションは本番と同じ SQL を適用 |
 | ブラウザ（`bun run smoke`）                | 18 項目 | 下記                                    |
 

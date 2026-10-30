@@ -167,7 +167,7 @@ aidlc/               # AI-DLC workspace shell
 
 - ルート `workspaces` は **`packages/*` と `admin` のみ**。`server/api`・`hocuspocus`・`mcp` は **workspace 外**（サービス単位の `bun.lock`）。
 - ルート `bun install` では `server/*` の依存は入らない → 各サービスで `cd server/<service> && bun install`。
-- CI もサービスごとに install → typecheck / test（`api-typecheck`, `api-test`, `mcp-test`, `hocuspocus-test`）。
+- CI もサービスごとに install → typecheck / test（`api-typecheck`, `api-test`, `mcp-test`, `hocuspocus-test`）。`app/` は `app-test`（型チェック・単体・workerd 統合・ビルド）と `app-smoke`（ブラウザのスモークテスト）。
 - **デプロイ**: フロント / admin は dev が Workers Static Assets、本番が Pages（`deploy-dev.yml` / `deploy-prod.yml`）。`server/*` の Railway デプロイと DB マイグレーションの自動適用は削除済み。API / MCP の Worker 版は `deploy-api-worker-dev.yml` / `deploy-mcp-worker-dev.yml` で dev にだけデプロイされる。
 - `server/mcp`: ヘルス `/health`。必須 env: `ZEDI_API_URL`, `BETTER_AUTH_SECRET`（API と同値）。API 側に `MCP_REDIRECT_URI_ALLOW`。関連: [#564](https://github.com/otomatty/zedi/issues/564)。
 

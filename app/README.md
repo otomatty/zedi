@@ -130,9 +130,11 @@ For investigation, the editor URL accepts these switches:
 
 ## Tests
 
+In CI (`.github/workflows/ci.yml`), `app-test` runs the type checks, unit and integration tests and the build, and `app-smoke` runs the browser smoke test.
+
 | Kind                                          | Count     | Scope                                       |
 | --------------------------------------------- | --------- | ------------------------------------------- |
-| Unit (Vitest, Node / happy-dom)               | 164       | See below                                   |
+| Unit (Vitest, Node / happy-dom)               | 165       | See below                                   |
 | Integration (Vitest, workerd with D1 and DOs) | 20        | Migrations apply the same SQL as production |
 | Browser (`bun run smoke`)                     | 18 checks | See below                                   |
 

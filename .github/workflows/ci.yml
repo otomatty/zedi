@@ -527,6 +527,88 @@ jobs:
           echo "### Mutation (light)" >> "$GITHUB_STEP_SUMMARY"
           echo "Duration: ${elapsed}s ($((elapsed / 60))m)" >> "$GITHUB_STEP_SUMMARY"
 
+  app-test:
+    name: App (rebuild) — types, tests, build
+    # app/ はルート workspace 外の独立パッケージ（Worker 1 本の作り直し）。
+    # 単体テスト（Node / happy-dom）と workerd 上の統合テスト（D1・Durable Objects）を実行する。
+    # app/ is a standalone package (the one-Worker rebuild) outside the root workspace.
+    # Runs unit tests (Node / happy-dom) and integration tests in workerd (D1, Durable Objects).
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
+        with:
+          action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+          attempt_limit: 3
+          attempt_delay: 5000
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          install-deps: "false"
+
+      - name: Install app dependencies
+        working-directory: app
+        run: bun install --frozen-lockfile
+
+      - name: Type check (client, worker, Node tests)
+        working-directory: app
+        run: bun run typecheck
+
+      - name: Unit and workerd integration tests
+        working-directory: app
+        run: bun run test
+
+      - name: Build
+        working-directory: app
+        run: bun run build
+
+  app-smoke:
+    name: App (rebuild) — browser smoke test
+    # 空のローカル D1 で wrangler dev を起動し、サインインからオフライン同期・サインアウトまでを
+    # ヘッドレス Chromium で確認する（外部サービスへの通信なし）。
+    # Starts wrangler dev on an empty local D1 and drives sign-in through offline sync and
+    # sign-out in headless Chromium (no external services).
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
+        with:
+          action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+          attempt_limit: 3
+          attempt_delay: 5000
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          install-deps: "false"
+
+      - name: Install app dependencies
+        working-directory: app
+        run: bun install --frozen-lockfile
+
+      # Same install as e2e-web (see the note there on Playwright and Node 24.16+).
+      - name: Install Playwright browsers (with retry)
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
+        with:
+          command: cd app && timeout 300 npx playwright install --with-deps chromium
+          attempt_limit: 3
+          attempt_delay: 10000
+
+      - name: Build
+        working-directory: app
+        run: bun run build
+
+      - name: Smoke test
+        working-directory: app
+        run: |
+          cp .dev.vars.example .dev.vars
+          bun run smoke
+
   security:
     name: Security
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
