@@ -53,7 +53,12 @@ export function createPageOutbox(
 
   const run = async (send: (page: PendingPage) => Promise<void>): Promise<FlushResult> => {
     const result: FlushResult = { sent: [], refused: [] };
-    for (const page of read()) {
+    const attempted = new Set<string>();
+    // Re-read the queue after each send, so pages added during this run are sent too.
+    for (;;) {
+      const page = read().find((p) => !attempted.has(p.id));
+      if (!page) break;
+      attempted.add(page.id);
       try {
         await send(page);
         result.sent.push(page);
@@ -72,6 +77,8 @@ export function createPageOutbox(
     list: (noteId?: string) => read().filter((p) => noteId === undefined || p.noteId === noteId),
     get: (id: string) => read().find((p) => p.id === id),
     add: (page: PendingPage) => write([...read().filter((p) => p.id !== page.id), page]),
+    /** Forgets every pending page (sign-out). */
+    clear: () => write([]),
     /** Re-reads storage after another tab changed it. */
     reload() {
       cache = null;

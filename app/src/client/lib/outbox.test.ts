@@ -84,6 +84,55 @@ describe("createPageOutbox", () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  it("sends a page added while a flush is already running", async () => {
+    const outbox = outboxWith();
+    outbox.add(page("a"));
+    const sent: string[] = [];
+
+    const first = outbox.flush(async (p) => {
+      sent.push(p.id);
+      // 送信中に新しいページが作られ、作成側も同期を呼ぶ（実行中の flush に合流する）。
+      // A new page is created mid-flush and its creator also asks for a sync.
+      if (p.id === "a") {
+        outbox.add(page("b"));
+        void outbox.flush(async () => undefined);
+      }
+    });
+    const result = await first;
+
+    expect(sent).toEqual(["a", "b"]);
+    expect(result.sent.map((p) => p.id)).toEqual(["a", "b"]);
+    expect(outbox.list()).toEqual([]);
+  });
+
+  it("does not retry a page in the same flush after a failure that may succeed later", async () => {
+    const outbox = outboxWith();
+    outbox.add(page("a"));
+    const send = vi.fn(async () => {
+      outbox.add(page("b"));
+      throw new TypeError("Failed to fetch");
+    });
+
+    await outbox.flush(send);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(outbox.list().map((p) => p.id)).toEqual(["a", "b"]);
+  });
+
+  it("forgets every pending page on clear, also after a reload", () => {
+    const storage = memoryStorage();
+    const outbox = outboxWith(storage);
+    const listener = vi.fn();
+    outbox.subscribe(listener);
+    outbox.add(page("a"));
+
+    outbox.clear();
+
+    expect(outbox.all()).toEqual([]);
+    expect(outboxWith(storage).all()).toEqual([]);
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
   it("returns the same snapshot until the queue changes, and re-reads it on reload", () => {
     const storage = memoryStorage();
     const outbox = outboxWith(storage);

@@ -26,10 +26,20 @@ function deviceStorage(): Pick<Storage, "getItem" | "setItem"> {
   }
 }
 
+/** Statuses a retry cannot fix; anything else (401 after the session expired offline, 408, 425, 429, 5xx, network) keeps the page queued. */
+const PERMANENT_STATUSES = new Set([400, 403, 404, 409, 410, 413, 422]);
+
+/**
+ * Whether the server refused a page creation for good, so it should leave the queue.
+ * ページ作成をサーバーが恒久的に拒否したか（キューから外すべきか）。
+ */
+export const isPermanentRefusal = (error: unknown) =>
+  error instanceof ApiError && PERMANENT_STATUSES.has(error.status);
+
 /** Pages created on this device and not yet confirmed by the server. */
 export const pageOutbox = createPageOutbox(deviceStorage(), {
   key: OUTBOX_KEY,
-  isPermanent: (error) => error instanceof ApiError && error.status >= 400 && error.status < 500,
+  isPermanent: isPermanentRefusal,
 });
 
 if (typeof window !== "undefined") {
@@ -83,11 +93,14 @@ export function useOnline(): boolean {
 }
 
 /**
- * Removes what this device keeps for offline use: cached API responses and local page copies.
- * Called on sign-out so the next user of the browser cannot read them.
- * オフライン用に端末へ保存したもの（API 応答のキャッシュとページのローカル複製）を消す。
+ * Removes what this device keeps for offline use: cached API responses, local page copies and
+ * the queue of unsent pages. Called on sign-out so the next user of the browser cannot read them
+ * (sign-out is blocked while offline, so the queue is normally empty by then).
+ * オフライン用に端末へ保存したもの（API 応答のキャッシュ、ページのローカル複製、未送信の
+ * ページ）を消す。
  */
 export async function clearOfflineData(): Promise<void> {
+  pageOutbox.clear();
   if ("caches" in window) {
     const names = await caches.keys();
     await Promise.all(
