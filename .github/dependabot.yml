@@ -1,8 +1,13 @@
 version: 2
 
 updates:
-  # Frontend + root dependencies (Bun/npm)
-  - package-ecosystem: npm
+  # ルートの依存（ワークスペース: packages/*, admin）。
+  # ルートは bun.lock だけを持つので bun エコシステムで更新する。npm エコシステムは
+  # bun.lock のプロジェクトを扱えず、更新ジョブが misconfigured_tooling で失敗する。
+  # Root dependencies (workspaces: packages/*, admin). The root only has bun.lock,
+  # so it uses the bun ecosystem; the npm ecosystem refuses bun.lock projects and
+  # its update jobs fail with misconfigured_tooling.
+  - package-ecosystem: bun
     directory: /
     target-branch: develop
     schedule:
@@ -18,6 +23,20 @@ updates:
     ignore:
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
+
+  # 作り直し中のアプリ。ルートのワークスペース外で、独自の bun.lock を持つ。
+  # The rebuilt app. Outside the root workspace, with its own bun.lock.
+  - package-ecosystem: bun
+    directory: /app
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+    labels: [dependencies]
 
   # GitHub Actions
   - package-ecosystem: github-actions
