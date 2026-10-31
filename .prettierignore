@@ -1,12 +1,6 @@
 # Release Please が自動更新するため、Prettier の対象外にして競合を防ぐ
 CHANGELOG.md
 
-# AI-DLC vendored harness (aidlc-workflows v2) — keep upstream formatting
-.codex/
-aidlc/
-.agents/skills/aidlc/
-.agents/skills/aidlc-*/
-
 .claude/
 dist/
 dist-ssr/

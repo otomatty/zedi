@@ -29,9 +29,6 @@ export default tseslint.config(
       ".stryker-tmp",
       "**/.stryker-tmp/**",
       ".claude",
-      // AI-DLC vendored harness (aidlc-workflows v2)
-      ".codex",
-      "aidlc",
       ".wrangler",
       "*.config.js",
       "*.config.mjs",
