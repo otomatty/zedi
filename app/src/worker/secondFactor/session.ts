@@ -12,11 +12,21 @@ export interface CurrentSession {
 
 /**
  * Reads the request's session. An unverified session that ran out of time is deleted and
- * reported as `expired`, so every caller turns it away.
- * リクエストのセッションを読む。期限切れの未確認セッションは消して `expired` を返す。
+ * reported as `expired`, so every caller turns it away. With `fresh`, the session is read from
+ * D1 rather than the five-minute cookie cache, so a session already ended (signed out, or
+ * cleared by the admin's recovery) is not found.
+ * リクエストのセッションを読む。期限切れの未確認セッションは消して `expired` を返す。`fresh` なら
+ * Cookie キャッシュではなく D1 から読むので、終えたセッションは見つからない。
  */
-export async function currentSession(env: Env, request: Request): Promise<CurrentSession | null> {
-  const found = await getAuth(env, request.url).api.getSession({ headers: request.headers });
+export async function currentSession(
+  env: Env,
+  request: Request,
+  { fresh = false }: { fresh?: boolean } = {},
+): Promise<CurrentSession | null> {
+  const found = await getAuth(env, request.url).api.getSession({
+    headers: request.headers,
+    query: { disableCookieCache: fresh },
+  });
   if (!found) return null;
   const state = secondFactorState(found.session, Date.now());
   if (state === "expired") await deleteSession(env.DB, found.session.id);

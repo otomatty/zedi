@@ -42,8 +42,11 @@ const invalidCode = (c: SecondFactorContext) => c.json({ error: "invalid_code" }
 export function secondFactorRoutes() {
   const routes = new Hono<SecondFactorEnv>();
 
+  // Read from D1, not the cookie cache: these routes register and remove methods, and an ended
+  // session must not do that in the minutes its cache would still last (for example right after
+  // the admin's recovery left the user with no method, when Google alone may register one).
   routes.use(async (c, next) => {
-    const current = await currentSession(c.env, c.req.raw);
+    const current = await currentSession(c.env, c.req.raw, { fresh: true });
     if (!current || current.state === "expired") return c.json({ error: "unauthorized" }, 401);
     c.set("current", current);
     await next();

@@ -99,6 +99,17 @@ describe("admin recovery: clearing a user's second factor", () => {
     });
   });
 
+  it("does not let an old session register a method in the gap, even while its cookie cache lasts", async () => {
+    const { email, jar } = await userWithEverything("reset-gap");
+    await reset(email);
+    // The jar still holds the signed cookie cache, which Better Auth would trust for five
+    // minutes; with no method left, Google alone could otherwise register the first one.
+    expect([...jar.keys()].some((name) => name.includes("session_data"))).toBe(true);
+    expect((await postSecondFactor("/totp/enrollment", jar)).status).toBe(401);
+    expect((await postSecondFactor("/passkey/registration", jar)).status).toBe(401);
+    expect(await inspect(email)).toMatchObject({ authenticator_app: 0, passkeys: 0 });
+  });
+
   it("keeps the account, its Google link and its notes", async () => {
     const { email } = await userWithEverything("reset-keeps");
     const before = await inspect(email);

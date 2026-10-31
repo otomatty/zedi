@@ -9,7 +9,7 @@ A user who still has a recovery code does not need this. They sign in with the c
 ## What the reset does
 
 - It removes the user's passkeys, authenticator app, recovery codes and attempt count.
-- It ends every session of the user. A browser that was signed in stops working within five minutes, because of the session cookie cache.
+- It ends every session of the user. An old session can no longer reach the second-factor endpoints at all (they read the session from D1), so it cannot register a method in the gap. For the rest of the app, a browser that was signed in stops working within five minutes, because of the session cookie cache (otomatty/zedi#1176).
 - It keeps the account, its Google link, its notes and its pages.
 - With no method left, the next Google sign-in registers a new first method and shows ten new recovery codes, as on the very first sign-in.
 

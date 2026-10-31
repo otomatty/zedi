@@ -34,6 +34,7 @@ One Cloudflare Worker serves everything (`wrangler.jsonc`). The front end and th
 A Google sign-in only opens the second step: every user needs a passkey or an authenticator app (TOTP) as well, and is encouraged to register both.
 
 - **The session records when it passed the second step** (`session.second_factor_at`). Until then, `/api/*` and the collaborative editing WebSocket (`/parties/*`) answer 403 `second_factor_required`, and so do Better Auth's account endpoints. Starting and finishing the Google sign-in, reading the session, signing out and `/api/second-factor/*` stay open.
+- **`/api/second-factor/*` reads the session from D1**, not the five-minute cookie cache, so a session that has ended (signed out, or cleared by the admin's recovery) cannot register, remove or check methods. The rest of the API still trusts the cache for up to five minutes (otomatty/zedi#1176).
 - **An unverified session lasts ten minutes**; after that it is deleted, the API answers 401 and Better Auth's `get-session` reports no session.
 - **The first time, the user registers a passkey (recommended) or an app**, and is then offered the other one.
   - Passkey: `POST /api/second-factor/passkey/registration`, then `…/confirm` with the browser's answer. Verification is SimpleWebAuthn's; the relying party is the app's host name, and challenges are stored per session, expire after five minutes and are used once.
@@ -170,7 +171,7 @@ In CI (`.github/workflows/ci.yml`), `app-test` runs the type checks, unit and in
 | Kind                                          | Count     | Scope                                       |
 | --------------------------------------------- | --------- | ------------------------------------------- |
 | Unit (Vitest, Node / happy-dom)               | 348       | See below                                   |
-| Integration (Vitest, workerd with D1 and DOs) | 104       | Migrations apply the same SQL as production |
+| Integration (Vitest, workerd with D1 and DOs) | 105       | Migrations apply the same SQL as production |
 | Browser (`bun run smoke`)                     | 22 checks | See below                                   |
 
 Unit tests cover:
@@ -200,7 +201,7 @@ Integration tests cover:
 - The OAuth round trip against the test IdP (sign-in, repeat sign-in, sign-out), and a callback is accepted only once and only with the browser's state cookie
 - Magic links and the dev outbox are gone, and only the test IdP's sign-in page is exposed
 - Without the `TEST_IDP` binding (production), none of the test IdP's entry points open
-- The admin's recovery: showing the account (used codes not counted); removing only that user's methods, codes, attempt count and sessions (an old session is refused once its cookie cache runs out); keeping the account, its Google link and notes; the next Google sign-in registering a new first method with new codes (the old ones refused); an address with an apostrophe
+- The admin's recovery: showing the account (used codes not counted); removing only that user's methods, codes, attempt count and sessions (an old session is refused once its cookie cache runs out, and cannot register a method in the gap even while the cache lasts); keeping the account, its Google link and notes; the next Google sign-in registering a new first method with new codes (the old ones refused); an address with an apostrophe
 - Second factor: the gate on the API, Better Auth's account endpoints and the WebSocket; unverified sessions ending after ten minutes; registering an app (wrong code, restarting, no takeover once registered, the secret encrypted and the codes hashed); signing in again with the app's code, an already used code refused, a recovery code working once; the attempt limit per user, its window and its reset
 - Passkeys (a software authenticator answering real WebAuthn options): registering the first one with its recovery codes, challenges answered for another challenge or origin, used once and expired; signing in again; another user's or an unknown passkey, a counter that went backwards, the attempt limit; adding the other method within five minutes and without new codes, refused with Google alone or later; two sessions registering the first method at once (the codes of the confirmed one kept, the other refused even if it already passed the check)
 - Managing methods: the list; removing a passkey or the app (never the last one, never another user's, and of two sessions removing both at once only one succeeds), then adding the app again without new codes; new recovery codes (an offer changes nothing, confirming switches and confirming again changes nothing, codes without a batch dropped, another session's or user's or a changed offer refused, an offer confirmed after the five minutes within its own ten, a session that passed only Google refused); all refused before the second step and five minutes after it, and allowed again after checking again with the app's code
