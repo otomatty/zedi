@@ -3,10 +3,13 @@
  * fresh local D1, sign in through the test IdP, and launch Chromium.
  * ブラウザ系スクリプト共通: 空の D1 でアプリとテスト用 IdP を起動、テスト用 IdP でサインイン、Chromium 起動。
  */
+import { base32 } from "@better-auth/utils/base32";
+import { createOTP } from "@better-auth/utils/otp";
 import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 
 const require = createRequire(import.meta.url);
 const root = join(import.meta.dirname, "../..");
@@ -96,10 +99,53 @@ function storeCookies(jar, res) {
 
 const cookieHeader = (jar) => [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
 
+/** Authenticator apps the scripts registered: secret and last used 30-second step, by e-mail. */
+const authenticators = new Map();
+
+/** Remembers the authenticator app registered for `email` (its secret, as shown or returned). */
+export function rememberAuthenticator(email, secret, step = Math.floor(Date.now() / 30_000)) {
+  authenticators.set(email, { secret: secret.replace(/\s+/g, ""), lastStep: step });
+}
+
+/**
+ * The next code of `email`'s authenticator app that has not been used yet (codes are single
+ * use, so this waits for the next 30-second step when the current one is spent).
+ * まだ使っていない認証アプリのコードを返す（使用済みなら次の 30 秒まで待つ）。
+ */
+export async function nextTotpCode(email) {
+  const app = authenticators.get(email);
+  if (!app) throw new Error(`no authenticator app registered for ${email}`);
+  let step = Math.floor(Date.now() / 30_000);
+  if (step <= app.lastStep) {
+    await sleep((app.lastStep + 1) * 30_000 - Date.now() + 50);
+    step = app.lastStep + 1;
+  }
+  app.lastStep = step;
+  return createOTP(base32.decode(app.secret)).hotp(step);
+}
+
+/** The code shown right now for a secret (enrollment uses it before it is remembered). */
+export function totpCodeNow(secret) {
+  return createOTP(base32.decode(secret.replace(/\s+/g, ""))).hotp(Math.floor(Date.now() / 30_000));
+}
+
+async function postSecondFactor(base, jar, path, body) {
+  const res = await fetch(`${base}/api/second-factor${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: base, cookie: cookieHeader(jar) },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`second factor ${path} failed: ${res.status}`);
+  storeCookies(jar, res);
+  return res.json();
+}
+
 /**
  * Signs in through the real OAuth flow against the test IdP (start → IdP sign-in form →
- * callback) and returns the Cookie header value. `email` must be `@test.zedi-note.app`.
- * テスト用 IdP に対して実際の OAuth の手順でサインインし、Cookie ヘッダー値を返す。
+ * callback), then passes the second factor: registers an authenticator app the first time
+ * and enters its next code afterwards. Returns the Cookie header value. `email` must be
+ * `@test.zedi-note.app`.
+ * テスト用 IdP でサインインし、2 段階目も済ませて Cookie ヘッダー値を返す（初回は認証アプリを登録）。
  */
 export async function signInViaApi(base, email) {
   const jar = new Map();
@@ -123,9 +169,20 @@ export async function signInViaApi(base, email) {
     redirect: "manual",
   });
   storeCookies(jar, callback);
-  const cookie = cookieHeader(jar);
-  if (!cookie.includes("session_token")) throw new Error("no session cookie after the callback");
-  return cookie;
+  if (!cookieHeader(jar).includes("session_token")) {
+    throw new Error("no session cookie after the callback");
+  }
+  if (authenticators.has(email)) {
+    await postSecondFactor(base, jar, "/totp/verify", { code: await nextTotpCode(email) });
+  } else {
+    const { secret } = await postSecondFactor(base, jar, "/totp/enrollment", {});
+    const step = Math.floor(Date.now() / 30_000);
+    await postSecondFactor(base, jar, "/totp/enrollment/confirm", {
+      code: await totpCodeNow(secret),
+    });
+    rememberAuthenticator(email, secret, step);
+  }
+  return cookieHeader(jar);
 }
 
 /** Copies a Cookie header value into a Playwright browser context. */

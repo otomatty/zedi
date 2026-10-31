@@ -95,8 +95,14 @@ function createAuth(env: Env, baseURL: string) {
           },
         }
       : {},
-    // Same as today's API: avoid a D1 read on every request by caching the session in a signed cookie.
-    session: { cookieCache: { enabled: true, maxAge: 5 * 60 } },
+    session: {
+      // Same as today's API: avoid a D1 read on every request by caching the session in a signed cookie.
+      cookieCache: { enabled: true, maxAge: 5 * 60 },
+      // Set by the second-factor routes only (never from a request body); see secondFactor/.
+      additionalFields: {
+        secondFactorAt: { type: "date", required: false, input: false },
+      },
+    },
     plugins: env.TEST_IDP ? [testIdpProvider(env.TEST_IDP, baseURL)] : [],
     databaseHooks: {
       user: { create: { after: async (user) => createDefaultNote(env.DB, user.id) } },

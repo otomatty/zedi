@@ -31,8 +31,9 @@ export async function networkFirst(request: Request, deps: NetworkFirstDeps): Pr
     if (response.ok && !isNoStore(response)) {
       const cache = await deps.caches.open(deps.cacheName);
       await cache.put(request, response.clone());
-    } else if (response.status === 401) {
-      // The session ended: data cached for this user must not outlive it.
+    } else if (response.status === 401 || response.status === 403) {
+      // The session ended, or has not passed the second factor: data cached for an earlier
+      // session must not outlive it or be shown before the second step.
       await deps.caches.delete(deps.cacheName);
     }
   } catch {

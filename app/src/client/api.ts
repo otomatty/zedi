@@ -19,12 +19,17 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 /**
- * Current user and default note, or null when signed out.
- * ログイン中のユーザーと既定ノート（未ログインなら null）。
+ * Current user and default note; null when signed out, `"secondFactor"` when the session has
+ * passed only Google.
+ * ログイン中のユーザーと既定ノート。未ログインなら null、2 段階目の前なら `"secondFactor"`。
  */
-export async function fetchMe(): Promise<Me | null> {
+export async function fetchMe(): Promise<Me | null | "secondFactor"> {
   const res = await fetch("/api/me");
   if (res.status === 401) return null;
+  if (res.status === 403) {
+    const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
+    if (body?.error === "second_factor_required") return "secondFactor";
+  }
   if (!res.ok) throw new ApiError(res.status, "/api/me");
   return (await res.json()) as Me;
 }

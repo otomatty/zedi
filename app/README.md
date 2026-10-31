@@ -29,10 +29,23 @@ One Cloudflare Worker serves everything (`wrangler.jsonc`). The front end and th
   - The production environment (`env.production` in `wrangler.jsonc`) has no `TEST_IDP`; a unit test checks this.
 - The top level of `wrangler.jsonc` is for local runs (`zedi-app-local`). Deployed environments live under `env` and are only used with `--env`.
 
+### Second factor
+
+A Google sign-in only opens the second step: every user needs an authenticator app (TOTP) as well. Passkeys come next (otomatty/zedi#1156).
+
+- **The session records when it passed the second step** (`session.second_factor_at`). Until then, `/api/*` and the collaborative editing WebSocket (`/parties/*`) answer 403 `second_factor_required`, and so do Better Auth's account endpoints. Starting and finishing the Google sign-in, reading the session, signing out and `/api/second-factor/*` stay open.
+- **An unverified session lasts ten minutes**; after that it is deleted and the API answers 401.
+- **The first time, the user registers an app** (`POST /api/second-factor/totp/enrollment`, then `…/confirm` with its first code), which is allowed only while the user has no app, so Google alone can never replace one. The secret is stored encrypted (XChaCha20-Poly1305 under a key derived from `BETTER_AUTH_SECRET`).
+- **Ten recovery codes are shown once** when the app is confirmed. They are stored as SHA-256 hashes and each works once (`POST /api/second-factor/recovery-code/verify`).
+- **Afterwards the user enters the app's code** (`POST /api/second-factor/totp/verify`). A code that was already used is refused, even while it is still inside its time window.
+- **Five attempts per user per 15 minutes**, counted before the code is checked; then 429 with `Retry-After`. A successful second step clears the count.
+- The Better Auth `twoFactor` plugin is not used because it only steps in after password, username and phone sign-ins, never after Google (see otomatty/zedi#1156).
+
 ### D1 schema (`migrations/`)
 
-- **Better Auth tables**: `user` / `session` / `account` / `verification`
+- **Better Auth tables**: `user` / `session` / `account` / `verification` (`session.second_factor_at` is the app's own column)
 - **App tables**: `notes` (the sharing boundary), `note_members`, `pages`
+- **Second factor**: `totp_factors` (one encrypted secret per user and its last used step), `recovery_codes` (hashes), `second_factor_attempts`
 - **Listing**: keyset pagination on the `pages_note_recent (note_id, updated_at DESC, id DESC)` index; no `OFFSET`
 - **Counts**: `notes.page_count` is maintained by triggers, so no `COUNT(*)` scans
 - **Full-text search**: FTS5 with the `trigram` tokenizer, which searches Japanese without a morphological analyzer. It is external-content (no copy of the text) and kept in sync by triggers. It references `pages.seq` (an INTEGER PRIMARY KEY), which unlike an implicit rowid does not change on VACUUM
@@ -144,9 +157,9 @@ In CI (`.github/workflows/ci.yml`), `app-test` runs the type checks, unit and in
 
 | Kind                                          | Count     | Scope                                       |
 | --------------------------------------------- | --------- | ------------------------------------------- |
-| Unit (Vitest, Node / happy-dom)               | 192       | See below                                   |
-| Integration (Vitest, workerd with D1 and DOs) | 28        | Migrations apply the same SQL as production |
-| Browser (`bun run smoke`)                     | 18 checks | See below                                   |
+| Unit (Vitest, Node / happy-dom)               | 257       | See below                                   |
+| Integration (Vitest, workerd with D1 and DOs) | 49        | Migrations apply the same SQL as production |
+| Browser (`bun run smoke`)                     | 20 checks | See below                                   |
 
 Unit tests cover:
 
@@ -164,6 +177,8 @@ Unit tests cover:
 - `hono/jsx/dom` components (Testing Library): the command palette, the search palette (starts empty when reopened), the list (a failed later page and its retry), the editor (viewers stay read-only with `?collab=0`)
 - Test IdP: redirects limited to the callback on the same origin, PKCE, the password and domain checks, and expired, tampered or swapped codes and tokens
 - Sign-in page: offers only the enabled providers, and shows errors with a retry when loading or starting fails
+- Second factor: TOTP against the RFC 6238 test vectors and its ±1 step window, the otpauth URI, recovery codes (format, typing variants, hashes), the encrypted secret (tampering, other keys), the ten-minute limit for unverified sessions, the QR code, the API client's error handling, and the screen (registering with the QR code and the secret, recovery codes shown once, the app's code, a recovery code, wrong codes, waiting after too many attempts, running out of time, sign-out)
+- `/api/me`: the second-factor answer, and the service worker drops cached data on 403 as on 401
 - Config: the deployable `wrangler.jsonc` never turns development mode on, production has no test IdP, and the test IdP has no public URL or route
 
 Integration tests cover:
@@ -171,6 +186,7 @@ Integration tests cover:
 - The OAuth round trip against the test IdP (sign-in, repeat sign-in, sign-out), and a callback is accepted only once and only with the browser's state cookie
 - Magic links and the dev outbox are gone, and only the test IdP's sign-in page is exposed
 - Without the `TEST_IDP` binding (production), none of the test IdP's entry points open
+- Second factor: the gate on the API, Better Auth's account endpoints and the WebSocket; unverified sessions ending after ten minutes; registering an app (wrong code, restarting, no takeover once registered, the secret encrypted and the codes hashed); signing in again with the app's code, an already used code refused, a recovery code working once; the attempt limit per user, its window and its reset
 - Keyset listing and counts
 - Japanese full-text search and short-term partial matching
 - Hiding other users' notes (404), viewer and editor permissions
@@ -182,7 +198,7 @@ Integration tests cover:
 
 Browser checks:
 
-- Sign-in through the UI
+- Sign-in through the UI: the second factor is asked for first (the API answers 403), the authenticator app is registered from the QR screen, the recovery codes are shown, and signing in again asks for the app's code
 - Page creation and connecting to its DO
 - Tags, WikiLinks and slash commands
 - The other tab shows a remote caret

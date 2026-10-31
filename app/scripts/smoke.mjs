@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Browser smoke test against a local `wrangler dev` with a fresh D1:
- * sign-in through the test IdP in the UI, page creation, editor sync, `#tag` / `[[WikiLink]]` /
+ * sign-in through the test IdP in the UI with the second factor (registering an authenticator
+ * app, then its code on the next sign-in), page creation, editor sync, `#tag` / `[[WikiLink]]` /
  * `/` commands, D1 projection + full-text search, infinite list, access control between
  * two users (404 → viewer, read-only), AI streaming, offline use through the service worker
  * (app shell, cached list, local page copies, pages created offline) and sign-out.
@@ -12,9 +13,12 @@ import assert from "node:assert/strict";
 import {
   addSessionCookies,
   launchBrowser,
+  nextTotpCode,
+  rememberAuthenticator,
   signInViaApi,
   startWorker,
   testIdpPassword,
+  totpCodeNow,
 } from "./lib/harness.mjs";
 
 const PORT = 8789;
@@ -57,16 +61,40 @@ try {
     assert.equal((await apiFrom(page, "/api/me")).status, 401);
   });
 
-  await check("test IdP sign-in through the UI lands on the notes list", async () => {
+  const signInWithTestIdp = async () => {
     await page.click("[data-testid=sign-in-test-idp]");
     await page.waitForSelector("[data-testid=test-idp-email]");
     await page.fill("[data-testid=test-idp-email]", OWNER);
     await page.fill("[data-testid=test-idp-password]", testIdpPassword());
     await page.click("[data-testid=test-idp-submit]");
-    await page.waitForSelector("[data-testid=account-email]");
-    assert.equal(await page.locator("[data-testid=account-email]").textContent(), OWNER);
-    assert.match(await page.locator(".notes h1").textContent(), /0 件/);
+  };
+
+  await check("test IdP sign-in through the UI asks for a second factor first", async () => {
+    await signInWithTestIdp();
+    await page.waitForSelector("[data-testid=totp-secret]");
+    const qr = page.getByRole("img", { name: "認証アプリ用の QR コード" });
+    assert.equal(await qr.count(), 1);
+    assert.deepEqual(await apiFrom(page, "/api/me"), {
+      status: 403,
+      body: { error: "second_factor_required" },
+    });
   });
+
+  await check(
+    "registering an authenticator app shows recovery codes, then the notes list",
+    async () => {
+      const secret = await page.locator("[data-testid=totp-secret]").textContent();
+      await page.fill("[data-testid=totp-code]", await totpCodeNow(secret));
+      rememberAuthenticator(OWNER, secret);
+      await page.click("[data-testid=totp-code-submit]");
+      await page.waitForSelector("[data-testid=recovery-codes]");
+      assert.equal(await page.locator("[data-testid=recovery-codes] li").count(), 10);
+      await page.click("[data-testid=recovery-codes-saved]");
+      await page.waitForSelector("[data-testid=account-email]");
+      assert.equal(await page.locator("[data-testid=account-email]").textContent(), OWNER);
+      assert.match(await page.locator(".notes h1").textContent(), /0 件/);
+    },
+  );
 
   await check("creating a page opens the editor connected to its Durable Object", async () => {
     await page.click("[data-testid=new-page]");
@@ -296,6 +324,16 @@ try {
         .filter((n) => n?.startsWith("zedi:page:")),
     }));
     assert.deepEqual(left, { caches: [], databases: [] });
+  });
+
+  await check("signing in again asks for the authenticator app's code", async () => {
+    await signInWithTestIdp();
+    await page.waitForSelector("[data-testid=totp-code]");
+    assert.equal(await page.locator("[data-testid=totp-secret]").count(), 0);
+    await page.fill("[data-testid=totp-code]", await nextTotpCode(OWNER));
+    await page.click("[data-testid=totp-code-submit]");
+    await page.waitForSelector("[data-testid=account-email]");
+    assert.equal(await page.locator("[data-testid=account-email]").textContent(), OWNER);
   });
 
   await check("no uncaught page errors", async () => assert.deepEqual(errors, []));
