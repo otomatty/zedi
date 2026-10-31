@@ -374,6 +374,32 @@ h1 {
   color: #fff;
   cursor: pointer;
 }
+.second-factor section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.sign-in .link-button {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+}
+.sign-in .checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.qr-code {
+  align-self: center;
+}
+.recovery-codes {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  columns: 2;
+  padding-left: 1.5rem;
+}
 .dev-link {
   font-size: 0.85rem;
   color: var(--muted);

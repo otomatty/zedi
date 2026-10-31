@@ -25,6 +25,10 @@ const EditorPage = lazyPage<{ id: string; defaultNoteId: string }>(
   () => import("./pages/EditorPage"),
 );
 const AiChatPage = lazyPage<Record<string, never>>(() => import("./pages/AiChatPage"));
+const SecondFactorPage = lazyPage<{
+  onSessionChange: () => void;
+  onSignOut: () => Promise<boolean>;
+}>(() => import("./pages/SecondFactorPage"));
 
 // `offlineFirst`: run query functions even when the browser reports offline, so the
 // service worker can answer from its cache instead of the query staying paused.
@@ -69,6 +73,19 @@ function usePendingPageSync(onRefused: (titles: string[]) => void) {
   }, [onRefused]);
 }
 
+/**
+ * Ends the session on the server, then clears what this device keeps. Resolves false (and
+ * changes nothing locally) when the server could not be reached.
+ * サーバーのセッションを終えてから端末のデータを消す。届かなければ何も変えずに false。
+ */
+const signOutEverywhere = () =>
+  signOutFlow({
+    endServerSession: async () => (await import("./authClient")).authClient.signOut(),
+    clearOfflineData,
+    clearQueries: () => queryClient.clear(),
+    endLocalSession: () => session.signOut(),
+  });
+
 /** Lets the router handle same-origin `<a href>` clicks (API links such as OAuth callbacks are left alone). */
 function useLinkInterception() {
   useEffect(() => {
@@ -112,12 +129,7 @@ function Shell({ me }: { me: Me }) {
 
   const signOut = async () => {
     setSignOutFailed(false);
-    const done = await signOutFlow({
-      endServerSession: async () => (await import("./authClient")).authClient.signOut(),
-      clearOfflineData,
-      clearQueries: () => queryClient.clear(),
-      endLocalSession: () => session.signOut(),
-    });
+    const done = await signOutEverywhere();
     if (done) router.navigate("/notes", { replace: true });
     else setSignOutFailed(true);
   };
@@ -211,6 +223,14 @@ function Gate() {
     );
   }
   if (state.status === "signedOut") return <SignInPage />;
+  if (state.status === "secondFactor") {
+    return (
+      <SecondFactorPage
+        onSessionChange={() => void session.refresh()}
+        onSignOut={signOutEverywhere}
+      />
+    );
+  }
   return <Shell me={state.me} />;
 }
 

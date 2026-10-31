@@ -20,6 +20,12 @@ describe("createSessionStore", () => {
     expect(store.get()).toEqual({ status: "signedOut" });
   });
 
+  it("asks for the second factor when the session has passed only Google", async () => {
+    const store = createSessionStore(async () => "secondFactor");
+    await store.refresh();
+    expect(store.get()).toEqual({ status: "secondFactor" });
+  });
+
   it("reports the session as unavailable when /api/me cannot be reached, and recovers", async () => {
     let online = false;
     const store = createSessionStore(async () => {

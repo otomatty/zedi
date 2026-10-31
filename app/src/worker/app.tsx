@@ -6,6 +6,8 @@ import { buildSearchPlan } from "./db/searchPlan";
 import { isDevelopment, type Env } from "./env";
 import { Landing } from "./landing";
 import { createSseStream, mockMarkdownTokens, mockTokens } from "./mockStream";
+import { secondFactorRoutes } from "./secondFactor/routes";
+import { currentSession } from "./secondFactor/session";
 import { canEdit, getNoteAccess, getPageAccess } from "./services/access";
 import { getDefaultNoteId, upsertMember } from "./services/notes";
 import {
@@ -25,6 +27,15 @@ interface SessionUser {
 }
 
 type AppEnv = { Bindings: Env; Variables: { user: SessionUser } };
+
+/**
+ * Better Auth endpoints that need no check of the current session: starting and finishing the
+ * Google (or test IdP) sign-in, which replaces it, signing out, and the error page.
+ * 今のセッションを確かめなくてよい Better Auth の窓口（サインインの開始と完了、サインアウトなど）。
+ */
+const SIGN_IN_FLOW =
+  /^\/api\/auth\/(?:sign-in\/(?:social|oauth2)|(?:oauth2\/)?callback\/[^/]+|sign-out|error|ok)$/;
+const GET_SESSION = "/api/auth/get-session";
 
 /** Page ids are UUIDs; clients may generate them when creating pages offline. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -70,7 +81,22 @@ export function createApp({ routeRealtime }: { routeRealtime?: RealtimeRouter } 
   const app = new Hono<AppEnv>();
 
   app.get("/", (c) => c.html(`<!DOCTYPE html>${(<Landing />).toString()}`));
-  app.on(["GET", "POST"], "/api/auth/*", (c) => getAuth(c.env, c.req.url).handler(c.req.raw));
+  // Better Auth. A session that has passed only Google may finish signing in, read itself or
+  // sign out; its account endpoints (sessions, linked accounts, profile) wait for the second
+  // factor. Once its ten minutes are up it is gone everywhere, get-session included.
+  app.on(["GET", "POST"], "/api/auth/*", async (c) => {
+    if (!SIGN_IN_FLOW.test(c.req.path)) {
+      const current = await currentSession(c.env, c.req.raw);
+      const getSession = c.req.path === GET_SESSION;
+      if (current?.state === "expired") {
+        return getSession ? c.json(null) : c.json({ error: "unauthorized" }, 401);
+      }
+      if (current?.state === "pending" && !getSession) {
+        return c.json({ error: "second_factor_required" }, 403);
+      }
+    }
+    return getAuth(c.env, c.req.url).handler(c.req.raw);
+  });
 
   // Public: which sign-in buttons the sign-in page shows.
   app.get("/api/sign-in-options", (c) =>
@@ -83,11 +109,16 @@ export function createApp({ routeRealtime }: { routeRealtime?: RealtimeRouter } 
     c.env.TEST_IDP ? c.env.TEST_IDP.fetch(c.req.raw) : c.notFound(),
   );
 
+  // Registering and checking the second factor, open to sessions that have passed only Google.
+  // Mounted before `api`, whose middleware would turn those sessions away.
+  app.route("/api/second-factor", secondFactorRoutes());
+
   const api = new Hono<AppEnv>();
   api.use(async (c, next) => {
-    const session = await getAuth(c.env, c.req.url).api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: "unauthorized" }, 401);
-    c.set("user", { id: session.user.id, email: session.user.email, name: session.user.name });
+    const current = await currentSession(c.env, c.req.raw);
+    if (!current || current.state === "expired") return c.json({ error: "unauthorized" }, 401);
+    if (current.state === "pending") return c.json({ error: "second_factor_required" }, 403);
+    c.set("user", current.user);
     await next();
   });
 

@@ -67,6 +67,18 @@ describe("networkFirst", () => {
     expect(caches.delete).toHaveBeenCalledWith(CACHE);
   });
 
+  it("drops the cached data when the session has not passed the second factor (403)", async () => {
+    // 2 段階目の前のセッションに、前のセッションのデータをオフラインで見せない。
+    // A session that has not passed the second factor must not see an earlier session's data offline.
+    const { caches } = fakeCaches();
+    const fetch = vi.fn(async () => new Response("", { status: 403 }));
+
+    const response = await networkFirst(request, { fetch, caches, cacheName: CACHE });
+
+    expect(response.status).toBe(403);
+    expect(caches.delete).toHaveBeenCalledWith(CACHE);
+  });
+
   it("answers from the cache when the network is down, and errors without a copy", async () => {
     const { caches, store } = fakeCaches();
     store.set(request.url, new Response("cached"));

@@ -22,3 +22,16 @@ b1e5dab7fa191b9f317b066099ca3fbb6450c5a7:server/api/src/__tests__/routes/invite.
 # from HEAD; it was never used to sign anything outside this test file. Git
 # history retains the blob, so we suppress the historical match here.
 d10d11f5fa92743bb5a8214ca5c088d7cb4b01dd:server/api/src/lib/githubAppAuth.test.ts:private-key:23
+
+# app/src/worker/secondFactor/{secretBox,totp}.test.ts in b3f3476 (PR #1160) use the
+# RFC 6238 Appendix B test seed ("12345678901234567890" in Base32) as a fixture; it is a
+# published test vector, not a secret. The follow-up commit names it so the generic rule
+# no longer matches; these entries cover the lines as first committed.
+# RFC 6238 の付録 B のテスト用シード（公開されたテストベクトル）で、秘密ではない。
+b3f347634e7af895965083d0c98b93e8855131b2:app/src/worker/secondFactor/secretBox.test.ts:generic-api-key:8
+b3f347634e7af895965083d0c98b93e8855131b2:app/src/worker/secondFactor/secretBox.test.ts:generic-api-key:14
+b3f347634e7af895965083d0c98b93e8855131b2:app/src/worker/secondFactor/secretBox.test.ts:generic-api-key:16
+b3f347634e7af895965083d0c98b93e8855131b2:app/src/worker/secondFactor/secretBox.test.ts:generic-api-key:20
+b3f347634e7af895965083d0c98b93e8855131b2:app/src/worker/secondFactor/secretBox.test.ts:generic-api-key:28
+b3f347634e7af895965083d0c98b93e8855131b2:app/src/worker/secondFactor/secretBox.test.ts:generic-api-key:33
+b3f347634e7af895965083d0c98b93e8855131b2:app/src/worker/secondFactor/totp.test.ts:generic-api-key:5
