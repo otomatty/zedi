@@ -86,6 +86,6 @@ describe("without the TEST_IDP binding (production)", () => {
       headers: { "content-type": "application/json", origin },
       body: JSON.stringify({ provider: "test-idp", callbackURL: "/notes" }),
     });
-    expect(res.status).not.toBe(200);
+    expect(res.status).toBe(404);
   });
 });

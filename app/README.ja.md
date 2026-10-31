@@ -23,7 +23,7 @@ Cloudflare Worker 1 本ですべてを配信します（`wrangler.jsonc`）。�
 ### サインイン
 
 - **本番は Google だけ**です。資格情報（`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`）を設定したときに有効になります。Google のアカウントがあれば誰でも登録できます。マジックリンクは廃止しました。
-- **ローカル・試験・Preview・staging ではテスト用 IdP** でもサインインできます。Google の代わりをする小さな OAuth プロバイダーで、別の Worker（`src/testIdp/`、`wrangler.test-idp.jsonc`）として動きます。
+- **ローカルと試験ではテスト用 IdP** でもサインインできます。Google の代わりをする小さな OAuth プロバイダーで、別の Worker（`src/testIdp/`、`wrangler.test-idp.jsonc`）として動きます。Preview と staging には、それぞれの環境を作るときに入れます（otomatty/zedi#1157）。
   - アプリからは `TEST_IDP` サービスバインディングで呼び、Better Auth の `genericOAuth` でつなぎます。ブラウザに見せるのはサインイン画面（`/test-idp/authorize`）だけで、アプリが同じオリジンで転送します。トークンとユーザー情報はバインディング経由でしか取れません。
   - 戻り先は、リクエストが届いたのと同じオリジンのコールバックに限ります。サインインには `.dev.vars` の `TEST_IDP_PASSWORD` が必要で、`@test.zedi-note.app` のアドレスしか作れません。
   - 本番の環境（`wrangler.jsonc` の `env.production`）には `TEST_IDP` を置きません。単体テストでこれを確かめています。

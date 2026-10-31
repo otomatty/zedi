@@ -23,7 +23,7 @@ One Cloudflare Worker serves everything (`wrangler.jsonc`). The front end and th
 ### Sign-in
 
 - **Production signs in with Google only.** It is enabled once the credentials (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`) are set. Anyone with a Google account can sign up. Magic links are gone.
-- **Local runs, tests, Previews and staging can also use the test IdP**: a small OAuth provider that stands in for Google, running as a separate Worker (`src/testIdp/`, `wrangler.test-idp.jsonc`).
+- **Local runs and tests can also use the test IdP**: a small OAuth provider that stands in for Google, running as a separate Worker (`src/testIdp/`, `wrangler.test-idp.jsonc`). Previews and staging will get it with their environments (otomatty/zedi#1157).
   - The app calls it over the `TEST_IDP` service binding and connects it with Better Auth's `genericOAuth`. Browsers only see its sign-in page (`/test-idp/authorize`), which the app forwards on its own origin; tokens and user info are only reachable over the binding.
   - The redirect must go back to the callback on the origin the request arrived on. Signing in needs `TEST_IDP_PASSWORD` from `.dev.vars`, and only `@test.zedi-note.app` addresses can be created.
   - The production environment (`env.production` in `wrangler.jsonc`) has no `TEST_IDP`; a unit test checks this.
