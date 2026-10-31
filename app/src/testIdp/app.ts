@@ -136,6 +136,14 @@ export function createTestIdp(options: TestIdpOptions) {
     return c.redirect(target.href, 302);
   });
 
+  // Codes are not single-use (RFC 6749 asks for that): this IdP keeps no state, so a code can be
+  // exchanged again until it expires. A replay is stopped before it gets here instead: the app
+  // accepts each callback once (its OAuth state needs the browser's cookie and is deleted on first
+  // use), the exchange needs the PKCE verifier the app keeps server-side, and this endpoint is
+  // reachable only over the app's TEST_IDP binding. auth.worker.test.ts and
+  // wranglerConfig.node.test.ts pin those checks.
+  // 認可コードは期限まで再交換できる（状態を持たないため）。使い回しは、1 回で消えるアプリ側の state、
+  // サーバー側にだけある PKCE の verifier、バインディングからしか呼べないこの窓口で止めている。
   app.post("/test-idp/token", async (c) => {
     const form = await c.req.parseBody();
     const field = (name: string) => (typeof form[name] === "string" ? (form[name] as string) : "");

@@ -144,8 +144,8 @@ In CI (`.github/workflows/ci.yml`), `app-test` runs the type checks, unit and in
 
 | Kind                                          | Count     | Scope                                       |
 | --------------------------------------------- | --------- | ------------------------------------------- |
-| Unit (Vitest, Node / happy-dom)               | 191       | See below                                   |
-| Integration (Vitest, workerd with D1 and DOs) | 26        | Migrations apply the same SQL as production |
+| Unit (Vitest, Node / happy-dom)               | 192       | See below                                   |
+| Integration (Vitest, workerd with D1 and DOs) | 28        | Migrations apply the same SQL as production |
 | Browser (`bun run smoke`)                     | 18 checks | See below                                   |
 
 Unit tests cover:
@@ -164,11 +164,11 @@ Unit tests cover:
 - `hono/jsx/dom` components (Testing Library): the command palette, the search palette (starts empty when reopened), the list (a failed later page and its retry), the editor (viewers stay read-only with `?collab=0`)
 - Test IdP: redirects limited to the callback on the same origin, PKCE, the password and domain checks, and expired, tampered or swapped codes and tokens
 - Sign-in page: offers only the enabled providers, and shows errors with a retry when loading or starting fails
-- Config: the deployable `wrangler.jsonc` never turns development mode on, and production has no test IdP
+- Config: the deployable `wrangler.jsonc` never turns development mode on, production has no test IdP, and the test IdP has no public URL or route
 
 Integration tests cover:
 
-- The OAuth round trip against the test IdP (sign-in, repeat sign-in, sign-out)
+- The OAuth round trip against the test IdP (sign-in, repeat sign-in, sign-out), and a callback is accepted only once and only with the browser's state cookie
 - Magic links and the dev outbox are gone, and only the test IdP's sign-in page is exposed
 - Without the `TEST_IDP` binding (production), none of the test IdP's entry points open
 - Keyset listing and counts

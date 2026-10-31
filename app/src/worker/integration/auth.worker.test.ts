@@ -1,7 +1,7 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app";
-import { BASE, api, me, signIn, uniqueEmail } from "./helpers";
+import { BASE, api, cookieHeader, me, signIn, startSignIn, uniqueEmail } from "./helpers";
 
 describe("auth (Better Auth on D1)", () => {
   it("rejects API calls without a session", async () => {
@@ -22,6 +22,32 @@ describe("auth (Better Auth on D1)", () => {
     const second = await me(await signIn(email));
     expect(second.user.id).toBe(first.user.id);
     expect(second.defaultNoteId).toBe(first.defaultNoteId);
+  });
+
+  // テスト用 IdP は認可コードを期限まで再交換できる。使い回しを止めているのは、ブラウザの state Cookie と、
+  // 1 回目のコールバックで消えるアプリ側の state。
+  // The test IdP lets a code be exchanged again until it expires; what stops a replay is the app's
+  // OAuth state, which needs the browser's state cookie and is deleted on the first callback.
+  const sessionCookieSet = (res: Response) =>
+    res.headers.getSetCookie().some((c) => c.split("=")[0]?.includes("session_token"));
+
+  it("rejects a sign-in callback that arrives without the browser's state cookie", async () => {
+    const { callbackUrl } = await startSignIn(uniqueEmail("stolen"));
+    const res = await SELF.fetch(callbackUrl, { redirect: "manual" });
+    expect(res.headers.get("location")).toBe(`${BASE}/api/auth/error?error=state_mismatch`);
+    expect(sessionCookieSet(res)).toBe(false);
+  });
+
+  it("accepts each sign-in callback only once", async () => {
+    const { callbackUrl, jar } = await startSignIn(uniqueEmail("replay"));
+    const cookie = cookieHeader(jar);
+    const first = await SELF.fetch(callbackUrl, { headers: { cookie }, redirect: "manual" });
+    expect(first.headers.get("location")).toBe("/notes");
+    expect(sessionCookieSet(first)).toBe(true);
+
+    const replay = await SELF.fetch(callbackUrl, { headers: { cookie }, redirect: "manual" });
+    expect(replay.headers.get("location")).toBe(`${BASE}/api/auth/error?error=state_mismatch`);
+    expect(sessionCookieSet(replay)).toBe(false);
   });
 
   it("invalidates the session on sign-out", async () => {

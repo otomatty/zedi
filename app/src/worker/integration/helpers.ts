@@ -22,15 +22,15 @@ function storeCookies(jar: Map<string, string>, res: Response) {
   }
 }
 
-const cookieHeader = (jar: Map<string, string>) =>
-  [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
-
 /**
- * Signs in through the real OAuth flow against the test IdP (start → IdP sign-in form →
- * callback) and returns the Cookie header for subsequent requests.
- * テスト用 IdP に対して実際の OAuth の手順でサインインし、以降のリクエスト用の Cookie を返す。
+ * Runs the OAuth flow against the test IdP up to its redirect back to the app (start → IdP
+ * sign-in form). Returns the callback URL and the cookies the browser holds at that point.
+ * テスト用 IdP の手順を、アプリへ戻る直前まで進める。戻り先の URL と、その時点の Cookie を返す。
  */
-export async function signIn(email: string, origin = BASE): Promise<string> {
+export async function startSignIn(
+  email: string,
+  origin = BASE,
+): Promise<{ callbackUrl: string; jar: Map<string, string> }> {
   const jar = new Map<string, string>();
   const start = await SELF.fetch(`${origin}/api/auth/sign-in/social`, {
     method: "POST",
@@ -49,8 +49,21 @@ export async function signIn(email: string, origin = BASE): Promise<string> {
     redirect: "manual",
   });
   expect(authorize.status).toBe(302);
+  return { callbackUrl: authorize.headers.get("location") ?? "", jar };
+}
 
-  const callback = await SELF.fetch(authorize.headers.get("location") ?? "", {
+/** The Cookie header for a cookie jar. */
+export const cookieHeader = (jar: Map<string, string>) =>
+  [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
+
+/**
+ * Signs in through the real OAuth flow against the test IdP (start → IdP sign-in form →
+ * callback) and returns the Cookie header for subsequent requests.
+ * テスト用 IdP に対して実際の OAuth の手順でサインインし、以降のリクエスト用の Cookie を返す。
+ */
+export async function signIn(email: string, origin = BASE): Promise<string> {
+  const { callbackUrl, jar } = await startSignIn(email, origin);
+  const callback = await SELF.fetch(callbackUrl, {
     headers: { cookie: cookieHeader(jar) },
     redirect: "manual",
   });
