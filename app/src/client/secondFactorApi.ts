@@ -47,6 +47,7 @@ export type SecondFactorRefusal =
   | "second_factor_required"
   | "last_factor"
   | "not_found"
+  | "invalid_offer"
   | "unexpected";
 
 const KNOWN = new Set<string>([
@@ -62,6 +63,7 @@ const KNOWN = new Set<string>([
   "second_factor_required",
   "last_factor",
   "not_found",
+  "invalid_offer",
 ]);
 
 /** A refused second-factor request; `retryAfterSeconds` is set for `too_many_attempts`. */
@@ -143,8 +145,14 @@ export const secondFactorApi = {
     call<Record<string, never>>(`/passkeys/${encodeURIComponent(id)}`, undefined, "DELETE"),
   /** Refused with `last_factor` when the app is the only method left. */
   deleteTotp: () => call<Record<string, never>>("/totp", undefined, "DELETE"),
-  /** Replaces every recovery code; the old ones stop working. */
-  newRecoveryCodes: () => call<{ recoveryCodes: string[] }>("/recovery-codes", {}),
+  /** New recovery codes and the offer that switches to them; nothing changes yet. */
+  newRecoveryCodes: () => call<{ recoveryCodes: string[]; offer: string }>("/recovery-codes", {}),
+  /**
+   * Switches to the offered codes; the old ones stop working. Sending the same offer again
+   * changes nothing, so it can be retried. Refused with `invalid_offer` once it ran out.
+   */
+  confirmRecoveryCodes: (offer: string) =>
+    call<Record<string, never>>("/recovery-codes/confirm", { offer }),
 };
 
 /** The client the second-factor screen uses (swapped for a fake in its tests). */

@@ -30,8 +30,12 @@ type Confirming = { kind: "passkey"; id: string } | { kind: "totp" } | null;
 type Panel =
   | { kind: "enrollPasskey"; options: PublicKeyCredentialCreationOptionsJSON }
   | { kind: "enrollTotp"; secret: string; uri: string }
-  | { kind: "codes"; codes: string[] }
+  | { kind: "codes"; codes: string[]; offer: string; switched: boolean }
   | null;
+
+/** Failures that leave the open panel to try again: a code to type again, a cancelled prompt. */
+const retryable = (error: unknown) =>
+  refusedAs(error, "invalid_code") || error instanceof PasskeyPromptError;
 
 /** Refusals that mean the session is no longer fit for this page: let the app check it again. */
 const sessionEnded = (error: unknown) =>
@@ -305,18 +309,70 @@ function RecoveryCodesSection({
   );
 }
 
+/**
+ * New recovery codes: shown first, switched to once the user ticks that they saved them. Until
+ * then the old codes keep working, so nothing is lost when the page or the network fails.
+ * 新しい復旧用コード。保存したと確かめてから切り替える。それまでは前のコードが使える。
+ */
+function NewCodesView({
+  codes,
+  switched,
+  busy,
+  onSwitch,
+}: {
+  codes: string[];
+  switched: boolean;
+  busy: boolean;
+  onSwitch: () => void;
+}) {
+  const [saved, setSaved] = useState(false);
+  return (
+    <>
+      <h2>新しい復旧用コード</h2>
+      <p>
+        {switched
+          ? "切り替えました。前のコードは使えなくなりました。"
+          : "このコードを保存してから切り替えてください。切り替えるまでは前のコードが使えます。このコードは今しか表示されません。"}
+      </p>
+      <ol aria-label="新しい復旧用コード" class="recovery-codes" data-testid="new-recovery-codes">
+        {codes.map((code) => (
+          <li>{code}</li>
+        ))}
+      </ol>
+      {!switched && (
+        <>
+          <label class="checkbox">
+            <input
+              type="checkbox"
+              checked={saved}
+              onChange={(event: Event) => setSaved((event.target as HTMLInputElement).checked)}
+              data-testid="new-recovery-codes-saved"
+            />
+            新しいコードを保存しました
+          </label>
+          <button type="button" disabled={busy || !saved} onClick={onSwitch}>
+            このコードに切り替える
+          </button>
+        </>
+      )}
+    </>
+  );
+}
+
 /** What opens below the lists. */
 function PanelView({
   panel,
   busy,
   onRegisterPasskey,
   onConfirmTotp,
+  onSwitchCodes,
   onClose,
 }: {
   panel: Exclude<Panel, null>;
   busy: boolean;
   onRegisterPasskey: (options: PublicKeyCredentialCreationOptionsJSON) => void;
   onConfirmTotp: (code: string) => void;
+  onSwitchCodes: (offer: string) => void;
   onClose: () => void;
 }) {
   return (
@@ -339,24 +395,15 @@ function PanelView({
         </>
       )}
       {panel.kind === "codes" && (
-        <>
-          <h2>新しい復旧用コード</h2>
-          <p>
-            前のコードは使えなくなりました。新しいコードを保存してください。このコードは今しか表示されません。
-          </p>
-          <ol
-            aria-label="新しい復旧用コード"
-            class="recovery-codes"
-            data-testid="new-recovery-codes"
-          >
-            {panel.codes.map((code) => (
-              <li>{code}</li>
-            ))}
-          </ol>
-        </>
+        <NewCodesView
+          codes={panel.codes}
+          switched={panel.switched}
+          busy={busy}
+          onSwitch={() => onSwitchCodes(panel.offer)}
+        />
       )}
       <button type="button" class="link-button" onClick={onClose}>
-        {panel.kind === "codes" ? "閉じる" : "やめる"}
+        {panel.kind === "codes" && panel.switched ? "閉じる" : "やめる"}
       </button>
     </section>
   );
@@ -378,18 +425,16 @@ function useChanges(
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const run = (step: () => Promise<void>) => {
+  /** Runs a step; `keepsPanel` says which failures leave the open panel to try again. */
+  const run = (step: () => Promise<void>, keepsPanel = retryable) => {
     setBusy(true);
     setError(null);
     step()
       .catch((e: unknown) => {
         if (sessionEnded(e)) return onSessionChange();
         setError(messageFor(e));
-        // Keep a code form open to type again; anything else starts over.
-        if (!refusedAs(e, "invalid_code")) {
-          setConfirming(null);
-          if (!(e instanceof PasskeyPromptError)) setPanel(null);
-        }
+        if (!refusedAs(e, "invalid_code")) setConfirming(null);
+        if (!keepsPanel(e)) setPanel(null);
         reload();
       })
       .finally(() => setBusy(false));
@@ -447,11 +492,22 @@ function useChanges(
       }),
     renewCodes: () =>
       run(async () => {
-        const { recoveryCodes } = await api.newRecoveryCodes();
+        const { recoveryCodes, offer } = await api.newRecoveryCodes();
         setConfirming(null);
-        setPanel({ kind: "codes", codes: recoveryCodes });
-        reload();
+        setPanel({ kind: "codes", codes: recoveryCodes, offer, switched: false });
       }),
+    // Any failure but a spent offer keeps the codes on screen: the same offer can be sent again.
+    switchCodes: (offer: string) =>
+      run(
+        async () => {
+          await api.confirmRecoveryCodes(offer);
+          setPanel((current) =>
+            current?.kind === "codes" ? { ...current, switched: true } : current,
+          );
+          reload();
+        },
+        (e) => !refusedAs(e, "invalid_offer"),
+      ),
     closePanel: () => setPanel(null),
   };
 
@@ -547,6 +603,7 @@ export function SecuritySettingsPage({
           busy={busy}
           onRegisterPasskey={actions.registerPasskey}
           onConfirmTotp={actions.confirmTotp}
+          onSwitchCodes={actions.switchCodes}
           onClose={actions.closePanel}
         />
       )}

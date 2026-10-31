@@ -96,14 +96,30 @@ describe("secondFactorApi", () => {
     expect(calls[0]?.init?.method).toBe(verb);
   });
 
-  it("asks for new recovery codes", async () => {
-    respond(200, { recoveryCodes: ["A"] });
-    expect(await secondFactorApi.newRecoveryCodes()).toEqual({ recoveryCodes: ["A"] });
+  it("asks for new recovery codes, then switches to them with the offer", async () => {
+    respond(200, { recoveryCodes: ["A"], offer: "OFFER" });
+    expect(await secondFactorApi.newRecoveryCodes()).toEqual({
+      recoveryCodes: ["A"],
+      offer: "OFFER",
+    });
     expect(calls[0]?.url).toBe("/api/second-factor/recovery-codes");
     expect(calls[0]?.init?.method).toBe("POST");
+
+    calls = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (u: string, init?: RequestInit) => {
+        calls.push({ url: u, init });
+        return new Response(null, { status: 204 });
+      }),
+    );
+    await secondFactorApi.confirmRecoveryCodes("OFFER");
+    expect(calls[0]?.url).toBe("/api/second-factor/recovery-codes/confirm");
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ offer: "OFFER" });
   });
 
-  it.each(["last_factor", "not_found", "second_factor_required"])(
+  it.each(["last_factor", "not_found", "second_factor_required", "invalid_offer"])(
     "keeps the management refusal %j",
     async (reason) => {
       respond(409, { error: reason });

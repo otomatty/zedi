@@ -1,12 +1,18 @@
 import { Hono } from "hono";
-import { hashAll, requireRecentSecondFactor, type SecondFactorEnv } from "./context";
+import {
+  hashAll,
+  readJsonObject,
+  requireRecentSecondFactor,
+  type SecondFactorEnv,
+} from "./context";
 import { generateRecoveryCodes } from "./recoveryCodes";
+import { openOffer, sealOffer } from "./recoveryOffer";
 import { recentlyVerified } from "./state";
 import * as store from "./store";
 
 /**
  * The settings page's view of the second factor: list the methods, remove one (never the
- * last), and issue new recovery codes. Changes need a second step within the last five
+ * last), and switch to new recovery codes. Changes need a second step within the last five
  * minutes; the user can pass it again from the page (the verify endpoints renew it).
  * 確認方法の一覧・削除（最後の 1 つは消せない）・復旧用コードの作り直し。変更には 5 分以内の 2 段階目が要る。
  */
@@ -56,13 +62,37 @@ export function manageRoutes() {
     return c.body(null, 204);
   });
 
+  // New recovery codes come in two steps, so a lost answer at either one loses no codes: the
+  // offer changes nothing, and confirming it again after the switch changes nothing either.
   routes.post("/recovery-codes", async (c) => {
     const refused = await requireRecentSecondFactor(c);
     if (refused) return refused;
-    const { user } = c.get("current");
+    const { user, sessionId } = c.get("current");
     const recoveryCodes = generateRecoveryCodes();
-    await store.replaceRecoveryCodes(c.env.DB, user.id, await hashAll(recoveryCodes), Date.now());
-    return c.json({ recoveryCodes });
+    const offer = await sealOffer(c.env.BETTER_AUTH_SECRET, {
+      userId: user.id,
+      sessionId,
+      batch: crypto.randomUUID(),
+      hashes: await hashAll(recoveryCodes),
+      now: Date.now(),
+    });
+    return c.json({ recoveryCodes, offer });
+  });
+
+  // The offer itself shows the step was recent when it was made; it lasts ten minutes so the
+  // user has time to save the codes.
+  routes.post("/recovery-codes/confirm", async (c) => {
+    const { user, state, sessionId } = c.get("current");
+    if (state !== "verified") return c.json({ error: "second_factor_required" }, 403);
+    const { offer: sealed } = await readJsonObject(c);
+    const now = Date.now();
+    const offer =
+      typeof sealed === "string"
+        ? await openOffer(c.env.BETTER_AUTH_SECRET, sealed, { userId: user.id, sessionId, now })
+        : null;
+    if (!offer) return c.json({ error: "invalid_offer" }, 400);
+    await store.replaceRecoveryCodes(c.env.DB, user.id, offer.hashes, offer.batch, now);
+    return c.body(null, 204);
   });
 
   return routes;

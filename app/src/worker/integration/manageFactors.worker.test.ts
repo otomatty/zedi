@@ -210,27 +210,103 @@ describe("managing second factors: removing the app", () => {
   });
 });
 
+interface Offered {
+  recoveryCodes: string[];
+  offer: string;
+}
+
+async function offerCodes(jar: CookieJar): Promise<Offered> {
+  const res = await send("POST", "/recovery-codes", jar);
+  expect(res.status).toBe(200);
+  return (await res.json()) as Offered;
+}
+
+/** Tries a recovery code at the second step of a fresh sign-in. */
+async function recoveryCodeWorks(email: string, code: string): Promise<boolean> {
+  const next = await signInFirstFactor(email);
+  return (await postSecondFactor("/recovery-code/verify", next, { code })).status === 200;
+}
+
 describe("managing second factors: new recovery codes", () => {
-  it("replaces every recovery code with ten new ones, shown once", async () => {
-    const { email, jar } = await appUser("new-codes");
+  it("offers ten new codes without changing the current ones", async () => {
+    const { email, jar } = await appUser("offer-codes");
     const old = enrolledFactors(email).recoveryCodes;
-    const res = await send("POST", "/recovery-codes", jar);
-    expect(res.status).toBe(200);
-    const { recoveryCodes } = (await res.json()) as { recoveryCodes: string[] };
+    const { recoveryCodes, offer } = await offerCodes(jar);
     expect(recoveryCodes).toHaveLength(10);
     expect(recoveryCodes).not.toContain(old[0]);
-    expect((await methods(jar)).recoveryCodesRemaining).toBe(10);
-
-    const next = await signInFirstFactor(email);
-    expect((await postSecondFactor("/recovery-code/verify", next, { code: old[0] })).status).toBe(
-      400,
-    );
-    expect(
-      (await postSecondFactor("/recovery-code/verify", next, { code: recoveryCodes[0] })).status,
-    ).toBe(200);
+    expect(typeof offer).toBe("string");
+    // A lost answer loses nothing: the old codes still work and the offered ones do not yet.
+    expect(await recoveryCodeWorks(email, old[0] ?? "")).toBe(true);
+    expect(await recoveryCodeWorks(email, recoveryCodes[0] ?? "")).toBe(false);
+    expect((await methods(jar)).recoveryCodesRemaining).toBe(9);
   });
 
-  it("needs a second step within the last five minutes", async () => {
+  it("switches to the offered codes once confirmed, and confirming again changes nothing", async () => {
+    const { email, jar } = await appUser("switch-codes");
+    const old = enrolledFactors(email).recoveryCodes;
+    const { recoveryCodes, offer } = await offerCodes(jar);
+    expect((await postSecondFactor("/recovery-codes/confirm", jar, { offer })).status).toBe(204);
+    expect((await methods(jar)).recoveryCodesRemaining).toBe(10);
+    expect(await recoveryCodeWorks(email, old[0] ?? "")).toBe(false);
+    expect(await recoveryCodeWorks(email, recoveryCodes[0] ?? "")).toBe(true);
+
+    // A retry after a lost answer: still the same codes, and the used one stays used.
+    expect((await postSecondFactor("/recovery-codes/confirm", jar, { offer })).status).toBe(204);
+    expect((await methods(jar)).recoveryCodesRemaining).toBe(9);
+    expect(await recoveryCodeWorks(email, recoveryCodes[0] ?? "")).toBe(false);
+    expect(await recoveryCodeWorks(email, recoveryCodes[1] ?? "")).toBe(true);
+  });
+
+  it("also drops codes stored without a batch", async () => {
+    const { email, jar } = await appUser("unbatched-codes");
+    await env.DB.prepare("UPDATE recovery_codes SET batch = NULL WHERE user_id = ?1")
+      .bind(await userId(email))
+      .run();
+    const { offer } = await offerCodes(jar);
+    expect((await postSecondFactor("/recovery-codes/confirm", jar, { offer })).status).toBe(204);
+    expect((await methods(jar)).recoveryCodesRemaining).toBe(10);
+    expect(await recoveryCodeWorks(email, enrolledFactors(email).recoveryCodes[0] ?? "")).toBe(
+      false,
+    );
+  });
+
+  it("refuses an offer made for another session or another user, or changed", async () => {
+    const { email, jar } = await appUser("offer-owner");
+    const { offer } = await offerCodes(jar);
+    const otherSession = await signInFirstFactor(email);
+    await passSecondFactor(email, otherSession);
+    const other = await appUser("offer-other");
+    const flipped = `${offer.slice(0, -1)}${offer.endsWith("0") ? "1" : "0"}`;
+    for (const [session, body] of [
+      [otherSession, { offer }],
+      [other.jar, { offer }],
+      [jar, { offer: flipped }],
+      [jar, {}],
+    ] as const) {
+      const res = await postSecondFactor("/recovery-codes/confirm", session, body);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "invalid_offer" });
+    }
+    expect((await methods(jar)).recoveryCodesRemaining).toBe(10);
+  });
+
+  it("confirms an offer after the five minutes, within the offer's own ten", async () => {
+    const { jar } = await appUser("offer-late");
+    const { offer } = await offerCodes(jar);
+    await ageSecondFactor(jar, 6);
+    expect((await postSecondFactor("/recovery-codes/confirm", jar, { offer })).status).toBe(204);
+  });
+
+  it("refuses to confirm for a session that has passed only Google", async () => {
+    const { email, jar } = await appUser("offer-pending");
+    const { offer } = await offerCodes(jar);
+    const pending = await signInFirstFactor(email);
+    const res = await postSecondFactor("/recovery-codes/confirm", pending, { offer });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "second_factor_required" });
+  });
+
+  it("needs a second step within the last five minutes to make an offer", async () => {
     const { jar } = await appUser("new-codes-stale");
     await ageSecondFactor(jar, 6);
     const res = await send("POST", "/recovery-codes", jar);

@@ -342,20 +342,28 @@ export async function deleteTotp(db: D1Database, userId: string): Promise<boolea
   return result.meta.changes > 0;
 }
 
-/** Replaces all of the user's recovery codes (used or not) with new ones, in one transaction. */
+/**
+ * Switches the user to the recovery codes of `batch`, in one transaction: every code of another
+ * batch goes (used or not) and the new ones are added. Running it again for the same batch
+ * changes nothing, so a retried confirmation keeps a code already used from the new set used.
+ * 復旧用コードを `batch` のものに切り替える。同じ batch でもう一度実行しても何も変わらない。
+ */
 export async function replaceRecoveryCodes(
   db: D1Database,
   userId: string,
   codeHashes: string[],
+  batch: string,
   now: number,
 ): Promise<void> {
-  const batch = crypto.randomUUID();
   await db.batch([
-    db.prepare("DELETE FROM recovery_codes WHERE user_id = ?1").bind(userId),
+    db
+      .prepare("DELETE FROM recovery_codes WHERE user_id = ?1 AND batch IS NOT ?2")
+      .bind(userId, batch),
     ...codeHashes.map((hash) =>
       db
         .prepare(
-          "INSERT INTO recovery_codes (user_id, code_hash, created_at, batch) VALUES (?1, ?2, ?3, ?4)",
+          `INSERT OR IGNORE INTO recovery_codes (user_id, code_hash, created_at, batch)
+           VALUES (?1, ?2, ?3, ?4)`,
         )
         .bind(userId, hash, now, batch),
     ),

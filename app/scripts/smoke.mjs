@@ -4,7 +4,7 @@
  * sign-in through the test IdP in the UI with the second factor (registering an authenticator
  * app, then its code on the next sign-in; a passkey on Chromium's virtual authenticator, then
  * the passkey on the next sign-in; the security page adding the app, removing the passkey and
- * making new recovery codes), page creation, editor sync, `#tag` / `[[WikiLink]]` /
+ * switching to new recovery codes once saved), page creation, editor sync, `#tag` / `[[WikiLink]]` /
  * `/` commands, D1 projection + full-text search, infinite list, access control between
  * two users (404 → viewer, read-only), AI streaming, offline use through the service worker
  * (app shell, cached list, local page copies, pages created offline) and sign-out.
@@ -424,9 +424,15 @@ try {
         await passkeyPage.getByRole("button", { name: "削除する" }).click();
         await passkeyPage.getByText("パスキーは登録されていません").waitFor();
 
+        // New codes are shown first and only replace the old ones once saved and switched to.
         await passkeyPage.getByRole("button", { name: "復旧用コードを作り直す" }).click();
         await passkeyPage.waitForSelector("[data-testid=new-recovery-codes] li");
         assert.equal(await passkeyPage.locator("[data-testid=new-recovery-codes] li").count(), 10);
+        const switchTo = passkeyPage.getByRole("button", { name: "このコードに切り替える" });
+        assert.equal(await switchTo.isDisabled(), true);
+        await passkeyPage.check("[data-testid=new-recovery-codes-saved]");
+        await switchTo.click();
+        await passkeyPage.getByText("前のコードは使えなくなりました").waitFor();
         await passkeyPage.getByText("残り 10 個").waitFor();
 
         // Without the passkey, the next sign-in asks for the app's code.

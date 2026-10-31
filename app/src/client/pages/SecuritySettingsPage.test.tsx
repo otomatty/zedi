@@ -42,7 +42,8 @@ function fakeApi(overrides: Partial<SecondFactorApi> = {}): SecondFactorApi {
     methods: vi.fn(async () => methodsOf()),
     deletePasskey: vi.fn(async () => ({})),
     deleteTotp: vi.fn(async () => ({})),
-    newRecoveryCodes: vi.fn(async () => ({ recoveryCodes: CODES })),
+    newRecoveryCodes: vi.fn(async () => ({ recoveryCodes: CODES, offer: "OFFER" })),
+    confirmRecoveryCodes: vi.fn(async () => ({})),
     ...overrides,
   } as SecondFactorApi;
 }
@@ -72,6 +73,13 @@ async function click(container: HTMLElement, name: string) {
   const button = (await findByRole(container, "button", { name })) as HTMLButtonElement;
   await waitFor(() => expect(button.disabled).toBe(false));
   fireEvent.click(button);
+}
+
+/** Ticks "the new codes are saved". */
+async function saved(container: HTMLElement) {
+  const box = (await findByLabelText(container, "新しいコードを保存しました")) as HTMLInputElement;
+  fireEvent.click(box);
+  expect(box.checked).toBe(true);
 }
 
 /** Submits a code form (see SecondFactorPage.test.tsx for why the event carries `detail`). */
@@ -243,15 +251,6 @@ describe("SecuritySettingsPage: changes", () => {
     await waitFor(() => expect(api.deleteTotp).toHaveBeenCalledTimes(1));
   });
 
-  it("makes new recovery codes and shows them once", async () => {
-    const api = fakeApi();
-    const { container } = mount(api);
-    await click(container, "復旧用コードを作り直す");
-    const list = await findByRole(container, "list", { name: "新しい復旧用コード" });
-    expect([...list.querySelectorAll("li")].map((li) => li.textContent)).toEqual(CODES);
-    expect(container.textContent).toContain("前のコードは使えなくなりました");
-  });
-
   it("adds a passkey", async () => {
     const api = fakeApi();
     const { container, webauthn } = mount(api);
@@ -296,5 +295,69 @@ describe("SecuritySettingsPage: changes", () => {
     await enter(container, "6 桁のコード", "654321", "登録する");
     await waitFor(() => expect(api.confirmEnrollment).toHaveBeenCalledWith("654321"));
     await waitFor(() => expect(api.methods).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("SecuritySettingsPage: new recovery codes", () => {
+  it("shows new recovery codes, and switches to them once the user saved them", async () => {
+    const api = fakeApi();
+    const { container } = mount(api);
+    await click(container, "復旧用コードを作り直す");
+    const list = await findByRole(container, "list", { name: "新しい復旧用コード" });
+    expect([...list.querySelectorAll("li")].map((li) => li.textContent)).toEqual(CODES);
+    expect(container.textContent).toContain("切り替えるまでは前のコードが使えます");
+    const switchTo = (await findByRole(container, "button", {
+      name: "このコードに切り替える",
+    })) as HTMLButtonElement;
+    expect(switchTo.disabled).toBe(true);
+
+    await saved(container);
+    await click(container, "このコードに切り替える");
+    await waitFor(() => expect(api.confirmRecoveryCodes).toHaveBeenCalledWith("OFFER"));
+    await waitFor(() => expect(container.textContent).toContain("前のコードは使えなくなりました"));
+    expect(api.methods).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the new codes on screen when switching fails, so it can be tried again", async () => {
+    const confirmRecoveryCodes = vi
+      .fn<SecondFactorApi["confirmRecoveryCodes"]>()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValue({});
+    const { container } = mount(fakeApi({ confirmRecoveryCodes }));
+    await click(container, "復旧用コードを作り直す");
+    await saved(container);
+    await click(container, "このコードに切り替える");
+    await findByRole(container, "alert");
+    await findByRole(container, "list", { name: "新しい復旧用コード" });
+    await click(container, "このコードに切り替える");
+    await waitFor(() => expect(confirmRecoveryCodes).toHaveBeenCalledTimes(2));
+    expect(confirmRecoveryCodes).toHaveBeenLastCalledWith("OFFER");
+    await waitFor(() => expect(container.textContent).toContain("前のコードは使えなくなりました"));
+  });
+
+  it("says the old codes still work when the offer ran out", async () => {
+    const api = fakeApi({
+      confirmRecoveryCodes: vi.fn(async () => {
+        throw new SecondFactorError("invalid_offer");
+      }),
+    });
+    const { container } = mount(api);
+    await click(container, "復旧用コードを作り直す");
+    await saved(container);
+    await click(container, "このコードに切り替える");
+    expect((await findByRole(container, "alert")).textContent).toContain(
+      "前のコードはそのまま使えます",
+    );
+    expect(queryByRole(container, "list", { name: "新しい復旧用コード" })).toBeNull();
+  });
+
+  it("can leave the new codes without switching", async () => {
+    const api = fakeApi();
+    const { container } = mount(api);
+    await click(container, "復旧用コードを作り直す");
+    await findByRole(container, "list", { name: "新しい復旧用コード" });
+    await click(container, "やめる");
+    expect(queryByRole(container, "list", { name: "新しい復旧用コード" })).toBeNull();
+    expect(api.confirmRecoveryCodes).not.toHaveBeenCalled();
   });
 });

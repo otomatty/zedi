@@ -8,6 +8,7 @@ describe("messageFor", () => {
     ["invalid_passkey", "パスキーを確認できませんでした"],
     ["reverification_required", "もう一度確認してください"],
     ["last_factor", "最後の確認方法は削除できません"],
+    ["invalid_offer", "前のコードはそのまま使えます"],
   ] as const)("explains %s", (reason, text) => {
     expect(messageFor(new SecondFactorError(reason))).toContain(text);
   });

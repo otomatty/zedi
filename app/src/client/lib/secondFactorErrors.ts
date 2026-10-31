@@ -27,6 +27,8 @@ const REFUSAL_MESSAGES: Partial<Record<SecondFactorError["reason"], string>> = {
     "確認してから時間が経ったため、この操作はできません。もう一度確認してください。",
   last_factor: "最後の確認方法は削除できません。先に別の方法を登録してください。",
   not_found: "見つかりませんでした。画面を読み込み直してください。",
+  invalid_offer:
+    "時間が経ったため切り替えられませんでした。前のコードはそのまま使えます。もう一度作り直してください。",
 };
 
 /**
