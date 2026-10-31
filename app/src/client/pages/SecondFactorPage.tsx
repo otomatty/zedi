@@ -1,17 +1,11 @@
 import { useEffect, useRef, useState } from "hono/jsx/dom";
+import { messageFor, prompt, refusedAs } from "../lib/secondFactorErrors";
 import {
   browserWebAuthn,
-  passkeyFailure,
-  type PasskeyFailure,
   type PublicKeyCredentialCreationOptionsJSON,
   type WebAuthnClient,
 } from "../lib/webauthn";
-import {
-  SecondFactorError,
-  secondFactorApi,
-  type SecondFactorApi,
-  type SecondFactorStatus,
-} from "../secondFactorApi";
+import { secondFactorApi, type SecondFactorApi, type SecondFactorStatus } from "../secondFactorApi";
 import {
   ChooseView,
   PasskeyEnrollView,
@@ -34,52 +28,6 @@ type View =
     }
   | { kind: "suggest"; other: "passkey" | "totp" }
   | { kind: "verify"; method: VerifyMethod; available: Record<VerifyMethod, boolean> };
-
-/** A passkey prompt that ended without a credential. */
-class PasskeyPromptError extends Error {
-  constructor(readonly failure: PasskeyFailure) {
-    super(failure);
-  }
-}
-
-const refusedAs = (error: unknown, reason: SecondFactorError["reason"]) =>
-  error instanceof SecondFactorError && error.reason === reason;
-
-const PROMPT_MESSAGES: Record<PasskeyFailure, string> = {
-  cancelled: "パスキーの操作が取り消されました。もう一度お試しください。",
-  alreadyRegistered: "この端末のパスキーはすでに登録されています。",
-  failed: "パスキーを使えませんでした。別の方法をお試しください。",
-};
-
-const REFUSAL_MESSAGES: Partial<Record<SecondFactorError["reason"], string>> = {
-  invalid_code: "コードが正しくありません。もう一度入力してください。",
-  invalid_passkey: "パスキーを確認できませんでした。もう一度お試しください。",
-  no_pending_registration: "パスキーを確認できませんでした。もう一度お試しください。",
-  reverification_required:
-    "サインインしてから時間が経ったため、ここでは追加できません。次のサインインのあとにお試しください。",
-};
-
-function messageFor(error: unknown): string {
-  if (error instanceof PasskeyPromptError) return PROMPT_MESSAGES[error.failure];
-  if (error instanceof SecondFactorError) {
-    if (error.reason === "too_many_attempts") {
-      const minutes = Math.max(1, Math.ceil((error.retryAfterSeconds ?? 15 * 60) / 60));
-      return `試行回数が上限に達しました。${minutes} 分ほど待ってから再度お試しください。`;
-    }
-    const message = REFUSAL_MESSAGES[error.reason];
-    if (message) return message;
-  }
-  return "確認できませんでした。時間をおいて再度お試しください。";
-}
-
-/** Runs a passkey prompt, turning its errors into `PasskeyPromptError`. */
-async function prompt<T>(run: () => Promise<T>): Promise<T> {
-  try {
-    return await run();
-  } catch (error) {
-    throw new PasskeyPromptError(passkeyFailure(error));
-  }
-}
 
 /** The view a loaded status leads to; null once the session has passed the second step. */
 function viewFor(status: SecondFactorStatus, passkeySupported: boolean): View | null {

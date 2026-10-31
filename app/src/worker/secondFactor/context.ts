@@ -35,6 +35,20 @@ export async function limitAttempts(c: SecondFactorContext): Promise<Response | 
 }
 
 /**
+ * Sensitive changes (removing a method, new recovery codes) need a session that passed the
+ * second step within the last five minutes, read from D1 rather than the cookie cache. Returns
+ * the refusal, or null when the change may go ahead.
+ * 大事な変更には、5 分以内に 2 段階目を通ったセッションが要る（D1 から読む）。拒否の応答か null を返す。
+ */
+export async function requireRecentSecondFactor(c: SecondFactorContext): Promise<Response | null> {
+  const { state, sessionId } = c.get("current");
+  if (state !== "verified") return c.json({ error: "second_factor_required" }, 403);
+  const at = await store.secondFactorAt(c.env.DB, sessionId);
+  if (!recentlyVerified(at, Date.now())) return c.json({ error: "reverification_required" }, 403);
+  return null;
+}
+
+/**
  * Who may register a second-factor method: anyone signed in with Google while the user has
  * none (the first one, which also issues the recovery codes), and otherwise only a session
  * that passed the second step within the last five minutes, read from D1. Google alone gets

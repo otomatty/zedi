@@ -287,6 +287,81 @@ export async function savePasskey(
   return (inserted?.meta.changes ?? 0) > 0;
 }
 
+/** A passkey as the settings page lists it. */
+export interface PasskeySummary {
+  id: string;
+  name: string;
+  createdAt: number;
+  lastUsedAt: number | null;
+}
+
+/** The user's passkeys for the settings page, oldest first. */
+export async function describePasskeys(db: D1Database, userId: string): Promise<PasskeySummary[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, name, created_at, last_used_at FROM passkeys WHERE user_id = ?1
+       ORDER BY created_at, id`,
+    )
+    .bind(userId)
+    .all<{ id: string; name: string; created_at: number; last_used_at: number | null }>();
+  return results.map((row) => ({
+    id: row.id,
+    name: row.name,
+    createdAt: row.created_at,
+    lastUsedAt: row.last_used_at,
+  }));
+}
+
+/**
+ * Removes one of the user's passkeys, only if another method is left (another passkey or a
+ * confirmed app). The condition is part of the statement, so two removals racing cannot leave
+ * the user with none.
+ * パスキーを消す。ほかの確認方法が残るときだけで、その条件は同じ文の中で確かめる。
+ */
+export async function deletePasskey(db: D1Database, userId: string, id: string): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `DELETE FROM passkeys WHERE user_id = ?1 AND id = ?2
+         AND (EXISTS (SELECT 1 FROM passkeys WHERE user_id = ?1 AND id <> ?2)
+              OR EXISTS (SELECT 1 FROM totp_factors WHERE user_id = ?1 AND confirmed_at IS NOT NULL))`,
+    )
+    .bind(userId, id)
+    .run();
+  return result.meta.changes > 0;
+}
+
+/** Removes the user's confirmed app, only if a passkey is left (checked in the statement). */
+export async function deleteTotp(db: D1Database, userId: string): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `DELETE FROM totp_factors WHERE user_id = ?1 AND confirmed_at IS NOT NULL
+         AND EXISTS (SELECT 1 FROM passkeys WHERE user_id = ?1)`,
+    )
+    .bind(userId)
+    .run();
+  return result.meta.changes > 0;
+}
+
+/** Replaces all of the user's recovery codes (used or not) with new ones, in one transaction. */
+export async function replaceRecoveryCodes(
+  db: D1Database,
+  userId: string,
+  codeHashes: string[],
+  now: number,
+): Promise<void> {
+  const batch = crypto.randomUUID();
+  await db.batch([
+    db.prepare("DELETE FROM recovery_codes WHERE user_id = ?1").bind(userId),
+    ...codeHashes.map((hash) =>
+      db
+        .prepare(
+          "INSERT INTO recovery_codes (user_id, code_hash, created_at, batch) VALUES (?1, ?2, ?3, ?4)",
+        )
+        .bind(userId, hash, now, batch),
+    ),
+  ]);
+}
+
 /**
  * Records a sign-in with a passkey: the new signature counter, only if the stored one is still
  * the one the assertion was checked against (two sign-ins racing cannot both pass).
