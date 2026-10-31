@@ -12,8 +12,8 @@ const CODES = Array.from({ length: 10 }, (_, i) => `AAAA-BBBB-CCCC-${String(i).p
 function fakeApi(overrides: Partial<SecondFactorApi> = {}): SecondFactorApi {
   return {
     status: vi.fn(async () => ({ verified: false, totp: false, recoveryCodesRemaining: 0 })),
-    startEnrollment: vi.fn(async () => ({ secret: SECRET, uri: URI })),
-    confirmEnrollment: vi.fn(async () => ({ recoveryCodes: CODES })),
+    startEnrollment: vi.fn(async () => ({ secret: SECRET, uri: URI, recoveryCodes: CODES })),
+    confirmEnrollment: vi.fn(async () => ({})),
     verifyTotp: vi.fn(async () => ({})),
     verifyRecoveryCode: vi.fn(async () => ({ recoveryCodesRemaining: 9 })),
     ...overrides,
@@ -51,10 +51,16 @@ async function enter(container: HTMLElement, label: string, value: string, butto
   );
 }
 
+/** Ticks "the recovery codes are saved". */
+async function confirmSaved(container: HTMLElement) {
+  const box = (await findByLabelText(container, "復旧用コードを保存しました")) as HTMLInputElement;
+  fireEvent.click(box);
+  expect(box.checked).toBe(true);
+}
+
 describe("SecondFactorPage: registering an authenticator app", () => {
-  it("shows the QR code and the secret, and takes the first code", async () => {
-    const api = fakeApi();
-    const { container } = mount(api);
+  it("shows the QR code, the secret and the recovery codes together", async () => {
+    const { container } = mount(fakeApi());
 
     expect(await findByRole(container, "img", { name: "認証アプリ用の QR コード" })).toBeTruthy();
     expect(container.querySelector("[data-testid=totp-secret]")?.textContent).toBe(
@@ -62,37 +68,46 @@ describe("SecondFactorPage: registering an authenticator app", () => {
     );
     const open = await findByRole(container, "link", { name: "この端末の認証アプリで開く" });
     expect(open.getAttribute("href")).toBe(URI);
-
-    await enter(container, "6 桁のコード", "123 456", "登録する");
-    await waitFor(() => expect(api.confirmEnrollment).toHaveBeenCalledWith("123 456"));
-  });
-
-  it("shows the recovery codes once, and continues only after the user says they saved them", async () => {
-    const { container, onSessionChange } = mount(fakeApi());
-    await enter(container, "6 桁のコード", "123456", "登録する");
-
     const list = await findByRole(container, "list", { name: "復旧用コード" });
     expect([...list.querySelectorAll("li")].map((li) => li.textContent)).toEqual(CODES);
-    expect(onSessionChange).not.toHaveBeenCalled();
+  });
 
-    fireEvent.click(await findByRole(container, "button", { name: "保存しました" }));
-    expect(onSessionChange).toHaveBeenCalledTimes(1);
+  it("takes the first code only once the user says the recovery codes are saved", async () => {
+    // 確定の応答が失われてもよいように、コードは確定の前に見せて保存してもらう。
+    // The codes are shown and saved before confirming, so a lost confirmation loses nothing.
+    const api = fakeApi();
+    const { container, onSessionChange } = mount(api);
+    const submit = (await findByRole(container, "button", {
+      name: "登録する",
+    })) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    await enter(container, "6 桁のコード", "123456", "登録する");
+    expect(api.confirmEnrollment).not.toHaveBeenCalled();
+
+    await confirmSaved(container);
+    expect(submit.disabled).toBe(false);
+    await enter(container, "6 桁のコード", "123 456", "登録する");
+
+    await waitFor(() => expect(onSessionChange).toHaveBeenCalledTimes(1));
+    expect(api.confirmEnrollment).toHaveBeenCalledWith("123 456");
   });
 
   it("says a wrong code is wrong, and lets the user try again", async () => {
     const confirmEnrollment = vi
       .fn<SecondFactorApi["confirmEnrollment"]>()
       .mockRejectedValueOnce(new SecondFactorError("invalid_code"))
-      .mockResolvedValueOnce({ recoveryCodes: CODES });
-    const { container } = mount(fakeApi({ confirmEnrollment }));
+      .mockResolvedValueOnce({});
+    const { container, onSessionChange } = mount(fakeApi({ confirmEnrollment }));
+    await confirmSaved(container);
 
     await enter(container, "6 桁のコード", "000000", "登録する");
     expect((await findByRole(container, "alert")).textContent).toContain(
       "コードが正しくありません",
     );
+    expect(onSessionChange).not.toHaveBeenCalled();
 
     await enter(container, "6 桁のコード", "123456", "登録する");
-    expect(await findByRole(container, "list", { name: "復旧用コード" })).toBeTruthy();
+    await waitFor(() => expect(onSessionChange).toHaveBeenCalledTimes(1));
   });
 
   it("keeps the same secret when the parent re-renders with a new callback", async () => {

@@ -34,9 +34,9 @@ One Cloudflare Worker serves everything (`wrangler.jsonc`). The front end and th
 A Google sign-in only opens the second step: every user needs an authenticator app (TOTP) as well. Passkeys come next (otomatty/zedi#1156).
 
 - **The session records when it passed the second step** (`session.second_factor_at`). Until then, `/api/*` and the collaborative editing WebSocket (`/parties/*`) answer 403 `second_factor_required`, and so do Better Auth's account endpoints. Starting and finishing the Google sign-in, reading the session, signing out and `/api/second-factor/*` stay open.
-- **An unverified session lasts ten minutes**; after that it is deleted and the API answers 401.
+- **An unverified session lasts ten minutes**; after that it is deleted, the API answers 401 and Better Auth's `get-session` reports no session.
 - **The first time, the user registers an app** (`POST /api/second-factor/totp/enrollment`, then `…/confirm` with its first code), which is allowed only while the user has no app, so Google alone can never replace one. The secret is stored encrypted (XChaCha20-Poly1305 under a key derived from `BETTER_AUTH_SECRET`).
-- **Ten recovery codes are shown once** when the app is confirmed. They are stored as SHA-256 hashes and each works once (`POST /api/second-factor/recovery-code/verify`).
+- **Ten recovery codes are shown once**, with the QR code when registration starts; the user ticks that they saved them before entering the first code, so a lost confirmation response loses nothing. They only work once the app is confirmed, are stored as SHA-256 hashes, and each works once (`POST /api/second-factor/recovery-code/verify`).
 - **Afterwards the user enters the app's code** (`POST /api/second-factor/totp/verify`). A code that was already used is refused, even while it is still inside its time window.
 - **Five attempts per user per 15 minutes**, counted before the code is checked; then 429 with `Retry-After`. A successful second step clears the count.
 - The Better Auth `twoFactor` plugin is not used because it only steps in after password, username and phone sign-ins, never after Google (see otomatty/zedi#1156).
@@ -84,7 +84,7 @@ The manifest and icon live in `src/client/public/`. The service worker (`src/cli
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `/assets/*` (hashed build output)                         | Precached at install, cache first                                                          |
 | Page navigations                                          | Network first; offline, the cached app shell (`/` is the SSR page online, the SPA offline) |
-| `/api/me`, `/api/notes/:id/pages`, `/api/pages/:id` (GET) | Network first, keeping the last 200 response; a 401 deletes the API cache                  |
+| `/api/me`, `/api/notes/:id/pages`, `/api/pages/:id` (GET) | Network first, keeping the last 200 response; a 401 or 403 deletes the API cache           |
 | Auth, search, AI, realtime, every write, other origins    | Not handled (straight to the network)                                                      |
 
 On top of that:
@@ -115,7 +115,7 @@ Spec for splitting web clips and PDF text into pages, based on the large-documen
 - Offline use as a PWA: cached lists and visited pages, editing and creating pages offline, sync on reconnect
 - A long-page warning in the editor and a splitter for long imported content (the import UI itself is not built)
 
-**Not yet built**: most features of the current app (real LLM calls, AI drafting, web clipping, billing, the admin console, MCP and so on), two-factor authentication (otomatty/zedi#1156), checking the real Google round trip (by hand on staging), code syntax highlighting, i18n.
+**Not yet built**: most features of the current app (real LLM calls, AI drafting, web clipping, billing, the admin console, MCP and so on), passkeys, re-checking the second factor before sensitive operations and the recovery procedure for users who lost every factor (otomatty/zedi#1156), checking the real Google round trip (by hand on staging), code syntax highlighting, i18n.
 
 ## Commands
 
@@ -158,7 +158,7 @@ In CI (`.github/workflows/ci.yml`), `app-test` runs the type checks, unit and in
 | Kind                                          | Count     | Scope                                       |
 | --------------------------------------------- | --------- | ------------------------------------------- |
 | Unit (Vitest, Node / happy-dom)               | 257       | See below                                   |
-| Integration (Vitest, workerd with D1 and DOs) | 49        | Migrations apply the same SQL as production |
+| Integration (Vitest, workerd with D1 and DOs) | 54        | Migrations apply the same SQL as production |
 | Browser (`bun run smoke`)                     | 20 checks | See below                                   |
 
 Unit tests cover:
@@ -177,7 +177,7 @@ Unit tests cover:
 - `hono/jsx/dom` components (Testing Library): the command palette, the search palette (starts empty when reopened), the list (a failed later page and its retry), the editor (viewers stay read-only with `?collab=0`)
 - Test IdP: redirects limited to the callback on the same origin, PKCE, the password and domain checks, and expired, tampered or swapped codes and tokens
 - Sign-in page: offers only the enabled providers, and shows errors with a retry when loading or starting fails
-- Second factor: TOTP against the RFC 6238 test vectors and its ±1 step window, the otpauth URI, recovery codes (format, typing variants, hashes), the encrypted secret (tampering, other keys), the ten-minute limit for unverified sessions, the QR code, the API client's error handling, and the screen (registering with the QR code and the secret, recovery codes shown once, the app's code, a recovery code, wrong codes, waiting after too many attempts, running out of time, sign-out)
+- Second factor: TOTP against the RFC 6238 test vectors and its ±1 step window, the otpauth URI, recovery codes (format, typing variants, hashes), the encrypted secret (tampering, other keys), the ten-minute limit for unverified sessions, the QR code, the API client's error handling, and the screen (registering with the QR code and the secret, recovery codes shown once and saved before the first code, the app's code, a recovery code, wrong codes, waiting after too many attempts, running out of time, sign-out)
 - `/api/me`: the second-factor answer, and the service worker drops cached data on 403 as on 401
 - Config: the deployable `wrangler.jsonc` never turns development mode on, production has no test IdP, and the test IdP has no public URL or route
 
@@ -198,7 +198,7 @@ Integration tests cover:
 
 Browser checks:
 
-- Sign-in through the UI: the second factor is asked for first (the API answers 403), the authenticator app is registered from the QR screen, the recovery codes are shown, and signing in again asks for the app's code
+- Sign-in through the UI: the second factor is asked for first (the API answers 403), the QR screen shows the recovery codes and accepts the first code only once they are saved, and signing in again asks for the app's code
 - Page creation and connecting to its DO
 - Tags, WikiLinks and slash commands
 - The other tab shows a remote caret

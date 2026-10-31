@@ -387,6 +387,11 @@ h1 {
   background: none;
   color: var(--accent);
 }
+.sign-in .checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
 .qr-code {
   align-self: center;
 }

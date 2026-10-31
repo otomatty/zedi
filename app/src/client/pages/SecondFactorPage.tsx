@@ -5,8 +5,7 @@ import { SecondFactorError, secondFactorApi, type SecondFactorApi } from "../sec
 type View =
   | { kind: "loading" }
   | { kind: "loadFailed" }
-  | { kind: "enroll"; secret: string; uri: string }
-  | { kind: "recoveryCodes"; codes: string[] }
+  | { kind: "enroll"; secret: string; uri: string; recoveryCodes: string[] }
   | { kind: "verify"; method: "totp" | "recovery" };
 
 const refusedAs = (error: unknown, reason: SecondFactorError["reason"]) =>
@@ -55,6 +54,7 @@ function CodeForm({
   label: string;
   button: string;
   numeric: boolean;
+  /** Keeps the form from being sent (a request in flight, or a step still to do). */
   busy: boolean;
   testId: string;
   onSubmit: (code: string) => void;
@@ -63,6 +63,7 @@ function CodeForm({
     <form
       onSubmit={(event: Event) => {
         event.preventDefault();
+        if (busy) return;
         const form = event.currentTarget as HTMLFormElement;
         onSubmit(String(new FormData(form).get("code") ?? ""));
       }}
@@ -87,20 +88,22 @@ function CodeForm({
 function EnrollView({
   secret,
   uri,
+  recoveryCodes,
   busy,
   onSubmit,
 }: {
   secret: string;
   uri: string;
+  recoveryCodes: string[];
   busy: boolean;
   onSubmit: (code: string) => void;
 }) {
+  const [saved, setSaved] = useState(false);
   return (
     <section>
       <p>
         Zedi では、Google のサインインに加えて 2 段階目の確認が必要です。認証アプリ（Google
-        Authenticator や 1Password など）でこの QR コードを読み取り、表示された 6
-        桁のコードを入力してください。
+        Authenticator や 1Password など）でこの QR コードを読み取ってください。
       </p>
       <QrCode text={uri} />
       <p class="muted">
@@ -110,34 +113,33 @@ function EnrollView({
       <p>
         <a href={uri}>この端末の認証アプリで開く</a>
       </p>
-      <CodeForm
-        label="6 桁のコード"
-        button="登録する"
-        numeric
-        busy={busy}
-        testId="totp-code"
-        onSubmit={onSubmit}
-      />
-    </section>
-  );
-}
-
-function RecoveryCodesView({ codes, onSaved }: { codes: string[]; onSaved: () => void }) {
-  return (
-    <section>
       <h2>復旧用コードを保存してください</h2>
       <p>
         認証アプリを使えなくなったときに、ここに並んだコードでサインインできます。1 つにつき 1
         回だけ使えます。このコードは今しか表示されません。
       </p>
       <ol aria-label="復旧用コード" class="recovery-codes" data-testid="recovery-codes">
-        {codes.map((code) => (
+        {recoveryCodes.map((code) => (
           <li>{code}</li>
         ))}
       </ol>
-      <button type="button" onClick={onSaved} data-testid="recovery-codes-saved">
-        保存しました
-      </button>
+      <label class="checkbox">
+        <input
+          type="checkbox"
+          checked={saved}
+          onChange={(event: Event) => setSaved((event.target as HTMLInputElement).checked)}
+          data-testid="recovery-codes-saved"
+        />
+        復旧用コードを保存しました
+      </label>
+      <CodeForm
+        label="6 桁のコード"
+        button="登録する"
+        numeric
+        busy={busy || !saved}
+        testId="totp-code"
+        onSubmit={onSubmit}
+      />
     </section>
   );
 }
@@ -177,10 +179,11 @@ function VerifyView({
 }
 
 /**
- * The second step after Google sign-in: register an authenticator app the first time (then
- * show the recovery codes once), and afterwards enter its code or a recovery code.
- * Google のサインインのあとの 2 段階目。初回は認証アプリを登録して復旧用コードを一度だけ表示し、
- * 2 回目以降はそのコードか復旧用コードを入力する。
+ * The second step after Google sign-in: register an authenticator app the first time (its
+ * recovery codes are shown once, and saved before the first code confirms the app), and
+ * afterwards enter its code or a recovery code.
+ * Google のサインインのあとの 2 段階目。初回は認証アプリを登録する（復旧用コードを一度だけ表示し、
+ * 保存してから最初のコードで確定する）。2 回目以降はそのコードか復旧用コードを入力する。
  */
 export function SecondFactorPage({
   api = secondFactorApi,
@@ -273,17 +276,15 @@ export function SecondFactorPage({
         <EnrollView
           secret={view.secret}
           uri={view.uri}
+          recoveryCodes={view.recoveryCodes}
           busy={busy}
           onSubmit={(code) =>
             submit(async () => {
-              const { recoveryCodes } = await api.confirmEnrollment(code);
-              setView({ kind: "recoveryCodes", codes: recoveryCodes });
+              await api.confirmEnrollment(code);
+              onSessionChange();
             })
           }
         />
-      )}
-      {view.kind === "recoveryCodes" && (
-        <RecoveryCodesView codes={view.codes} onSaved={onSessionChange} />
       )}
       {view.kind === "verify" && (
         <VerifyView
@@ -300,11 +301,9 @@ export function SecondFactorPage({
         />
       )}
       {error && <p role="alert">{error}</p>}
-      {view.kind !== "recoveryCodes" && (
-        <button type="button" class="link-button" onClick={() => void signOut()}>
-          サインアウト
-        </button>
-      )}
+      <button type="button" class="link-button" onClick={() => void signOut()}>
+        サインアウト
+      </button>
     </main>
   );
 }

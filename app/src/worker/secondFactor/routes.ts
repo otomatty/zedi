@@ -84,15 +84,19 @@ export function secondFactorRoutes() {
     });
   });
 
-  // Only while the user has no app: Google alone must never be enough to replace one.
+  // Only while the user has no app: Google alone must never be enough to replace one. The
+  // recovery codes come now, before the first code, so a lost confirmation loses nothing.
   routes.post("/totp/enrollment", async (c) => {
     const { user } = c.get("current");
     const secret = generateTotpSecret();
     const sealed = await sealSecret(c.env.BETTER_AUTH_SECRET, secret);
-    if (!(await store.savePendingTotp(c.env.DB, user.id, sealed, Date.now()))) {
+    const recoveryCodes = generateRecoveryCodes();
+    const hashes = (await Promise.all(recoveryCodes.map(hashRecoveryCode))) as string[];
+    if (!(await store.savePendingEnrollment(c.env.DB, user.id, sealed, hashes, Date.now()))) {
       return c.json({ error: "already_enrolled" }, 409);
     }
-    return c.json({ secret, uri: totpUri({ secret, account: user.email, issuer: ISSUER }) });
+    const uri = totpUri({ secret, account: user.email, issuer: ISSUER });
+    return c.json({ secret, uri, recoveryCodes });
   });
 
   routes.post("/totp/enrollment/confirm", async (c) => {
@@ -112,10 +116,7 @@ export function secondFactorRoutes() {
     if (!(await store.confirmTotp(c.env.DB, user.id, totp.sealedSecret, step, now))) {
       return c.json({ error: "no_pending_enrollment" }, 409);
     }
-    const recoveryCodes = generateRecoveryCodes();
-    const hashes = await Promise.all(recoveryCodes.map(hashRecoveryCode));
-    await store.replaceRecoveryCodes(c.env.DB, user.id, hashes as string[], now);
-    return finishVerification(c, { recoveryCodes });
+    return finishVerification(c, {});
   });
 
   routes.post("/totp/verify", async (c) => {

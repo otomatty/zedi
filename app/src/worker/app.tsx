@@ -29,12 +29,13 @@ interface SessionUser {
 type AppEnv = { Bindings: Env; Variables: { user: SessionUser } };
 
 /**
- * Better Auth endpoints a session may use before the second factor: starting and finishing the
- * Google (or test IdP) sign-in, reading the session, signing out, and the error page.
- * 2 段階目の前でも使える Better Auth の窓口（サインインの開始と完了、セッションの取得、サインアウト）。
+ * Better Auth endpoints that need no check of the current session: starting and finishing the
+ * Google (or test IdP) sign-in, which replaces it, signing out, and the error page.
+ * 今のセッションを確かめなくてよい Better Auth の窓口（サインインの開始と完了、サインアウトなど）。
  */
-const OPEN_TO_UNVERIFIED =
-  /^\/api\/auth\/(?:sign-in\/(?:social|oauth2)|(?:oauth2\/)?callback\/[^/]+|get-session|sign-out|error|ok)$/;
+const SIGN_IN_FLOW =
+  /^\/api\/auth\/(?:sign-in\/(?:social|oauth2)|(?:oauth2\/)?callback\/[^/]+|sign-out|error|ok)$/;
+const GET_SESSION = "/api/auth/get-session";
 
 /** Page ids are UUIDs; clients may generate them when creating pages offline. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -80,13 +81,19 @@ export function createApp({ routeRealtime }: { routeRealtime?: RealtimeRouter } 
   const app = new Hono<AppEnv>();
 
   app.get("/", (c) => c.html(`<!DOCTYPE html>${(<Landing />).toString()}`));
-  // Better Auth. A session that has passed only Google may finish signing in or sign out;
-  // its account endpoints (sessions, linked accounts, profile) wait for the second factor.
+  // Better Auth. A session that has passed only Google may finish signing in, read itself or
+  // sign out; its account endpoints (sessions, linked accounts, profile) wait for the second
+  // factor. Once its ten minutes are up it is gone everywhere, get-session included.
   app.on(["GET", "POST"], "/api/auth/*", async (c) => {
-    if (!OPEN_TO_UNVERIFIED.test(c.req.path)) {
+    if (!SIGN_IN_FLOW.test(c.req.path)) {
       const current = await currentSession(c.env, c.req.raw);
-      if (current?.state === "expired") return c.json({ error: "unauthorized" }, 401);
-      if (current?.state === "pending") return c.json({ error: "second_factor_required" }, 403);
+      const getSession = c.req.path === GET_SESSION;
+      if (current?.state === "expired") {
+        return getSession ? c.json(null) : c.json({ error: "unauthorized" }, 401);
+      }
+      if (current?.state === "pending" && !getSession) {
+        return c.json({ error: "second_factor_required" }, 403);
+      }
     }
     return getAuth(c.env, c.req.url).handler(c.req.raw);
   });

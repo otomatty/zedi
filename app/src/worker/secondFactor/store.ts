@@ -33,26 +33,43 @@ export async function countRecoveryCodes(db: D1Database, userId: string): Promis
   return row?.n ?? 0;
 }
 
+/** No confirmed authenticator app for user ?1 (guards writes that only enrollment may make). */
+const NOT_ENROLLED =
+  "NOT EXISTS (SELECT 1 FROM totp_factors WHERE user_id = ?1 AND confirmed_at IS NOT NULL)";
+
 /**
- * Stores a new pending secret, replacing an earlier pending one. Returns false when the user
- * already has a confirmed app, which is left untouched.
- * 未確定の秘密鍵を保存する（前の未確定分は置き換える）。確定済みの認証アプリがあれば false。
+ * Stores a new pending secret and its recovery codes, replacing an earlier pending enrollment.
+ * Returns false, and changes nothing, when the user already has a confirmed app. The codes are
+ * handed out with the secret so a lost confirmation response loses nothing; they only work
+ * once the app is confirmed.
+ * 未確定の秘密鍵と復旧用コードを保存する（前の未確定分は置き換える）。確定済みなら何も変えず false。
  */
-export async function savePendingTotp(
+export async function savePendingEnrollment(
   db: D1Database,
   userId: string,
   sealedSecret: string,
+  codeHashes: string[],
   now: number,
 ): Promise<boolean> {
-  const result = await db
-    .prepare(
-      `INSERT INTO totp_factors (user_id, secret, created_at) VALUES (?1, ?2, ?3)
-       ON CONFLICT (user_id) DO UPDATE SET secret = excluded.secret, created_at = excluded.created_at
-       WHERE totp_factors.confirmed_at IS NULL`,
-    )
-    .bind(userId, sealedSecret, now)
-    .run();
-  return result.meta.changes > 0;
+  const [saved] = await db.batch([
+    db
+      .prepare(
+        `INSERT INTO totp_factors (user_id, secret, created_at) VALUES (?1, ?2, ?3)
+         ON CONFLICT (user_id) DO UPDATE SET secret = excluded.secret, created_at = excluded.created_at
+         WHERE totp_factors.confirmed_at IS NULL`,
+      )
+      .bind(userId, sealedSecret, now),
+    db.prepare(`DELETE FROM recovery_codes WHERE user_id = ?1 AND ${NOT_ENROLLED}`).bind(userId),
+    ...codeHashes.map((hash) =>
+      db
+        .prepare(
+          `INSERT INTO recovery_codes (user_id, code_hash, created_at)
+           SELECT ?1, ?2, ?3 WHERE ${NOT_ENROLLED}`,
+        )
+        .bind(userId, hash, now),
+    ),
+  ]);
+  return (saved?.meta.changes ?? 0) > 0;
 }
 
 /**
@@ -89,24 +106,10 @@ export async function useTotpStep(db: D1Database, userId: string, step: number):
   return result.meta.changes > 0;
 }
 
-/** Replaces the user's recovery codes with `hashes`. */
-export async function replaceRecoveryCodes(
-  db: D1Database,
-  userId: string,
-  hashes: string[],
-  now: number,
-): Promise<void> {
-  await db.batch([
-    db.prepare("DELETE FROM recovery_codes WHERE user_id = ?1").bind(userId),
-    ...hashes.map((hash) =>
-      db
-        .prepare("INSERT INTO recovery_codes (user_id, code_hash, created_at) VALUES (?1, ?2, ?3)")
-        .bind(userId, hash, now),
-    ),
-  ]);
-}
-
-/** Uses up a recovery code; false when it does not exist or was used. */
+/**
+ * Uses up a recovery code; false when it does not exist, was used, or belongs to an enrollment
+ * that was never confirmed.
+ */
 export async function useRecoveryCode(
   db: D1Database,
   userId: string,
@@ -115,7 +118,9 @@ export async function useRecoveryCode(
 ): Promise<boolean> {
   const result = await db
     .prepare(
-      "UPDATE recovery_codes SET used_at = ?3 WHERE user_id = ?1 AND code_hash = ?2 AND used_at IS NULL",
+      `UPDATE recovery_codes SET used_at = ?3
+       WHERE user_id = ?1 AND code_hash = ?2 AND used_at IS NULL
+         AND EXISTS (SELECT 1 FROM totp_factors WHERE user_id = ?1 AND confirmed_at IS NOT NULL)`,
     )
     .bind(userId, hash, now)
     .run();

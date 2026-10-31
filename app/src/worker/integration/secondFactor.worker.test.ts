@@ -1,5 +1,6 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { getAuth } from "../auth";
 import { totpCode, totpStep } from "../secondFactor/totp";
 import {
   BASE,
@@ -11,6 +12,7 @@ import {
   postSecondFactor,
   signIn,
   signInFirstFactor,
+  storeCookies,
   uniqueEmail,
   type CookieJar,
 } from "./helpers";
@@ -22,12 +24,15 @@ const status = async (jar: CookieJar) => {
   return { code: res.status, body: res.ok ? await res.json() : null };
 };
 
-/** Starts enrollment and returns the authenticator app's secret. */
-async function startEnrollment(jar: CookieJar): Promise<string> {
+/** Starts enrollment and returns the authenticator app's secret and the recovery codes. */
+async function enroll(jar: CookieJar): Promise<{ secret: string; recoveryCodes: string[] }> {
   const res = await postSecondFactor("/totp/enrollment", jar);
   expect(res.status).toBe(200);
-  return ((await res.json()) as { secret: string }).secret;
+  return (await res.json()) as { secret: string; recoveryCodes: string[] };
 }
+
+/** Starts enrollment and returns the authenticator app's secret. */
+const startEnrollment = async (jar: CookieJar) => (await enroll(jar)).secret;
 
 const nowCode = (secret: string) => totpCode(secret, totpStep(Date.now()));
 
@@ -75,6 +80,46 @@ describe("second factor: the gate", () => {
     expect(res.status).toBe(403);
   });
 
+  it("reports no session to Better Auth's get-session once the ten minutes are up", async () => {
+    const jar = await signInFirstFactor(uniqueEmail("stale-get"));
+    const token = decodeURIComponent(jar.get("better-auth.session_token") ?? "").split(".")[0];
+    await env.DB.prepare("UPDATE session SET created_at = ?1 WHERE token = ?2")
+      .bind(Date.now() - 10 * 60_000, token)
+      .run();
+    // A cookie cache refreshed from D1 now carries the old creation time and stays valid for
+    // minutes; Better Auth alone would keep answering from it.
+    const { headers } = await getAuth(env, BASE).api.getSession({
+      headers: new Headers({ cookie: cookieHeader(jar) }),
+      query: { disableCookieCache: true },
+      returnHeaders: true,
+    });
+    storeCookies(jar, new Response(null, { headers }));
+    expect([...jar.keys()].some((name) => name.includes("session_data"))).toBe(true);
+
+    const res = await api("/api/auth/get-session", cookieHeader(jar));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toBeNull();
+    const left = await env.DB.prepare("SELECT COUNT(*) AS n FROM session WHERE token = ?1")
+      .bind(token)
+      .first<{ n: number }>();
+    expect(left?.n).toBe(0);
+  });
+
+  it("lets a user whose unverified session ran out sign in again", async () => {
+    const email = uniqueEmail("stale-again");
+    const jar = await signInFirstFactor(email);
+    const token = decodeURIComponent(jar.get("better-auth.session_token") ?? "").split(".")[0];
+    await env.DB.prepare("UPDATE session SET created_at = ?1 WHERE token = ?2")
+      .bind(Date.now() - 10 * 60_000, token)
+      .run();
+    const res = await SELF.fetch(`${BASE}/api/auth/sign-in/social`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: BASE, cookie: cookieHeader(jar) },
+      body: JSON.stringify({ provider: "test-idp", callbackURL: "/notes" }),
+    });
+    expect(res.status).toBe(200);
+  });
+
   it("ends an unverified session ten minutes after Google sign-in", async () => {
     const jar = await signInFirstFactor(uniqueEmail("stale"));
     const token = decodeURIComponent(jar.get("better-auth.session_token") ?? "").split(".")[0];
@@ -118,6 +163,36 @@ describe("second factor: registering an authenticator app", () => {
     expect(parsed.searchParams.get("secret")).toBe(secret);
   });
 
+  it("hands out the ten recovery codes with the secret, before the first code", async () => {
+    // 確定の応答が途中で失われても、利用者はすでに復旧用コードを持っている。
+    // If the confirmation's response is lost, the user already holds the recovery codes.
+    const jar = await signInFirstFactor(uniqueEmail("codes-first"));
+    const { recoveryCodes } = await enroll(jar);
+    expect(recoveryCodes).toHaveLength(10);
+    expect(new Set(recoveryCodes).size).toBe(10);
+  });
+
+  it("does not accept the recovery codes before the app is confirmed", async () => {
+    const jar = await signInFirstFactor(uniqueEmail("codes-pending"));
+    const { recoveryCodes } = await enroll(jar);
+    const res = await postSecondFactor("/recovery-code/verify", jar, { code: recoveryCodes[0] });
+    expect(res.status).toBe(400);
+    expect((await api("/api/me", cookieHeader(jar))).status).toBe(403);
+  });
+
+  it("keeps the recovery codes usable when the confirmation's response never arrived", async () => {
+    const email = uniqueEmail("lost-response");
+    const jar = await signInFirstFactor(email);
+    const { secret, recoveryCodes } = await enroll(jar);
+    // The confirmation succeeds on the server, but the browser never sees the answer.
+    await postSecondFactor("/totp/enrollment/confirm", jar, { code: await nowCode(secret) });
+
+    const next = await signInFirstFactor(email);
+    const res = await postSecondFactor("/recovery-code/verify", next, { code: recoveryCodes[0] });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ recoveryCodesRemaining: 9 });
+  });
+
   it("does not finish with a wrong code", async () => {
     const jar = await signInFirstFactor(uniqueEmail("wrong"));
     const secret = await startEnrollment(jar);
@@ -128,16 +203,13 @@ describe("second factor: registering an authenticator app", () => {
     expect((await api("/api/me", cookieHeader(jar))).status).toBe(403);
   });
 
-  it("finishes with the app's code: the session is verified and ten recovery codes come back once", async () => {
+  it("finishes with the app's code: the session is verified", async () => {
     const jar = await signInFirstFactor(uniqueEmail("enroll"));
     const secret = await startEnrollment(jar);
     const res = await postSecondFactor("/totp/enrollment/confirm", jar, {
       code: await nowCode(secret),
     });
     expect(res.status).toBe(200);
-    const { recoveryCodes } = (await res.json()) as { recoveryCodes: string[] };
-    expect(recoveryCodes).toHaveLength(10);
-    expect(new Set(recoveryCodes).size).toBe(10);
 
     expect((await api("/api/me", cookieHeader(jar))).status).toBe(200);
     expect(await status(jar)).toEqual({
@@ -172,24 +244,34 @@ describe("second factor: registering an authenticator app", () => {
     const res = await postSecondFactor("/totp/enrollment", attacker);
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "already_enrolled" });
-    // The user's own app still works.
-    await passSecondFactor(email, attacker);
-    expect((await api("/api/me", cookieHeader(attacker))).status).toBe(200);
+    // The user's own recovery codes and app still work.
+    const [code] = enrolledFactors(email).recoveryCodes;
+    expect((await postSecondFactor("/recovery-code/verify", attacker, { code })).status).toBe(200);
+    const again = await signInFirstFactor(email);
+    await passSecondFactor(email, again);
+    expect((await api("/api/me", cookieHeader(again))).status).toBe(200);
   });
 
-  it("uses the latest secret when enrollment is started again before it is confirmed", async () => {
-    const jar = await signInFirstFactor(uniqueEmail("restart"));
-    const first = await startEnrollment(jar);
-    const second = await startEnrollment(jar);
-    expect(second).not.toBe(first);
+  it("uses the latest secret and codes when enrollment is started again before it is confirmed", async () => {
+    const email = uniqueEmail("restart");
+    const jar = await signInFirstFactor(email);
+    const first = await enroll(jar);
+    const second = await enroll(jar);
+    expect(second.secret).not.toBe(first.secret);
     const stale = await postSecondFactor("/totp/enrollment/confirm", jar, {
-      code: await nowCode(first),
+      code: await nowCode(first.secret),
     });
     expect(stale.status).toBe(400);
     const fresh = await postSecondFactor("/totp/enrollment/confirm", jar, {
-      code: await nowCode(second),
+      code: await nowCode(second.secret),
     });
     expect(fresh.status).toBe(200);
+
+    const next = await signInFirstFactor(email);
+    const old = { code: first.recoveryCodes[0] };
+    expect((await postSecondFactor("/recovery-code/verify", next, old)).status).toBe(400);
+    const current = { code: second.recoveryCodes[0] };
+    expect((await postSecondFactor("/recovery-code/verify", next, current)).status).toBe(200);
   });
 
   it("refuses to confirm without a pending enrollment", async () => {

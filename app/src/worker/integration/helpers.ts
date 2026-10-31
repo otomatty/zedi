@@ -114,7 +114,10 @@ export async function passSecondFactor(email: string, jar: CookieJar, origin = B
   if (!enrolled) {
     const start = await postSecondFactor("/totp/enrollment", jar, {}, origin);
     expect(start.status).toBe(200);
-    const { secret } = (await start.json()) as { secret: string };
+    const { secret, recoveryCodes } = (await start.json()) as {
+      secret: string;
+      recoveryCodes: string[];
+    };
     const step = totpStep(Date.now());
     const confirm = await postSecondFactor(
       "/totp/enrollment/confirm",
@@ -123,7 +126,6 @@ export async function passSecondFactor(email: string, jar: CookieJar, origin = B
       origin,
     );
     expect(confirm.status).toBe(200);
-    const { recoveryCodes } = (await confirm.json()) as { recoveryCodes: string[] };
     factors.set(email, { secret, recoveryCodes, lastStep: step });
     return;
   }

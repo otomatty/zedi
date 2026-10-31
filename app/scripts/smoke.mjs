@@ -81,15 +81,15 @@ try {
   });
 
   await check(
-    "registering an authenticator app shows recovery codes, then the notes list",
+    "registering an authenticator app (after saving the recovery codes) opens the notes list",
     async () => {
+      assert.equal(await page.locator("[data-testid=recovery-codes] li").count(), 10);
+      assert.equal(await page.locator("[data-testid=totp-code-submit]").isDisabled(), true);
+      await page.check("[data-testid=recovery-codes-saved]");
       const secret = await page.locator("[data-testid=totp-secret]").textContent();
       await page.fill("[data-testid=totp-code]", await totpCodeNow(secret));
       rememberAuthenticator(OWNER, secret);
       await page.click("[data-testid=totp-code-submit]");
-      await page.waitForSelector("[data-testid=recovery-codes]");
-      assert.equal(await page.locator("[data-testid=recovery-codes] li").count(), 10);
-      await page.click("[data-testid=recovery-codes-saved]");
       await page.waitForSelector("[data-testid=account-email]");
       assert.equal(await page.locator("[data-testid=account-email]").textContent(), OWNER);
       assert.match(await page.locator(".notes h1").textContent(), /0 件/);

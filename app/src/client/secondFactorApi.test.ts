@@ -51,8 +51,10 @@ describe("secondFactorApi", () => {
   });
 
   it("returns what the server sends back", async () => {
-    respond(200, { recoveryCodes: ["A", "B"] });
-    expect(await secondFactorApi.confirmEnrollment("123456")).toEqual({
+    respond(200, { secret: "S", uri: "otpauth://totp/x", recoveryCodes: ["A", "B"] });
+    expect(await secondFactorApi.startEnrollment()).toEqual({
+      secret: "S",
+      uri: "otpauth://totp/x",
       recoveryCodes: ["A", "B"],
     });
   });

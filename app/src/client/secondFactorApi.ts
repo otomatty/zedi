@@ -63,9 +63,11 @@ async function call<T>(path: string, body?: Record<string, string>): Promise<T> 
  */
 export const secondFactorApi = {
   status: () => call<SecondFactorStatus>(""),
-  startEnrollment: () => call<{ secret: string; uri: string }>("/totp/enrollment", {}),
+  /** The recovery codes come with the secret, before the first code confirms it. */
+  startEnrollment: () =>
+    call<{ secret: string; uri: string; recoveryCodes: string[] }>("/totp/enrollment", {}),
   confirmEnrollment: (code: string) =>
-    call<{ recoveryCodes: string[] }>("/totp/enrollment/confirm", { code }),
+    call<Record<string, never>>("/totp/enrollment/confirm", { code }),
   verifyTotp: (code: string) => call<Record<string, never>>("/totp/verify", { code }),
   verifyRecoveryCode: (code: string) =>
     call<{ recoveryCodesRemaining: number }>("/recovery-code/verify", { code }),
