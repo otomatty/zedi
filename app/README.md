@@ -34,6 +34,7 @@ One Cloudflare Worker serves everything (`wrangler.jsonc`). The front end and th
 A Google sign-in only opens the second step: every user needs a passkey or an authenticator app (TOTP) as well, and is encouraged to register both.
 
 - **The session records when it passed the second step** (`session.second_factor_at`). Until then, `/api/*` and the collaborative editing WebSocket (`/parties/*`) answer 403 `second_factor_required`, and so do Better Auth's account endpoints. Starting and finishing the Google sign-in, reading the session, signing out and `/api/second-factor/*` stay open.
+- **`/api/second-factor/*` reads the session from D1**, not the five-minute cookie cache, so a session that has ended (signed out, or cleared by the admin's recovery) cannot register, remove or check methods. The rest of the API still trusts the cache for up to five minutes (otomatty/zedi#1176).
 - **An unverified session lasts ten minutes**; after that it is deleted, the API answers 401 and Better Auth's `get-session` reports no session.
 - **The first time, the user registers a passkey (recommended) or an app**, and is then offered the other one.
   - Passkey: `POST /api/second-factor/passkey/registration`, then `…/confirm` with the browser's answer. Verification is SimpleWebAuthn's; the relying party is the app's host name, and challenges are stored per session, expire after five minutes and are used once.
@@ -47,6 +48,7 @@ A Google sign-in only opens the second step: every user needs a passkey or an au
 - **Changes need the second step within the last five minutes**, the same window as for adding a method (read from D1). An older session gets 403 `reverification_required`, and the page asks for the passkey, the app's code or a recovery code first. A session that has not passed the second step gets 403 `second_factor_required`.
 - **The last method cannot be removed**: the server answers 409 `last_factor`. The check that another method exists and the delete are one statement, so two sessions removing the passkey and the app at once cannot both succeed. The page does not offer the removal either.
 - **Passkeys need a host name**: WebAuthn does not accept an IP address as the relying party, so at `http://127.0.0.1:8787` only the app is offered. Open `http://localhost:8787` to use passkeys locally.
+- **A user who lost every method and every recovery code** is recovered by the admin: after checking who they are, a script clears their second factor in D1 and ends their sessions, and their next Google sign-in registers a new method. See [docs/secondFactorRecovery.md](docs/secondFactorRecovery.md).
 - The Better Auth `twoFactor` plugin is not used because it only steps in after password, username and phone sign-ins, never after Google (see otomatty/zedi#1156).
 
 ### D1 schema (`migrations/`)
@@ -124,7 +126,7 @@ Spec for splitting web clips and PDF text into pages, based on the large-documen
 - A long-page warning in the editor and a splitter for long imported content (the import UI itself is not built)
 - Second factor after Google: passkeys and an authenticator app, recovery codes, and the security page for managing them (changes need the second step within the last five minutes)
 
-**Not yet built**: most features of the current app (real LLM calls, AI drafting, web clipping, billing, the admin console, MCP and so on), the recovery procedure for users who lost every factor (otomatty/zedi#1156), deleting an account (it needs a plan for removing Durable Object storage and shared notes), checking the real Google round trip (by hand on staging), code syntax highlighting, i18n.
+**Not yet built**: most features of the current app (real LLM calls, AI drafting, web clipping, billing, the admin console, MCP and so on), deleting an account (it needs a plan for removing Durable Object storage and shared notes), checking the real Google round trip (by hand on staging), code syntax highlighting, i18n.
 
 ## Commands
 
@@ -138,6 +140,8 @@ bun run db:migrate    # apply migrations to the local D1
 bun run dev:worker    # the app and the test IdP under wrangler dev (http://localhost:8787 for passkeys)
 bun run smoke         # browser check from sign-in to sign-out on a fresh D1 (needs a build)
 bun run bundle:report # bundle sizes -> results/bundle.json
+# clear the second factor of a user who lost every method (docs/secondFactorRecovery.md)
+node scripts/resetSecondFactor.mjs --email user@example.com --remote --env production --dry-run
 bun run measure       # seed 10,000 pages, measure the API and the browser -> results/measurements.json
 # Large-document analysis at 4x CPU throttling -> results/large-documents.json
 ONLY=largeDoc CPU_RATES=4 OUTPUT=results/large-documents.json bun run measure
@@ -166,8 +170,8 @@ In CI (`.github/workflows/ci.yml`), `app-test` runs the type checks, unit and in
 
 | Kind                                          | Count     | Scope                                       |
 | --------------------------------------------- | --------- | ------------------------------------------- |
-| Unit (Vitest, Node / happy-dom)               | 333       | See below                                   |
-| Integration (Vitest, workerd with D1 and DOs) | 99        | Migrations apply the same SQL as production |
+| Unit (Vitest, Node / happy-dom)               | 348       | See below                                   |
+| Integration (Vitest, workerd with D1 and DOs) | 105       | Migrations apply the same SQL as production |
 | Browser (`bun run smoke`)                     | 22 checks | See below                                   |
 
 Unit tests cover:
@@ -189,6 +193,7 @@ Unit tests cover:
 - Second factor: TOTP against the RFC 6238 test vectors and its ±1 step window, the otpauth URI, recovery codes (format, typing variants, hashes), the encrypted secret (tampering, other keys, another purpose), offers of new recovery codes (another user or session, expiry, tampering, malformed payloads), the ten-minute limit for unverified sessions, the QR code, the API client's error handling, passkey prompt failures and hosts that cannot use passkeys, the five-minute window for adding a method, and the screen (choosing a passkey or the app, registering either with the recovery codes saved first, suggesting the other method, a passkey, the app's code, a recovery code, cancelled prompts, wrong codes, waiting after too many attempts, running out of time, sign-out)
 - The security page: the list, checking again before changes (with a passkey or the app's code) and when the five minutes ran out meanwhile, removing after a confirmation and cancelling, the last method not offered and refused when the other went meanwhile, adding a passkey (a cancelled prompt keeps it open, a refused one closes it) or the app, new recovery codes (switched to only once saved, kept on screen when switching fails, an offer that ran out, leaving without switching), a session that ran out, loading again after a failure; the API client's management calls (DELETE, an empty 204, their refusals)
 - `/api/me`: the second-factor answer, and the service worker drops cached data on 403 as on 401
+- The admin's recovery SQL: the address check (spaces around it, case, malformed input), quoting an apostrophe, which tables in which order, and never deleting the account or notes
 - Config: the deployable `wrangler.jsonc` never turns development mode on, production has no test IdP, and the test IdP has no public URL or route
 
 Integration tests cover:
@@ -196,6 +201,7 @@ Integration tests cover:
 - The OAuth round trip against the test IdP (sign-in, repeat sign-in, sign-out), and a callback is accepted only once and only with the browser's state cookie
 - Magic links and the dev outbox are gone, and only the test IdP's sign-in page is exposed
 - Without the `TEST_IDP` binding (production), none of the test IdP's entry points open
+- The admin's recovery: showing the account (used codes not counted); removing only that user's methods, codes, attempt count and sessions (an old session is refused once its cookie cache runs out, and cannot register a method in the gap even while the cache lasts); keeping the account, its Google link and notes; the next Google sign-in registering a new first method with new codes (the old ones refused); an address with an apostrophe
 - Second factor: the gate on the API, Better Auth's account endpoints and the WebSocket; unverified sessions ending after ten minutes; registering an app (wrong code, restarting, no takeover once registered, the secret encrypted and the codes hashed); signing in again with the app's code, an already used code refused, a recovery code working once; the attempt limit per user, its window and its reset
 - Passkeys (a software authenticator answering real WebAuthn options): registering the first one with its recovery codes, challenges answered for another challenge or origin, used once and expired; signing in again; another user's or an unknown passkey, a counter that went backwards, the attempt limit; adding the other method within five minutes and without new codes, refused with Google alone or later; two sessions registering the first method at once (the codes of the confirmed one kept, the other refused even if it already passed the check)
 - Managing methods: the list; removing a passkey or the app (never the last one, never another user's, and of two sessions removing both at once only one succeeds), then adding the app again without new codes; new recovery codes (an offer changes nothing, confirming switches and confirming again changes nothing, codes without a batch dropped, another session's or user's or a changed offer refused, an offer confirmed after the five minutes within its own ten, a session that passed only Google refused); all refused before the second step and five minutes after it, and allowed again after checking again with the app's code
