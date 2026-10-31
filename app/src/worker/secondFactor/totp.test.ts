@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { generateTotpSecret, matchTotp, totpCode, totpStep, totpUri } from "./totp";
 
-// RFC 6238 Appendix B (SHA-1): the ASCII key "12345678901234567890", Base32-encoded.
-const RFC_SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+// RFC 6238 Appendix B (SHA-1): the seed "12345678901234567890" (ASCII), Base32-encoded.
+const RFC_SEED = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
 const at = (seconds: number) => seconds * 1000;
 
 describe("TOTP (RFC 6238, SHA-1, 6 digits, 30 s)", () => {
@@ -12,7 +12,7 @@ describe("TOTP (RFC 6238, SHA-1, 6 digits, 30 s)", () => {
     [1_234_567_890, "005924"],
     [2_000_000_000, "279037"],
   ])("matches the RFC 6238 test vector at T=%i", async (seconds, expected) => {
-    expect(await totpCode(RFC_SECRET, totpStep(at(seconds)))).toBe(expected);
+    expect(await totpCode(RFC_SEED, totpStep(at(seconds)))).toBe(expected);
   });
 
   it("counts 30-second steps", () => {
@@ -25,26 +25,26 @@ describe("TOTP (RFC 6238, SHA-1, 6 digits, 30 s)", () => {
     const now = at(1_234_567_890);
     const step = totpStep(now);
     for (const offset of [-1, 0, 1]) {
-      const code = await totpCode(RFC_SECRET, step + offset);
-      expect(await matchTotp(RFC_SECRET, code, now)).toBe(step + offset);
+      const code = await totpCode(RFC_SEED, step + offset);
+      expect(await matchTotp(RFC_SEED, code, now)).toBe(step + offset);
     }
   });
 
   it("rejects codes two or more steps away", async () => {
     const now = at(1_234_567_890);
     const step = totpStep(now);
-    expect(await matchTotp(RFC_SECRET, await totpCode(RFC_SECRET, step - 2), now)).toBeNull();
-    expect(await matchTotp(RFC_SECRET, await totpCode(RFC_SECRET, step + 2), now)).toBeNull();
+    expect(await matchTotp(RFC_SEED, await totpCode(RFC_SEED, step - 2), now)).toBeNull();
+    expect(await matchTotp(RFC_SEED, await totpCode(RFC_SEED, step + 2), now)).toBeNull();
   });
 
   it("ignores the spaces authenticator apps show inside a code", async () => {
-    expect(await matchTotp(RFC_SECRET, " 287 082 ", at(59))).toBe(1);
+    expect(await matchTotp(RFC_SEED, " 287 082 ", at(59))).toBe(1);
   });
 
   it.each(["", "28708", "2870820", "28708a", "２８７０８２"])(
     "rejects a malformed code %j",
     async (code) => {
-      expect(await matchTotp(RFC_SECRET, code, at(59))).toBeNull();
+      expect(await matchTotp(RFC_SEED, code, at(59))).toBeNull();
     },
   );
 
@@ -65,13 +65,13 @@ describe("generateTotpSecret", () => {
 describe("totpUri", () => {
   it("builds the otpauth URI authenticator apps read from the QR code", () => {
     const uri = new URL(
-      totpUri({ secret: RFC_SECRET, account: "alice@test.zedi-note.app", issuer: "Zedi" }),
+      totpUri({ secret: RFC_SEED, account: "alice@test.zedi-note.app", issuer: "Zedi" }),
     );
     expect(uri.protocol).toBe("otpauth:");
     expect(uri.host).toBe("totp");
     expect(decodeURIComponent(uri.pathname)).toBe("/Zedi:alice@test.zedi-note.app");
     expect(Object.fromEntries(uri.searchParams)).toEqual({
-      secret: RFC_SECRET,
+      secret: RFC_SEED,
       issuer: "Zedi",
       algorithm: "SHA1",
       digits: "6",
