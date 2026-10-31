@@ -171,8 +171,12 @@ export function SecondFactorPage({
         else if (refusedAs(e, "already_enrolled")) reload();
         else setError(messageFor(e));
         if (refusedAs(e, "invalid_passkey") || refusedAs(e, "no_pending_registration")) {
-          // The challenge is spent; start the registration again from the choice.
-          setView((current) => (current.kind === "enrollPasskey" ? { kind: "choose" } : current));
+          // The challenge is spent: start again from the first-time choice, or from the
+          // suggestion when the passkey was being added to a method the user already has.
+          setView((current) => {
+            if (current.kind !== "enrollPasskey") return current;
+            return current.first ? { kind: "choose" } : { kind: "suggest", other: "passkey" };
+          });
         }
       })
       .finally(() => setBusy(false));

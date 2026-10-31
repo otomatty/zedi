@@ -258,6 +258,26 @@ describe("SecondFactorPage: registering an authenticator app first", () => {
     expect(api.confirmPasskeyRegistration).toHaveBeenCalledWith(REG_RESPONSE);
   });
 
+  it("goes back to the suggestion, not the first-time choice, when adding a passkey fails", async () => {
+    const api = fakeApi({
+      startPasskeyRegistration: vi.fn(async () => ({ options: REG_OPTIONS })),
+      confirmPasskeyRegistration: vi.fn(async () => {
+        throw new SecondFactorError("invalid_passkey");
+      }),
+    });
+    const { container } = await chooseApp(api);
+    await confirmSaved(container);
+    await enter(container, "6 桁のコード", "123456", "登録する");
+    await click(container, "パスキーも登録する");
+    await click(container, "パスキーを登録");
+
+    expect((await findByRole(container, "alert")).textContent).toContain(
+      "パスキーを確認できませんでした",
+    );
+    expect(await findByRole(container, "button", { name: "パスキーも登録する" })).toBeTruthy();
+    expect(queryByRole(container, "button", { name: "認証アプリを使う" })).toBeNull();
+  });
+
   it("goes straight on where the browser cannot use passkeys", async () => {
     const { container, onSessionChange } = await chooseApp(
       fakeApi(),

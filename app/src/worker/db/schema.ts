@@ -138,6 +138,8 @@ export const totpFactors = sqliteTable("totp_factors", {
   confirmedAt: integer("confirmed_at", { mode: "timestamp_ms" }),
   lastUsedStep: integer("last_used_step"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  /** The recovery codes issued with this enrollment when it is the first factor. */
+  recoveryBatch: text("recovery_batch"),
 });
 
 /** Recovery codes as SHA-256 hashes; each can be used once. */
@@ -150,6 +152,8 @@ export const recoveryCodes = sqliteTable(
     codeHash: text("code_hash").notNull(),
     usedAt: integer("used_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    /** The enrollment that issued the code; confirming it keeps only its batch. */
+    batch: text("batch"),
   },
   (t) => [primaryKey({ columns: [t.userId, t.codeHash] })],
 );
@@ -191,6 +195,8 @@ export const webauthnChallenges = sqliteTable(
       .references(() => session.id, { onDelete: "cascade" }),
     purpose: text("purpose", { enum: ["register", "authenticate"] }).notNull(),
     challenge: text("challenge").notNull(),
+    /** The recovery codes issued with a first passkey's registration options. */
+    recoveryBatch: text("recovery_batch"),
     expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.sessionId, t.purpose] })],

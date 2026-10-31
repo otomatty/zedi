@@ -77,7 +77,11 @@ export function secondFactorRoutes() {
     const sealed = await sealSecret(c.env.BETTER_AUTH_SECRET, secret);
     const recoveryCodes = gate.firstFactor ? generateRecoveryCodes() : [];
     const hashes = await hashAll(recoveryCodes);
-    if (!(await store.savePendingEnrollment(c.env.DB, user.id, sealed, hashes, Date.now()))) {
+    // A first factor's codes belong to this enrollment: confirming it keeps only them.
+    const batch = gate.firstFactor ? crypto.randomUUID() : null;
+    if (
+      !(await store.savePendingEnrollment(c.env.DB, user.id, sealed, hashes, batch, Date.now()))
+    ) {
       return c.json({ error: "already_enrolled" }, 409);
     }
     const uri = totpUri({ secret, account: user.email, issuer: ISSUER });
@@ -100,8 +104,12 @@ export function secondFactorRoutes() {
       now,
     );
     if (step === null) return invalidCode(c);
-    if (!(await store.confirmTotp(c.env.DB, user.id, totp.sealedSecret, step, now))) {
-      return c.json({ error: "no_pending_enrollment" }, 409);
+    if (
+      !(await store.confirmTotp(c.env.DB, user.id, totp.sealedSecret, step, now, gate.firstFactor))
+    ) {
+      // A first factor loses to a passkey another session registered meanwhile.
+      const lost = gate.firstFactor && (await store.hasFactor(c.env.DB, user.id));
+      return c.json({ error: lost ? "already_enrolled" : "no_pending_enrollment" }, 409);
     }
     return finishVerification(c, {});
   });

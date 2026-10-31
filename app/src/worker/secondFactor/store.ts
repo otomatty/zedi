@@ -48,24 +48,31 @@ export async function hasFactor(db: D1Database, userId: string): Promise<boolean
   return row?.enrolled === 1;
 }
 
-/** Statements that replace the user's recovery codes, only while the user has no factor. */
-function issueCodeStatements(db: D1Database, userId: string, codeHashes: string[], now: number) {
-  return [
-    db.prepare(`DELETE FROM recovery_codes WHERE user_id = ?1 AND ${NOT_ENROLLED}`).bind(userId),
-    ...codeHashes.map((hash) =>
-      db
-        .prepare(
-          `INSERT INTO recovery_codes (user_id, code_hash, created_at)
-           SELECT ?1, ?2, ?3 WHERE ${NOT_ENROLLED}`,
-        )
-        .bind(userId, hash, now),
-    ),
-  ];
+/**
+ * Statements that store a first enrollment's recovery codes under `batch`, only while the user
+ * has no factor. Other sessions' pending batches are left alone; confirming an enrollment keeps
+ * only its own batch (see `confirmTotp` and `savePasskey`).
+ */
+function issueCodeStatements(
+  db: D1Database,
+  userId: string,
+  codeHashes: string[],
+  batch: string,
+  now: number,
+) {
+  return codeHashes.map((hash) =>
+    db
+      .prepare(
+        `INSERT INTO recovery_codes (user_id, code_hash, created_at, batch)
+         SELECT ?1, ?2, ?3, ?4 WHERE ${NOT_ENROLLED}`,
+      )
+      .bind(userId, hash, now, batch),
+  );
 }
 
 /**
  * Stores the recovery codes handed out with a first passkey's registration options; like the
- * authenticator app's, they only work once the passkey is registered. Does nothing once the
+ * authenticator app's, they only work once that registration is confirmed. Does nothing once the
  * user has a factor.
  * 最初のパスキーの登録で渡す復旧用コードを保存する。確認方法がすでにあれば何もしない。
  */
@@ -73,16 +80,17 @@ export async function issueRecoveryCodes(
   db: D1Database,
   userId: string,
   codeHashes: string[],
+  batch: string,
   now: number,
 ): Promise<void> {
-  await db.batch(issueCodeStatements(db, userId, codeHashes, now));
+  await db.batch(issueCodeStatements(db, userId, codeHashes, batch, now));
 }
 
 /**
  * Stores a new pending secret, replacing an earlier pending enrollment, and (for a user with no
- * factor yet) its recovery codes. Returns false, and changes nothing, when the user already has
- * a confirmed app. The codes are handed out with the secret so a lost confirmation response
- * loses nothing; they only work once a factor is confirmed.
+ * factor yet) its recovery codes under `batch`. Returns false, and changes nothing, when the user
+ * already has a confirmed app. The codes are handed out with the secret so a lost confirmation
+ * response loses nothing; they only work once this enrollment is confirmed.
  * 未確定の秘密鍵と（最初の確認方法なら）復旧用コードを保存する。確定済みのアプリがあれば何も変えず false。
  */
 export async function savePendingEnrollment(
@@ -90,25 +98,29 @@ export async function savePendingEnrollment(
   userId: string,
   sealedSecret: string,
   codeHashes: string[],
+  batch: string | null,
   now: number,
 ): Promise<boolean> {
   const [saved] = await db.batch([
     db
       .prepare(
-        `INSERT INTO totp_factors (user_id, secret, created_at) VALUES (?1, ?2, ?3)
-         ON CONFLICT (user_id) DO UPDATE SET secret = excluded.secret, created_at = excluded.created_at
+        `INSERT INTO totp_factors (user_id, secret, created_at, recovery_batch) VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT (user_id) DO UPDATE SET secret = excluded.secret,
+           created_at = excluded.created_at, recovery_batch = excluded.recovery_batch
          WHERE totp_factors.confirmed_at IS NULL`,
       )
-      .bind(userId, sealedSecret, now),
-    ...(codeHashes.length > 0 ? issueCodeStatements(db, userId, codeHashes, now) : []),
+      .bind(userId, sealedSecret, now, batch),
+    ...(batch ? issueCodeStatements(db, userId, codeHashes, batch, now) : []),
   ]);
   return (saved?.meta.changes ?? 0) > 0;
 }
 
 /**
  * Confirms the pending secret the code was checked against. Fails when it was confirmed or
- * replaced in the meantime.
- * 確かめた未確定の秘密鍵を確定する。その間に確定・置き換えされていたら失敗。
+ * replaced in the meantime. As the first factor it also fails when a passkey was registered
+ * meanwhile (checked in the same statement), and keeps only this enrollment's recovery codes.
+ * 確かめた未確定の秘密鍵を確定する。最初の確認方法としてなら、その間にパスキーが登録されていれば失敗し、
+ * この登録で渡した復旧用コードだけを残す。
  */
 export async function confirmTotp(
   db: D1Database,
@@ -116,15 +128,28 @@ export async function confirmTotp(
   sealedSecret: string,
   step: number,
   now: number,
+  firstFactor: boolean,
 ): Promise<boolean> {
-  const result = await db
+  const confirm = db
     .prepare(
       `UPDATE totp_factors SET confirmed_at = ?4, last_used_step = ?3
-       WHERE user_id = ?1 AND secret = ?2 AND confirmed_at IS NULL`,
+       WHERE user_id = ?1 AND secret = ?2 AND confirmed_at IS NULL
+         ${firstFactor ? "AND NOT EXISTS (SELECT 1 FROM passkeys WHERE user_id = ?1)" : ""}`,
     )
-    .bind(userId, sealedSecret, step, now)
-    .run();
-  return result.meta.changes > 0;
+    .bind(userId, sealedSecret, step, now);
+  if (!firstFactor) return (await confirm.run()).meta.changes > 0;
+  const [confirmed] = await db.batch([
+    confirm,
+    db
+      .prepare(
+        `DELETE FROM recovery_codes WHERE user_id = ?1
+           AND batch IS NOT (SELECT recovery_batch FROM totp_factors WHERE user_id = ?1)
+           AND EXISTS (SELECT 1 FROM totp_factors
+                       WHERE user_id = ?1 AND secret = ?2 AND confirmed_at = ?3)`,
+      )
+      .bind(userId, sealedSecret, now),
+  ]);
+  return (confirmed?.meta.changes ?? 0) > 0;
 }
 
 /** Records `step` as used; false when it (or a later step) was used already. */
@@ -219,29 +244,47 @@ export async function listPasskeys(db: D1Database, userId: string): Promise<Stor
   }));
 }
 
-/** Stores a registered passkey; false when the credential ID is already registered. */
+/**
+ * Stores a registered passkey; false when the credential ID is already registered. As the first
+ * factor (`firstFactor`), it is stored only if the user still has no factor, checked in the
+ * same statement so a confirmation racing in another session cannot let Google alone add one,
+ * and only the recovery codes issued with this registration (`batch`) are kept.
+ * 登録したパスキーを保存する。最初の確認方法としてなら、まだ確認方法がないことを同じ文で確かめ、
+ * この登録で渡した復旧用コードだけを残す。
+ */
 export async function savePasskey(
   db: D1Database,
   userId: string,
   passkey: StoredPasskey & { name: string },
   now: number,
+  firstFactor: { batch: string | null } | null,
 ): Promise<boolean> {
-  const result = await db
+  const insert = db
     .prepare(
       `INSERT INTO passkeys (id, user_id, public_key, counter, transports, name, created_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) ON CONFLICT (id) DO NOTHING`,
+       SELECT ?2, ?1, ?3, ?4, ?5, ?6, ?7 WHERE ${firstFactor ? NOT_ENROLLED : "1"}
+       ON CONFLICT (id) DO NOTHING`,
     )
     .bind(
-      passkey.id,
       userId,
+      passkey.id,
       passkey.publicKey,
       passkey.counter,
       JSON.stringify(passkey.transports),
       passkey.name,
       now,
-    )
-    .run();
-  return result.meta.changes > 0;
+    );
+  if (!firstFactor) return (await insert.run()).meta.changes > 0;
+  const [inserted] = await db.batch([
+    insert,
+    db
+      .prepare(
+        `DELETE FROM recovery_codes WHERE user_id = ?1 AND batch IS NOT ?2
+           AND EXISTS (SELECT 1 FROM passkeys WHERE user_id = ?1 AND id = ?3 AND created_at = ?4)`,
+      )
+      .bind(userId, firstFactor.batch, passkey.id, now),
+  ]);
+  return (inserted?.meta.changes ?? 0) > 0;
 }
 
 /**
@@ -270,22 +313,26 @@ export async function usePasskey(
 /** How long a WebAuthn challenge stays valid. */
 export const CHALLENGE_TTL_MS = 5 * 60_000;
 
-/** Stores the challenge the session must answer for `purpose`, replacing an earlier one. */
+/**
+ * Stores the challenge the session must answer for `purpose`, replacing an earlier one, with the
+ * recovery codes' batch when it registers a first passkey.
+ */
 export async function saveChallenge(
   db: D1Database,
   sessionId: string,
   purpose: "register" | "authenticate",
   challenge: string,
   now: number,
+  recoveryBatch: string | null = null,
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO webauthn_challenges (session_id, purpose, challenge, expires_at)
-       VALUES (?1, ?2, ?3, ?4)
-       ON CONFLICT (session_id, purpose) DO UPDATE SET
-         challenge = excluded.challenge, expires_at = excluded.expires_at`,
+      `INSERT INTO webauthn_challenges (session_id, purpose, challenge, recovery_batch, expires_at)
+       VALUES (?1, ?2, ?3, ?4, ?5)
+       ON CONFLICT (session_id, purpose) DO UPDATE SET challenge = excluded.challenge,
+         recovery_batch = excluded.recovery_batch, expires_at = excluded.expires_at`,
     )
-    .bind(sessionId, purpose, challenge, now + CHALLENGE_TTL_MS)
+    .bind(sessionId, purpose, challenge, recoveryBatch, now + CHALLENGE_TTL_MS)
     .run();
 }
 
@@ -295,15 +342,17 @@ export async function takeChallenge(
   sessionId: string,
   purpose: "register" | "authenticate",
   now: number,
-): Promise<string | null> {
+): Promise<{ challenge: string; recoveryBatch: string | null } | null> {
   const row = await db
     .prepare(
       `DELETE FROM webauthn_challenges WHERE session_id = ?1 AND purpose = ?2
-       RETURNING challenge, expires_at`,
+       RETURNING challenge, recovery_batch, expires_at`,
     )
     .bind(sessionId, purpose)
-    .first<{ challenge: string; expires_at: number }>();
-  return row && row.expires_at > now ? row.challenge : null;
+    .first<{ challenge: string; recovery_batch: string | null; expires_at: number }>();
+  return row && row.expires_at > now
+    ? { challenge: row.challenge, recoveryBatch: row.recovery_batch }
+    : null;
 }
 
 /** Marks the session as having passed the second step now; false when it no longer exists. */

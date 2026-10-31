@@ -39,7 +39,7 @@ A Google sign-in only opens the second step: every user needs a passkey or an au
   - Passkey: `POST /api/second-factor/passkey/registration`, then `…/confirm` with the browser's answer. Verification is SimpleWebAuthn's; the relying party is the app's host name, and challenges are stored per session, expire after five minutes and are used once.
   - App: `POST /api/second-factor/totp/enrollment`, then `…/confirm` with its first code. One app per user. The secret is stored encrypted (XChaCha20-Poly1305 under a key derived from `BETTER_AUTH_SECRET`).
 - **Adding a method needs a fresh second step**: Google alone may register the first one only. After that, another can be added only by a session that passed the second step within the last five minutes (read from D1, not the cookie cache); Google alone gets 409 `already_enrolled`, an older session 403 `reverification_required`.
-- **Ten recovery codes are shown once**, with the first method before it is confirmed; the user ticks that they saved them first, so a lost confirmation response loses nothing. They only work once a method is registered, are stored as SHA-256 hashes, and each works once (`POST /api/second-factor/recovery-code/verify`). Adding the second method issues none.
+- **Ten recovery codes are shown once**, with the first method before it is confirmed; the user ticks that they saved them first, so a lost confirmation response loses nothing. They belong to the registration that issued them: if two sessions start the first registration at once, confirming one keeps only its codes, and the other cannot finish (the check that the user has no method yet and the write are one statement). They are stored as SHA-256 hashes, and each works once (`POST /api/second-factor/recovery-code/verify`). Adding the second method issues none.
 - **Afterwards the user passes the second step with the passkey** (`POST /api/second-factor/passkey/authentication`, then `…/verify`), **the app's code** (`POST /api/second-factor/totp/verify`) or a recovery code. A used code is refused even inside its time window, and a passkey whose signature counter went backwards is refused.
 - **Five attempts per user per 15 minutes**, counted before the code or passkey is checked; then 429 with `Retry-After`. A successful second step clears the count.
 - **Passkeys need a host name**: WebAuthn does not accept an IP address as the relying party, so at `http://127.0.0.1:8787` only the app is offered. Open `http://localhost:8787` to use passkeys locally.
@@ -161,8 +161,8 @@ In CI (`.github/workflows/ci.yml`), `app-test` runs the type checks, unit and in
 
 | Kind                                          | Count     | Scope                                       |
 | --------------------------------------------- | --------- | ------------------------------------------- |
-| Unit (Vitest, Node / happy-dom)               | 284       | See below                                   |
-| Integration (Vitest, workerd with D1 and DOs) | 74        | Migrations apply the same SQL as production |
+| Unit (Vitest, Node / happy-dom)               | 285       | See below                                   |
+| Integration (Vitest, workerd with D1 and DOs) | 78        | Migrations apply the same SQL as production |
 | Browser (`bun run smoke`)                     | 21 checks | See below                                   |
 
 Unit tests cover:
@@ -191,7 +191,7 @@ Integration tests cover:
 - Magic links and the dev outbox are gone, and only the test IdP's sign-in page is exposed
 - Without the `TEST_IDP` binding (production), none of the test IdP's entry points open
 - Second factor: the gate on the API, Better Auth's account endpoints and the WebSocket; unverified sessions ending after ten minutes; registering an app (wrong code, restarting, no takeover once registered, the secret encrypted and the codes hashed); signing in again with the app's code, an already used code refused, a recovery code working once; the attempt limit per user, its window and its reset
-- Passkeys (a software authenticator answering real WebAuthn options): registering the first one with its recovery codes, challenges answered for another challenge or origin, used once and expired; signing in again; another user's or an unknown passkey, a counter that went backwards, the attempt limit; adding the other method within five minutes and without new codes, refused with Google alone or later
+- Passkeys (a software authenticator answering real WebAuthn options): registering the first one with its recovery codes, challenges answered for another challenge or origin, used once and expired; signing in again; another user's or an unknown passkey, a counter that went backwards, the attempt limit; adding the other method within five minutes and without new codes, refused with Google alone or later; two sessions registering the first method at once (the codes of the confirmed one kept, the other refused even if it already passed the check)
 - Keyset listing and counts
 - Japanese full-text search and short-term partial matching
 - Hiding other users' notes (404), viewer and editor permissions

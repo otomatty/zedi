@@ -4,6 +4,7 @@ import type {
   PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/server";
 import { describe, expect, it } from "vitest";
+import * as store from "../secondFactor/store";
 import { totpCode, totpStep } from "../secondFactor/totp";
 import {
   BASE,
@@ -12,6 +13,7 @@ import {
   enrolledFactors,
   passSecondFactor,
   postSecondFactor,
+  signIn,
   signInFirstFactor,
   uniqueEmail,
   type CookieJar,
@@ -329,5 +331,107 @@ describe("passkeys: adding the other method", () => {
       expect(await res.json()).toEqual({ error: "already_enrolled" });
     }
     expect((await status(attacker)).passkeys).toBe(1);
+  });
+});
+
+describe("passkeys: two sessions registering the first method at once", () => {
+  const userId = async (email: string) =>
+    (
+      await env.DB.prepare("SELECT id FROM user WHERE email = ?1")
+        .bind(email)
+        .first<{ id: string }>()
+    )?.id ?? "";
+
+  it("keeps the recovery codes the user saved when another session starts registering too", async () => {
+    // 同じ Google アカウントの別のセッションが登録を始めても、利用者が保存したコードは置き換わらない。
+    // Another session of the same Google account must not swap the codes the user saved.
+    const email = uniqueEmail("race-codes");
+    const user = await signInFirstFactor(email);
+    const app = await postSecondFactor("/totp/enrollment", user);
+    const { secret, recoveryCodes: saved } = (await app.json()) as {
+      secret: string;
+      recoveryCodes: string[];
+    };
+    const other = await signInFirstFactor(email);
+    const { recoveryCodes: others } = await registrationOptions(other);
+
+    const confirm = await postSecondFactor("/totp/enrollment/confirm", user, {
+      code: await totpCode(secret, totpStep(Date.now())),
+    });
+    expect(confirm.status).toBe(200);
+
+    const next = await signInFirstFactor(email);
+    expect(
+      (await postSecondFactor("/recovery-code/verify", next, { code: others?.[0] })).status,
+    ).toBe(400);
+    expect((await postSecondFactor("/recovery-code/verify", next, { code: saved[0] })).status).toBe(
+      200,
+    );
+  });
+
+  it("keeps the winner's codes when the other session finishes first", async () => {
+    const email = uniqueEmail("race-winner");
+    const user = await signInFirstFactor(email);
+    const app = await postSecondFactor("/totp/enrollment", user);
+    const { secret, recoveryCodes: appCodes } = (await app.json()) as {
+      secret: string;
+      recoveryCodes: string[];
+    };
+    const other = await signInFirstFactor(email);
+    const { options, recoveryCodes: passkeyCodes } = await registrationOptions(other);
+    const passkey = await SoftAuthenticator.create();
+    const registered = await postSecondFactor("/passkey/registration/confirm", other, {
+      response: await passkey.register(options, BASE),
+    });
+    expect(registered.status).toBe(200);
+
+    const late = await postSecondFactor("/totp/enrollment/confirm", user, {
+      code: await totpCode(secret, totpStep(Date.now())),
+    });
+    expect(late.status).toBe(409);
+    expect(await late.json()).toEqual({ error: "already_enrolled" });
+
+    const next = await signInFirstFactor(email);
+    const lost = await postSecondFactor("/recovery-code/verify", next, { code: appCodes[0] });
+    expect(lost.status).toBe(400);
+    const kept = await postSecondFactor("/recovery-code/verify", next, { code: passkeyCodes?.[0] });
+    expect(kept.status).toBe(200);
+  });
+
+  it("refuses to store a first passkey once another method was confirmed in the meantime", async () => {
+    // 確認と保存の間に別のセッションが確定しても、最初の 1 つとしての保存は 1 文の条件で止まる。
+    // Even if another session confirms between the check and the write, the write itself refuses.
+    const email = uniqueEmail("race-passkey");
+    await signIn(email);
+    const id = await userId(email);
+    const passkey = {
+      id: "cmFjZS1jcmVk",
+      publicKey: "a2V5",
+      counter: 0,
+      transports: [],
+      name: "p",
+    };
+    expect(await store.savePasskey(env.DB, id, passkey, Date.now(), { batch: "late" })).toBe(false);
+    const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM passkeys WHERE user_id = ?1")
+      .bind(id)
+      .first<{ n: number }>();
+    expect(row?.n).toBe(0);
+    expect(enrolledFactors(email).recoveryCodes).toHaveLength(10);
+    const codes = await env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM recovery_codes WHERE user_id = ?1 AND used_at IS NULL",
+    )
+      .bind(id)
+      .first<{ n: number }>();
+    expect(codes?.n).toBe(10);
+  });
+
+  it("refuses to confirm an app as the first method once a passkey exists", async () => {
+    const { email } = await passkeyUser("race-app");
+    const id = await userId(email);
+    const now = Date.now();
+    expect(await store.savePendingEnrollment(env.DB, id, "sealed", [], null, now)).toBe(true);
+    expect(await store.confirmTotp(env.DB, id, "sealed", 1, now, true)).toBe(false);
+    // As an added method (a session that just passed the second step), it may be confirmed.
+    expect(await store.confirmTotp(env.DB, id, "sealed", 1, now, false)).toBe(true);
   });
 });

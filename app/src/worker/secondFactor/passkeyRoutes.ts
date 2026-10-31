@@ -61,11 +61,16 @@ export function passkeyRoutes() {
       authenticatorSelection: { residentKey: "preferred", userVerification: "preferred" },
     });
     const now = Date.now();
-    await store.saveChallenge(c.env.DB, sessionId, "register", options.challenge, now);
-    if (!gate.firstFactor) return c.json({ options });
-    // The first factor's recovery codes come before the passkey exists, as with the app.
+    if (!gate.firstFactor) {
+      await store.saveChallenge(c.env.DB, sessionId, "register", options.challenge, now);
+      return c.json({ options });
+    }
+    // The first factor's recovery codes come before the passkey exists, as with the app, and
+    // belong to this registration: confirming it keeps only them.
+    const batch = crypto.randomUUID();
     const recoveryCodes = generateRecoveryCodes();
-    await store.issueRecoveryCodes(c.env.DB, user.id, await hashAll(recoveryCodes), now);
+    await store.issueRecoveryCodes(c.env.DB, user.id, await hashAll(recoveryCodes), batch, now);
+    await store.saveChallenge(c.env.DB, sessionId, "register", options.challenge, now, batch);
     return c.json({ options, recoveryCodes });
   });
 
@@ -74,13 +79,13 @@ export function passkeyRoutes() {
     if (gate instanceof Response) return gate;
     const { user, sessionId } = c.get("current");
     const now = Date.now();
-    const challenge = await store.takeChallenge(c.env.DB, sessionId, "register", now);
-    if (!challenge) return c.json({ error: "no_pending_registration" }, 409);
+    const pending = await store.takeChallenge(c.env.DB, sessionId, "register", now);
+    if (!pending) return c.json({ error: "no_pending_registration" }, 409);
     const { response } = await readJsonObject(c);
     const { origin, rpID } = relyingParty(c);
     const verification = await verifyRegistrationResponse({
       response: response as RegistrationResponseJSON,
-      expectedChallenge: challenge,
+      expectedChallenge: pending.challenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
       // A second factor: the authenticator must show the user was present, not who they are.
@@ -99,8 +104,15 @@ export function passkeyRoutes() {
         name: "パスキー",
       },
       now,
+      gate.firstFactor ? { batch: pending.recoveryBatch } : null,
     );
-    if (!saved) return invalidPasskey(c);
+    if (!saved) {
+      // A first passkey loses to a method another session confirmed meanwhile.
+      if (gate.firstFactor && (await store.hasFactor(c.env.DB, user.id))) {
+        return c.json({ error: "already_enrolled" }, 409);
+      }
+      return invalidPasskey(c);
+    }
     return finishVerification(c, {});
   });
 
@@ -122,15 +134,15 @@ export function passkeyRoutes() {
     const limited = await limitAttempts(c);
     if (limited) return limited;
     const now = Date.now();
-    const challenge = await store.takeChallenge(c.env.DB, sessionId, "authenticate", now);
+    const pending = await store.takeChallenge(c.env.DB, sessionId, "authenticate", now);
     const response = (await readJsonObject(c)).response as AuthenticationResponseJSON | undefined;
-    if (!challenge || typeof response?.id !== "string") return invalidPasskey(c);
+    if (!pending || typeof response?.id !== "string") return invalidPasskey(c);
     const passkey = (await store.listPasskeys(c.env.DB, user.id)).find((p) => p.id === response.id);
     if (!passkey) return invalidPasskey(c);
     const { origin, rpID } = relyingParty(c);
     const result = await verifyAuthenticationResponse({
       response,
-      expectedChallenge: challenge,
+      expectedChallenge: pending.challenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
       credential: {
