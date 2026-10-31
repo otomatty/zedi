@@ -5,6 +5,6 @@
     "jsxImportSource": "hono/jsx",
     "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"]
   },
-  "include": ["src/worker", "src/shared"],
+  "include": ["src/worker", "src/shared", "src/testIdp"],
   "exclude": ["src/**/*.node.test.ts"]
 }

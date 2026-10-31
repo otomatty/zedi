@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Browser smoke test against a local `wrangler dev` with a fresh D1:
- * magic-link sign-in through the UI, page creation, editor sync, `#tag` / `[[WikiLink]]` /
+ * sign-in through the test IdP in the UI, page creation, editor sync, `#tag` / `[[WikiLink]]` /
  * `/` commands, D1 projection + full-text search, infinite list, access control between
  * two users (404 → viewer, read-only), AI streaming, offline use through the service worker
  * (app shell, cached list, local page copies, pages created offline) and sign-out.
@@ -9,12 +9,18 @@
  * 空の D1 に対して、サインインから共有・検索・サインアウトまでをブラウザで確認するスモークテスト。
  */
 import assert from "node:assert/strict";
-import { launchBrowser, signInViaApi, startWorker, addSessionCookies } from "./lib/harness.mjs";
+import {
+  addSessionCookies,
+  launchBrowser,
+  signInViaApi,
+  startWorker,
+  testIdpPassword,
+} from "./lib/harness.mjs";
 
 const PORT = 8789;
 const BASE = `http://127.0.0.1:${PORT}`;
-const OWNER = `owner-${Date.now()}@example.com`;
-const GUEST = `guest-${Date.now()}@example.com`;
+const OWNER = `owner-${Date.now()}@test.zedi-note.app`;
+const GUEST = `guest-${Date.now()}@test.zedi-note.app`;
 
 const worker = await startWorker(PORT);
 const browser = await launchBrowser();
@@ -47,14 +53,16 @@ try {
 
   await check("unauthenticated visit shows the sign-in page and the API answers 401", async () => {
     await page.goto(`${BASE}/notes`);
-    await page.waitForSelector("[data-testid=sign-in-email]");
+    await page.waitForSelector("[data-testid=sign-in-test-idp]");
     assert.equal((await apiFrom(page, "/api/me")).status, 401);
   });
 
-  await check("magic-link sign-in through the UI lands on the notes list", async () => {
-    await page.fill("[data-testid=sign-in-email]", OWNER);
-    await page.click("[data-testid=sign-in-submit]");
-    await page.click("[data-testid=dev-magic-link]");
+  await check("test IdP sign-in through the UI lands on the notes list", async () => {
+    await page.click("[data-testid=sign-in-test-idp]");
+    await page.waitForSelector("[data-testid=test-idp-email]");
+    await page.fill("[data-testid=test-idp-email]", OWNER);
+    await page.fill("[data-testid=test-idp-password]", testIdpPassword());
+    await page.click("[data-testid=test-idp-submit]");
     await page.waitForSelector("[data-testid=account-email]");
     assert.equal(await page.locator("[data-testid=account-email]").textContent(), OWNER);
     assert.match(await page.locator(".notes h1").textContent(), /0 件/);
@@ -276,7 +284,7 @@ try {
   await check("sign-out returns to the sign-in page and revokes API access", async () => {
     await page.goto(`${BASE}/notes`);
     await page.getByRole("button", { name: "サインアウト" }).click();
-    await page.waitForSelector("[data-testid=sign-in-email]");
+    await page.waitForSelector("[data-testid=sign-in-test-idp]");
     assert.equal((await apiFrom(page, "/api/me")).status, 401);
   });
 

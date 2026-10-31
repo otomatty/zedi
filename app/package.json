@@ -6,7 +6,7 @@
   "description": "Zedi rebuilt on a single Cloudflare Worker: hono/jsx/dom client, Hono API, D1 and Durable Objects",
   "scripts": {
     "dev:client": "vite",
-    "dev:worker": "wrangler dev --port 8787",
+    "dev:worker": "wrangler dev -c wrangler.jsonc -c wrangler.test-idp.jsonc --port 8787",
     "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.client.json && tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run && vitest run -c vitest.config.worker.ts",

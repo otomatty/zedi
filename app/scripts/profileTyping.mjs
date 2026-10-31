@@ -18,7 +18,7 @@ const COLLAB = process.env.COLLAB !== "0";
 const worker = await startWorker(PORT);
 const browser = await launchBrowser();
 try {
-  const cookie = await signInViaApi(BASE, `profile-${Date.now()}@example.com`);
+  const cookie = await signInViaApi(BASE, `profile-${Date.now()}@test.zedi-note.app`);
   const headers = { cookie, origin: BASE, "content-type": "application/json" };
   const { defaultNoteId } = await (await fetch(`${BASE}/api/me`, { headers })).json();
   const { id } = await (

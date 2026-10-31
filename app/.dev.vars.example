@@ -1,3 +1,7 @@
 BETTER_AUTH_SECRET=change-me-local-dev-secret-at-least-32-chars
-# Enables the dev outbox (magic links without e-mail) and seeding. Local only.
+# Enables the seeding route used by the measurement scripts. Local only.
 ENVIRONMENT=development
+# Test IdP (wrangler.test-idp.jsonc), which stands in for Google locally. Local values only:
+# staging and Previews set their own with `wrangler secret put`.
+TEST_IDP_SECRET=change-me-local-test-idp-secret-0000
+TEST_IDP_PASSWORD=local-test-idp-password

@@ -13,16 +13,26 @@ One Cloudflare Worker serves everything (`wrangler.jsonc`). The front end and th
 | Path                     | Content                                                                                      | Technology                                                                                                                                                     |
 | ------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/`                      | Public page (no JS)                                                                          | Server-rendered with `hono/jsx` on the Worker (`src/worker/landing.tsx`)                                                                                       |
-| `/api/auth/*`            | Authentication                                                                               | Better Auth (`better-auth/minimal` + Drizzle adapter + D1). Magic-link sign-in; Google is enabled only when credentials are set                                |
+| `/api/auth/*`            | Authentication                                                                               | Better Auth (`better-auth/minimal` + Drizzle adapter + D1). Google sign-in (enabled only when credentials are set); outside production, the test IdP as well   |
+| `/test-idp/authorize`    | The test IdP's sign-in page                                                                  | Forwarded to the test IdP Worker only when the `TEST_IDP` binding exists. Production has no binding, so it answers 404                                         |
 | `/api/*`                 | Page list/create/detail, note members, full-text search, mock AI streaming (text / Markdown) | Hono (`src/worker/app.tsx`) + D1. Every route requires a session, with per-note authorization                                                                  |
 | `/parties/page-room/:id` | Collaborative editing                                                                        | One Durable Object per page (`PageRoom`). Session and page access are checked on connect, viewers cannot write, and saves project the document text back to D1 |
 | `/sw.js`                 | Service worker (offline)                                                                     | Built from `src/client/sw/`; see "Offline (PWA)" below                                                                                                         |
 | everything else          | The app SPA                                                                                  | `hono/jsx/dom` (`src/client/`), served as Static Assets                                                                                                        |
 
-### D1 schema (`migrations/0001_init.sql`)
+### Sign-in
+
+- **Production signs in with Google only.** It is enabled once the credentials (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`) are set. Anyone with a Google account can sign up. Magic links are gone.
+- **Local runs and tests can also use the test IdP**: a small OAuth provider that stands in for Google, running as a separate Worker (`src/testIdp/`, `wrangler.test-idp.jsonc`). Previews and staging will get it with their environments (otomatty/zedi#1157).
+  - The app calls it over the `TEST_IDP` service binding and connects it with Better Auth's `genericOAuth`. Browsers only see its sign-in page (`/test-idp/authorize`), which the app forwards on its own origin; tokens and user info are only reachable over the binding.
+  - The redirect must go back to the callback on the origin the request arrived on. Signing in needs `TEST_IDP_PASSWORD` from `.dev.vars`, and only `@test.zedi-note.app` addresses can be created.
+  - The production environment (`env.production` in `wrangler.jsonc`) has no `TEST_IDP`; a unit test checks this.
+- The top level of `wrangler.jsonc` is for local runs (`zedi-app-local`). Deployed environments live under `env` and are only used with `--env`.
+
+### D1 schema (`migrations/`)
 
 - **Better Auth tables**: `user` / `session` / `account` / `verification`
-- **App tables**: `notes` (the sharing boundary), `note_members`, `pages`, `dev_outbox` (development only; stores magic links instead of emailing them)
+- **App tables**: `notes` (the sharing boundary), `note_members`, `pages`
 - **Listing**: keyset pagination on the `pages_note_recent (note_id, updated_at DESC, id DESC)` index; no `OFFSET`
 - **Counts**: `notes.page_count` is maintained by triggers, so no `COUNT(*)` scans
 - **Full-text search**: FTS5 with the `trigram` tokenizer, which searches Japanese without a morphological analyzer. It is external-content (no copy of the text) and kept in sync by triggers. It references `pages.seq` (an INTEGER PRIMARY KEY), which unlike an implicit rowid does not change on VACUUM
@@ -83,7 +93,7 @@ Spec for splitting web clips and PDF text into pages, based on the large-documen
 
 ## Implemented features
 
-- Magic-link sign-in and sign-out, plus a default note created on first sign-in (a Better Auth database hook)
+- Sign-in and sign-out with Google (or the test IdP outside production), plus a default note created on first sign-in (a Better Auth database hook)
 - Page list from D1 (100 rows per request + virtual scrolling) and page creation
 - `⌘K` full-text search across every note the user can access
 - Collaborative editor: WikiLinks (`[[` suggestions come from full-text search), `/` commands, `#tags`, remote carets
@@ -92,18 +102,18 @@ Spec for splitting web clips and PDF text into pages, based on the large-documen
 - Offline use as a PWA: cached lists and visited pages, editing and creating pages offline, sync on reconnect
 - A long-page warning in the editor and a splitter for long imported content (the import UI itself is not built)
 
-**Not yet built**: most features of the current app (real LLM calls, AI drafting, web clipping, billing, the admin console, MCP and so on), real e-mail delivery (Email Service) and the Google OAuth round trip, code syntax highlighting, i18n.
+**Not yet built**: most features of the current app (real LLM calls, AI drafting, web clipping, billing, the admin console, MCP and so on), two-factor authentication (otomatty/zedi#1156), checking the real Google round trip (by hand on staging), code syntax highlighting, i18n.
 
 ## Commands
 
 ```bash
 bun install
-cp .dev.vars.example .dev.vars   # local BETTER_AUTH_SECRET and ENVIRONMENT=development
+cp .dev.vars.example .dev.vars   # local BETTER_AUTH_SECRET, ENVIRONMENT=development and test IdP values
 bun run test          # unit tests (Node / happy-dom) + integration tests (workerd with D1 and DOs)
 bun run typecheck     # client (hono/jsx/dom), worker (hono/jsx) and Node-run tests are checked separately
 bun run build         # build the SPA into dist/client
 bun run db:migrate    # apply migrations to the local D1
-bun run dev:worker    # wrangler dev (http://127.0.0.1:8787)
+bun run dev:worker    # the app and the test IdP under wrangler dev (http://127.0.0.1:8787)
 bun run smoke         # browser check from sign-in to sign-out on a fresh D1 (needs a build)
 bun run bundle:report # bundle sizes -> results/bundle.json
 bun run measure       # seed 10,000 pages, measure the API and the browser -> results/measurements.json
@@ -134,8 +144,8 @@ In CI (`.github/workflows/ci.yml`), `app-test` runs the type checks, unit and in
 
 | Kind                                          | Count     | Scope                                       |
 | --------------------------------------------- | --------- | ------------------------------------------- |
-| Unit (Vitest, Node / happy-dom)               | 165       | See below                                   |
-| Integration (Vitest, workerd with D1 and DOs) | 20        | Migrations apply the same SQL as production |
+| Unit (Vitest, Node / happy-dom)               | 192       | See below                                   |
+| Integration (Vitest, workerd with D1 and DOs) | 28        | Migrations apply the same SQL as production |
 | Browser (`bun run smoke`)                     | 18 checks | See below                                   |
 
 Unit tests cover:
@@ -152,11 +162,15 @@ Unit tests cover:
 - Splitting long content (heading levels, packing, even cuts, lists kept whole, index and links) and the long-page count
 - Offline: service-worker routing and network-first responses (failed cache writes, no-store, 401), the outbox (persistence, order, which refusals are permanent, overlapping flushes, pages added mid-flush, clearing), local search, the session's unavailable state, sign-out (device data cleared only after the server confirms), refreshed search results after a sync
 - `hono/jsx/dom` components (Testing Library): the command palette, the search palette (starts empty when reopened), the list (a failed later page and its retry), the editor (viewers stay read-only with `?collab=0`)
-- Config: the deployable `wrangler.jsonc` never turns development mode on
+- Test IdP: redirects limited to the callback on the same origin, PKCE, the password and domain checks, and expired, tampered or swapped codes and tokens
+- Sign-in page: offers only the enabled providers, and shows errors with a retry when loading or starting fails
+- Config: the deployable `wrangler.jsonc` never turns development mode on, production has no test IdP, and the test IdP has no public URL or route
 
 Integration tests cover:
 
-- Magic-link sign-in, repeat sign-in and sign-out
+- The OAuth round trip against the test IdP (sign-in, repeat sign-in, sign-out), and a callback is accepted only once and only with the browser's state cookie
+- Magic links and the dev outbox are gone, and only the test IdP's sign-in page is exposed
+- Without the `TEST_IDP` binding (production), none of the test IdP's entry points open
 - Keyset listing and counts
 - Japanese full-text search and short-term partial matching
 - Hiding other users' notes (404), viewer and editor permissions

@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Test IdP: stands in for Google in local runs, tests, Previews and staging. Never deployed
+  // to production. The app calls it through its `TEST_IDP` service binding and proxies only
+  // `/test-idp/authorize` to browsers, so it needs no route of its own.
+  "name": "zedi-test-idp",
+  "main": "src/testIdp/index.ts",
+  "tsconfig": "./tsconfig.worker.json",
+  "compatibility_date": "2026-08-15",
+  "workers_dev": false,
+  "preview_urls": false,
+  // TEST_IDP_SECRET and TEST_IDP_PASSWORD come from `.dev.vars` locally.
+}

@@ -69,7 +69,7 @@ function usePendingPageSync(onRefused: (titles: string[]) => void) {
   }, [onRefused]);
 }
 
-/** Lets the router handle same-origin `<a href>` clicks (API links such as magic links are left alone). */
+/** Lets the router handle same-origin `<a href>` clicks (API links such as OAuth callbacks are left alone). */
 function useLinkInterception() {
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
