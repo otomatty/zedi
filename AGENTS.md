@@ -1,38 +1,5 @@
 # Zedi - AI Agent Guidelines
 
-## AI-DLC (aidlc-workflows v2)
-
-[AI-DLC](https://github.com/awslabs/aidlc-workflows/tree/v2) Codex harness（`aidlc 2.4.1`）導入済み。**本ファイルの Zedi 方針が常に優先**。ライフサイクル実行時のみ AI-DLC を使う。
-
-エンジンは **1 系統（Codex dist → `.codex/`）**。Cursor / Claude Code はスキルミラー経由で同じオーケストレータを呼ぶ（公式の Claude フル `.claude/` エンジンは入れない — Zedi の `.agents/` 正本と衝突するため）。
-
-| 項目            | パス / コマンド                                                    |
-| --------------- | ------------------------------------------------------------------ |
-| Orchestrator    | `.agents/skills/aidlc/`                                            |
-| Engine          | `.codex/`                                                          |
-| Workspace shell | `aidlc/spaces/default/memory/`                                     |
-| Doctor          | `bun .codex/tools/aidlc-utility.ts doctor`                         |
-| スキルミラー    | `bun run setup:agent-mirrors`（`.agents` → `.cursor` / `.claude`） |
-
-### ハーネス別の起動
-
-| ハーネス        | 起動                                 | 前提                                                              |
-| --------------- | ------------------------------------ | ----------------------------------------------------------------- |
-| **Cursor**      | `/aidlc` またはスキル `aidlc`        | `.cursor/skills` ミラー（`bun run init` / `setup:agent-mirrors`） |
-| **Claude Code** | `/aidlc`                             | `.claude/skills` ミラー + `bun` が非対話シェルの PATH にあること  |
-| **Codex CLI**   | `$aidlc`（または `/skills` → aidlc） | Codex ≥ 0.139.0、プロジェクト trust、`$CODEX_HOME` の hook trust  |
-
-```bash
-bun .codex/tools/aidlc-utility.ts doctor   # 健全性
-/aidlc --doctor                            # セッション内（Cursor / Claude）
-$aidlc --doctor                            # Codex
-/aidlc Build a …                           # ワークフロー開始（スコープ自動判定）
-```
-
-- メソッドルールの編集は `aidlc/spaces/<space>/memory/`（`.codex/` は触らない）。
-- **モデル課金**: Claude Code → Claude.ai サブスク、Codex → ChatGPT / Codex サブスク。プロジェクトの `.codex/config.toml` は Bedrock を無効化済み（`model_provider` コメントアウト）。Bedrock に戻すときは同ファイルのコメントを復元。
-- Codex hooks: 初回は TUI で Trust、または `.codex/trust-seed.toml` を `$CODEX_HOME/config.toml` に反映（マシンローカル）。
-
 ## テスト駆動開発（必守） / TDD (mandatory)
 
 Zedi は **TDD を徹底**する。実装を先に書いてテストを後付けしない。
@@ -120,8 +87,6 @@ packages/
   shared/            # @zedi/shared（ピュア TS 定数）
 e2e/                 # Playwright
 .agents/             # Agent Skills / サブエージェント正本（`bun run init` でミラー）
-.codex/              # AI-DLC エンジン（Codex harness）
-aidlc/               # AI-DLC workspace shell
 ```
 
 ### 命名規則 / Naming
