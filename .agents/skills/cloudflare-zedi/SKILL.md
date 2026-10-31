@@ -85,7 +85,8 @@ Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in know
    `wrangler d1 migrations apply DB --remote` を流す。
 2. Secrets を登録する（`wrangler secret put BETTER_AUTH_SECRET` など。必要な鍵は
    [`app/.dev.vars.example`](../../../app/.dev.vars.example) を参照）。`ENVIRONMENT=development` は
-   マジックリンクの受信箱を公開するので、デプロイ先には絶対に設定しない。
+   サインインした誰もがページを一括投入できる入口を開くので、デプロイ先には絶対に設定しない。テスト用 IdP（`TEST_IDP`）は
+   staging と Preview にだけ置き、本番の環境には入れない（otomatty/zedi#1156）。
 3. 使うドメインに残っている旧 Pages のカスタムドメインと CNAME を、ダッシュボードで先に外す。
    残っていると `custom_domain` の作成が衝突する（以前の dev デプロイが失敗した原因の一つ）。
 4. `routes` に `{ "pattern": "<domain>", "custom_domain": true }` を足して `wrangler deploy`。

@@ -10,19 +10,29 @@ Zedi を Cloudflare Worker 1 本の構成で作り直したアプリです。画
 
 Cloudflare Worker 1 本ですべてを配信します（`wrangler.jsonc`）。フロントと API が同じオリジンなので、CORS の設定やサードパーティ Cookie は不要です。
 
-| パス                     | 中身                                                                                          | 技術                                                                                                                                              |
-| ------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                      | 公開ページ（JS なし）                                                                         | Worker 上で `hono/jsx` によるサーバー描画（`src/worker/landing.tsx`）                                                                             |
-| `/api/auth/*`            | 認証                                                                                          | Better Auth（`better-auth/minimal` + Drizzle アダプタ + D1）。マジックリンクでサインイン。Google は資格情報を設定したときだけ有効                 |
-| `/api/*`                 | ページ一覧・作成・詳細、共有メンバー、全文検索、疑似 AI ストリーミング（テキスト / Markdown） | Hono（`src/worker/app.tsx`）+ D1。全ルートでセッション必須、ノート単位の認可                                                                      |
-| `/parties/page-room/:id` | 共同編集                                                                                      | ページごとの Durable Object（`PageRoom`）。接続時にセッションとページの権限を確認し、閲覧者は書き込み不可。保存時に本文のテキストを D1 に書き戻す |
-| `/sw.js`                 | Service Worker（オフライン）                                                                  | `src/client/sw/` からビルド。後述の「オフライン（PWA）」を参照                                                                                    |
-| それ以外                 | アプリ本体の SPA                                                                              | `hono/jsx/dom`（`src/client/`）。Static Assets として配信                                                                                         |
+| パス                     | 中身                                                                                          | 技術                                                                                                                                                   |
+| ------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/`                      | 公開ページ（JS なし）                                                                         | Worker 上で `hono/jsx` によるサーバー描画（`src/worker/landing.tsx`）                                                                                  |
+| `/api/auth/*`            | 認証                                                                                          | Better Auth（`better-auth/minimal` + Drizzle アダプタ + D1）。Google でサインイン（資格情報を設定したときだけ有効）。本番以外ではテスト用 IdP も使える |
+| `/test-idp/authorize`    | テスト用 IdP のサインイン画面                                                                 | `TEST_IDP` バインディングがあるときだけ、テスト用 IdP の Worker に転送する。本番にはバインディングがないので 404                                       |
+| `/api/*`                 | ページ一覧・作成・詳細、共有メンバー、全文検索、疑似 AI ストリーミング（テキスト / Markdown） | Hono（`src/worker/app.tsx`）+ D1。全ルートでセッション必須、ノート単位の認可                                                                           |
+| `/parties/page-room/:id` | 共同編集                                                                                      | ページごとの Durable Object（`PageRoom`）。接続時にセッションとページの権限を確認し、閲覧者は書き込み不可。保存時に本文のテキストを D1 に書き戻す      |
+| `/sw.js`                 | Service Worker（オフライン）                                                                  | `src/client/sw/` からビルド。後述の「オフライン（PWA）」を参照                                                                                         |
+| それ以外                 | アプリ本体の SPA                                                                              | `hono/jsx/dom`（`src/client/`）。Static Assets として配信                                                                                              |
 
-### D1 のスキーマ（`migrations/0001_init.sql`）
+### サインイン
+
+- **本番は Google だけ**です。資格情報（`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`）を設定したときに有効になります。Google のアカウントがあれば誰でも登録できます。マジックリンクは廃止しました。
+- **ローカル・試験・Preview・staging ではテスト用 IdP** でもサインインできます。Google の代わりをする小さな OAuth プロバイダーで、別の Worker（`src/testIdp/`、`wrangler.test-idp.jsonc`）として動きます。
+  - アプリからは `TEST_IDP` サービスバインディングで呼び、Better Auth の `genericOAuth` でつなぎます。ブラウザに見せるのはサインイン画面（`/test-idp/authorize`）だけで、アプリが同じオリジンで転送します。トークンとユーザー情報はバインディング経由でしか取れません。
+  - 戻り先は、リクエストが届いたのと同じオリジンのコールバックに限ります。サインインには `.dev.vars` の `TEST_IDP_PASSWORD` が必要で、`@test.zedi-note.app` のアドレスしか作れません。
+  - 本番の環境（`wrangler.jsonc` の `env.production`）には `TEST_IDP` を置きません。単体テストでこれを確かめています。
+- `wrangler.jsonc` の最上位はローカル用（`zedi-app-local`）です。デプロイする環境は `env` の下にあり、`--env` を付けたときだけ使われます。
+
+### D1 のスキーマ（`migrations/`）
 
 - **Better Auth の表**: `user` / `session` / `account` / `verification`
-- **アプリの表**: `notes`（共有の単位）、`note_members`、`pages`、`dev_outbox`（開発時のみ、メールの代わりにマジックリンクを保存）
+- **アプリの表**: `notes`（共有の単位）、`note_members`、`pages`
 - **一覧**: `pages_note_recent (note_id, updated_at DESC, id DESC)` 索引を使うキーセット方式で、`OFFSET` は使いません
 - **件数**: `notes.page_count` をトリガーで更新し、`COUNT(*)` で全件を数えません
 - **全文検索**: FTS5 の `trigram` トークナイザで、形態素解析なしで日本語を検索します。本文の複製を持たない外部コンテンツ型で、トリガーで同期します。参照先の rowid には、VACUUM で変わらない `pages.seq`（INTEGER PRIMARY KEY）を使います
@@ -83,7 +93,7 @@ Y.js のエディタ連携（`@tiptap/y-tiptap`）には小さなパッチを当
 
 ## 実装済みの機能
 
-- マジックリンクでのサインイン・サインアウトと、初回サインイン時の既定ノート作成（Better Auth の database hook）
+- Google（本番以外ではテスト用 IdP）でのサインイン・サインアウトと、初回サインイン時の既定ノート作成（Better Auth の database hook）
 - D1 のページ一覧（100 件ずつ取得 + 仮想スクロール）と新規ページ作成
 - `⌘K` の全文検索（アクセスできる全ノートが対象）
 - 共同編集エディタ: WikiLink（`[[` で候補を全文検索）、`/` コマンド、`#タグ`、複数人のカーソル
@@ -92,18 +102,18 @@ Y.js のエディタ連携（`@tiptap/y-tiptap`）には小さなパッチを当
 - PWA としてのオフライン利用: 一覧と開いたことのあるページの閲覧、オフラインでの編集とページ作成、再接続時の同期
 - エディタの長文警告と、長い取り込みコンテンツの分割処理（取り込み UI 自体は未実装）
 
-**未実装**: 現行アプリから移す機能の大半（実際の LLM 呼び出し、AI での下書き生成、Web クリップ、課金、管理画面、MCP など）、実際のメール送信（Email Service）と Google OAuth の往復、コードのシンタックスハイライト、i18n。
+**未実装**: 現行アプリから移す機能の大半（実際の LLM 呼び出し、AI での下書き生成、Web クリップ、課金、管理画面、MCP など）、2 段階認証（otomatty/zedi#1156）、本物の Google での往復の確認（staging で手作業）、コードのシンタックスハイライト、i18n。
 
 ## コマンド
 
 ```bash
 bun install
-cp .dev.vars.example .dev.vars   # BETTER_AUTH_SECRET と ENVIRONMENT=development（ローカル用）
+cp .dev.vars.example .dev.vars   # BETTER_AUTH_SECRET・ENVIRONMENT=development・テスト用 IdP の値（ローカル用）
 bun run test          # 単体テスト（Node / happy-dom）+ 統合テスト（workerd 上で D1・DO を使用）
 bun run typecheck     # クライアント（hono/jsx/dom）・ワーカー（hono/jsx）・Node で動くテストを別々に型チェック
 bun run build         # SPA を dist/client にビルド
 bun run db:migrate    # ローカル D1 にマイグレーションを適用
-bun run dev:worker    # wrangler dev（http://127.0.0.1:8787）
+bun run dev:worker    # アプリとテスト用 IdP を wrangler dev で起動（http://127.0.0.1:8787）
 bun run smoke         # 空の D1 でサインインからサインアウトまでをブラウザで確認（build 済みが前提）
 bun run bundle:report # バンドルサイズ → results/bundle.json
 bun run measure       # D1 に 1 万ページを投入して API とブラウザを計測 → results/measurements.json
@@ -133,8 +143,8 @@ CI（`.github/workflows/ci.yml`）の `app-test` が型チェック・単体テ�
 
 | 種類                                       | 件数    | 内容                                    |
 | ------------------------------------------ | ------- | --------------------------------------- |
-| 単体（Vitest、Node / happy-dom）           | 165     | 下記                                    |
-| 統合（Vitest、workerd 上で D1・DO を使用） | 20      | マイグレーションは本番と同じ SQL を適用 |
+| 単体（Vitest、Node / happy-dom）           | 191     | 下記                                    |
+| 統合（Vitest、workerd 上で D1・DO を使用） | 26      | マイグレーションは本番と同じ SQL を適用 |
 | ブラウザ（`bun run smoke`）                | 18 項目 | 下記                                    |
 
 単体テストの対象:
@@ -151,11 +161,15 @@ CI（`.github/workflows/ci.yml`）の `app-test` が型チェック・単体テ�
 - 長いコンテンツの分割（見出しレベル、詰め込み、均等分割、リストを分けない、目次とリンク）と長文の数え方
 - オフライン: Service Worker の振り分けとネットワーク優先の応答（キャッシュ失敗・no-store・401）、送信キュー（永続化・順序・恒久的な拒否の判定・同時実行・送信中の追加・削除）、ローカル検索、セッションの「接続不可」状態、サインアウト（サーバーの確認後に端末のデータを削除）、同期後の検索結果の更新
 - `hono/jsx/dom` のコンポーネント（Testing Library）: コマンドパレット、検索パレット（開き直すと空から始まる）、一覧（途中のページの失敗と再試行）、エディタ（`?collab=0` でも閲覧者は編集不可）
-- 設定: デプロイされる `wrangler.jsonc` で開発モードが有効にならないこと
+- テスト用 IdP: 戻り先の制限（同じオリジンのコールバックだけ）、PKCE、パスワードとドメインの制限、コードとトークンの期限・改ざん・取り違え
+- サインイン画面: 有効なプロバイダーだけを出すこと、読み込みや開始に失敗したときの表示と再試行
+- 設定: デプロイされる `wrangler.jsonc` で開発モードが有効にならないこと、本番の環境にテスト用 IdP がないこと
 
 統合テストの対象:
 
-- マジックリンクでのサインイン、再サインイン、サインアウト
+- テスト用 IdP での OAuth の往復（サインイン、再サインイン、サインアウト）
+- マジックリンクと開発用の受信箱がなくなったこと、テスト用 IdP の公開範囲（サインイン画面だけ）
+- `TEST_IDP` バインディングがないとき（本番）は、テスト用 IdP のどの入口も開かないこと
 - キーセット方式の一覧と件数
 - 日本語の全文検索と短い語の部分一致
 - 他人のノートへのアクセス拒否（404）、閲覧者と編集者の権限

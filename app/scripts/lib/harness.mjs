@@ -1,10 +1,10 @@
 /**
- * Shared helpers for the browser scripts: start `wrangler dev` on a fresh local D1,
- * sign in through the magic-link API, and launch Chromium.
- * ブラウザ系スクリプト共通: 空の D1 で `wrangler dev` を起動、マジックリンクでサインイン、Chromium 起動。
+ * Shared helpers for the browser scripts: start `wrangler dev` (the app and the test IdP) on a
+ * fresh local D1, sign in through the test IdP, and launch Chromium.
+ * ブラウザ系スクリプト共通: 空の D1 でアプリとテスト用 IdP を起動、テスト用 IdP でサインイン、Chromium 起動。
  */
 import { execFileSync, spawn } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 
@@ -13,8 +13,9 @@ const root = join(import.meta.dirname, "../..");
 
 /**
  * Applies the D1 migrations to a fresh persistence directory and starts `wrangler dev` on
- * `port` (serving the built `dist/client`). Resolves when the server is ready.
- * 新しい保存先に D1 マイグレーションを適用して `wrangler dev` を起動する（事前に build が必要）。
+ * `port` with the app (serving the built `dist/client`) and the test IdP behind its
+ * `TEST_IDP` binding. Resolves when the server is ready.
+ * 新しい保存先に D1 マイグレーションを適用し、アプリとテスト用 IdP を `wrangler dev` で起動する（事前に build が必要）。
  */
 export function startWorker(port) {
   const persistTo = join(root, ".wrangler/runs", `${port}-${Date.now()}`);
@@ -32,6 +33,10 @@ export function startWorker(port) {
     [
       "wrangler",
       "dev",
+      "-c",
+      "wrangler.jsonc",
+      "-c",
+      "wrangler.test-idp.jsonc",
       "--port",
       String(port),
       "--ip",
@@ -40,7 +45,7 @@ export function startWorker(port) {
       "0",
       "--persist-to",
       persistTo,
-      // The scripts sign in through the dev outbox, whatever `.dev.vars` says.
+      // The measurement scripts seed pages, whatever `.dev.vars` says.
       "--var",
       "ENVIRONMENT:development",
     ],
@@ -66,27 +71,60 @@ export function startWorker(port) {
 }
 
 /**
- * Signs in through the real magic-link endpoints (request → dev outbox → verify) and returns
- * the Cookie header value.
- * 実際のマジックリンク API でサインインし、Cookie ヘッダー値を返す。
+ * The test IdP's password: `TEST_IDP_PASSWORD` from the environment, else from `.dev.vars`
+ * (CI copies `.dev.vars.example`).
+ * テスト用 IdP のパスワード。環境変数、なければ `.dev.vars` から読む。
+ */
+export function testIdpPassword() {
+  if (process.env.TEST_IDP_PASSWORD) return process.env.TEST_IDP_PASSWORD;
+  const vars = readFileSync(join(root, ".dev.vars"), "utf8");
+  const line = vars.split("\n").find((l) => l.startsWith("TEST_IDP_PASSWORD="));
+  if (!line) throw new Error("TEST_IDP_PASSWORD is not set (copy .dev.vars.example to .dev.vars)");
+  return line.slice("TEST_IDP_PASSWORD=".length).trim();
+}
+
+/** Applies a response's Set-Cookie headers to a cookie jar (empty values delete). */
+function storeCookies(jar, res) {
+  for (const header of res.headers.getSetCookie()) {
+    const pair = header.split(";")[0];
+    const index = pair.indexOf("=");
+    const value = pair.slice(index + 1);
+    if (value === "" || /max-age=0/i.test(header)) jar.delete(pair.slice(0, index));
+    else jar.set(pair.slice(0, index), value);
+  }
+}
+
+const cookieHeader = (jar) => [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
+
+/**
+ * Signs in through the real OAuth flow against the test IdP (start → IdP sign-in form →
+ * callback) and returns the Cookie header value. `email` must be `@test.zedi-note.app`.
+ * テスト用 IdP に対して実際の OAuth の手順でサインインし、Cookie ヘッダー値を返す。
  */
 export async function signInViaApi(base, email) {
-  const headers = { "content-type": "application/json", origin: base };
-  const request = await fetch(`${base}/api/auth/sign-in/magic-link`, {
+  const jar = new Map();
+  const start = await fetch(`${base}/api/auth/sign-in/social`, {
     method: "POST",
-    headers,
-    body: JSON.stringify({ email, callbackURL: "/notes" }),
+    headers: { "content-type": "application/json", origin: base },
+    body: JSON.stringify({ provider: "test-idp", callbackURL: "/notes" }),
   });
-  if (!request.ok) throw new Error(`magic link request failed: ${request.status}`);
-  const { url } = await (
-    await fetch(`${base}/api/dev/outbox?email=${encodeURIComponent(email)}`)
-  ).json();
-  const verify = await fetch(url, { redirect: "manual" });
-  const cookie = verify.headers
-    .getSetCookie()
-    .map((c) => c.split(";")[0])
-    .join("; ");
-  if (!cookie.includes("session_token")) throw new Error("no session cookie after verify");
+  if (!start.ok) throw new Error(`sign-in start failed: ${start.status}`);
+  storeCookies(jar, start);
+  const { url } = await start.json();
+  const authorize = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ email, password: testIdpPassword() }).toString(),
+    redirect: "manual",
+  });
+  if (authorize.status !== 302) throw new Error(`test IdP sign-in failed: ${authorize.status}`);
+  const callback = await fetch(authorize.headers.get("location"), {
+    headers: { cookie: cookieHeader(jar) },
+    redirect: "manual",
+  });
+  storeCookies(jar, callback);
+  const cookie = cookieHeader(jar);
+  if (!cookie.includes("session_token")) throw new Error("no session cookie after the callback");
   return cookie;
 }
 

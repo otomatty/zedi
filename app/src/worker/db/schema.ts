@@ -61,7 +61,7 @@ export const account = sqliteTable(
   (t) => [index("account_user_id").on(t.userId)],
 );
 
-/** Better Auth: verification tokens (magic links). */
+/** Better Auth: verification values (OAuth state and the like). */
 export const verification = sqliteTable(
   "verification",
   {
@@ -122,11 +122,3 @@ export const pages = sqliteTable(
   },
   (t) => [index("pages_note_recent").on(t.noteId, sql`${t.updatedAt} DESC`, sql`${t.id} DESC`)],
 );
-
-/** Development-only outbox that captures magic links instead of sending email. */
-export const devOutbox = sqliteTable("dev_outbox", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  email: text("email").notNull(),
-  url: text("url").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-});

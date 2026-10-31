@@ -9,6 +9,9 @@ declare global {
       BETTER_AUTH_SECRET: string;
       BETTER_AUTH_URL?: string;
       ENVIRONMENT?: string;
+      GOOGLE_CLIENT_ID?: string;
+      GOOGLE_CLIENT_SECRET?: string;
+      TEST_IDP?: Fetcher;
     }
   }
 }

@@ -336,7 +336,7 @@ const worker = await startWorker(PORT);
 const browser = await launchBrowser();
 const results = { measuredAt: new Date().toISOString(), seedPages: SEED_PAGES, runs: [] };
 try {
-  cookie = await signInViaApi(BASE, `bench-${Date.now()}@example.com`);
+  cookie = await signInViaApi(BASE, `bench-${Date.now()}@test.zedi-note.app`);
   noteId = (await (await apiFetch("/api/me")).json()).defaultNoteId;
   const t0 = performance.now();
   const seeded = await (

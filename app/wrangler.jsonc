@@ -1,6 +1,8 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "zedi-app",
+  // The top level is for local runs (`wrangler dev`) and the workerd tests. Deployed environments
+  // live under `env` and are deployed with `--env`, so a bare `wrangler deploy` never reaches them.
+  "name": "zedi-app-local",
   "main": "src/worker/index.ts",
   // Worker TSX uses hono/jsx (server); the client SPA uses hono/jsx/dom via vite.config.ts.
   "tsconfig": "./tsconfig.worker.json",
@@ -10,7 +12,7 @@
     "directory": "./dist/client",
     "not_found_handling": "single-page-application",
     // `/` is the server-rendered landing page; API and realtime are Worker routes.
-    "run_worker_first": ["/", "/api/*", "/parties/*"],
+    "run_worker_first": ["/", "/api/*", "/parties/*", "/test-idp/*"],
   },
   "durable_objects": {
     "bindings": [{ "name": "PageRoom", "class_name": "PageRoom" }],
@@ -25,7 +27,28 @@
       "migrations_dir": "migrations",
     },
   ],
+  // Test IdP that stands in for Google (wrangler.test-idp.jsonc). Never add it to `env.production`.
+  "services": [{ "binding": "TEST_IDP", "service": "zedi-test-idp" }],
   // BETTER_AUTH_SECRET and ENVIRONMENT=development come from `.dev.vars` locally (see
-  // .dev.vars.example). Development mode exposes the magic-link outbox, so never set it here.
+  // .dev.vars.example). Development mode enables seeding routes, so never set it here.
   "observability": { "enabled": true },
+  "env": {
+    // Production signs in with Google only: no TEST_IDP binding and no ENVIRONMENT variable.
+    // The D1 id is still a placeholder; staging, routes and the deploy workflow come with #1157.
+    "production": {
+      "name": "zedi-app",
+      "services": [],
+      "durable_objects": {
+        "bindings": [{ "name": "PageRoom", "class_name": "PageRoom" }],
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "zedi-app",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations",
+        },
+      ],
+    },
+  },
 }

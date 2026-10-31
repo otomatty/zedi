@@ -1,6 +1,6 @@
 /** @jsxImportSource hono/jsx */
 import { Hono, type Context } from "hono";
-import { getAuth } from "./auth";
+import { getAuth, googleConfigured } from "./auth";
 import { decodeCursor, encodeCursor } from "./db/cursor";
 import { buildSearchPlan } from "./db/searchPlan";
 import { isDevelopment, type Env } from "./env";
@@ -72,16 +72,16 @@ export function createApp({ routeRealtime }: { routeRealtime?: RealtimeRouter } 
   app.get("/", (c) => c.html(`<!DOCTYPE html>${(<Landing />).toString()}`));
   app.on(["GET", "POST"], "/api/auth/*", (c) => getAuth(c.env, c.req.url).handler(c.req.raw));
 
-  // Development only: read the magic link that would have been e-mailed.
-  app.get("/api/dev/outbox", async (c) => {
-    if (!isDevelopment(c.env)) return c.notFound();
-    const row = await c.env.DB.prepare(
-      "SELECT url FROM dev_outbox WHERE email = ?1 ORDER BY id DESC LIMIT 1",
-    )
-      .bind(c.req.query("email") ?? "")
-      .first<{ url: string }>();
-    return row ? c.json(row) : c.notFound();
-  });
+  // Public: which sign-in buttons the sign-in page shows.
+  app.get("/api/sign-in-options", (c) =>
+    c.json({ google: googleConfigured(c.env), testIdp: Boolean(c.env.TEST_IDP) }),
+  );
+
+  // The test IdP's sign-in page, served on this origin so its redirect can only come back here.
+  // Its token and userinfo endpoints stay reachable only over the service binding.
+  app.on(["GET", "POST"], "/test-idp/authorize", (c) =>
+    c.env.TEST_IDP ? c.env.TEST_IDP.fetch(c.req.raw) : c.notFound(),
+  );
 
   const api = new Hono<AppEnv>();
   api.use(async (c, next) => {
