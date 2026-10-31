@@ -2,7 +2,7 @@ import { useCallback, useSyncExternalStore } from "hono/jsx/dom";
 import { createRouter, type HistoryLike, type RouteMatch } from "./lib/router";
 
 /** Page identifiers used by the app shell. */
-export type PageId = "notes" | "editor" | "ai";
+export type PageId = "notes" | "editor" | "ai" | "security";
 
 const browserHistory: HistoryLike = {
   get location() {
@@ -22,6 +22,7 @@ export const router = createRouter<PageId>(
     { path: "/notes", value: "notes" },
     { path: "/notes/:id", value: "editor" },
     { path: "/ai", value: "ai" },
+    { path: "/settings/security", value: "security" },
   ],
   browserHistory,
 );

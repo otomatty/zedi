@@ -71,6 +71,62 @@ describe("secondFactorApi", () => {
     },
   );
 
+  it("lists the methods for the settings page", async () => {
+    const listed = { passkeys: [], totp: true, recoveryCodesRemaining: 10, recentlyVerified: true };
+    respond(200, listed);
+    expect(await secondFactorApi.methods()).toEqual(listed);
+    expect(calls[0]?.url).toBe("/api/second-factor/methods");
+    expect(calls[0]?.init?.method ?? "GET").toBe("GET");
+  });
+
+  it.each([
+    ["deletePasskey", ["a/b+c"], "/api/second-factor/passkeys/a%2Fb%2Bc", "DELETE"],
+    ["deleteTotp", [], "/api/second-factor/totp", "DELETE"],
+  ] as const)("%s sends %s %s and accepts an empty 204", async (method, args, url, verb) => {
+    calls = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (u: string, init?: RequestInit) => {
+        calls.push({ url: u, init });
+        return new Response(null, { status: 204 });
+      }),
+    );
+    await (secondFactorApi[method] as (...a: string[]) => Promise<unknown>)(...args);
+    expect(calls[0]?.url).toBe(url);
+    expect(calls[0]?.init?.method).toBe(verb);
+  });
+
+  it("asks for new recovery codes, then switches to them with the offer", async () => {
+    respond(200, { recoveryCodes: ["A"], offer: "OFFER" });
+    expect(await secondFactorApi.newRecoveryCodes()).toEqual({
+      recoveryCodes: ["A"],
+      offer: "OFFER",
+    });
+    expect(calls[0]?.url).toBe("/api/second-factor/recovery-codes");
+    expect(calls[0]?.init?.method).toBe("POST");
+
+    calls = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (u: string, init?: RequestInit) => {
+        calls.push({ url: u, init });
+        return new Response(null, { status: 204 });
+      }),
+    );
+    await secondFactorApi.confirmRecoveryCodes("OFFER");
+    expect(calls[0]?.url).toBe("/api/second-factor/recovery-codes/confirm");
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ offer: "OFFER" });
+  });
+
+  it.each(["last_factor", "not_found", "second_factor_required", "invalid_offer"])(
+    "keeps the management refusal %j",
+    async (reason) => {
+      respond(409, { error: reason });
+      await expect(secondFactorApi.deleteTotp()).rejects.toMatchObject({ reason });
+    },
+  );
+
   it("returns what the server sends back", async () => {
     respond(200, { secret: "S", uri: "otpauth://totp/x", recoveryCodes: ["A", "B"] });
     expect(await secondFactorApi.startEnrollment()).toEqual({

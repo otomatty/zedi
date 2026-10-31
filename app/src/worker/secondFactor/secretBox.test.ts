@@ -29,6 +29,15 @@ describe("secretBox", () => {
     await expect(symmetricDecrypt({ key: KEY, data: sealed })).rejects.toThrow();
   });
 
+  it("keeps purposes apart: a box opens only for the purpose it was sealed for", async () => {
+    const offer = await sealSecret(KEY, PLAINTEXT, "recovery-code-offer");
+    expect(await openSecret(KEY, offer, "recovery-code-offer")).toBe(PLAINTEXT);
+    expect(await openSecret(KEY, offer)).toBeNull();
+    expect(
+      await openSecret(KEY, await sealSecret(KEY, PLAINTEXT), "recovery-code-offer"),
+    ).toBeNull();
+  });
+
   it("rejects a tampered or malformed box", async () => {
     const sealed = await sealSecret(KEY, PLAINTEXT);
     const flipped = `${sealed.slice(0, -1)}${sealed.endsWith("0") ? "1" : "0"}`;

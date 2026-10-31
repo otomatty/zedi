@@ -34,6 +34,22 @@ function fakeApi(overrides: Partial<SecondFactorApi> = {}): SecondFactorApi {
     confirmPasskeyRegistration: vi.fn(async () => ({})),
     startPasskeyAuthentication: vi.fn(async () => ({ options: AUTH_OPTIONS })),
     verifyPasskey: vi.fn(async () => ({})),
+    // The settings page's calls; this screen must not use them.
+    methods: vi.fn(async () => {
+      throw new Error("not used here");
+    }),
+    deletePasskey: vi.fn(async () => {
+      throw new Error("not used here");
+    }),
+    deleteTotp: vi.fn(async () => {
+      throw new Error("not used here");
+    }),
+    newRecoveryCodes: vi.fn(async () => {
+      throw new Error("not used here");
+    }),
+    confirmRecoveryCodes: vi.fn(async () => {
+      throw new Error("not used here");
+    }),
     ...overrides,
   };
 }

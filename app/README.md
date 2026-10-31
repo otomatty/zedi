@@ -42,6 +42,10 @@ A Google sign-in only opens the second step: every user needs a passkey or an au
 - **Ten recovery codes are shown once**, with the first method before it is confirmed; the user ticks that they saved them first, so a lost confirmation response loses nothing. They belong to the registration that issued them: if two sessions start the first registration at once, confirming one keeps only its codes, and the other cannot finish (the check that the user has no method yet and the write are one statement). They are stored as SHA-256 hashes, and each works once (`POST /api/second-factor/recovery-code/verify`). Adding the second method issues none.
 - **Afterwards the user passes the second step with the passkey** (`POST /api/second-factor/passkey/authentication`, then `…/verify`), **the app's code** (`POST /api/second-factor/totp/verify`) or a recovery code. A used code is refused even inside its time window, and a passkey whose signature counter went backwards is refused.
 - **Five attempts per user per 15 minutes**, counted before the code or passkey is checked; then 429 with `Retry-After`. A successful second step clears the count.
+- **The security page manages the methods** (`/settings/security`, "セキュリティ" in the sidebar). It lists the passkeys (name, registration date, last use), the app and how many recovery codes are left (`GET /api/second-factor/methods`). There the user removes a passkey (`DELETE /api/second-factor/passkeys/:id`) or the app (`DELETE /api/second-factor/totp`), adds the missing one, and makes new recovery codes.
+- **New recovery codes come in two steps, so a lost response loses no codes**. `POST /api/second-factor/recovery-codes` returns ten new codes and an offer, and changes nothing: the old codes keep working. The offer is sealed (XChaCha20-Poly1305 under a key derived for this purpose), bound to the user and the session, and lasts ten minutes. Once the user ticks that they saved the codes, `POST /api/second-factor/recovery-codes/confirm` switches to them and the old ones stop working. Sending the same offer again changes nothing, so a retry is safe; an expired or foreign offer gets 400 `invalid_offer`.
+- **Changes need the second step within the last five minutes**, the same window as for adding a method (read from D1). An older session gets 403 `reverification_required`, and the page asks for the passkey, the app's code or a recovery code first. A session that has not passed the second step gets 403 `second_factor_required`.
+- **The last method cannot be removed**: the server answers 409 `last_factor`. The check that another method exists and the delete are one statement, so two sessions removing the passkey and the app at once cannot both succeed. The page does not offer the removal either.
 - **Passkeys need a host name**: WebAuthn does not accept an IP address as the relying party, so at `http://127.0.0.1:8787` only the app is offered. Open `http://localhost:8787` to use passkeys locally.
 - The Better Auth `twoFactor` plugin is not used because it only steps in after password, username and phone sign-ins, never after Google (see otomatty/zedi#1156).
 
@@ -118,8 +122,9 @@ Spec for splitting web clips and PDF text into pages, based on the large-documen
 - Streaming AI output: three strategies for plain text and two for Markdown (`md-blocks` / `md-naive`)
 - Offline use as a PWA: cached lists and visited pages, editing and creating pages offline, sync on reconnect
 - A long-page warning in the editor and a splitter for long imported content (the import UI itself is not built)
+- Second factor after Google: passkeys and an authenticator app, recovery codes, and the security page for managing them (changes need the second step within the last five minutes)
 
-**Not yet built**: most features of the current app (real LLM calls, AI drafting, web clipping, billing, the admin console, MCP and so on), re-checking the second factor before sensitive operations, managing registered methods and the recovery procedure for users who lost every factor (otomatty/zedi#1156), checking the real Google round trip (by hand on staging), code syntax highlighting, i18n.
+**Not yet built**: most features of the current app (real LLM calls, AI drafting, web clipping, billing, the admin console, MCP and so on), the recovery procedure for users who lost every factor (otomatty/zedi#1156), deleting an account (it needs a plan for removing Durable Object storage and shared notes), checking the real Google round trip (by hand on staging), code syntax highlighting, i18n.
 
 ## Commands
 
@@ -161,9 +166,9 @@ In CI (`.github/workflows/ci.yml`), `app-test` runs the type checks, unit and in
 
 | Kind                                          | Count     | Scope                                       |
 | --------------------------------------------- | --------- | ------------------------------------------- |
-| Unit (Vitest, Node / happy-dom)               | 285       | See below                                   |
-| Integration (Vitest, workerd with D1 and DOs) | 78        | Migrations apply the same SQL as production |
-| Browser (`bun run smoke`)                     | 21 checks | See below                                   |
+| Unit (Vitest, Node / happy-dom)               | 333       | See below                                   |
+| Integration (Vitest, workerd with D1 and DOs) | 99        | Migrations apply the same SQL as production |
+| Browser (`bun run smoke`)                     | 22 checks | See below                                   |
 
 Unit tests cover:
 
@@ -181,7 +186,8 @@ Unit tests cover:
 - `hono/jsx/dom` components (Testing Library): the command palette, the search palette (starts empty when reopened), the list (a failed later page and its retry), the editor (viewers stay read-only with `?collab=0`)
 - Test IdP: redirects limited to the callback on the same origin, PKCE, the password and domain checks, and expired, tampered or swapped codes and tokens
 - Sign-in page: offers only the enabled providers, and shows errors with a retry when loading or starting fails
-- Second factor: TOTP against the RFC 6238 test vectors and its ±1 step window, the otpauth URI, recovery codes (format, typing variants, hashes), the encrypted secret (tampering, other keys), the ten-minute limit for unverified sessions, the QR code, the API client's error handling, passkey prompt failures and hosts that cannot use passkeys, the five-minute window for adding a method, and the screen (choosing a passkey or the app, registering either with the recovery codes saved first, suggesting the other method, a passkey, the app's code, a recovery code, cancelled prompts, wrong codes, waiting after too many attempts, running out of time, sign-out)
+- Second factor: TOTP against the RFC 6238 test vectors and its ±1 step window, the otpauth URI, recovery codes (format, typing variants, hashes), the encrypted secret (tampering, other keys, another purpose), offers of new recovery codes (another user or session, expiry, tampering, malformed payloads), the ten-minute limit for unverified sessions, the QR code, the API client's error handling, passkey prompt failures and hosts that cannot use passkeys, the five-minute window for adding a method, and the screen (choosing a passkey or the app, registering either with the recovery codes saved first, suggesting the other method, a passkey, the app's code, a recovery code, cancelled prompts, wrong codes, waiting after too many attempts, running out of time, sign-out)
+- The security page: the list, checking again before changes (with a passkey or the app's code) and when the five minutes ran out meanwhile, removing after a confirmation and cancelling, the last method not offered and refused when the other went meanwhile, adding a passkey (a cancelled prompt keeps it open, a refused one closes it) or the app, new recovery codes (switched to only once saved, kept on screen when switching fails, an offer that ran out, leaving without switching), a session that ran out, loading again after a failure; the API client's management calls (DELETE, an empty 204, their refusals)
 - `/api/me`: the second-factor answer, and the service worker drops cached data on 403 as on 401
 - Config: the deployable `wrangler.jsonc` never turns development mode on, production has no test IdP, and the test IdP has no public URL or route
 
@@ -192,6 +198,7 @@ Integration tests cover:
 - Without the `TEST_IDP` binding (production), none of the test IdP's entry points open
 - Second factor: the gate on the API, Better Auth's account endpoints and the WebSocket; unverified sessions ending after ten minutes; registering an app (wrong code, restarting, no takeover once registered, the secret encrypted and the codes hashed); signing in again with the app's code, an already used code refused, a recovery code working once; the attempt limit per user, its window and its reset
 - Passkeys (a software authenticator answering real WebAuthn options): registering the first one with its recovery codes, challenges answered for another challenge or origin, used once and expired; signing in again; another user's or an unknown passkey, a counter that went backwards, the attempt limit; adding the other method within five minutes and without new codes, refused with Google alone or later; two sessions registering the first method at once (the codes of the confirmed one kept, the other refused even if it already passed the check)
+- Managing methods: the list; removing a passkey or the app (never the last one, never another user's, and of two sessions removing both at once only one succeeds), then adding the app again without new codes; new recovery codes (an offer changes nothing, confirming switches and confirming again changes nothing, codes without a batch dropped, another session's or user's or a changed offer refused, an offer confirmed after the five minutes within its own ten, a session that passed only Google refused); all refused before the second step and five minutes after it, and allowed again after checking again with the app's code
 - Keyset listing and counts
 - Japanese full-text search and short-term partial matching
 - Hiding other users' notes (404), viewer and editor permissions
@@ -205,6 +212,7 @@ Browser checks:
 
 - Sign-in through the UI: the second factor is asked for first (the API answers 403), on 127.0.0.1 only the app is offered, the QR screen shows the recovery codes and accepts the first code only once they are saved, and signing in again asks for the app's code
 - Passkeys on Chromium's virtual authenticator at `localhost`: registered first after saving the recovery codes, then used to sign in again
+- The security page (from the sidebar): the only method cannot be removed; adding the app, then removing the passkey and switching to new recovery codes once they are saved; the next sign-in asks for the app's code
 - Page creation and connecting to its DO
 - Tags, WikiLinks and slash commands
 - The other tab shows a remote caret

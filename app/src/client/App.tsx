@@ -17,7 +17,7 @@ import {
 } from "./offline";
 import { NotesPage } from "./pages/NotesPage";
 import { SignInPage } from "./pages/SignInPage";
-import { router, useRoute } from "./routing";
+import { router, useRoute, type PageId } from "./routing";
 import { session, useSession } from "./session";
 import { SearchPalette } from "./ui/SearchPalette";
 
@@ -25,6 +25,9 @@ const EditorPage = lazyPage<{ id: string; defaultNoteId: string }>(
   () => import("./pages/EditorPage"),
 );
 const AiChatPage = lazyPage<Record<string, never>>(() => import("./pages/AiChatPage"));
+const SecuritySettingsPage = lazyPage<{ onSessionChange: () => void }>(
+  () => import("./pages/SecuritySettingsPage"),
+);
 const SecondFactorPage = lazyPage<{
   onSessionChange: () => void;
   onSignOut: () => Promise<boolean>;
@@ -106,6 +109,13 @@ function useLinkInterception() {
   }, []);
 }
 
+/** The sidebar's page links; the current page is marked with `aria-current`. */
+const NAV_LINKS: { href: string; page: PageId; label: string }[] = [
+  { href: "/notes", page: "notes", label: "ノート一覧" },
+  { href: "/ai", page: "ai", label: "AI チャット" },
+  { href: "/settings/security", page: "security", label: "セキュリティ" },
+];
+
 /** The persistent shell: sidebar, ⌘K palette and the routed page stay mounted across navigation. */
 function Shell({ me }: { me: Me }) {
   const route = useRoute();
@@ -140,12 +150,11 @@ function Shell({ me }: { me: Me }) {
         <a class="brand" href="/notes">
           Zedi
         </a>
-        <a href="/notes" aria-current={route?.value === "notes" ? "page" : undefined}>
-          ノート一覧
-        </a>
-        <a href="/ai" aria-current={route?.value === "ai" ? "page" : undefined}>
-          AI チャット
-        </a>
+        {NAV_LINKS.map(({ href, page, label }) => (
+          <a href={href} aria-current={route?.value === page ? "page" : undefined}>
+            {label}
+          </a>
+        ))}
         <button type="button" class="search-button" onClick={() => setPaletteOpen(true)}>
           検索 <kbd>⌘K</kbd>
         </button>
@@ -187,6 +196,9 @@ function Shell({ me }: { me: Me }) {
           <EditorPage id={route.params.id ?? ""} defaultNoteId={me.defaultNoteId} />
         )}
         {route?.value === "ai" && <AiChatPage />}
+        {route?.value === "security" && (
+          <SecuritySettingsPage onSessionChange={() => void session.refresh()} />
+        )}
         {!route && <p class="muted">ページが見つかりません。</p>}
       </main>
       {paletteOpen && (

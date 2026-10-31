@@ -8,6 +8,7 @@ import {
   type SecondFactorContext,
   type SecondFactorEnv,
 } from "./context";
+import { manageRoutes } from "./manageRoutes";
 import { passkeyRoutes } from "./passkeyRoutes";
 import { generateRecoveryCodes, hashRecoveryCode } from "./recoveryCodes";
 import { openSecret, sealSecret } from "./secretBox";
@@ -141,6 +142,7 @@ export function secondFactorRoutes() {
   });
 
   routes.route("/passkey", passkeyRoutes());
+  routes.route("/", manageRoutes());
 
   return routes;
 }

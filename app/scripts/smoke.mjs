@@ -3,7 +3,8 @@
  * Browser smoke test against a local `wrangler dev` with a fresh D1:
  * sign-in through the test IdP in the UI with the second factor (registering an authenticator
  * app, then its code on the next sign-in; a passkey on Chromium's virtual authenticator, then
- * the passkey on the next sign-in), page creation, editor sync, `#tag` / `[[WikiLink]]` /
+ * the passkey on the next sign-in; the security page adding the app, removing the passkey and
+ * switching to new recovery codes once saved), page creation, editor sync, `#tag` / `[[WikiLink]]` /
  * `/` commands, D1 projection + full-text search, infinite list, access control between
  * two users (404 → viewer, read-only), AI streaming, offline use through the service worker
  * (app shell, cached list, local page copies, pages created offline) and sign-out.
@@ -345,29 +346,35 @@ try {
     assert.equal(await page.locator("[data-testid=account-email]").textContent(), OWNER);
   });
 
-  await check("a passkey is registered first, then used to sign in again", async () => {
-    const context = await browser.newContext();
-    const passkeyPage = await context.newPage();
+  // The passkey user's browser, shared by the next two checks.
+  const passkeyContext = await browser.newContext();
+  try {
+    const passkeyPage = await passkeyContext.newPage();
     passkeyPage.on("pageerror", (e) => errors.push(e.message));
-    const cdp = await context.newCDPSession(passkeyPage);
-    await cdp.send("WebAuthn.enable");
-    const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
-      options: {
-        protocol: "ctap2",
-        transport: "internal",
-        hasResidentKey: true,
-        hasUserVerification: true,
-        isUserVerified: true,
-        automaticPresenceSimulation: true,
-      },
-    });
+    const cdp = await passkeyContext.newCDPSession(passkeyPage);
     const signInHere = async () => {
       await passkeyPage.click("[data-testid=sign-in-test-idp]");
       await passkeyPage.fill("[data-testid=test-idp-email]", PASSKEY_USER);
       await passkeyPage.fill("[data-testid=test-idp-password]", testIdpPassword());
       await passkeyPage.click("[data-testid=test-idp-submit]");
     };
-    try {
+    const signOutHere = async () => {
+      await passkeyPage.getByRole("button", { name: "サインアウト" }).click();
+      await passkeyPage.waitForSelector("[data-testid=sign-in-test-idp]");
+    };
+
+    await check("a passkey is registered first, then used to sign in again", async () => {
+      await cdp.send("WebAuthn.enable");
+      const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
+        options: {
+          protocol: "ctap2",
+          transport: "internal",
+          hasResidentKey: true,
+          hasUserVerification: true,
+          isUserVerified: true,
+          automaticPresenceSimulation: true,
+        },
+      });
       await passkeyPage.goto(`${LOCALHOST}/notes`);
       await signInHere();
       await passkeyPage.click("[data-testid=choose-passkey]");
@@ -383,8 +390,7 @@ try {
       assert.equal(credentials.length, 1);
       assert.equal(credentials[0].rpId, "localhost");
 
-      await passkeyPage.getByRole("button", { name: "サインアウト" }).click();
-      await passkeyPage.waitForSelector("[data-testid=sign-in-test-idp]");
+      await signOutHere();
       await signInHere();
       await passkeyPage.click("[data-testid=passkey-verify]");
       await passkeyPage.waitForSelector("[data-testid=account-email]");
@@ -392,10 +398,56 @@ try {
         await passkeyPage.locator("[data-testid=account-email]").textContent(),
         PASSKEY_USER,
       );
-    } finally {
-      await context.close();
-    }
-  });
+    });
+
+    await check(
+      "the security page adds an app, then removes the passkey, and makes new recovery codes",
+      async () => {
+        // Just signed in with the passkey, so changes are allowed without checking again.
+        await passkeyPage.getByRole("link", { name: "セキュリティ" }).click();
+        const passkeys = passkeyPage.getByRole("list", { name: "登録したパスキー" });
+        await passkeys.waitFor();
+        assert.equal(new URL(passkeyPage.url()).pathname, "/settings/security");
+        assert.equal(await passkeys.locator("li").count(), 1);
+        // The only method cannot go.
+        assert.equal(await passkeys.getByRole("button").isDisabled(), true);
+
+        await passkeyPage.getByRole("button", { name: "認証アプリを登録" }).click();
+        const secret = await passkeyPage.locator("[data-testid=totp-secret]").textContent();
+        const step = Math.floor(Date.now() / 30_000);
+        await passkeyPage.fill("[data-testid=totp-code]", await totpCodeNow(secret));
+        await passkeyPage.click("[data-testid=totp-code-submit]");
+        await passkeyPage.getByText("認証アプリ: 登録済み").waitFor();
+        rememberAuthenticator(PASSKEY_USER, secret, step);
+
+        await passkeys.getByRole("button").click();
+        await passkeyPage.getByRole("button", { name: "削除する" }).click();
+        await passkeyPage.getByText("パスキーは登録されていません").waitFor();
+
+        // New codes are shown first and only replace the old ones once saved and switched to.
+        await passkeyPage.getByRole("button", { name: "復旧用コードを作り直す" }).click();
+        await passkeyPage.waitForSelector("[data-testid=new-recovery-codes] li");
+        assert.equal(await passkeyPage.locator("[data-testid=new-recovery-codes] li").count(), 10);
+        const switchTo = passkeyPage.getByRole("button", { name: "このコードに切り替える" });
+        assert.equal(await switchTo.isDisabled(), true);
+        await passkeyPage.check("[data-testid=new-recovery-codes-saved]");
+        await switchTo.click();
+        await passkeyPage.getByText("前のコードは使えなくなりました").waitFor();
+        await passkeyPage.getByText("残り 10 個").waitFor();
+
+        // Without the passkey, the next sign-in asks for the app's code.
+        await signOutHere();
+        await signInHere();
+        await passkeyPage.waitForSelector("[data-testid=totp-code]");
+        assert.equal(await passkeyPage.locator("[data-testid=passkey-verify]").count(), 0);
+        await passkeyPage.fill("[data-testid=totp-code]", await nextTotpCode(PASSKEY_USER));
+        await passkeyPage.click("[data-testid=totp-code-submit]");
+        await passkeyPage.waitForSelector("[data-testid=account-email]");
+      },
+    );
+  } finally {
+    await passkeyContext.close();
+  }
 
   await check("no uncaught page errors", async () => assert.deepEqual(errors, []));
 } finally {
