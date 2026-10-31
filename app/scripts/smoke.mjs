@@ -2,7 +2,8 @@
 /**
  * Browser smoke test against a local `wrangler dev` with a fresh D1:
  * sign-in through the test IdP in the UI with the second factor (registering an authenticator
- * app, then its code on the next sign-in), page creation, editor sync, `#tag` / `[[WikiLink]]` /
+ * app, then its code on the next sign-in; a passkey on Chromium's virtual authenticator, then
+ * the passkey on the next sign-in), page creation, editor sync, `#tag` / `[[WikiLink]]` /
  * `/` commands, D1 projection + full-text search, infinite list, access control between
  * two users (404 → viewer, read-only), AI streaming, offline use through the service worker
  * (app shell, cached list, local page copies, pages created offline) and sign-out.
@@ -25,6 +26,9 @@ const PORT = 8789;
 const BASE = `http://127.0.0.1:${PORT}`;
 const OWNER = `owner-${Date.now()}@test.zedi-note.app`;
 const GUEST = `guest-${Date.now()}@test.zedi-note.app`;
+const PASSKEY_USER = `passkey-${Date.now()}@test.zedi-note.app`;
+// WebAuthn does not accept an IP address as the relying party, so passkeys run on localhost.
+const LOCALHOST = `http://localhost:${PORT}`;
 
 const worker = await startWorker(PORT);
 const browser = await launchBrowser();
@@ -71,6 +75,10 @@ try {
 
   await check("test IdP sign-in through the UI asks for a second factor first", async () => {
     await signInWithTestIdp();
+    // Passkeys need a host name, so on 127.0.0.1 only the authenticator app is offered.
+    await page.waitForSelector("[data-testid=choose-totp]");
+    assert.equal(await page.locator("[data-testid=choose-passkey]").count(), 0);
+    await page.click("[data-testid=choose-totp]");
     await page.waitForSelector("[data-testid=totp-secret]");
     const qr = page.getByRole("img", { name: "認証アプリ用の QR コード" });
     assert.equal(await qr.count(), 1);
@@ -90,6 +98,7 @@ try {
       await page.fill("[data-testid=totp-code]", await totpCodeNow(secret));
       rememberAuthenticator(OWNER, secret);
       await page.click("[data-testid=totp-code-submit]");
+      // No passkey is suggested on 127.0.0.1 (see above); the notes list opens.
       await page.waitForSelector("[data-testid=account-email]");
       assert.equal(await page.locator("[data-testid=account-email]").textContent(), OWNER);
       assert.match(await page.locator(".notes h1").textContent(), /0 件/);
@@ -334,6 +343,58 @@ try {
     await page.click("[data-testid=totp-code-submit]");
     await page.waitForSelector("[data-testid=account-email]");
     assert.equal(await page.locator("[data-testid=account-email]").textContent(), OWNER);
+  });
+
+  await check("a passkey is registered first, then used to sign in again", async () => {
+    const context = await browser.newContext();
+    const passkeyPage = await context.newPage();
+    passkeyPage.on("pageerror", (e) => errors.push(e.message));
+    const cdp = await context.newCDPSession(passkeyPage);
+    await cdp.send("WebAuthn.enable");
+    const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
+      options: {
+        protocol: "ctap2",
+        transport: "internal",
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+        automaticPresenceSimulation: true,
+      },
+    });
+    const signInHere = async () => {
+      await passkeyPage.click("[data-testid=sign-in-test-idp]");
+      await passkeyPage.fill("[data-testid=test-idp-email]", PASSKEY_USER);
+      await passkeyPage.fill("[data-testid=test-idp-password]", testIdpPassword());
+      await passkeyPage.click("[data-testid=test-idp-submit]");
+    };
+    try {
+      await passkeyPage.goto(`${LOCALHOST}/notes`);
+      await signInHere();
+      await passkeyPage.click("[data-testid=choose-passkey]");
+      await passkeyPage.waitForSelector("[data-testid=recovery-codes]");
+      assert.equal(await passkeyPage.locator("[data-testid=recovery-codes] li").count(), 10);
+      assert.equal(await passkeyPage.locator("[data-testid=passkey-register]").isDisabled(), true);
+      await passkeyPage.check("[data-testid=recovery-codes-saved]");
+      await passkeyPage.click("[data-testid=passkey-register]");
+      // The authenticator app is suggested next; it can wait.
+      await passkeyPage.click("[data-testid=suggest-later]");
+      await passkeyPage.waitForSelector("[data-testid=account-email]");
+      const { credentials } = await cdp.send("WebAuthn.getCredentials", { authenticatorId });
+      assert.equal(credentials.length, 1);
+      assert.equal(credentials[0].rpId, "localhost");
+
+      await passkeyPage.getByRole("button", { name: "サインアウト" }).click();
+      await passkeyPage.waitForSelector("[data-testid=sign-in-test-idp]");
+      await signInHere();
+      await passkeyPage.click("[data-testid=passkey-verify]");
+      await passkeyPage.waitForSelector("[data-testid=account-email]");
+      assert.equal(
+        await passkeyPage.locator("[data-testid=account-email]").textContent(),
+        PASSKEY_USER,
+      );
+    } finally {
+      await context.close();
+    }
   });
 
   await check("no uncaught page errors", async () => assert.deepEqual(errors, []));

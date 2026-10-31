@@ -138,6 +138,8 @@ export const totpFactors = sqliteTable("totp_factors", {
   confirmedAt: integer("confirmed_at", { mode: "timestamp_ms" }),
   lastUsedStep: integer("last_used_step"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  /** The recovery codes issued with this enrollment when it is the first factor. */
+  recoveryBatch: text("recovery_batch"),
 });
 
 /** Recovery codes as SHA-256 hashes; each can be used once. */
@@ -150,6 +152,8 @@ export const recoveryCodes = sqliteTable(
     codeHash: text("code_hash").notNull(),
     usedAt: integer("used_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    /** The enrollment that issued the code; confirming it keeps only its batch. */
+    batch: text("batch"),
   },
   (t) => [primaryKey({ columns: [t.userId, t.codeHash] })],
 );
@@ -162,3 +166,38 @@ export const secondFactorAttempts = sqliteTable("second_factor_attempts", {
   attempts: integer("attempts").notNull(),
   windowStartedAt: integer("window_started_at", { mode: "timestamp_ms" }).notNull(),
 });
+
+/** Passkeys (WebAuthn credentials); `id` is the credential ID, `publicKey` the COSE key. */
+export const passkeys = sqliteTable(
+  "passkeys",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    publicKey: text("public_key").notNull(),
+    counter: integer("counter").notNull(),
+    /** JSON array of transports the browser reported. */
+    transports: text("transports"),
+    name: text("name").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("passkeys_user").on(t.userId)],
+);
+
+/** The WebAuthn challenge a session is answering, one per purpose; used once. */
+export const webauthnChallenges = sqliteTable(
+  "webauthn_challenges",
+  {
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => session.id, { onDelete: "cascade" }),
+    purpose: text("purpose", { enum: ["register", "authenticate"] }).notNull(),
+    challenge: text("challenge").notNull(),
+    /** The recovery codes issued with a first passkey's registration options. */
+    recoveryBatch: text("recovery_batch"),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.sessionId, t.purpose] })],
+);

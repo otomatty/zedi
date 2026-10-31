@@ -148,7 +148,7 @@ describe("second factor: registering an authenticator app", () => {
     const jar = await signInFirstFactor(uniqueEmail("new"));
     expect(await status(jar)).toEqual({
       code: 200,
-      body: { verified: false, totp: false, recoveryCodesRemaining: 0 },
+      body: { verified: false, totp: false, passkeys: 0, recoveryCodesRemaining: 0 },
     });
   });
 
@@ -214,7 +214,7 @@ describe("second factor: registering an authenticator app", () => {
     expect((await api("/api/me", cookieHeader(jar))).status).toBe(200);
     expect(await status(jar)).toEqual({
       code: 200,
-      body: { verified: true, totp: true, recoveryCodesRemaining: 10 },
+      body: { verified: true, totp: true, passkeys: 0, recoveryCodesRemaining: 10 },
     });
   });
 

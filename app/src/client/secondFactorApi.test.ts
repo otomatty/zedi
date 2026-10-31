@@ -42,6 +42,8 @@ describe("secondFactorApi", () => {
       "/api/second-factor/recovery-code/verify",
       { code: "AAAA-BBBB-CCCC-DDDD" },
     ],
+    ["startPasskeyRegistration", [], "/api/second-factor/passkey/registration", {}],
+    ["startPasskeyAuthentication", [], "/api/second-factor/passkey/authentication", {}],
   ] as const)("%s posts JSON to %s", async (method, args, url, body) => {
     respond(200, {});
     await (secondFactorApi[method] as (...a: string[]) => Promise<unknown>)(...args);
@@ -49,6 +51,25 @@ describe("secondFactorApi", () => {
     expect(calls[0]?.init?.method).toBe("POST");
     expect(JSON.parse(String(calls[0]?.init?.body))).toEqual(body);
   });
+
+  it.each([
+    ["confirmPasskeyRegistration", "/api/second-factor/passkey/registration/confirm"],
+    ["verifyPasskey", "/api/second-factor/passkey/authentication/verify"],
+  ] as const)("%s posts the browser's WebAuthn response to %s", async (method, url) => {
+    respond(200, {});
+    const response = { id: "cred", type: "public-key" } as never;
+    await secondFactorApi[method](response);
+    expect(calls[0]?.url).toBe(url);
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ response });
+  });
+
+  it.each(["invalid_passkey", "no_pending_registration", "reverification_required"])(
+    "keeps the server's reason %j",
+    async (reason) => {
+      respond(400, { error: reason });
+      await expect(secondFactorApi.startPasskeyRegistration()).rejects.toMatchObject({ reason });
+    },
+  );
 
   it("returns what the server sends back", async () => {
     respond(200, { secret: "S", uri: "otpauth://totp/x", recoveryCodes: ["A", "B"] });

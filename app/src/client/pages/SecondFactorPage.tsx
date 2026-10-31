@@ -1,205 +1,111 @@
 import { useEffect, useRef, useState } from "hono/jsx/dom";
-import { qrCode } from "../lib/qrCode";
-import { SecondFactorError, secondFactorApi, type SecondFactorApi } from "../secondFactorApi";
+import {
+  browserWebAuthn,
+  passkeyFailure,
+  type PasskeyFailure,
+  type PublicKeyCredentialCreationOptionsJSON,
+  type WebAuthnClient,
+} from "../lib/webauthn";
+import {
+  SecondFactorError,
+  secondFactorApi,
+  type SecondFactorApi,
+  type SecondFactorStatus,
+} from "../secondFactorApi";
+import {
+  ChooseView,
+  PasskeyEnrollView,
+  SuggestView,
+  TotpEnrollView,
+  VerifyView,
+  type VerifyMethod,
+} from "./SecondFactorViews";
 
 type View =
   | { kind: "loading" }
   | { kind: "loadFailed" }
-  | { kind: "enroll"; secret: string; uri: string; recoveryCodes: string[] }
-  | { kind: "verify"; method: "totp" | "recovery" };
+  | { kind: "choose" }
+  | { kind: "enrollTotp"; secret: string; uri: string; recoveryCodes?: string[]; first: boolean }
+  | {
+      kind: "enrollPasskey";
+      options: PublicKeyCredentialCreationOptionsJSON;
+      recoveryCodes?: string[];
+      first: boolean;
+    }
+  | { kind: "suggest"; other: "passkey" | "totp" }
+  | { kind: "verify"; method: VerifyMethod; available: Record<VerifyMethod, boolean> };
+
+/** A passkey prompt that ended without a credential. */
+class PasskeyPromptError extends Error {
+  constructor(readonly failure: PasskeyFailure) {
+    super(failure);
+  }
+}
 
 const refusedAs = (error: unknown, reason: SecondFactorError["reason"]) =>
   error instanceof SecondFactorError && error.reason === reason;
 
+const PROMPT_MESSAGES: Record<PasskeyFailure, string> = {
+  cancelled: "パスキーの操作が取り消されました。もう一度お試しください。",
+  alreadyRegistered: "この端末のパスキーはすでに登録されています。",
+  failed: "パスキーを使えませんでした。別の方法をお試しください。",
+};
+
+const REFUSAL_MESSAGES: Partial<Record<SecondFactorError["reason"], string>> = {
+  invalid_code: "コードが正しくありません。もう一度入力してください。",
+  invalid_passkey: "パスキーを確認できませんでした。もう一度お試しください。",
+  no_pending_registration: "パスキーを確認できませんでした。もう一度お試しください。",
+  reverification_required:
+    "サインインしてから時間が経ったため、ここでは追加できません。次のサインインのあとにお試しください。",
+};
+
 function messageFor(error: unknown): string {
-  if (refusedAs(error, "invalid_code")) {
-    return "コードが正しくありません。もう一度入力してください。";
-  }
-  if (error instanceof SecondFactorError && error.reason === "too_many_attempts") {
-    const minutes = Math.max(1, Math.ceil((error.retryAfterSeconds ?? 15 * 60) / 60));
-    return `試行回数が上限に達しました。${minutes} 分ほど待ってから再度お試しください。`;
+  if (error instanceof PasskeyPromptError) return PROMPT_MESSAGES[error.failure];
+  if (error instanceof SecondFactorError) {
+    if (error.reason === "too_many_attempts") {
+      const minutes = Math.max(1, Math.ceil((error.retryAfterSeconds ?? 15 * 60) / 60));
+      return `試行回数が上限に達しました。${minutes} 分ほど待ってから再度お試しください。`;
+    }
+    const message = REFUSAL_MESSAGES[error.reason];
+    if (message) return message;
   }
   return "確認できませんでした。時間をおいて再度お試しください。";
 }
 
-/** Splits a Base32 secret into groups of four so it can be typed by hand. */
-const grouped = (secret: string) => secret.match(/.{1,4}/g)?.join(" ") ?? secret;
-
-function QrCode({ text }: { text: string }) {
-  const { size, path } = qrCode(text);
-  return (
-    <svg
-      role="img"
-      aria-label="認証アプリ用の QR コード"
-      class="qr-code"
-      viewBox={`0 0 ${size} ${size}`}
-      width="200"
-      height="200"
-      shape-rendering="crispEdges"
-    >
-      <rect width={size} height={size} fill="#fff" />
-      <path d={path} fill="#000" />
-    </svg>
-  );
+/** Runs a passkey prompt, turning its errors into `PasskeyPromptError`. */
+async function prompt<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    throw new PasskeyPromptError(passkeyFailure(error));
+  }
 }
 
-function CodeForm({
-  label,
-  button,
-  numeric,
-  busy,
-  testId,
-  onSubmit,
-}: {
-  label: string;
-  button: string;
-  numeric: boolean;
-  /** Keeps the form from being sent (a request in flight, or a step still to do). */
-  busy: boolean;
-  testId: string;
-  onSubmit: (code: string) => void;
-}) {
-  return (
-    <form
-      onSubmit={(event: Event) => {
-        event.preventDefault();
-        if (busy) return;
-        const form = event.currentTarget as HTMLFormElement;
-        onSubmit(String(new FormData(form).get("code") ?? ""));
-      }}
-    >
-      <label>
-        {label}
-        <input
-          name="code"
-          required
-          autocomplete={numeric ? "one-time-code" : "off"}
-          inputmode={numeric ? "numeric" : "text"}
-          data-testid={testId}
-        />
-      </label>
-      <button type="submit" disabled={busy} data-testid={`${testId}-submit`}>
-        {button}
-      </button>
-    </form>
-  );
-}
-
-function EnrollView({
-  secret,
-  uri,
-  recoveryCodes,
-  busy,
-  onSubmit,
-}: {
-  secret: string;
-  uri: string;
-  recoveryCodes: string[];
-  busy: boolean;
-  onSubmit: (code: string) => void;
-}) {
-  const [saved, setSaved] = useState(false);
-  return (
-    <section>
-      <p>
-        Zedi では、Google のサインインに加えて 2 段階目の確認が必要です。認証アプリ（Google
-        Authenticator や 1Password など）でこの QR コードを読み取ってください。
-      </p>
-      <QrCode text={uri} />
-      <p class="muted">
-        読み取れないときは、次のキーを入力してください:{" "}
-        <code data-testid="totp-secret">{grouped(secret)}</code>
-      </p>
-      <p>
-        <a href={uri}>この端末の認証アプリで開く</a>
-      </p>
-      <h2>復旧用コードを保存してください</h2>
-      <p>
-        認証アプリを使えなくなったときに、ここに並んだコードでサインインできます。1 つにつき 1
-        回だけ使えます。このコードは今しか表示されません。
-      </p>
-      <ol aria-label="復旧用コード" class="recovery-codes" data-testid="recovery-codes">
-        {recoveryCodes.map((code) => (
-          <li>{code}</li>
-        ))}
-      </ol>
-      <label class="checkbox">
-        <input
-          type="checkbox"
-          checked={saved}
-          onChange={(event: Event) => setSaved((event.target as HTMLInputElement).checked)}
-          data-testid="recovery-codes-saved"
-        />
-        復旧用コードを保存しました
-      </label>
-      <CodeForm
-        label="6 桁のコード"
-        button="登録する"
-        numeric
-        busy={busy || !saved}
-        testId="totp-code"
-        onSubmit={onSubmit}
-      />
-    </section>
-  );
-}
-
-function VerifyView({
-  method,
-  busy,
-  onSubmit,
-  onSwitch,
-}: {
-  method: "totp" | "recovery";
-  busy: boolean;
-  onSubmit: (code: string) => void;
-  onSwitch: () => void;
-}) {
-  const totp = method === "totp";
-  return (
-    <section>
-      <p>
-        {totp
-          ? "認証アプリに表示されている 6 桁のコードを入力してください。"
-          : "保存しておいた復旧用コードを 1 つ入力してください。使ったコードは使えなくなります。"}
-      </p>
-      <CodeForm
-        label={totp ? "6 桁のコード" : "復旧用コード"}
-        button="確認する"
-        numeric={totp}
-        busy={busy}
-        testId={totp ? "totp-code" : "recovery-code"}
-        onSubmit={onSubmit}
-      />
-      <button type="button" class="link-button" onClick={onSwitch}>
-        {totp ? "復旧用コードを使う" : "認証アプリのコードを使う"}
-      </button>
-    </section>
-  );
+/** The view a loaded status leads to; null once the session has passed the second step. */
+function viewFor(status: SecondFactorStatus, passkeySupported: boolean): View | null {
+  if (status.verified) return null;
+  const available = {
+    passkey: status.passkeys > 0 && passkeySupported,
+    totp: status.totp,
+    recovery: true,
+  };
+  if (status.passkeys === 0 && !status.totp) return { kind: "choose" };
+  const method = available.passkey ? "passkey" : available.totp ? "totp" : "recovery";
+  return { kind: "verify", method, available };
 }
 
 /**
- * The second step after Google sign-in: register an authenticator app the first time (its
- * recovery codes are shown once, and saved before the first code confirms the app), and
- * afterwards enter its code or a recovery code.
- * Google のサインインのあとの 2 段階目。初回は認証アプリを登録する（復旧用コードを一度だけ表示し、
- * 保存してから最初のコードで確定する）。2 回目以降はそのコードか復旧用コードを入力する。
+ * Loads the session's second-factor status and turns it into the first view; `reload` loads it
+ * again. A verified or expired session is handed back through `onSessionChange`.
+ * 2 段階目の状態を読み込んで最初の画面を決める。確認済みや期限切れなら `onSessionChange` に返す。
  */
-export function SecondFactorPage({
-  api = secondFactorApi,
-  onSessionChange,
-  onSignOut,
-}: {
-  api?: SecondFactorApi;
-  /** Called when the session passed the second step or ran out of time; refresh it. */
-  onSessionChange: () => void;
-  /** Resolves false when the sign-out did not go through. */
-  onSignOut: () => Promise<boolean>;
-}) {
+function useStatusView(
+  api: SecondFactorApi,
+  webauthn: WebAuthnClient,
+  onSessionChange: () => void,
+) {
   const [view, setView] = useState<View>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   // Kept in a ref: a new callback from the parent must not restart enrollment (a new secret).
   const sessionChangedRef = useRef(onSessionChange);
   useEffect(() => {
@@ -209,20 +115,10 @@ export function SecondFactorPage({
   useEffect(() => {
     let active = true;
     setView({ kind: "loading" });
-    const load = async (): Promise<View | null> => {
-      const status = await api.status();
-      if (status.verified) return null;
-      if (status.totp) return { kind: "verify", method: "totp" };
-      try {
-        return { kind: "enroll", ...(await api.startEnrollment()) };
-      } catch (e) {
-        if (refusedAs(e, "already_enrolled")) return { kind: "verify", method: "totp" };
-        throw e;
-      }
-    };
-    load().then(
-      (next) => {
+    api.status().then(
+      (status) => {
         if (!active) return;
+        const next = viewFor(status, webauthn.supported());
         if (next) setView(next);
         else sessionChangedRef.current();
       },
@@ -235,29 +131,80 @@ export function SecondFactorPage({
     return () => {
       active = false;
     };
-  }, [attempt, api]);
+  }, [attempt, api, webauthn]);
 
-  const submit = (send: () => Promise<void>) => {
+  return { view, setView, reload: () => setAttempt((n) => n + 1) };
+}
+
+/**
+ * The second step after Google sign-in. The first time, the user registers a passkey
+ * (recommended) or an authenticator app; its recovery codes are shown once and saved before the
+ * method is confirmed, and the other method is suggested afterwards. Later sign-ins use a
+ * registered method or a recovery code.
+ * Google のサインインのあとの 2 段階目。初回はパスキー（おすすめ）か認証アプリを登録し、復旧用コードを
+ * 確定前に一度だけ見せる。登録後はもう一方も勧める。2 回目以降は登録した方法か復旧用コードで確認する。
+ */
+export function SecondFactorPage({
+  api = secondFactorApi,
+  webauthn = browserWebAuthn,
+  onSessionChange,
+  onSignOut,
+}: {
+  api?: SecondFactorApi;
+  webauthn?: WebAuthnClient;
+  /** Called when the session passed the second step or ran out of time; refresh it. */
+  onSessionChange: () => void;
+  /** Resolves false when the sign-out did not go through. */
+  onSignOut: () => Promise<boolean>;
+}) {
+  const { view, setView, reload } = useStatusView(api, webauthn, onSessionChange);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  /** Runs a step; an expired session goes back to sign-in, a registered factor reloads. */
+  const run = (step: () => Promise<void>) => {
     setBusy(true);
     setError(null);
-    send()
+    step()
       .catch((e: unknown) => {
         if (refusedAs(e, "unauthorized")) onSessionChange();
+        else if (refusedAs(e, "already_enrolled")) reload();
         else setError(messageFor(e));
+        if (refusedAs(e, "invalid_passkey") || refusedAs(e, "no_pending_registration")) {
+          // The challenge is spent: start again from the first-time choice, or from the
+          // suggestion when the passkey was being added to a method the user already has.
+          setView((current) => {
+            if (current.kind !== "enrollPasskey") return current;
+            return current.first ? { kind: "choose" } : { kind: "suggest", other: "passkey" };
+          });
+        }
       })
       .finally(() => setBusy(false));
   };
+
+  /** After a method is confirmed: suggest the other one the first time, else carry on. */
+  const enrolled = (first: boolean, other: "passkey" | "totp") => {
+    if (first && (other === "totp" || webauthn.supported())) setView({ kind: "suggest", other });
+    else onSessionChange();
+  };
+
+  const startPasskey = (first: boolean) =>
+    run(async () => {
+      const { options, recoveryCodes } = await api.startPasskeyRegistration();
+      setView({ kind: "enrollPasskey", options, recoveryCodes, first });
+    });
+
+  const startTotp = (first: boolean) =>
+    run(async () => {
+      const started = await api.startEnrollment();
+      setView({ kind: "enrollTotp", ...started, first });
+    });
 
   const signOut = async () => {
     setError(null);
     if (!(await onSignOut())) {
       setError("サインアウトできませんでした。時間をおいて再度お試しください。");
     }
-  };
-
-  const switchTo = (method: "totp" | "recovery") => {
-    setError(null);
-    setView({ kind: "verify", method });
   };
 
   return (
@@ -267,37 +214,77 @@ export function SecondFactorPage({
       {view.kind === "loadFailed" && (
         <p role="alert">
           確認の方法を読み込めませんでした。{" "}
-          <button type="button" onClick={() => setAttempt((n) => n + 1)}>
+          <button type="button" onClick={reload}>
             再読み込み
           </button>
         </p>
       )}
-      {view.kind === "enroll" && (
-        <EnrollView
+      {view.kind === "choose" && (
+        <ChooseView
+          passkeySupported={webauthn.supported()}
+          busy={busy}
+          onPasskey={() => startPasskey(true)}
+          onTotp={() => startTotp(true)}
+        />
+      )}
+      {view.kind === "enrollPasskey" && (
+        <PasskeyEnrollView
+          recoveryCodes={view.recoveryCodes}
+          busy={busy}
+          onRegister={() =>
+            run(async () => {
+              const response = await prompt(() => webauthn.register(view.options));
+              await api.confirmPasskeyRegistration(response);
+              enrolled(view.first, "totp");
+            })
+          }
+        />
+      )}
+      {view.kind === "enrollTotp" && (
+        <TotpEnrollView
           secret={view.secret}
           uri={view.uri}
           recoveryCodes={view.recoveryCodes}
           busy={busy}
           onSubmit={(code) =>
-            submit(async () => {
+            run(async () => {
               await api.confirmEnrollment(code);
-              onSessionChange();
+              enrolled(view.first, "passkey");
             })
           }
+        />
+      )}
+      {view.kind === "suggest" && (
+        <SuggestView
+          other={view.other}
+          busy={busy}
+          onAdd={() => (view.other === "passkey" ? startPasskey(false) : startTotp(false))}
+          onLater={onSessionChange}
         />
       )}
       {view.kind === "verify" && (
         <VerifyView
           method={view.method}
+          available={view.available}
           busy={busy}
-          onSubmit={(code) =>
-            submit(async () => {
+          onPasskey={() =>
+            run(async () => {
+              const { options } = await api.startPasskeyAuthentication();
+              await api.verifyPasskey(await prompt(() => webauthn.authenticate(options)));
+              onSessionChange();
+            })
+          }
+          onCode={(code) =>
+            run(async () => {
               if (view.method === "totp") await api.verifyTotp(code);
               else await api.verifyRecoveryCode(code);
               onSessionChange();
             })
           }
-          onSwitch={() => switchTo(view.method === "totp" ? "recovery" : "totp")}
+          onSwitch={(method) => {
+            setError(null);
+            setView({ ...view, method });
+          }}
         />
       )}
       {error && <p role="alert">{error}</p>}

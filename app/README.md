@@ -31,21 +31,25 @@ One Cloudflare Worker serves everything (`wrangler.jsonc`). The front end and th
 
 ### Second factor
 
-A Google sign-in only opens the second step: every user needs an authenticator app (TOTP) as well. Passkeys come next (otomatty/zedi#1156).
+A Google sign-in only opens the second step: every user needs a passkey or an authenticator app (TOTP) as well, and is encouraged to register both.
 
 - **The session records when it passed the second step** (`session.second_factor_at`). Until then, `/api/*` and the collaborative editing WebSocket (`/parties/*`) answer 403 `second_factor_required`, and so do Better Auth's account endpoints. Starting and finishing the Google sign-in, reading the session, signing out and `/api/second-factor/*` stay open.
 - **An unverified session lasts ten minutes**; after that it is deleted, the API answers 401 and Better Auth's `get-session` reports no session.
-- **The first time, the user registers an app** (`POST /api/second-factor/totp/enrollment`, then `…/confirm` with its first code), which is allowed only while the user has no app, so Google alone can never replace one. The secret is stored encrypted (XChaCha20-Poly1305 under a key derived from `BETTER_AUTH_SECRET`).
-- **Ten recovery codes are shown once**, with the QR code when registration starts; the user ticks that they saved them before entering the first code, so a lost confirmation response loses nothing. They only work once the app is confirmed, are stored as SHA-256 hashes, and each works once (`POST /api/second-factor/recovery-code/verify`).
-- **Afterwards the user enters the app's code** (`POST /api/second-factor/totp/verify`). A code that was already used is refused, even while it is still inside its time window.
-- **Five attempts per user per 15 minutes**, counted before the code is checked; then 429 with `Retry-After`. A successful second step clears the count.
+- **The first time, the user registers a passkey (recommended) or an app**, and is then offered the other one.
+  - Passkey: `POST /api/second-factor/passkey/registration`, then `…/confirm` with the browser's answer. Verification is SimpleWebAuthn's; the relying party is the app's host name, and challenges are stored per session, expire after five minutes and are used once.
+  - App: `POST /api/second-factor/totp/enrollment`, then `…/confirm` with its first code. One app per user. The secret is stored encrypted (XChaCha20-Poly1305 under a key derived from `BETTER_AUTH_SECRET`).
+- **Adding a method needs a fresh second step**: Google alone may register the first one only. After that, another can be added only by a session that passed the second step within the last five minutes (read from D1, not the cookie cache); Google alone gets 409 `already_enrolled`, an older session 403 `reverification_required`.
+- **Ten recovery codes are shown once**, with the first method before it is confirmed; the user ticks that they saved them first, so a lost confirmation response loses nothing. They belong to the registration that issued them: if two sessions start the first registration at once, confirming one keeps only its codes, and the other cannot finish (the check that the user has no method yet and the write are one statement). They are stored as SHA-256 hashes, and each works once (`POST /api/second-factor/recovery-code/verify`). Adding the second method issues none.
+- **Afterwards the user passes the second step with the passkey** (`POST /api/second-factor/passkey/authentication`, then `…/verify`), **the app's code** (`POST /api/second-factor/totp/verify`) or a recovery code. A used code is refused even inside its time window, and a passkey whose signature counter went backwards is refused.
+- **Five attempts per user per 15 minutes**, counted before the code or passkey is checked; then 429 with `Retry-After`. A successful second step clears the count.
+- **Passkeys need a host name**: WebAuthn does not accept an IP address as the relying party, so at `http://127.0.0.1:8787` only the app is offered. Open `http://localhost:8787` to use passkeys locally.
 - The Better Auth `twoFactor` plugin is not used because it only steps in after password, username and phone sign-ins, never after Google (see otomatty/zedi#1156).
 
 ### D1 schema (`migrations/`)
 
 - **Better Auth tables**: `user` / `session` / `account` / `verification` (`session.second_factor_at` is the app's own column)
 - **App tables**: `notes` (the sharing boundary), `note_members`, `pages`
-- **Second factor**: `totp_factors` (one encrypted secret per user and its last used step), `recovery_codes` (hashes), `second_factor_attempts`
+- **Second factor**: `passkeys` (credential ID, public key, signature counter), `webauthn_challenges` (one per session and purpose), `totp_factors` (one encrypted secret per user and its last used step), `recovery_codes` (hashes), `second_factor_attempts`
 - **Listing**: keyset pagination on the `pages_note_recent (note_id, updated_at DESC, id DESC)` index; no `OFFSET`
 - **Counts**: `notes.page_count` is maintained by triggers, so no `COUNT(*)` scans
 - **Full-text search**: FTS5 with the `trigram` tokenizer, which searches Japanese without a morphological analyzer. It is external-content (no copy of the text) and kept in sync by triggers. It references `pages.seq` (an INTEGER PRIMARY KEY), which unlike an implicit rowid does not change on VACUUM
@@ -115,7 +119,7 @@ Spec for splitting web clips and PDF text into pages, based on the large-documen
 - Offline use as a PWA: cached lists and visited pages, editing and creating pages offline, sync on reconnect
 - A long-page warning in the editor and a splitter for long imported content (the import UI itself is not built)
 
-**Not yet built**: most features of the current app (real LLM calls, AI drafting, web clipping, billing, the admin console, MCP and so on), passkeys, re-checking the second factor before sensitive operations and the recovery procedure for users who lost every factor (otomatty/zedi#1156), checking the real Google round trip (by hand on staging), code syntax highlighting, i18n.
+**Not yet built**: most features of the current app (real LLM calls, AI drafting, web clipping, billing, the admin console, MCP and so on), re-checking the second factor before sensitive operations, managing registered methods and the recovery procedure for users who lost every factor (otomatty/zedi#1156), checking the real Google round trip (by hand on staging), code syntax highlighting, i18n.
 
 ## Commands
 
@@ -126,7 +130,7 @@ bun run test          # unit tests (Node / happy-dom) + integration tests (worke
 bun run typecheck     # client (hono/jsx/dom), worker (hono/jsx) and Node-run tests are checked separately
 bun run build         # build the SPA into dist/client
 bun run db:migrate    # apply migrations to the local D1
-bun run dev:worker    # the app and the test IdP under wrangler dev (http://127.0.0.1:8787)
+bun run dev:worker    # the app and the test IdP under wrangler dev (http://localhost:8787 for passkeys)
 bun run smoke         # browser check from sign-in to sign-out on a fresh D1 (needs a build)
 bun run bundle:report # bundle sizes -> results/bundle.json
 bun run measure       # seed 10,000 pages, measure the API and the browser -> results/measurements.json
@@ -157,9 +161,9 @@ In CI (`.github/workflows/ci.yml`), `app-test` runs the type checks, unit and in
 
 | Kind                                          | Count     | Scope                                       |
 | --------------------------------------------- | --------- | ------------------------------------------- |
-| Unit (Vitest, Node / happy-dom)               | 257       | See below                                   |
-| Integration (Vitest, workerd with D1 and DOs) | 54        | Migrations apply the same SQL as production |
-| Browser (`bun run smoke`)                     | 20 checks | See below                                   |
+| Unit (Vitest, Node / happy-dom)               | 285       | See below                                   |
+| Integration (Vitest, workerd with D1 and DOs) | 78        | Migrations apply the same SQL as production |
+| Browser (`bun run smoke`)                     | 21 checks | See below                                   |
 
 Unit tests cover:
 
@@ -177,7 +181,7 @@ Unit tests cover:
 - `hono/jsx/dom` components (Testing Library): the command palette, the search palette (starts empty when reopened), the list (a failed later page and its retry), the editor (viewers stay read-only with `?collab=0`)
 - Test IdP: redirects limited to the callback on the same origin, PKCE, the password and domain checks, and expired, tampered or swapped codes and tokens
 - Sign-in page: offers only the enabled providers, and shows errors with a retry when loading or starting fails
-- Second factor: TOTP against the RFC 6238 test vectors and its ±1 step window, the otpauth URI, recovery codes (format, typing variants, hashes), the encrypted secret (tampering, other keys), the ten-minute limit for unverified sessions, the QR code, the API client's error handling, and the screen (registering with the QR code and the secret, recovery codes shown once and saved before the first code, the app's code, a recovery code, wrong codes, waiting after too many attempts, running out of time, sign-out)
+- Second factor: TOTP against the RFC 6238 test vectors and its ±1 step window, the otpauth URI, recovery codes (format, typing variants, hashes), the encrypted secret (tampering, other keys), the ten-minute limit for unverified sessions, the QR code, the API client's error handling, passkey prompt failures and hosts that cannot use passkeys, the five-minute window for adding a method, and the screen (choosing a passkey or the app, registering either with the recovery codes saved first, suggesting the other method, a passkey, the app's code, a recovery code, cancelled prompts, wrong codes, waiting after too many attempts, running out of time, sign-out)
 - `/api/me`: the second-factor answer, and the service worker drops cached data on 403 as on 401
 - Config: the deployable `wrangler.jsonc` never turns development mode on, production has no test IdP, and the test IdP has no public URL or route
 
@@ -187,6 +191,7 @@ Integration tests cover:
 - Magic links and the dev outbox are gone, and only the test IdP's sign-in page is exposed
 - Without the `TEST_IDP` binding (production), none of the test IdP's entry points open
 - Second factor: the gate on the API, Better Auth's account endpoints and the WebSocket; unverified sessions ending after ten minutes; registering an app (wrong code, restarting, no takeover once registered, the secret encrypted and the codes hashed); signing in again with the app's code, an already used code refused, a recovery code working once; the attempt limit per user, its window and its reset
+- Passkeys (a software authenticator answering real WebAuthn options): registering the first one with its recovery codes, challenges answered for another challenge or origin, used once and expired; signing in again; another user's or an unknown passkey, a counter that went backwards, the attempt limit; adding the other method within five minutes and without new codes, refused with Google alone or later; two sessions registering the first method at once (the codes of the confirmed one kept, the other refused even if it already passed the check)
 - Keyset listing and counts
 - Japanese full-text search and short-term partial matching
 - Hiding other users' notes (404), viewer and editor permissions
@@ -198,7 +203,8 @@ Integration tests cover:
 
 Browser checks:
 
-- Sign-in through the UI: the second factor is asked for first (the API answers 403), the QR screen shows the recovery codes and accepts the first code only once they are saved, and signing in again asks for the app's code
+- Sign-in through the UI: the second factor is asked for first (the API answers 403), on 127.0.0.1 only the app is offered, the QR screen shows the recovery codes and accepts the first code only once they are saved, and signing in again asks for the app's code
+- Passkeys on Chromium's virtual authenticator at `localhost`: registered first after saving the recovery codes, then used to sign in again
 - Page creation and connecting to its DO
 - Tags, WikiLinks and slash commands
 - The other tab shows a remote caret

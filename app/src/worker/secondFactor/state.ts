@@ -21,3 +21,15 @@ export function secondFactorState(
   if (session.secondFactorAt) return "verified";
   return nowMs - session.createdAt.getTime() < UNVERIFIED_SESSION_TTL_MS ? "pending" : "expired";
 }
+
+/**
+ * How recently the session must have passed the second step to add another method. Adding
+ * one is how an attacker who got past the second step once would keep a way back in.
+ * 別の確認方法を足せるのは、2 段階目を通ってからこの時間内だけ。
+ */
+export const RECENT_SECOND_FACTOR_MS = 5 * 60_000;
+
+/** Whether the second step (at `secondFactorAt`, ms) was passed within the last five minutes. */
+export function recentlyVerified(secondFactorAt: number | null, nowMs: number): boolean {
+  return secondFactorAt !== null && nowMs - secondFactorAt < RECENT_SECOND_FACTOR_MS;
+}
