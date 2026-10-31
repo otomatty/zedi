@@ -18,6 +18,7 @@ const DOC_PAIRS = [
   { en: "app/README.md", ja: "app/README.ja.md" },
   { en: "app/docs/verification.md", ja: "app/docs/verification.ja.md" },
   { en: "app/docs/tauriRemoval.md", ja: "app/docs/tauriRemoval.ja.md" },
+  { en: "app/docs/secondFactorRecovery.md", ja: "app/docs/secondFactorRecovery.ja.md" },
 ];
 
 const EN_BANNER = /> \*\*Language:\*\* English \|/m;
