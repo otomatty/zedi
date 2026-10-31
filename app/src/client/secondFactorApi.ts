@@ -1,8 +1,17 @@
+import type {
+  AuthenticationResponseJSON,
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+  RegistrationResponseJSON,
+} from "./lib/webauthn";
+
 /** Where the session stands on the second factor (`GET /api/second-factor`). */
 export interface SecondFactorStatus {
   verified: boolean;
   /** Whether an authenticator app is registered. */
   totp: boolean;
+  /** How many passkeys are registered. */
+  passkeys: number;
   recoveryCodesRemaining: number;
 }
 
@@ -14,6 +23,9 @@ export type SecondFactorRefusal =
   | "already_enrolled"
   | "not_enrolled"
   | "no_pending_enrollment"
+  | "invalid_passkey"
+  | "no_pending_registration"
+  | "reverification_required"
   | "unexpected";
 
 const KNOWN = new Set<string>([
@@ -23,6 +35,9 @@ const KNOWN = new Set<string>([
   "already_enrolled",
   "not_enrolled",
   "no_pending_enrollment",
+  "invalid_passkey",
+  "no_pending_registration",
+  "reverification_required",
 ]);
 
 /** A refused second-factor request; `retryAfterSeconds` is set for `too_many_attempts`. */
@@ -36,7 +51,7 @@ export class SecondFactorError extends Error {
   }
 }
 
-async function call<T>(path: string, body?: Record<string, string>): Promise<T> {
+async function call<T>(path: string, body?: Record<string, unknown>): Promise<T> {
   const res = await fetch(
     `/api/second-factor${path}`,
     body === undefined
@@ -63,14 +78,29 @@ async function call<T>(path: string, body?: Record<string, string>): Promise<T> 
  */
 export const secondFactorApi = {
   status: () => call<SecondFactorStatus>(""),
-  /** The recovery codes come with the secret, before the first code confirms it. */
+  /**
+   * For the first factor, the recovery codes come with the secret, before the first code
+   * confirms it; adding an app to a passkey brings none.
+   */
   startEnrollment: () =>
-    call<{ secret: string; uri: string; recoveryCodes: string[] }>("/totp/enrollment", {}),
+    call<{ secret: string; uri: string; recoveryCodes?: string[] }>("/totp/enrollment", {}),
   confirmEnrollment: (code: string) =>
     call<Record<string, never>>("/totp/enrollment/confirm", { code }),
   verifyTotp: (code: string) => call<Record<string, never>>("/totp/verify", { code }),
   verifyRecoveryCode: (code: string) =>
     call<{ recoveryCodesRemaining: number }>("/recovery-code/verify", { code }),
+  /** Registration options; recovery codes too when the passkey is the first factor. */
+  startPasskeyRegistration: () =>
+    call<{ options: PublicKeyCredentialCreationOptionsJSON; recoveryCodes?: string[] }>(
+      "/passkey/registration",
+      {},
+    ),
+  confirmPasskeyRegistration: (response: RegistrationResponseJSON) =>
+    call<Record<string, never>>("/passkey/registration/confirm", { response }),
+  startPasskeyAuthentication: () =>
+    call<{ options: PublicKeyCredentialRequestOptionsJSON }>("/passkey/authentication", {}),
+  verifyPasskey: (response: AuthenticationResponseJSON) =>
+    call<Record<string, never>>("/passkey/authentication/verify", { response }),
 };
 
 /** The client the second-factor screen uses (swapped for a fake in its tests). */

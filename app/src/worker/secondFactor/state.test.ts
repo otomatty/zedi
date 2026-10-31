@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { UNVERIFIED_SESSION_TTL_MS, secondFactorState } from "./state";
+import {
+  RECENT_SECOND_FACTOR_MS,
+  UNVERIFIED_SESSION_TTL_MS,
+  recentlyVerified,
+  secondFactorState,
+} from "./state";
 
 const created = new Date("2026-10-31T00:00:00Z");
 const after = (ms: number) => created.getTime() + ms;
@@ -21,5 +26,19 @@ describe("secondFactorState", () => {
     const session = { createdAt: created, secondFactorAt: new Date(after(60_000)) };
     expect(secondFactorState(session, after(60_000))).toBe("verified");
     expect(secondFactorState(session, after(6 * 24 * 60 * 60_000))).toBe("verified");
+  });
+});
+
+describe("recentlyVerified", () => {
+  it("allows five minutes after the second step for adding another method", () => {
+    expect(RECENT_SECOND_FACTOR_MS).toBe(5 * 60_000);
+    const at = created.getTime();
+    expect(recentlyVerified(at, after(0))).toBe(true);
+    expect(recentlyVerified(at, after(RECENT_SECOND_FACTOR_MS - 1))).toBe(true);
+    expect(recentlyVerified(at, after(RECENT_SECOND_FACTOR_MS))).toBe(false);
+  });
+
+  it("is never true for a session that has not passed the second step", () => {
+    expect(recentlyVerified(null, after(0))).toBe(false);
   });
 });

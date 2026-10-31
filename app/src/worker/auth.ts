@@ -110,6 +110,14 @@ function createAuth(env: Env, baseURL: string) {
   });
 }
 
+/**
+ * The app's public origin: `BETTER_AUTH_URL` when set, else the request's origin (development
+ * on any local port). Passkeys are bound to its host name.
+ * アプリの公開オリジン。パスキーはこのホスト名に結び付く。
+ */
+export const appOrigin = (env: Pick<Env, "BETTER_AUTH_URL">, requestUrl: string) =>
+  env.BETTER_AUTH_URL ?? new URL(requestUrl).origin;
+
 /** Whether Google sign-in has credentials. */
 export const googleConfigured = (env: Pick<Env, "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET">) =>
   Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
@@ -126,7 +134,7 @@ const cache = new Map<string, Auth>();
  */
 export function getAuth(env: Env, requestUrl: string): Auth {
   if (!env.BETTER_AUTH_SECRET) throw new Error("BETTER_AUTH_SECRET is not set");
-  const baseURL = env.BETTER_AUTH_URL ?? new URL(requestUrl).origin;
+  const baseURL = appOrigin(env, requestUrl);
   const key = `${baseURL}|${env.TEST_IDP ? "test-idp" : ""}|${googleConfigured(env) ? "google" : ""}`;
   let auth = cache.get(key);
   if (!auth) {

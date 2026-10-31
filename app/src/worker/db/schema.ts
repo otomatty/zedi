@@ -162,3 +162,36 @@ export const secondFactorAttempts = sqliteTable("second_factor_attempts", {
   attempts: integer("attempts").notNull(),
   windowStartedAt: integer("window_started_at", { mode: "timestamp_ms" }).notNull(),
 });
+
+/** Passkeys (WebAuthn credentials); `id` is the credential ID, `publicKey` the COSE key. */
+export const passkeys = sqliteTable(
+  "passkeys",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    publicKey: text("public_key").notNull(),
+    counter: integer("counter").notNull(),
+    /** JSON array of transports the browser reported. */
+    transports: text("transports"),
+    name: text("name").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("passkeys_user").on(t.userId)],
+);
+
+/** The WebAuthn challenge a session is answering, one per purpose; used once. */
+export const webauthnChallenges = sqliteTable(
+  "webauthn_challenges",
+  {
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => session.id, { onDelete: "cascade" }),
+    purpose: text("purpose", { enum: ["register", "authenticate"] }).notNull(),
+    challenge: text("challenge").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.sessionId, t.purpose] })],
+);
