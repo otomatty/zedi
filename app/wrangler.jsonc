@@ -34,9 +34,12 @@
   "observability": { "enabled": true },
   "env": {
     // Production signs in with Google only: no TEST_IDP binding and no ENVIRONMENT variable.
-    // The D1 id is still a placeholder; staging, routes and the deploy workflow come with #1157.
+    // workers.dev stays off until the custom domain is attached. Routes and the deploy
+    // workflow come with #1157.
     "production": {
       "name": "zedi-app",
+      "workers_dev": false,
+      "preview_urls": false,
       "services": [],
       "durable_objects": {
         "bindings": [{ "name": "PageRoom", "class_name": "PageRoom" }],
@@ -45,7 +48,26 @@
         {
           "binding": "DB",
           "database_name": "zedi-app",
-          "database_id": "00000000-0000-0000-0000-000000000000",
+          "database_id": "75889d51-9b7d-4c0c-8026-4f4b18de3eea",
+          "migrations_dir": "migrations",
+        },
+      ],
+    },
+    // Standing non-production environment (#1157). TEST_IDP stays unbound until that
+    // Worker is deployed behind Access. No public hostname yet.
+    "staging": {
+      "name": "zedi-app-staging",
+      "workers_dev": false,
+      "preview_urls": false,
+      "services": [],
+      "durable_objects": {
+        "bindings": [{ "name": "PageRoom", "class_name": "PageRoom" }],
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "zedi-app-staging",
+          "database_id": "fdbe0954-a9bc-415d-97db-393eb689d13b",
           "migrations_dir": "migrations",
         },
       ],
