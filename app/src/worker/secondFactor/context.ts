@@ -23,7 +23,7 @@ export async function readJsonObject(c: SecondFactorContext): Promise<Record<str
 }
 
 /** Hashes recovery codes for storage (generated codes always parse). */
-export const hashAll = async (codes: string[]) =>
+export const hashAll = async (codes: string[]): Promise<string[]> =>
   (await Promise.all(codes.map(hashRecoveryCode))) as string[];
 
 /** Counts the attempt; returns the 429 response when the user has run out of attempts. */
@@ -71,7 +71,10 @@ export async function enrollmentGate(
  * gates read) carries the new state at once.
  * セッションを確認済みにし、D1 から読み直して Cookie キャッシュにもすぐ反映する。
  */
-export async function finishVerification(c: SecondFactorContext, body: Record<string, unknown>) {
+export async function finishVerification(
+  c: SecondFactorContext,
+  body: Record<string, unknown>,
+): Promise<Response> {
   const { sessionId, user } = c.get("current");
   await store.clearAttempts(c.env.DB, user.id);
   if (!(await store.markSessionVerified(c.env.DB, sessionId, Date.now()))) {

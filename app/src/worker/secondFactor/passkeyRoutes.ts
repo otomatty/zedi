@@ -42,7 +42,7 @@ const invalidPasskey = (c: SecondFactorContext) => c.json({ error: "invalid_pass
  * is SimpleWebAuthn's; challenges are stored per session and used once.
  * パスキーの登録と、パスキーでの 2 段階目。検証は SimpleWebAuthn、チャレンジはセッションごとに 1 回だけ使う。
  */
-export function passkeyRoutes() {
+export function passkeyRoutes(): Hono<SecondFactorEnv> {
   const routes = new Hono<SecondFactorEnv>();
 
   routes.post("/registration", async (c) => {

@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import { useContext, useEffect, useMemo, useRef } from "hono/jsx/dom";
 import type { PageListItem, PageListResponse } from "../../shared/types";
 import { fetchPageList } from "../api";
@@ -16,7 +17,11 @@ const dateFormat = new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium", timeS
  * is fetched when the viewport gets close to the end of what is loaded.
  * D1 のページ一覧。100 件ずつのキーセット取得 + 仮想スクロールで、末尾に近づくと次を読む。
  */
-export function NotesPage({ noteId }: { noteId: string }) {
+export function NotesPage({
+  noteId,
+}: {
+  noteId: string;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
   const scrollRef = useRef<HTMLDivElement>(null);
   const client = useContext(QueryClientContext);
   const allPending = usePendingPages();

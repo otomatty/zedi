@@ -18,7 +18,7 @@ export function countTextblocks(doc: PMNode): number {
 }
 
 /** Whether a page is long enough that collaborative typing slows down. */
-export const isLongPage = (textblocks: number) => textblocks > LONG_PAGE_BLOCKS;
+export const isLongPage = (textblocks: number): boolean => textblocks > LONG_PAGE_BLOCKS;
 
 /**
  * Reports the page size now and again once edits pause, so long documents do not pay for

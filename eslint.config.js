@@ -176,6 +176,13 @@ export default tseslint.config(
       "react/no-multi-comp": "off",
     },
   },
+  // app/: CONTRIBUTING の「関数には戻り値の型を指定」を ESLint で必須にする
+  {
+    files: ["app/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/explicit-module-boundary-types": "error",
+    },
+  },
   // スクリプト・e2e: console 可、行数制限は緩め
   {
     files: ["scripts/**/*.ts", "e2e/**/*.ts"],

@@ -21,4 +21,5 @@ export interface Env {
 }
 
 /** Whether development-only routes (seeding) are enabled. */
-export const isDevelopment = (env: Pick<Env, "ENVIRONMENT">) => env.ENVIRONMENT === "development";
+export const isDevelopment = (env: Pick<Env, "ENVIRONMENT">): boolean =>
+  env.ENVIRONMENT === "development";

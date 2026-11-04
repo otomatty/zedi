@@ -14,7 +14,7 @@ const DIGITS = 6;
 const WINDOW = 1;
 
 /** The 30-second step that contains `nowMs`. */
-export const totpStep = (nowMs: number) => Math.floor(nowMs / PERIOD_MS);
+export const totpStep = (nowMs: number): number => Math.floor(nowMs / PERIOD_MS);
 
 /** A new secret: 160 random bits as unpadded Base32 (what authenticator apps expect). */
 export function generateTotpSecret(): string {

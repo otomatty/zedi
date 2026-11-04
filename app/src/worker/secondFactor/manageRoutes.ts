@@ -16,7 +16,7 @@ import * as store from "./store";
  * minutes; the user can pass it again from the page (the verify endpoints renew it).
  * 確認方法の一覧・削除（最後の 1 つは消せない）・復旧用コードの作り直し。変更には 5 分以内の 2 段階目が要る。
  */
-export function manageRoutes() {
+export function manageRoutes(): Hono<SecondFactorEnv> {
   const routes = new Hono<SecondFactorEnv>();
 
   routes.get("/methods", async (c) => {

@@ -10,7 +10,12 @@ import { SuggestionList } from "./SuggestionList";
  * Tiptap の候補ポップアップを hono/jsx/dom で描画し、Floating UI で配置するレンダラー。
  */
 export function createSuggestionRenderer<I>(label: (item: I) => string, empty: string) {
-  return () => {
+  return (): {
+    onStart(props: SuggestionProps<I, I>): void;
+    onUpdate(props: SuggestionProps<I, I>): void;
+    onKeyDown({ event }: SuggestionKeyDownProps): boolean;
+    onExit(): void;
+  } => {
     let container: HTMLDivElement | null = null;
     let root: Root | null = null;
     let current: SuggestionProps<I, I> | null = null;

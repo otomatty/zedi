@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import { useEffect, useId, useMemo, useRef, useState } from "hono/jsx/dom";
 import { filterItems, moveActive, type ListItem } from "../lib/listbox";
 
@@ -18,7 +19,9 @@ export interface CommandPaletteProps<T extends ListItem> {
  * WAI-ARIA combobox + listbox pattern (no UI library).
  * ネイティブ `<dialog>` と ARIA の combobox/listbox パターンで作ったコマンドパレット。
  */
-export function CommandPalette<T extends ListItem>(props: CommandPaletteProps<T>) {
+export function CommandPalette<T extends ListItem>(
+  props: CommandPaletteProps<T>,
+): HtmlEscapedString | Promise<HtmlEscapedString> {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");

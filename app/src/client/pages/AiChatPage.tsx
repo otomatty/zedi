@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import { useEffect, useRef, useState } from "hono/jsx/dom";
 import { createFrameBatcher } from "../lib/frameBatcher";
 import { createSseParser } from "../lib/sseParser";
@@ -59,7 +60,7 @@ function createBlockAppender(container: HTMLElement): (chunk: string) => void {
  * 疑似 AI 応答のストリーミング表示。`state`（トークンごとに再描画）・`direct`（1 つの
  * Text ノードへフレームごとに追記）・`blocks`（段落ブロックへ追記）を比較する。
  */
-export default function AiChatPage() {
+export default function AiChatPage(): HtmlEscapedString | Promise<HtmlEscapedString> {
   const params = new URLSearchParams(location.search);
   const requested = params.get("strategy") as Strategy | null;
   const [strategy, setStrategy] = useState<Strategy>(

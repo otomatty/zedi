@@ -19,7 +19,12 @@ export type SessionState =
  * `"secondFactor"` when the session has not passed the second factor yet.
  * 小さなセッションストア。`fetchMe` はセッションがなければ null、2 段階目の前なら `"secondFactor"`。
  */
-export function createSessionStore(fetchMe: () => Promise<Me | null | "secondFactor">) {
+export function createSessionStore(fetchMe: () => Promise<Me | null | "secondFactor">): {
+  get: () => SessionState;
+  subscribe(listener: () => void): () => boolean;
+  refresh(): Promise<void>;
+  signOut(): void;
+} {
   let state: SessionState = { status: "loading" };
   const listeners = new Set<() => void>();
   const set = (next: SessionState) => {

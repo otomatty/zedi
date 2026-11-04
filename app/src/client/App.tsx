@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import { QueryClient, type InfiniteData } from "@tanstack/query-core";
 import { useEffect, useState } from "hono/jsx/dom";
 import type { PageListItem, PageListResponse } from "../shared/types";
@@ -250,7 +251,7 @@ function Gate() {
  * Root component of the hono/jsx/dom SPA: session gate + persistent shell.
  * hono/jsx/dom SPA のルート。セッションで出し分け、シェルを常駐させる。
  */
-export function App() {
+export function App(): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
     <QueryClientContext.Provider value={queryClient}>
       <Gate />

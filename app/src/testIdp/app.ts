@@ -98,7 +98,7 @@ function unexpired(payload: Record<string, unknown>, now: number): boolean {
  * staging. It is never deployed to production.
  * ローカル・試験・Preview・staging で Google の代わりをする最小の OAuth プロバイダー。本番には置かない。
  */
-export function createTestIdp(options: TestIdpOptions) {
+export function createTestIdp(options: TestIdpOptions): Hono {
   const now = options.now ?? Date.now;
   const app = new Hono();
   const emailPattern = new RegExp(
