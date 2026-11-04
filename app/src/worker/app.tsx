@@ -77,7 +77,9 @@ function withCost(c: Context, cost: D1Cost) {
  * Builds the single Hono app: public SSR page, Better Auth, the authorized API and realtime routing.
  * 公開ページ・認証・認可付き API・リアルタイム振り分けを 1 つの Hono アプリで提供する。
  */
-export function createApp({ routeRealtime }: { routeRealtime?: RealtimeRouter } = {}) {
+export function createApp({
+  routeRealtime,
+}: { routeRealtime?: RealtimeRouter } = {}): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
 
   app.get("/", (c) => c.html(`<!DOCTYPE html>${(<Landing />).toString()}`));

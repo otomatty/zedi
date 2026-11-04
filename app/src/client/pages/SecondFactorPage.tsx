@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import { useEffect, useRef, useState } from "hono/jsx/dom";
 import { messageFor, prompt, refusedAs } from "../lib/secondFactorErrors";
 import {
@@ -104,7 +105,7 @@ export function SecondFactorPage({
   onSessionChange: () => void;
   /** Resolves false when the sign-out did not go through. */
   onSignOut: () => Promise<boolean>;
-}) {
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { view, setView, reload } = useStatusView(api, webauthn, onSessionChange);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

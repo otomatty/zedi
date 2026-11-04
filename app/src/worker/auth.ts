@@ -115,12 +115,13 @@ function createAuth(env: Env, baseURL: string) {
  * on any local port). Passkeys are bound to its host name.
  * アプリの公開オリジン。パスキーはこのホスト名に結び付く。
  */
-export const appOrigin = (env: Pick<Env, "BETTER_AUTH_URL">, requestUrl: string) =>
+export const appOrigin = (env: Pick<Env, "BETTER_AUTH_URL">, requestUrl: string): string =>
   env.BETTER_AUTH_URL ?? new URL(requestUrl).origin;
 
 /** Whether Google sign-in has credentials. */
-export const googleConfigured = (env: Pick<Env, "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET">) =>
-  Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+export const googleConfigured = (
+  env: Pick<Env, "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET">,
+): boolean => Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 
 /** The Better Auth instance type used by the app. */
 export type Auth = ReturnType<typeof createAuth>;

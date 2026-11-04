@@ -114,44 +114,52 @@ async function call<T>(
  * 2 段階目の API。
  */
 export const secondFactorApi = {
-  status: () => call<SecondFactorStatus>(""),
+  status: (): Promise<SecondFactorStatus> => call<SecondFactorStatus>(""),
   /**
    * For the first factor, the recovery codes come with the secret, before the first code
    * confirms it; adding an app to a passkey brings none.
    */
-  startEnrollment: () =>
+  startEnrollment: (): Promise<{ secret: string; uri: string; recoveryCodes?: string[] }> =>
     call<{ secret: string; uri: string; recoveryCodes?: string[] }>("/totp/enrollment", {}),
-  confirmEnrollment: (code: string) =>
+  confirmEnrollment: (code: string): Promise<Record<string, never>> =>
     call<Record<string, never>>("/totp/enrollment/confirm", { code }),
-  verifyTotp: (code: string) => call<Record<string, never>>("/totp/verify", { code }),
-  verifyRecoveryCode: (code: string) =>
+  verifyTotp: (code: string): Promise<Record<string, never>> =>
+    call<Record<string, never>>("/totp/verify", { code }),
+  verifyRecoveryCode: (code: string): Promise<{ recoveryCodesRemaining: number }> =>
     call<{ recoveryCodesRemaining: number }>("/recovery-code/verify", { code }),
   /** Registration options; recovery codes too when the passkey is the first factor. */
-  startPasskeyRegistration: () =>
+  startPasskeyRegistration: (): Promise<{
+    options: PublicKeyCredentialCreationOptionsJSON;
+    recoveryCodes?: string[];
+  }> =>
     call<{ options: PublicKeyCredentialCreationOptionsJSON; recoveryCodes?: string[] }>(
       "/passkey/registration",
       {},
     ),
-  confirmPasskeyRegistration: (response: RegistrationResponseJSON) =>
+  confirmPasskeyRegistration: (
+    response: RegistrationResponseJSON,
+  ): Promise<Record<string, never>> =>
     call<Record<string, never>>("/passkey/registration/confirm", { response }),
-  startPasskeyAuthentication: () =>
+  startPasskeyAuthentication: (): Promise<{ options: PublicKeyCredentialRequestOptionsJSON }> =>
     call<{ options: PublicKeyCredentialRequestOptionsJSON }>("/passkey/authentication", {}),
-  verifyPasskey: (response: AuthenticationResponseJSON) =>
+  verifyPasskey: (response: AuthenticationResponseJSON): Promise<Record<string, never>> =>
     call<Record<string, never>>("/passkey/authentication/verify", { response }),
   /** What the settings page lists. Changing it needs `recentlyVerified`. */
-  methods: () => call<SecondFactorMethods>("/methods"),
+  methods: (): Promise<SecondFactorMethods> => call<SecondFactorMethods>("/methods"),
   /** Refused with `last_factor` when the passkey is the only method left. */
-  deletePasskey: (id: string) =>
+  deletePasskey: (id: string): Promise<Record<string, never>> =>
     call<Record<string, never>>(`/passkeys/${encodeURIComponent(id)}`, undefined, "DELETE"),
   /** Refused with `last_factor` when the app is the only method left. */
-  deleteTotp: () => call<Record<string, never>>("/totp", undefined, "DELETE"),
+  deleteTotp: (): Promise<Record<string, never>> =>
+    call<Record<string, never>>("/totp", undefined, "DELETE"),
   /** New recovery codes and the offer that switches to them; nothing changes yet. */
-  newRecoveryCodes: () => call<{ recoveryCodes: string[]; offer: string }>("/recovery-codes", {}),
+  newRecoveryCodes: (): Promise<{ recoveryCodes: string[]; offer: string }> =>
+    call<{ recoveryCodes: string[]; offer: string }>("/recovery-codes", {}),
   /**
    * Switches to the offered codes; the old ones stop working. Sending the same offer again
    * changes nothing, so it can be retried. Refused with `invalid_offer` once it ran out.
    */
-  confirmRecoveryCodes: (offer: string) =>
+  confirmRecoveryCodes: (offer: string): Promise<Record<string, never>> =>
     call<Record<string, never>>("/recovery-codes/confirm", { offer }),
 };
 

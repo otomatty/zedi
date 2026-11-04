@@ -26,7 +26,16 @@ type KeyValueStorage = Pick<Storage, "getItem" | "setItem">;
 export function createPageOutbox(
   storage: KeyValueStorage,
   options: { key?: string; isPermanent: (error: unknown) => boolean },
-) {
+): {
+  all: () => PendingPage[];
+  list: (noteId?: string) => PendingPage[];
+  get: (id: string) => PendingPage | undefined;
+  add: (page: PendingPage) => void;
+  clear: () => void;
+  reload(): void;
+  subscribe(listener: () => void): () => void;
+  flush(send: (page: PendingPage) => Promise<void>): Promise<FlushResult>;
+} {
   const key = options.key ?? "zedi:outbox:pages";
   const listeners = new Set<() => void>();
   let inFlight: Promise<FlushResult> | null = null;

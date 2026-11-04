@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import { useState } from "hono/jsx/dom";
 import { qrCode } from "../lib/qrCode";
 
@@ -108,7 +109,7 @@ export function ChooseView({
   busy: boolean;
   onPasskey: () => void;
   onTotp: () => void;
-}) {
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
     <section>
       <p>
@@ -140,7 +141,7 @@ export function TotpEnrollView({
   recoveryCodes?: string[];
   busy: boolean;
   onSubmit: (code: string) => void;
-}) {
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
   const codes = useRecoveryCodes(recoveryCodes);
   return (
     <section>
@@ -177,7 +178,7 @@ export function PasskeyEnrollView({
   recoveryCodes?: string[];
   busy: boolean;
   onRegister: () => void;
-}) {
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
   const codes = useRecoveryCodes(recoveryCodes);
   return (
     <section>
@@ -208,7 +209,7 @@ export function SuggestView({
   busy: boolean;
   onAdd: () => void;
   onLater: () => void;
-}) {
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
   return (
     <section>
       <p>
@@ -243,7 +244,7 @@ export function VerifyView({
   onPasskey: () => void;
   onCode: (code: string) => void;
   onSwitch: (method: VerifyMethod) => void;
-}) {
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
   const links: [VerifyMethod, string][] = [
     ["passkey", "パスキーを使う"],
     ["totp", "認証アプリのコードを使う"],

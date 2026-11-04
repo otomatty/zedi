@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import { useEffect, useState } from "hono/jsx/dom";
 import type { PageListItem } from "../../shared/types";
 import { useQuery } from "../lib/query";
@@ -29,7 +30,7 @@ export function SearchPalette(props: {
   online: boolean;
   onSelect(page: { id: string }): void;
   onClose(): void;
-}) {
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounced(query.trim(), 150);
   const results = useQuery({

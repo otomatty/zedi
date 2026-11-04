@@ -8,14 +8,14 @@ export const BASE = "http://zedi.test";
 
 let counter = 0;
 /** A fresh test-IdP address per call so tests in the same file never share a user. */
-export const uniqueEmail = (label: string) =>
+export const uniqueEmail = (label: string): string =>
   `${label}-${Date.now()}-${(counter += 1)}@test.zedi-note.app`;
 
 /** A browser's cookies, by name. */
 export type CookieJar = Map<string, string>;
 
 /** Applies a response's Set-Cookie headers to a cookie jar (empty values delete). */
-export function storeCookies(jar: CookieJar, res: Response) {
+export function storeCookies(jar: CookieJar, res: Response): void {
   for (const header of res.headers.getSetCookie()) {
     const pair = header.split(";")[0] ?? "";
     const index = pair.indexOf("=");
@@ -27,7 +27,7 @@ export function storeCookies(jar: CookieJar, res: Response) {
 }
 
 /** The Cookie header for a cookie jar. */
-export const cookieHeader = (jar: CookieJar) =>
+export const cookieHeader = (jar: CookieJar): string =>
   [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
 
 /**
@@ -97,7 +97,11 @@ export async function postSecondFactor(
 const factors = new Map<string, { secret: string; recoveryCodes: string[]; lastStep: number }>();
 
 /** The second factors `signIn` registered for `email`. */
-export function enrolledFactors(email: string) {
+export function enrolledFactors(email: string): {
+  secret: string;
+  recoveryCodes: string[];
+  lastStep: number;
+} {
   const enrolled = factors.get(email);
   if (!enrolled) throw new Error(`${email} has not been enrolled by signIn`);
   return enrolled;
@@ -109,7 +113,11 @@ export function enrolledFactors(email: string) {
  * for the current time are spent).
  * 2 段階目を済ませる。初回は認証アプリを登録し、以後はまだ使っていないコードを入れる。
  */
-export async function passSecondFactor(email: string, jar: CookieJar, origin = BASE) {
+export async function passSecondFactor(
+  email: string,
+  jar: CookieJar,
+  origin = BASE,
+): Promise<void> {
   const enrolled = factors.get(email);
   if (!enrolled) {
     const start = await postSecondFactor("/totp/enrollment", jar, {}, origin);
@@ -163,7 +171,7 @@ export function api(
   path: string,
   cookie: string | null,
   init: { method?: string; body?: unknown } = {},
-) {
+): Promise<Response> {
   const headers: Record<string, string> = { origin: BASE };
   if (cookie) headers.cookie = cookie;
   if (init.body !== undefined) headers["content-type"] = "application/json";

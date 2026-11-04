@@ -20,7 +20,10 @@ export function isRemoteAwarenessChange(change: AwarenessChange, localClientId: 
  * typing pauses).
  * 末尾実行のデバウンス（入力が止まってから自分のカーソルを送るために使う）。
  */
-export function createTrailingDebounce(fn: () => void, waitMs: number) {
+export function createTrailingDebounce(
+  fn: () => void,
+  waitMs: number,
+): { schedule(): void; flush(): void; cancel: () => void } {
   let timer: ReturnType<typeof setTimeout> | null = null;
   const cancel = () => {
     if (timer !== null) clearTimeout(timer);

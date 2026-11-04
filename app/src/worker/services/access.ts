@@ -59,4 +59,4 @@ export function getPageAccess(
 }
 
 /** Whether the role may create or edit pages. */
-export const canEdit = (role: NoteRole) => role === "owner" || role === "editor";
+export const canEdit = (role: NoteRole): boolean => role === "owner" || role === "editor";

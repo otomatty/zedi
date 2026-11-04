@@ -39,7 +39,7 @@ const invalidCode = (c: SecondFactorContext) => c.json({ error: "invalid_code" }
  * other API is not.
  * パスキーか認証アプリの登録と、それか復旧用コードでの 2 段階目。Google だけを通ったセッションでも使える。
  */
-export function secondFactorRoutes() {
+export function secondFactorRoutes(): Hono<SecondFactorEnv> {
   const routes = new Hono<SecondFactorEnv>();
 
   // Read from D1, not the cookie cache: these routes register and remove methods, and an ended

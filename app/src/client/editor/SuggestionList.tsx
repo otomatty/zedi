@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 /**
  * Listbox shown in the Tiptap suggestion popup (WikiLink targets, slash commands).
  * Tiptap の候補ポップアップに出す一覧（WikiLink 先・スラッシュコマンド）。
@@ -8,7 +9,7 @@ export function SuggestionList<I>(props: {
   label: (item: I) => string;
   empty: string;
   onPick: (index: number) => void;
-}) {
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
   if (props.items.length === 0) return <p class="suggestion-empty">{props.empty}</p>;
   return (
     <ul role="listbox" class="suggestion-list">

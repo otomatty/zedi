@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import { useEffect, useRef, useState } from "hono/jsx/dom";
 import { PasskeyPromptError, messageFor, prompt, refusedAs } from "../lib/secondFactorErrors";
 import {
@@ -530,7 +531,7 @@ export function SecuritySettingsPage({
   webauthn?: WebAuthnClient;
   /** Called when the session ran out or lost its second step; refresh it. */
   onSessionChange: () => void;
-}) {
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
   const { loaded, reload } = useMethods(api, onSessionChange);
   const { confirming, setConfirming, panel, error, busy, actions } = useChanges(
     api,

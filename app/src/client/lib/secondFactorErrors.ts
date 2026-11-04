@@ -10,7 +10,7 @@ export class PasskeyPromptError extends Error {
 }
 
 /** Whether `error` is the server refusing for `reason`. */
-export const refusedAs = (error: unknown, reason: SecondFactorError["reason"]) =>
+export const refusedAs = (error: unknown, reason: SecondFactorError["reason"]): boolean =>
   error instanceof SecondFactorError && error.reason === reason;
 
 const PROMPT_MESSAGES: Record<PasskeyFailure, string> = {

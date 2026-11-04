@@ -11,7 +11,7 @@ import { createPageOutbox, type FlushResult, type PendingPage } from "./lib/outb
 export const API_CACHE_PREFIX = "zedi-api-";
 
 /** IndexedDB name of a page's local Y.js copy (y-indexeddb). */
-export const pageDocName = (pageId: string) => `zedi:page:${pageId}`;
+export const pageDocName = (pageId: string): string => `zedi:page:${pageId}`;
 
 const OUTBOX_KEY = "zedi:outbox:pages";
 
@@ -33,7 +33,7 @@ const PERMANENT_STATUSES = new Set([400, 403, 404, 409, 410, 413, 422]);
  * Whether the server refused a page creation for good, so it should leave the queue.
  * ページ作成をサーバーが恒久的に拒否したか（キューから外すべきか）。
  */
-export const isPermanentRefusal = (error: unknown) =>
+export const isPermanentRefusal = (error: unknown): boolean =>
   error instanceof ApiError && PERMANENT_STATUSES.has(error.status);
 
 /** Pages created on this device and not yet confirmed by the server. */

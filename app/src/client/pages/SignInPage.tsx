@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import { useEffect, useState } from "hono/jsx/dom";
 
 /** Sign-in providers the server enables (`GET /api/sign-in-options`). */
@@ -32,7 +33,7 @@ export function SignInPage({
 }: {
   loadOptions?: () => Promise<SignInOptions>;
   startSignIn?: (provider: Provider) => Promise<void>;
-}) {
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
   const [options, setOptions] = useState<SignInOptions | "loading" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
   const [pending, setPending] = useState<Provider | null>(null);

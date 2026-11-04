@@ -1,3 +1,4 @@
+import type { HtmlEscapedString } from "hono/utils/html";
 import { useEffect, useRef, useState } from "hono/jsx/dom";
 import { IndexeddbPersistence } from "y-indexeddb";
 import YProvider from "y-partyserver/provider";
@@ -37,7 +38,13 @@ async function searchTargets(noteId: string, query: string): Promise<LinkTarget[
  * and viewers get a read-only editor.
  * 共同編集ページ（遅延読み込み）。WebSocket はセッション Cookie で認可され、閲覧者は読み取り専用。
  */
-export default function EditorPage({ id, defaultNoteId }: { id: string; defaultNoteId: string }) {
+export default function EditorPage({
+  id,
+  defaultNoteId,
+}: {
+  id: string;
+  defaultNoteId: string;
+}): HtmlEscapedString | Promise<HtmlEscapedString> {
   const hostRef = useRef<HTMLDivElement>(null);
   // A page created offline is shown from the outbox until the server has it.
   const page = useQuery({
