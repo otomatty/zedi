@@ -16,7 +16,7 @@
 
 ### 報告方法
 
-1. **メールで報告**: security@example.com（プロジェクトのセキュリティ連絡先に置き換えてください）
+1. **メールで報告**: akimasa.sugai@saedgewell.com
 2. **GitHub Security Advisories**: リポジトリの Security タブから Private vulnerability reporting を使用
 
 ### 報告に含める情報
