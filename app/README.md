@@ -72,7 +72,7 @@ Every library the client uses is framework-agnostic:
 - Tiptap 3 core (no React binding) + Y.js + `y-partyserver/provider` + `y-indexeddb`
 - `marked`, used for its lexer only (see below)
 
-`@tiptap/y-tiptap` (the Y.js editor binding) carries a small patch, applied on install through `patchedDependencies` (`patches/`); see "Large documents" in [docs/verification.md](docs/verification.md).
+`@tiptap/y-tiptap` (the Y.js editor binding) carries a small patch, applied on install through `patchedDependencies` (`patches/`); see "Large documents" in [docs/verification.md](docs/verification.md). The patch only fits 3.0.11, so `package.json` pins that version and Dependabot skips it; port the patch before upgrading.
 
 `better-auth/client` is loaded lazily, only for sign-in and sign-out. The router, lazy loading and the command palette (native `<dialog>` + ARIA combobox/listbox) are written in-house; no UI library is used.
 

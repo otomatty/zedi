@@ -72,7 +72,7 @@ Drizzle のスキーマ（`src/worker/db/schema.ts`）は SQL と対にしてい
 - Tiptap 3 本体（React バインディングは使わない）+ Y.js + `y-partyserver/provider` + `y-indexeddb`
 - `marked`: 字句解析だけを使います（後述）
 
-Y.js のエディタ連携（`@tiptap/y-tiptap`）には小さなパッチを当てています。`patchedDependencies`（`patches/`）でインストール時に適用されます。詳細は [docs/verification.ja.md](docs/verification.ja.md) の「大きな文書」を参照してください。
+Y.js のエディタ連携（`@tiptap/y-tiptap`）には小さなパッチを当てています。`patchedDependencies`（`patches/`）でインストール時に適用されます。詳細は [docs/verification.ja.md](docs/verification.ja.md) の「大きな文書」を参照してください。パッチは 3.0.11 専用なので、`package.json` で版を固定し、Dependabot でも更新を止めています。上げるときは、先にパッチを新しい版向けに作り直してください。
 
 `better-auth/client` はサインイン・サインアウトの時だけ遅延読み込みします。ルーター、遅延読み込み、コマンドパレット（ネイティブ `<dialog>` + ARIA の combobox/listbox）は自作で、UI ライブラリは使っていません。
 
