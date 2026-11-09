@@ -31,64 +31,63 @@ export function AIChatModelSelector() {
   const { setSelectedModel, isStreaming } = useAIChatStore();
   const [models, setModels] = useState<DisplayModel[]>([]);
   const [serverAIModels, setServerAIModels] = useState<AIModel[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const loadModels = useCallback(async () => {
-    setLoading(true);
-    try {
-      const settings = await loadAISettings();
-      const currentMode = settings ? getInteractionMode(settings) : "default";
-
-      const { models: serverModels, systemDefaultModelId } = await fetchServerModels();
-      let available = serverModels.filter((m) => m.available);
-      if (currentMode === "user_api_key" && settings) {
-        available = available.filter((m) => m.provider === settings.provider);
-      }
-      setServerAIModels(available);
-      setModels(
-        available.map((m) => ({
-          id: m.id,
-          provider: m.provider,
-          modelId: m.modelId,
-          displayName: m.displayName,
-          inputCostUnits: m.inputCostUnits,
-          outputCostUnits: m.outputCostUnits,
-        })),
-      );
-
-      const current = useAIChatStore.getState().selectedModel;
-      if (available.length === 0) {
-        setSelectedModel(null);
-      } else {
-        const initial = resolveServerInitialSelection(
-          available,
-          current,
-          settings?.modelId,
-          systemDefaultModelId,
-        );
-        if (initial) {
-          setSelectedModel({
-            id: initial.id,
-            provider: initial.provider,
-            model: initial.modelId,
-            displayName: initial.displayName,
-            inputCostUnits: initial.inputCostUnits,
-            outputCostUnits: initial.outputCostUnits,
-          });
-        }
-      }
-    } catch {
-      // fallback: use settings model
-    } finally {
-      setLoading(false);
-    }
-  }, [setSelectedModel]);
-
   useEffect(() => {
-    loadModels();
-  }, [loadModels]);
+    const loadModels = async () => {
+      const settings = await loadAISettings();
+      const serverModels = await fetchServerModels();
+      return { settings, ...serverModels };
+    };
+
+    void loadModels()
+      .then(({ settings, models: serverModels, systemDefaultModelId }) => {
+        const currentMode = settings ? getInteractionMode(settings) : "default";
+        let available = serverModels.filter((m) => m.available);
+        if (currentMode === "user_api_key" && settings) {
+          available = available.filter((m) => m.provider === settings.provider);
+        }
+        setServerAIModels(available);
+        setModels(
+          available.map((m) => ({
+            id: m.id,
+            provider: m.provider,
+            modelId: m.modelId,
+            displayName: m.displayName,
+            inputCostUnits: m.inputCostUnits,
+            outputCostUnits: m.outputCostUnits,
+          })),
+        );
+
+        const current = useAIChatStore.getState().selectedModel;
+        if (available.length === 0) {
+          setSelectedModel(null);
+        } else {
+          const initial = resolveServerInitialSelection(
+            available,
+            current,
+            settings?.modelId,
+            systemDefaultModelId,
+          );
+          if (initial) {
+            setSelectedModel({
+              id: initial.id,
+              provider: initial.provider,
+              model: initial.modelId,
+              displayName: initial.displayName,
+              inputCostUnits: initial.inputCostUnits,
+              outputCostUnits: initial.outputCostUnits,
+            });
+          }
+        }
+      })
+      .catch(() => {
+        // fallback: use settings model
+      })
+      .finally(() => setLoading(false));
+  }, [setSelectedModel]);
 
   useEffect(() => {
     if (!open) return;

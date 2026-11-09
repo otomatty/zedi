@@ -123,25 +123,6 @@ const IndexPage: React.FC = () => {
   const [rebuilding, setRebuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await fetchIndex();
-      setData({
-        pageId: result.pageId,
-        noteId: result.noteId,
-        totalPages: result.totalPages,
-        categories: result.categories,
-        timestamp: result.lastBuiltAt,
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const rebuild = useCallback(async () => {
     setRebuilding(true);
     setError(null);
@@ -163,8 +144,21 @@ const IndexPage: React.FC = () => {
   }, [toast, t]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void fetchIndex()
+      .then((result) => {
+        setData({
+          pageId: result.pageId,
+          noteId: result.noteId,
+          totalPages: result.totalPages,
+          categories: result.categories,
+          timestamp: result.lastBuiltAt,
+        });
+      })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const busy = loading || rebuilding;
 

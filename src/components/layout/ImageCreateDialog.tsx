@@ -71,6 +71,20 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
    * OCR 進捗 (0-100)。null の場合は非表示 / OCR progress 0-100; null hides the UI.
    */
   const [ocrProgress, setOcrProgress] = useState<number | null>(null);
+  const [previousOpen, setPreviousOpen] = useState(open);
+
+  if (open !== previousOpen) {
+    setPreviousOpen(open);
+    if (!open) {
+      setStep("source");
+      setSelectedImage(null);
+      setPreviewUrl(null);
+      setProcessingMode("none");
+      setError(null);
+      setOcrProgress(null);
+      setIsProcessing(false);
+    }
+  }
 
   /**
    *
@@ -111,23 +125,25 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
       ? "api-server"
       : null;
 
-  const clearPreviewUrl = useCallback((updateState = true) => {
+  const releasePreviewUrl = useCallback(() => {
     if (previewUrlRef.current) {
       URL.revokeObjectURL(previewUrlRef.current);
       previewUrlRef.current = null;
     }
-    if (updateState) {
-      setPreviewUrl(null);
-    }
   }, []);
+
+  const clearPreviewUrl = useCallback(() => {
+    releasePreviewUrl();
+    setPreviewUrl(null);
+  }, [releasePreviewUrl]);
 
   const updatePreviewUrl = useCallback(
     (nextPreviewUrl: string) => {
-      clearPreviewUrl(false);
+      releasePreviewUrl();
       previewUrlRef.current = nextPreviewUrl;
       setPreviewUrl(nextPreviewUrl);
     },
-    [clearPreviewUrl],
+    [releasePreviewUrl],
   );
 
   // ダイアログを閉じたときにリセット
@@ -154,27 +170,18 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
-      clearPreviewUrl(false);
+      releasePreviewUrl();
     };
-  }, [clearPreviewUrl]);
+  }, [releasePreviewUrl]);
 
-  // 親が直接 `open=false` にしたケース（DialogContent の Esc/オーバーレイ以外、
-  // たとえば外部状態で閉じる場合）に備え、`open` の遷移を監視して
-  // 進行中の OCR / describe を必ず中断し、内部状態をリセットする。
-  // Without this, closing via the parent could leave a previous run state
-  // (preview / progress) when the dialog reopens.
+  // 親から閉じた場合も外部リソースを解放する。表示用 state は上で調整する。
+  // Release external resources after a parent closes the dialog.
   useEffect(() => {
     if (open) return;
     abortRef.current?.abort();
     abortRef.current = null;
-    setStep("source");
-    setSelectedImage(null);
-    clearPreviewUrl();
-    setProcessingMode("none");
-    setError(null);
-    setOcrProgress(null);
-    setIsProcessing(false);
-  }, [open, clearPreviewUrl]);
+    releasePreviewUrl();
+  }, [open, releasePreviewUrl]);
 
   // 画像選択
   /**

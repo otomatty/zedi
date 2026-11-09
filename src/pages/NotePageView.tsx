@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Download, FileText, History, Trash2 } from "lucide-react";
@@ -268,47 +268,49 @@ function NotePageEditorEditable({
   const suppressTitleSaveEffectsRef = useRef(false);
 
   const persistTitleRef = useRef<(nextTitle: string) => Promise<void>>(async () => {});
-  persistTitleRef.current = async (nextTitle: string) => {
-    const previousTitle = lastSavedTitleRef.current;
-    try {
-      // Issue #889 Phase 4: 旧来の `getPageContent` + `putPageContent` 経由のタイトル
-      // 更新は撤廃し、Y.Doc バイト列を介さない `PUT /api/pages/:id` (metadata only)
-      // に一本化する。`local` モード廃止に伴い、すべてのページは note 配下にあり
-      // `updatePageMetadata` が単一の正規 REST 経路。
-      // Issue #889 Phase 4: drop the legacy `getPageContent` + `putPageContent`
-      // round-trip and rename via `PUT /api/pages/:id` (metadata only). Every
-      // page now belongs to a note, so `updatePageMetadata` is the single
-      // canonical REST entry point for title saves.
-      await api.updatePageMetadata(page.id, { title: nextTitle });
-      // 削除完了後はキャッシュ無効化も lastSaved 更新もスキップする。
-      // After cancel (delete path), skip cache invalidation and lastSaved update —
-      // `useRemovePageFromNote` has already invalidated note caches.
-      if (suppressTitleSaveEffectsRef.current) return;
-      lastSavedTitleRef.current = nextTitle;
-      // ノート側のキャッシュは `noteKeys.*` 配下にあるため、タイトル変更を
-      // ノート表示やサイドバーに反映させるために明示的に無効化する。
-      // The note view and sidebar pull from `noteKeys.*`, so invalidate those
-      // explicitly to propagate the rename.
-      queryClient.invalidateQueries({ queryKey: noteKeys.page(noteId, page.id) });
-      queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(noteId) });
-    } catch (error) {
-      // 削除済みページに対する失敗は予期されたもの。toast / rollback を抑止する。
-      // Expected failure path when the page was just deleted out from under us;
-      // suppress toast + rollback + rethrow so we don't surface
-      // `errors.titleSaveFailedTitle` right after a successful delete.
-      if (suppressTitleSaveEffectsRef.current) return;
-      if (pendingTitleRef.current === null) {
-        setTitle(previousTitle);
+  useLayoutEffect(() => {
+    persistTitleRef.current = async (nextTitle: string) => {
+      const previousTitle = lastSavedTitleRef.current;
+      try {
+        // Issue #889 Phase 4: 旧来の `getPageContent` + `putPageContent` 経由のタイトル
+        // 更新は撤廃し、Y.Doc バイト列を介さない `PUT /api/pages/:id` (metadata only)
+        // に一本化する。`local` モード廃止に伴い、すべてのページは note 配下にあり
+        // `updatePageMetadata` が単一の正規 REST 経路。
+        // Issue #889 Phase 4: drop the legacy `getPageContent` + `putPageContent`
+        // round-trip and rename via `PUT /api/pages/:id` (metadata only). Every
+        // page now belongs to a note, so `updatePageMetadata` is the single
+        // canonical REST entry point for title saves.
+        await api.updatePageMetadata(page.id, { title: nextTitle });
+        // 削除完了後はキャッシュ無効化も lastSaved 更新もスキップする。
+        // After cancel (delete path), skip cache invalidation and lastSaved update —
+        // `useRemovePageFromNote` has already invalidated note caches.
+        if (suppressTitleSaveEffectsRef.current) return;
+        lastSavedTitleRef.current = nextTitle;
+        // ノート側のキャッシュは `noteKeys.*` 配下にあるため、タイトル変更を
+        // ノート表示やサイドバーに反映させるために明示的に無効化する。
+        // The note view and sidebar pull from `noteKeys.*`, so invalidate those
+        // explicitly to propagate the rename.
+        queryClient.invalidateQueries({ queryKey: noteKeys.page(noteId, page.id) });
+        queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(noteId) });
+      } catch (error) {
+        // 削除済みページに対する失敗は予期されたもの。toast / rollback を抑止する。
+        // Expected failure path when the page was just deleted out from under us;
+        // suppress toast + rollback + rethrow so we don't surface
+        // `errors.titleSaveFailedTitle` right after a successful delete.
+        if (suppressTitleSaveEffectsRef.current) return;
+        if (pendingTitleRef.current === null) {
+          setTitle(previousTitle);
+        }
+        console.error("Failed to save page title:", error);
+        toast({
+          title: t("errors.titleSaveFailedTitle"),
+          description: t("errors.titleSaveFailedDescription"),
+          variant: "destructive",
+        });
+        throw error;
       }
-      console.error("Failed to save page title:", error);
-      toast({
-        title: t("errors.titleSaveFailedTitle"),
-        description: t("errors.titleSaveFailedDescription"),
-        variant: "destructive",
-      });
-      throw error;
-    }
-  };
+    };
+  });
 
   // タイトル保存を直列化する。保存中なら何もせず、完了後に pending があれば
   // 追随保存する。これにより「古いリクエストが遅延完了して新しい値を上書きする」
@@ -317,26 +319,28 @@ function NotePageEditorEditable({
   // completes if a newer title is pending. This prevents an out-of-order
   // response from overwriting a more recent edit.
   const flushPendingTitleRef = useRef<() => void>(() => {});
-  flushPendingTitleRef.current = () => {
-    if (isSavingTitleRef.current) return;
-    const pending = pendingTitleRef.current;
-    if (pending === null) return;
-    pendingTitleRef.current = null;
-    isSavingTitleRef.current = true;
-    void (async () => {
-      try {
-        await persistTitleRef.current(pending);
-      } catch {
-        // persistTitleRef で toast + console.error 済み。ここは coalesce 継続のため握る。
-        // Already logged + toasted inside persistTitleRef; swallow so we keep coalescing.
-      } finally {
-        isSavingTitleRef.current = false;
-        if (pendingTitleRef.current !== null) {
-          flushPendingTitleRef.current();
+  useLayoutEffect(() => {
+    flushPendingTitleRef.current = () => {
+      if (isSavingTitleRef.current) return;
+      const pending = pendingTitleRef.current;
+      if (pending === null) return;
+      pendingTitleRef.current = null;
+      isSavingTitleRef.current = true;
+      void (async () => {
+        try {
+          await persistTitleRef.current(pending);
+        } catch {
+          // persistTitleRef で toast + console.error 済み。ここは coalesce 継続のため握る。
+          // Already logged + toasted inside persistTitleRef; swallow so we keep coalescing.
+        } finally {
+          isSavingTitleRef.current = false;
+          if (pendingTitleRef.current !== null) {
+            flushPendingTitleRef.current();
+          }
         }
-      }
-    })();
-  };
+      })();
+    };
+  });
 
   const handleTitleChange = useCallback((newTitle: string) => {
     setTitle(newTitle);
