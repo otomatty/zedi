@@ -1,4 +1,5 @@
 /** モデル読み込みと選択 / Model loading and selection. */
+import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AIChatModelSelector } from "./AIChatModelSelector";
@@ -160,5 +161,51 @@ describe("AIChatModelSelector", () => {
 
     await waitFor(() => expect(mocks.setSelectedModel).toHaveBeenCalledTimes(1));
     expect(screen.getByTitle("aiChat.modelSelector.tooltip")).toBeDisabled();
+  });
+
+  it("does not change the global selection if loading finishes after unmount", async () => {
+    let resolve!: (value: { models: typeof models; systemDefaultModelId: string }) => void;
+    mocks.fetchModels.mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    const { unmount } = render(<AIChatModelSelector />);
+    await waitFor(() => expect(mocks.fetchModels).toHaveBeenCalledTimes(1));
+
+    unmount();
+    await act(async () => resolve({ models, systemDefaultModelId: "openai:gpt-5-mini" }));
+
+    expect(mocks.setSelectedModel).not.toHaveBeenCalled();
+  });
+
+  it("ignores an obsolete Strict Mode response after the current selection loads", async () => {
+    let resolveOld!: (value: { models: typeof models; systemDefaultModelId: string }) => void;
+    mocks.fetchModels.mockReturnValueOnce(
+      new Promise((done) => {
+        resolveOld = done;
+      }),
+    );
+    render(
+      <StrictMode>
+        <AIChatModelSelector />
+      </StrictMode>,
+    );
+    await waitFor(() => expect(mocks.fetchModels).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByTitle("aiChat.modelSelector.tooltip")).toBeEnabled());
+    expect(mocks.setSelectedModel).toHaveBeenCalledTimes(1);
+
+    await act(async () =>
+      resolveOld({ models: [models[1]], systemDefaultModelId: "anthropic:claude" }),
+    );
+
+    expect(mocks.setSelectedModel).toHaveBeenCalledExactlyOnceWith({
+      id: "openai:gpt-5-mini",
+      provider: "openai",
+      model: "gpt-5-mini",
+      displayName: "GPT 5 mini",
+      inputCostUnits: 1,
+      outputCostUnits: 2,
+    });
   });
 });

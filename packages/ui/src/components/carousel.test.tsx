@@ -197,4 +197,32 @@ describe("Carousel", () => {
     expect(screen.getByRole("button", { name: "Previous slide" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Next slide" })).toBeDisabled();
   });
+
+  it("ignores reinitialization from the old API after replacing it", () => {
+    const first = createApi(false, true);
+    const second = createApi(true, false);
+    embla.api = first.emblaApi;
+    const { rerender } = render(<Slides />);
+
+    embla.api = second.emblaApi;
+    rerender(<Slides />);
+    act(() => first.emit("reInit"));
+
+    expect(screen.getByRole("button", { name: "Previous slide" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Next slide" })).toBeDisabled();
+  });
+
+  it("disables both buttons when the API becomes unavailable", () => {
+    const fake = createApi(true, true);
+    embla.api = fake.emblaApi;
+    const { rerender } = render(<Slides />);
+    expect(screen.getByRole("button", { name: "Previous slide" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Next slide" })).toBeEnabled();
+
+    embla.api = undefined;
+    rerender(<Slides />);
+
+    expect(screen.getByRole("button", { name: "Previous slide" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next slide" })).toBeDisabled();
+  });
 });

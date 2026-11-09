@@ -11,7 +11,7 @@ export function useDebouncedCallback<T extends (...args: unknown[]) => void>(
   const callbackRef = useRef(callback);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useLayoutEffect(() => {
+  useLayoutEffect((): void => {
     callbackRef.current = callback;
   }, [callback]);
 

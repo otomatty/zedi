@@ -188,28 +188,28 @@ export function useApiErrors(params: UseApiErrorsParams = {}): UseApiErrorsResul
   // current value without forcing the SSE effect to tear down + reconnect on
   // every filter change.
   const filterRef = useRef({ status, severity });
-  useLayoutEffect(() => {
+  useLayoutEffect((): void => {
     filterRef.current = { status, severity };
   }, [status, severity]);
 
-  const load = useCallback(() => {
+  const load = useCallback((): Promise<void> => {
     const requestId = ++latestRequestRef.current;
     return getApiErrors({ status, severity, limit, offset })
-      .then((result) => {
+      .then((result): void => {
         if (!isMountedRef.current || requestId !== latestRequestRef.current) return;
         setData(result);
         setError(null);
       })
-      .catch((e) => {
+      .catch((e): void => {
         if (!isMountedRef.current || requestId !== latestRequestRef.current) return;
         setError(e instanceof Error ? e.message : String(e));
       })
-      .finally(() => {
+      .finally((): void => {
         if (isMountedRef.current && requestId === latestRequestRef.current) setLoading(false);
       });
   }, [status, severity, limit, offset]);
 
-  useEffect(() => {
+  useEffect((): (() => void) => {
     isMountedRef.current = true;
     void load();
     return () => {
@@ -321,15 +321,15 @@ export function useApiErrors(params: UseApiErrorsParams = {}): UseApiErrorsResul
 
   // フォールバックポーリング: SSE が確立していれば抑制する。
   // Fallback polling: suppressed while SSE is healthy so we don't double-load.
-  useEffect(() => {
+  useEffect((): (() => void) | undefined => {
     if (intervalMs <= 0) return;
     if (streamConnected) return;
-    const tick = () => {
+    const tick = (): void => {
       if (typeof document !== "undefined" && document.hidden) return;
       void load();
     };
     const id = window.setInterval(tick, intervalMs);
-    const onVisible = () => {
+    const onVisible = (): void => {
       if (typeof document !== "undefined" && !document.hidden) {
         void load();
       }
@@ -341,7 +341,7 @@ export function useApiErrors(params: UseApiErrorsParams = {}): UseApiErrorsResul
     };
   }, [intervalMs, load, streamConnected]);
 
-  const refetch = useCallback(() => load(), [load]);
+  const refetch = useCallback((): Promise<void> => load(), [load]);
 
   return {
     errors: data?.errors ?? [],

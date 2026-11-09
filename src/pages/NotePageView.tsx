@@ -268,8 +268,8 @@ function NotePageEditorEditable({
   const suppressTitleSaveEffectsRef = useRef(false);
 
   const persistTitleRef = useRef<(nextTitle: string) => Promise<void>>(async () => {});
-  useLayoutEffect(() => {
-    persistTitleRef.current = async (nextTitle: string) => {
+  useLayoutEffect((): void => {
+    persistTitleRef.current = async (nextTitle: string): Promise<void> => {
       const previousTitle = lastSavedTitleRef.current;
       try {
         // Issue #889 Phase 4: 旧来の `getPageContent` + `putPageContent` 経由のタイトル
@@ -319,14 +319,14 @@ function NotePageEditorEditable({
   // completes if a newer title is pending. This prevents an out-of-order
   // response from overwriting a more recent edit.
   const flushPendingTitleRef = useRef<() => void>(() => {});
-  useLayoutEffect(() => {
-    flushPendingTitleRef.current = () => {
+  useLayoutEffect((): void => {
+    flushPendingTitleRef.current = (): void => {
       if (isSavingTitleRef.current) return;
       const pending = pendingTitleRef.current;
       if (pending === null) return;
       pendingTitleRef.current = null;
       isSavingTitleRef.current = true;
-      void (async () => {
+      void (async (): Promise<void> => {
         try {
           await persistTitleRef.current(pending);
         } catch {

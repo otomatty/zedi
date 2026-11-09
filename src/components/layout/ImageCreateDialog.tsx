@@ -42,7 +42,11 @@ interface ImageCreateDialogProps {
 export /**
  *
  */
-const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChange, onCreated }) => {
+const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
+  open,
+  onOpenChange,
+  onCreated,
+}): React.JSX.Element => {
   /**
    *
    */
@@ -125,20 +129,20 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
       ? "api-server"
       : null;
 
-  const releasePreviewUrl = useCallback(() => {
+  const releasePreviewUrl = useCallback((): void => {
     if (previewUrlRef.current) {
       URL.revokeObjectURL(previewUrlRef.current);
       previewUrlRef.current = null;
     }
   }, []);
 
-  const clearPreviewUrl = useCallback(() => {
+  const clearPreviewUrl = useCallback((): void => {
     releasePreviewUrl();
     setPreviewUrl(null);
   }, [releasePreviewUrl]);
 
   const updatePreviewUrl = useCallback(
-    (nextPreviewUrl: string) => {
+    (nextPreviewUrl: string): void => {
       releasePreviewUrl();
       previewUrlRef.current = nextPreviewUrl;
       setPreviewUrl(nextPreviewUrl);
@@ -167,8 +171,8 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
   }, [clearPreviewUrl, onOpenChange]);
 
   // コンポーネントアンマウント時も abort する / Also abort on unmount.
-  useEffect(() => {
-    return () => {
+  useEffect((): (() => void) => {
+    return (): void => {
       abortRef.current?.abort();
       releasePreviewUrl();
     };
@@ -176,7 +180,7 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
 
   // 親から閉じた場合も外部リソースを解放する。表示用 state は上で調整する。
   // Release external resources after a parent closes the dialog.
-  useEffect(() => {
+  useEffect((): void => {
     if (open) return;
     abortRef.current?.abort();
     abortRef.current = null;

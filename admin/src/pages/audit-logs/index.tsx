@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 import type { AuditLogEntry, GetAuditLogsParams } from "@/api/admin";
 import { getAuditLogs } from "@/api/admin";
 import { AuditLogsContent, type AuditLogsFilters } from "./AuditLogsContent";
@@ -23,7 +23,7 @@ function toIso(value: string | undefined): string | undefined {
  * Admin "Audit Logs" page. Fetches from `GET /api/admin/audit-logs`
  * with client-side debounced filter state.
  */
-export default function AuditLogs() {
+export default function AuditLogs(): JSX.Element {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -37,7 +37,7 @@ export default function AuditLogs() {
   const latestRequestRef = useRef(0);
   const pageRef = useRef(page);
   const filtersRef = useRef(appliedFilters);
-  useLayoutEffect(() => {
+  useLayoutEffect((): void => {
     pageRef.current = page;
     filtersRef.current = appliedFilters;
   }, [page, appliedFilters]);

@@ -38,7 +38,7 @@ export function useGeneralSettings(): UseGeneralSettingsReturn {
 
   // Sync external theme and locale without replacing the settings being edited.
   // 編集中の設定を上書きせず、外部のテーマと言語だけを同期する。
-  useEffect(() => {
+  useEffect((): void => {
     const loaded = loadGeneralSettings();
     setTheme(loaded.theme);
     i18n.changeLanguage(loaded.locale);

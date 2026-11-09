@@ -33,7 +33,7 @@ function isObject(v: unknown): v is Record<string, unknown> {
  * MCP authorization consent page component.
  * MCP 認可同意ページコンポーネント。
  */
-const McpAuthorize: React.FC = () => {
+const McpAuthorize: React.FC = (): React.JSX.Element => {
   const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

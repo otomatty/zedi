@@ -77,11 +77,11 @@ export function useProfile(): UseProfileReturn {
   const isLoading = isSignedIn ? isFetching : false;
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
+  useEffect((): void => {
     if (!isSignedIn) {
       return;
     }
-    const fetchProfile = async () => {
+    const fetchProfile = async (): Promise<void> => {
       try {
         const res = await fetch(`${getApiBaseUrl()}/api/users/me`, {
           credentials: "include",

@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import { Toaster } from "@zedi/ui";
 import { Toaster as Sonner } from "@zedi/ui/components/sonner";
 import { TooltipProvider } from "@zedi/ui";
@@ -142,7 +143,7 @@ function AppShellRoute() {
  * Root app component. Sets up providers and route tree.
  * ルートアプリコンポーネント。プロバイダーとルートを構成する。
  */
-const App = () => (
+const App = (): JSX.Element => (
   <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

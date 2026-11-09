@@ -64,16 +64,17 @@ export const TAG_PASTE_REGEX = new RegExp(`(?<![\\w/#])#[${TAG_NAME_CHAR_CLASS}]
  * input-rule handler computes the document range from `match[1]` and applies
  * the mark to that range only, leaving the user-typed terminator in place
  * (unlike `markInputRule`, which would delete non-capture trailing text).
- * Since Tiptap 3.33, the typed character is already inserted and included in
- * the handler's range, so the terminator must not be inserted again.
+ * Tiptap 3.33 inserts ordinary typed characters before calling the handler,
+ * but Enter reaches the input rule without inserting its newline. Restore
+ * the terminator only when it is not already present in the document.
  *
  * 先頭境界・終端文字は **キャプチャに含めない**。唯一のキャプチャ `match[1]` は
  * `#name` 本体で、入力規則ハンドラはこの範囲だけにマークを付け、ユーザーが
  * 直前に打鍵した終端文字（空白・句読点・括弧・引用符など）はそのまま残す。
  * `markInputRule` を使うと終端文字が削除されて打ち直しが必要になるため、
  * 独自ハンドラで範囲のみマーク化する。
- * Tiptap 3.33 以降は打鍵文字が挿入済みでハンドラの range にも含まれるため、
- * 終端文字を再挿入しない。
+ * Tiptap 3.33 の通常入力では終端文字が挿入済みだが、Enter の入力規則では
+ * 改行がまだ挿入されていない。文書に終端文字がない場合だけ補う。
  */
 export const TAG_INPUT_REGEX = new RegExp(
   `(?:^|[^\\w/#])(#[${TAG_NAME_CHAR_CLASS}]+)[^${TAG_NAME_CHAR_CLASS}]$`,
@@ -277,7 +278,7 @@ export const Tag = Mark.create<TagOptions>({
     ];
   },
 
-  addInputRules() {
+  addInputRules(): InputRule[] {
     // `this.type` を外側で捕捉し、ハンドラは PURE な関数として閉じ込める。
     // Capture `this.type` outside the handler so the rule stays a pure closure.
     const markType = this.type;
@@ -285,7 +286,7 @@ export const Tag = Mark.create<TagOptions>({
     return [
       new InputRule({
         find: TAG_INPUT_REGEX,
-        handler: ({ state, range, match }) => {
+        handler: ({ state, range, match }): null | undefined => {
           const tagText = match[1];
           const fullMatch = match[0];
           if (!tagText || !fullMatch) return null;
@@ -326,11 +327,9 @@ export const Tag = Mark.create<TagOptions>({
           const tagStart = range.from + tagOffsetInMatch;
           const tagEnd = tagStart + tagText.length;
 
-          // Tiptap 3.33 以降は入力文字の挿入後にハンドラが呼ばれ、range にも
-          // その文字が含まれる。終端文字は再挿入せず、`#name` だけをマーク化する。
-          // Since Tiptap 3.33, the handler runs after the typed character is
-          // inserted, and range includes it. Mark only `#name` without
-          // inserting the terminator again.
+          // 通常入力は終端文字の挿入後、Enter は改行の挿入前にここへ来る。
+          // Ordinary typing arrives after insertion; Enter arrives before its newline.
+          const typedTerminator = fullMatch.slice(tagOffsetInMatch + tagText.length);
 
           // 注: `state.tr` は呼び出すたびに新しい Transaction を返すゲッター。
           // Tiptap が `state` をラップして `tr` が同一インスタンスを返すように
@@ -339,6 +338,12 @@ export const Tag = Mark.create<TagOptions>({
           // `state.tr` is a getter; Tiptap proxies `state` so accesses share a
           // single `tr` instance which is then dispatched after the handler.
           const { tr } = state;
+          if (
+            typedTerminator.length > 0 &&
+            state.doc.textBetween(range.to - typedTerminator.length, range.to) !== typedTerminator
+          ) {
+            tr.insertText(typedTerminator, range.to);
+          }
           tr.addMark(
             tagStart,
             tagEnd,

@@ -1,4 +1,5 @@
 /** インデックス読み込みと再構築 / Index loading and rebuilding. */
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -152,5 +153,76 @@ describe("IndexPage", () => {
     expect(
       screen.queryByRole("link", { name: "common.wikiIndex.openIndexPage" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("ignores an obsolete Strict Mode success after the current summary loads", async () => {
+    const obsolete = deferredResponse();
+    mocks.fetch.mockReturnValueOnce(obsolete.promise).mockResolvedValueOnce(Response.json(initial));
+    render(
+      <StrictMode>
+        <MemoryRouter>
+          <IndexPage />
+        </MemoryRouter>
+      </StrictMode>,
+    );
+    await screen.findByText("Initial category");
+
+    await act(async () =>
+      obsolete.resolve(
+        Response.json({
+          ...initial,
+          pageId: "obsolete-index",
+          categories: [{ label: "Obsolete category", count: 1 }],
+        }),
+      ),
+    );
+
+    expect(screen.getByText("Initial category")).toBeInTheDocument();
+    expect(screen.queryByText("Obsolete category")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "common.wikiIndex.openIndexPage" })).toHaveAttribute(
+      "href",
+      "/notes/note-1/index-1",
+    );
+  });
+
+  it("ignores an obsolete Strict Mode failure after the current summary loads", async () => {
+    const obsolete = deferredResponse();
+    mocks.fetch.mockReturnValueOnce(obsolete.promise).mockResolvedValueOnce(Response.json(initial));
+    render(
+      <StrictMode>
+        <MemoryRouter>
+          <IndexPage />
+        </MemoryRouter>
+      </StrictMode>,
+    );
+    await screen.findByText("Initial category");
+
+    await act(async () => obsolete.resolve(new Response(null, { status: 500 })));
+
+    expect(screen.getByText("Initial category")).toBeInTheDocument();
+    expect(screen.queryByText("Fetch failed: HTTP 500")).not.toBeInTheDocument();
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it("keeps rebuilding disabled when only an obsolete Strict Mode request finishes", async () => {
+    const obsolete = deferredResponse();
+    const current = deferredResponse();
+    mocks.fetch.mockReturnValueOnce(obsolete.promise).mockReturnValueOnce(current.promise);
+    render(
+      <StrictMode>
+        <MemoryRouter>
+          <IndexPage />
+        </MemoryRouter>
+      </StrictMode>,
+    );
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
+
+    await act(async () => obsolete.resolve(Response.json(initial)));
+
+    expect(screen.getByRole("button", { name: "common.wikiIndex.rebuild" })).toBeDisabled();
+    expect(screen.queryByText("Initial category")).not.toBeInTheDocument();
+    await act(async () => current.resolve(Response.json(initial)));
+    expect(screen.getByText("Initial category")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "common.wikiIndex.rebuild" })).toBeEnabled();
   });
 });

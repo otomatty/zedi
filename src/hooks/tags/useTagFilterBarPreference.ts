@@ -39,7 +39,7 @@ export function useTagFilterBarPreference(noteId: string): {
   const { note } = useNote(noteId, { allowRemote: true });
   const noteDefault = note?.showTagFilterBar ?? false;
 
-  const [state, setState] = useState(() => ({
+  const [state, setState] = useState((): { noteId: string; override: boolean | undefined } => ({
     noteId,
     override: getShowTagFilterBarOverride(noteId),
   }));
@@ -53,7 +53,7 @@ export function useTagFilterBarPreference(noteId: string): {
   }
 
   const setOverride = useCallback(
-    (value: boolean | undefined) => {
+    (value: boolean | undefined): void => {
       setShowTagFilterBarOverride(noteId, value);
       setState({ noteId, override: value });
     },

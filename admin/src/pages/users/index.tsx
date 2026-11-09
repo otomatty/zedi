@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 import type { UserAdmin, UserRole, UserStatus } from "@/api/admin";
 import { getUsers, patchUserRole, suspendUser, unsuspendUser, deleteUser } from "@/api/admin";
 import { UsersContent } from "./UsersContent";
@@ -10,7 +10,7 @@ const PAGE_SIZE = 50;
  * ユーザー管理ページのコンテナコンポーネント。
  * Container component for the user management page.
  */
-export default function Users() {
+export default function Users(): JSX.Element {
   const [users, setUsers] = useState<UserAdmin[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -26,7 +26,7 @@ export default function Users() {
   const pageRef = useRef(page);
   const searchRef = useRef(search);
   const statusFilterRef = useRef(statusFilter);
-  useLayoutEffect(() => {
+  useLayoutEffect((): void => {
     pageRef.current = page;
     searchRef.current = search;
     statusFilterRef.current = statusFilter;

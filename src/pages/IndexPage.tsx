@@ -115,7 +115,7 @@ async function rebuildIndex(): Promise<IndexRebuildResponse> {
  *
  * インデックス閲覧ページ。マウント時は GET、再構築ボタン押下で POST。
  */
-const IndexPage: React.FC = () => {
+const IndexPage: React.FC = (): React.JSX.Element => {
   const { toast } = useToast();
   const { t } = useTranslation();
   const [data, setData] = useState<IndexViewModel | null>(null);
@@ -143,9 +143,11 @@ const IndexPage: React.FC = () => {
     }
   }, [toast, t]);
 
-  useEffect(() => {
+  useEffect((): (() => void) => {
+    let cancelled = false;
     void fetchIndex()
-      .then((result) => {
+      .then((result): void => {
+        if (cancelled) return;
         setData({
           pageId: result.pageId,
           noteId: result.noteId,
@@ -154,10 +156,18 @@ const IndexPage: React.FC = () => {
           timestamp: result.lastBuiltAt,
         });
       })
-      .catch((e: unknown) => {
+      .catch((e: unknown): void => {
+        if (cancelled) return;
         setError(e instanceof Error ? e.message : String(e));
       })
-      .finally(() => setLoading(false));
+      .finally((): void => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+
+    return (): void => {
+      cancelled = true;
+    };
   }, []);
 
   const busy = loading || rebuilding;
