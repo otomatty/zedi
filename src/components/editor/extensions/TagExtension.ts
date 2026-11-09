@@ -64,12 +64,16 @@ export const TAG_PASTE_REGEX = new RegExp(`(?<![\\w/#])#[${TAG_NAME_CHAR_CLASS}]
  * input-rule handler computes the document range from `match[1]` and applies
  * the mark to that range only, leaving the user-typed terminator in place
  * (unlike `markInputRule`, which would delete non-capture trailing text).
+ * Since Tiptap 3.33, the typed character is already inserted and included in
+ * the handler's range, so the terminator must not be inserted again.
  *
  * 先頭境界・終端文字は **キャプチャに含めない**。唯一のキャプチャ `match[1]` は
  * `#name` 本体で、入力規則ハンドラはこの範囲だけにマークを付け、ユーザーが
  * 直前に打鍵した終端文字（空白・句読点・括弧・引用符など）はそのまま残す。
  * `markInputRule` を使うと終端文字が削除されて打ち直しが必要になるため、
  * 独自ハンドラで範囲のみマーク化する。
+ * Tiptap 3.33 以降は打鍵文字が挿入済みでハンドラの range にも含まれるため、
+ * 終端文字を再挿入しない。
  */
 export const TAG_INPUT_REGEX = new RegExp(
   `(?:^|[^\\w/#])(#[${TAG_NAME_CHAR_CLASS}]+)[^${TAG_NAME_CHAR_CLASS}]$`,
@@ -322,18 +326,11 @@ export const Tag = Mark.create<TagOptions>({
           const tagStart = range.from + tagOffsetInMatch;
           const tagEnd = tagStart + tagText.length;
 
-          // Tiptap の入力規則プラグインはハンドラ呼び出し時点でユーザーが
-          // タイプした文字（終端文字）をまだドキュメントに挿入していない。
-          // `tr.steps.length > 0` で `handleTextInput` が `true` を返す扱いと
-          // なり、ProseMirror デフォルトのテキスト挿入はスキップされるため、
-          // ここで終端文字を明示的に挿入してユーザー入力を保全する。終端文字は
-          // `fullMatch` のうちキャプチャ後ろに残る部分（通常 1 文字）に等しい。
-          // Tiptap's input-rule plugin invokes the handler before ProseMirror
-          // commits the just-typed character. Returning a transaction with
-          // `steps > 0` causes the plugin to dispatch it and skip the default
-          // text insertion, so we re-insert the terminator (the slice of
-          // `fullMatch` after the capture) ourselves to preserve the keystroke.
-          const typedTerminator = fullMatch.slice(tagOffsetInMatch + tagText.length);
+          // Tiptap 3.33 以降は入力文字の挿入後にハンドラが呼ばれ、range にも
+          // その文字が含まれる。終端文字は再挿入せず、`#name` だけをマーク化する。
+          // Since Tiptap 3.33, the handler runs after the typed character is
+          // inserted, and range includes it. Mark only `#name` without
+          // inserting the terminator again.
 
           // 注: `state.tr` は呼び出すたびに新しい Transaction を返すゲッター。
           // Tiptap が `state` をラップして `tr` が同一インスタンスを返すように
@@ -342,13 +339,6 @@ export const Tag = Mark.create<TagOptions>({
           // `state.tr` is a getter; Tiptap proxies `state` so accesses share a
           // single `tr` instance which is then dispatched after the handler.
           const { tr } = state;
-          if (typedTerminator.length > 0) {
-            // 終端文字をマーク範囲の直後に挿入する（範囲シフトを起こさないよう
-            // mark 適用より前に行う）。
-            // Insert the terminator first so the subsequent `addMark` range
-            // does not need rebasing.
-            tr.insertText(typedTerminator, range.to);
-          }
           tr.addMark(
             tagStart,
             tagEnd,

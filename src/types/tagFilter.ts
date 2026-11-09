@@ -25,9 +25,7 @@
  *   The `__none__` token: only untagged pages. Cannot coexist with `tags`.
  */
 export type SelectedTags =
-  | { kind: "none-selected" }
-  | { kind: "tags"; tags: string[] }
-  | { kind: "untagged-only" };
+  { kind: "none-selected" } | { kind: "tags"; tags: string[] } | { kind: "untagged-only" };
 
 /**
  * `GET /api/notes/:noteId/tags` の `items[]` 1 件分。
