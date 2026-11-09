@@ -83,21 +83,21 @@ export default function ActivityLog() {
   // request resolves.
   const requestIdRef = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(() => {
     const requestId = ++requestIdRef.current;
-    if (mountedRef.current) setLoading(true);
-    if (mountedRef.current) setError(null);
-    try {
-      const result = await listActivity({ kind: kindFilter, actor: actorFilter, limit: 100 });
-      if (!mountedRef.current || requestId !== requestIdRef.current) return;
-      setEntries(result.entries);
-      setTotal(result.total);
-    } catch (e) {
-      if (!mountedRef.current || requestId !== requestIdRef.current) return;
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      if (mountedRef.current && requestId === requestIdRef.current) setLoading(false);
-    }
+    return listActivity({ kind: kindFilter, actor: actorFilter, limit: 100 })
+      .then((result) => {
+        if (!mountedRef.current || requestId !== requestIdRef.current) return;
+        setEntries(result.entries);
+        setTotal(result.total);
+      })
+      .catch((e) => {
+        if (!mountedRef.current || requestId !== requestIdRef.current) return;
+        setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (mountedRef.current && requestId === requestIdRef.current) setLoading(false);
+      });
   }, [kindFilter, actorFilter]);
 
   useEffect(() => {
@@ -108,14 +108,34 @@ export default function ActivityLog() {
     };
   }, [load]);
 
-  const onKind = (v: string) => setKindFilter(v === ANY ? undefined : (v as ActivityKind));
-  const onActor = (v: string) => setActorFilter(v === ANY ? undefined : (v as ActivityActor));
+  const onKind = (v: string) => {
+    const kind = v === ANY ? undefined : (v as ActivityKind);
+    if (kind === kindFilter) return;
+    setLoading(true);
+    setError(null);
+    setKindFilter(kind);
+  };
+  const onActor = (v: string) => {
+    const actor = v === ANY ? undefined : (v as ActivityActor);
+    if (actor === actorFilter) return;
+    setLoading(true);
+    setError(null);
+    setActorFilter(actor);
+  };
 
   return (
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold">{t("activityLog.title")}</h1>
-        <Button type="button" onClick={() => void load()} disabled={loading}>
+        <Button
+          type="button"
+          onClick={() => {
+            setLoading(true);
+            setError(null);
+            void load();
+          }}
+          disabled={loading}
+        >
           {loading ? t("common.loading") : t("common.reload")}
         </Button>
       </div>

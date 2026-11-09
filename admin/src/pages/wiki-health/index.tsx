@@ -26,20 +26,20 @@ export default function WikiHealth() {
   // overwrite a newer one (e.g. reload tapped twice or resolve+reload race).
   const requestIdRef = useRef(0);
 
-  const loadFindings = useCallback(async () => {
+  const loadFindings = useCallback(() => {
     const requestId = ++requestIdRef.current;
-    if (isMountedRef.current) setLoading(true);
-    if (isMountedRef.current) setError(null);
-    try {
-      const result = await getLintFindings();
-      if (!isMountedRef.current || requestId !== requestIdRef.current) return;
-      setFindings(result.findings);
-    } catch (e) {
-      if (!isMountedRef.current || requestId !== requestIdRef.current) return;
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      if (isMountedRef.current && requestId === requestIdRef.current) setLoading(false);
-    }
+    return getLintFindings()
+      .then((result) => {
+        if (!isMountedRef.current || requestId !== requestIdRef.current) return;
+        setFindings(result.findings);
+      })
+      .catch((e) => {
+        if (!isMountedRef.current || requestId !== requestIdRef.current) return;
+        setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (isMountedRef.current && requestId === requestIdRef.current) setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -58,6 +58,8 @@ export default function WikiHealth() {
       if (!isMountedRef.current) return;
       setSummary(result.summary);
       // findings を再取得 / Reload findings
+      setLoading(true);
+      setError(null);
       await loadFindings();
     } catch (e) {
       if (!isMountedRef.current) return;
@@ -72,6 +74,8 @@ export default function WikiHealth() {
       try {
         await resolveLintFinding(id);
         if (!isMountedRef.current) return;
+        setLoading(true);
+        setError(null);
         await loadFindings();
       } catch (e) {
         if (!isMountedRef.current) return;

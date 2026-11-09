@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { AuditLogEntry, GetAuditLogsParams } from "@/api/admin";
 import { getAuditLogs } from "@/api/admin";
 import { AuditLogsContent, type AuditLogsFilters } from "./AuditLogsContent";
@@ -37,8 +37,10 @@ export default function AuditLogs() {
   const latestRequestRef = useRef(0);
   const pageRef = useRef(page);
   const filtersRef = useRef(appliedFilters);
-  pageRef.current = page;
-  filtersRef.current = appliedFilters;
+  useLayoutEffect(() => {
+    pageRef.current = page;
+    filtersRef.current = appliedFilters;
+  }, [page, appliedFilters]);
 
   const load = useCallback(async () => {
     const requestId = ++latestRequestRef.current;

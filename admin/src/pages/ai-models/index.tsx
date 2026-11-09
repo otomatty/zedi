@@ -23,22 +23,31 @@ export default function AiModels() {
   const isMountedRef = useRef(true);
   const originalModelsRef = useRef<AiModelAdmin[]>([]);
 
-  const load = useCallback(async (showLoading = true) => {
-    if (showLoading && isMountedRef.current) setLoading(true);
-    if (isMountedRef.current) setError(null);
-    try {
-      const nextModels = await getAiModels();
-      if (!isMountedRef.current) return;
-      setModels(nextModels);
-      originalModelsRef.current = nextModels;
-      setError(null);
-    } catch (e) {
-      if (!isMountedRef.current) return;
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      if (isMountedRef.current) setLoading(false);
-    }
+  const fetchModels = useCallback(() => {
+    return getAiModels()
+      .then((nextModels) => {
+        if (!isMountedRef.current) return;
+        setModels(nextModels);
+        originalModelsRef.current = nextModels;
+        setError(null);
+      })
+      .catch((e) => {
+        if (!isMountedRef.current) return;
+        setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (isMountedRef.current) setLoading(false);
+      });
   }, []);
+
+  const load = useCallback(
+    (showLoading = true) => {
+      if (showLoading && isMountedRef.current) setLoading(true);
+      if (isMountedRef.current) setError(null);
+      return fetchModels();
+    },
+    [fetchModels],
+  );
 
   const { handleModelUpdate, handleToggleActive, handleTierChange, handleSetSystemDefault } =
     useAiModelActions({
@@ -58,11 +67,11 @@ export default function AiModels() {
 
   useEffect(() => {
     isMountedRef.current = true;
-    void load();
+    void fetchModels();
     return () => {
       isMountedRef.current = false;
     };
-  }, [load]);
+  }, [fetchModels]);
 
   const handlePreviewClick = useCallback(async () => {
     setPreviewData(null);

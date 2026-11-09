@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { UserAdmin, UserRole, UserStatus } from "@/api/admin";
 import { getUsers, patchUserRole, suspendUser, unsuspendUser, deleteUser } from "@/api/admin";
 import { UsersContent } from "./UsersContent";
@@ -26,9 +26,11 @@ export default function Users() {
   const pageRef = useRef(page);
   const searchRef = useRef(search);
   const statusFilterRef = useRef(statusFilter);
-  pageRef.current = page;
-  searchRef.current = search;
-  statusFilterRef.current = statusFilter;
+  useLayoutEffect(() => {
+    pageRef.current = page;
+    searchRef.current = search;
+    statusFilterRef.current = statusFilter;
+  }, [page, search, statusFilter]);
 
   const load = useCallback(
     async (showLoading = true) => {

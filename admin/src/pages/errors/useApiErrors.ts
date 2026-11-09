@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   ApiErrorRow,
   ApiErrorSeverity,
@@ -168,6 +168,17 @@ export function useApiErrors(params: UseApiErrorsParams = {}): UseApiErrorsResul
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [streamConnected, setStreamConnected] = useState(false);
+  const [previousParams, setPreviousParams] = useState({ status, severity, limit, offset });
+
+  if (
+    previousParams.status !== status ||
+    previousParams.severity !== severity ||
+    previousParams.limit !== limit ||
+    previousParams.offset !== offset
+  ) {
+    setPreviousParams({ status, severity, limit, offset });
+    setLoading(true);
+  }
 
   const isMountedRef = useRef(true);
   const latestRequestRef = useRef(0);
@@ -177,32 +188,30 @@ export function useApiErrors(params: UseApiErrorsParams = {}): UseApiErrorsResul
   // current value without forcing the SSE effect to tear down + reconnect on
   // every filter change.
   const filterRef = useRef({ status, severity });
-  filterRef.current = { status, severity };
+  useLayoutEffect(() => {
+    filterRef.current = { status, severity };
+  }, [status, severity]);
 
-  const load = useCallback(
-    async (showLoading: boolean) => {
-      const requestId = ++latestRequestRef.current;
-      if (showLoading && isMountedRef.current) setLoading(true);
-      try {
-        const result = await getApiErrors({ status, severity, limit, offset });
+  const load = useCallback(() => {
+    const requestId = ++latestRequestRef.current;
+    return getApiErrors({ status, severity, limit, offset })
+      .then((result) => {
         if (!isMountedRef.current || requestId !== latestRequestRef.current) return;
         setData(result);
         setError(null);
-      } catch (e) {
+      })
+      .catch((e) => {
         if (!isMountedRef.current || requestId !== latestRequestRef.current) return;
         setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        if (isMountedRef.current && requestId === latestRequestRef.current) {
-          setLoading(false);
-        }
-      }
-    },
-    [status, severity, limit, offset],
-  );
+      })
+      .finally(() => {
+        if (isMountedRef.current && requestId === latestRequestRef.current) setLoading(false);
+      });
+  }, [status, severity, limit, offset]);
 
   useEffect(() => {
     isMountedRef.current = true;
-    void load(true);
+    void load();
     return () => {
       isMountedRef.current = false;
     };
@@ -317,12 +326,12 @@ export function useApiErrors(params: UseApiErrorsParams = {}): UseApiErrorsResul
     if (streamConnected) return;
     const tick = () => {
       if (typeof document !== "undefined" && document.hidden) return;
-      void load(false);
+      void load();
     };
     const id = window.setInterval(tick, intervalMs);
     const onVisible = () => {
       if (typeof document !== "undefined" && !document.hidden) {
-        void load(false);
+        void load();
       }
     };
     document.addEventListener("visibilitychange", onVisible);
@@ -332,7 +341,7 @@ export function useApiErrors(params: UseApiErrorsParams = {}): UseApiErrorsResul
     };
   }, [intervalMs, load, streamConnected]);
 
-  const refetch = useCallback(() => load(false), [load]);
+  const refetch = useCallback(() => load(), [load]);
 
   return {
     errors: data?.errors ?? [],
