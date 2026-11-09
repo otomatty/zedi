@@ -16,6 +16,16 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+      # メジャー更新でも、同じ版が必要なものは 1 本の PR にまとめる。
+      # @vitest/coverage-v8 は同じ版の vitest、@stryker-mutator/vitest-runner は
+      # 同じ版の @stryker-mutator/core を要求する（#1173、#1169）。
+      # Group major updates that must stay on the same version into one PR.
+      # @vitest/coverage-v8 requires the same vitest version; @stryker-mutator/vitest-runner
+      # requires the same @stryker-mutator/core version (#1173, #1169).
+      vitest:
+        patterns: ["vitest", "@vitest/*"]
+      stryker:
+        patterns: ["@stryker-mutator/*"]
     open-pull-requests-limit: 10
     labels: [dependencies]
     # ESLint 10: wait until typescript-eslint and plugins support it (closed PR #407).
@@ -23,6 +33,93 @@ updates:
     ignore:
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
+      # @eslint/js 10 は eslint 10 を要求するので、eslint と一緒に上げる（#1168）。
+      # @eslint/js 10 requires eslint 10; upgrade them together (#1168).
+      - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
+      # ルートの TypeScript は旧フロントの型チェックと、app/ を含むリポジトリ全体の
+      # typescript-eslint が使う。7 にすると CI の Type Check・Lint・Mutation が落ちる（#1167）。
+      # app/ は独自の package.json ですでに TypeScript 7 を使っている。
+      # Root TypeScript serves legacy frontend type checks and repository-wide typescript-eslint,
+      # including app/. Version 7 breaks CI Type Check, Lint and Mutation (#1167).
+      # app/ already uses TypeScript 7 through its own package.json.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # 旧フロント（src/・admin/・packages/ui）は作り直しの参照用で、ドメイン切替時に削除する。
+      # メジャー更新は追わず、minor と patch は minor-and-patch で続ける。
+      # リポジトリ共通の道具（eslint のプラグイン、typescript-eslint、prettier、commitlint、
+      # husky、lint-staged、knip、vitest、stryker、playwright）は app/ にも効くので除外する。
+      # Sentry 11（#1166）と jsdom 30（#1171）のメジャー更新を閉じた経緯を反映する。
+      # The legacy frontend (src/, admin/, packages/ui) stays only as a rebuild reference
+      # and will be removed at domain cutover. Skip majors; keep minors and patches in minor-and-patch.
+      # Repository-wide tools (eslint plugins, typescript-eslint, prettier, commitlint, husky,
+      # lint-staged, knip, vitest, stryker, playwright) also serve app/, so exclude them from this list.
+      # This follows the closed major updates for Sentry 11 (#1166) and jsdom 30 (#1171).
+      # ランタイム依存。
+      # Runtime dependencies.
+      - { dependency-name: "@anthropic-ai/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@dagrejs/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@google/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@hocuspocus/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@hookform/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@mozilla/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@radix-ui/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@sentry/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@tanstack/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@tiptap/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@xyflow/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: baseline-browser-mapping, update-types: [version-update:semver-major] }
+      - { dependency-name: "better-auth", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "caniuse-lite", update-types: ["version-update:semver-major"] }
+      - { dependency-name: class-variance-authority, update-types: [version-update:semver-major] }
+      - { dependency-name: "clsx", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "cmdk", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "date-fns", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "dompurify", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "embla-carousel-react", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "highlight.js", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "html2pdf.js", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "i18next*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "idb-keyval", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "input-otp", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "katex", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "lowlight", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "lucide-react", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "mermaid", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "next-themes", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "openai", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "react*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "recharts", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "rehype-*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "remark-*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "sonner", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "sql.js", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "tailwind-merge", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "tailwindcss-animate", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "tesseract.js", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "vaul", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "vite-plugin-*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "y-*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "yjs", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "zod", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "zustand", update-types: ["version-update:semver-major"] }
+      # 旧フロントのビルド・テスト依存。
+      # Legacy frontend build and test dependencies.
+      - { dependency-name: "@tailwindcss/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "tailwindcss", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "postcss", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@vitejs/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "vite", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@testing-library/*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "jsdom", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "happy-dom", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "fake-indexeddb", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@types/react*", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@types/sql.js", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "@types/pg", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "pg", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "lib0", update-types: ["version-update:semver-major"] }
+      - { dependency-name: "lovable-tagger", update-types: ["version-update:semver-major"] }
 
   # 作り直し中のアプリ。ルートのワークスペース外で、独自の bun.lock を持つ。
   # The rebuilt app. Outside the root workspace, with its own bun.lock.
@@ -37,6 +134,16 @@ updates:
         update-types: [minor, patch]
     open-pull-requests-limit: 5
     labels: [dependencies]
+    # app/patches/ のパッチは 3.0.11 専用で、package.json の patchedDependencies が版を名指しする。
+    # 上げるとパッチが当たらず、入力遅延の改善（app/docs/verification.ja.md）が消える。
+    # さらに projectionError が非公開になり、型チェックも落ちる（#1184）。
+    # パッチを新しい版向けに作り直すまでは更新を止める。
+    # The app/patches/ patch only fits 3.0.11, named explicitly in package.json's patchedDependencies.
+    # Upgrading loses the patch and its input-latency improvement (app/docs/verification.ja.md).
+    # It also makes projectionError private, breaking type checks (#1184).
+    # Skip all updates until the patch is ported to a newer version.
+    ignore:
+      - dependency-name: "@tiptap/y-tiptap"
 
   # GitHub Actions
   - package-ecosystem: github-actions
