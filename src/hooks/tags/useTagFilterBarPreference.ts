@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useNote } from "@/hooks/notes/useNoteQueries";
 import {
   getShowTagFilterBarOverride,
@@ -39,21 +39,23 @@ export function useTagFilterBarPreference(noteId: string): {
   const { note } = useNote(noteId, { allowRemote: true });
   const noteDefault = note?.showTagFilterBar ?? false;
 
-  const [userOverride, setUserOverride] = useState<boolean | undefined>(() =>
-    getShowTagFilterBarOverride(noteId),
-  );
+  const [state, setState] = useState(() => ({
+    noteId,
+    override: getShowTagFilterBarOverride(noteId),
+  }));
 
-  // ノート切替時に override を読み直す。同じ noteId のままなら state を維持する。
-  // Re-read the override whenever the noteId changes; keep state otherwise so
-  // the same tab does not flicker between renders.
-  useEffect(() => {
-    setUserOverride(getShowTagFilterBarOverride(noteId));
-  }, [noteId]);
+  // ノートが切り替わった描画で読み直し、同じ noteId の再描画では state を保つ。
+  // Re-read during the render that switches notes; keep state for the same noteId.
+  const userOverride =
+    state.noteId === noteId ? state.override : getShowTagFilterBarOverride(noteId);
+  if (state.noteId !== noteId) {
+    setState({ noteId, override: userOverride });
+  }
 
   const setOverride = useCallback(
     (value: boolean | undefined) => {
       setShowTagFilterBarOverride(noteId, value);
-      setUserOverride(value);
+      setState({ noteId, override: value });
     },
     [noteId],
   );

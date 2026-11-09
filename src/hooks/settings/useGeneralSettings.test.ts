@@ -16,14 +16,9 @@ const mockChangeLanguage = vi.fn();
 const mockLoadGeneralSettings = vi.fn();
 const mockSaveGeneralSettings = vi.fn();
 
-// `useTheme()` / `useTranslation()` の戻り値はレンダーごとに同一参照に固定する。
-// 内部 effect の依存配列が `[setTheme, i18n]` のため、毎回新しい参照を返すと
-// effect が再実行され、テスト中の状態更新が `loadGeneralSettings` の戻り値で
-// 上書きされてしまう。
-// Stabilize hook return values across renders. The component-side effect
-// depends on `[setTheme, i18n]`, so unstable references cause it to re-run
-// after every state update and clobber the test's local mutations.
-const stableI18n = { changeLanguage: mockChangeLanguage };
+// Keep references stable so ordinary rerenders do not repeat external synchronization.
+// 通常の再描画で外部への同期を繰り返さないよう参照を固定する。
+let stableI18n = { changeLanguage: mockChangeLanguage };
 const stableTheme = { setTheme: mockSetTheme };
 
 vi.mock("next-themes", () => ({
@@ -48,11 +43,87 @@ import { useGeneralSettings } from "@/hooks/settings/useGeneralSettings";
 describe("useGeneralSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    stableI18n = { changeLanguage: mockChangeLanguage };
+    stableTheme.setTheme = mockSetTheme;
     mockLoadGeneralSettings.mockReturnValue({ ...DEFAULT_GENERAL_SETTINGS });
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("returns the initial saved settings without loading and syncs persisted theme and locale on mount", () => {
+    const initial = { ...DEFAULT_GENERAL_SETTINGS, theme: "light" as const };
+    const mounted = { ...DEFAULT_GENERAL_SETTINGS, theme: "dark" as const, locale: "en" as const };
+    mockLoadGeneralSettings.mockReturnValueOnce(initial).mockReturnValue(mounted);
+    const renders: { settings: typeof DEFAULT_GENERAL_SETTINGS; isLoading: boolean }[] = [];
+
+    const { result } = renderHook(() => {
+      const value = useGeneralSettings();
+      renders.push({ settings: value.settings, isLoading: value.isLoading });
+      return value;
+    });
+
+    expect(renders[0]).toEqual({ settings: initial, isLoading: false });
+    expect(result.current.settings).toEqual(initial);
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.isSaving).toBe(false);
+    expect(mockSetTheme).toHaveBeenCalledExactlyOnceWith("dark");
+    expect(mockChangeLanguage).toHaveBeenCalledExactlyOnceWith("en");
+    expect(mockSaveGeneralSettings).not.toHaveBeenCalled();
+  });
+
+  it("keeps edited settings on ordinary rerenders without reloading or resyncing", () => {
+    const { result, rerender } = renderHook(() => useGeneralSettings());
+    act(() => result.current.updateTheme("dark"));
+    mockLoadGeneralSettings.mockReturnValue({ ...DEFAULT_GENERAL_SETTINGS, theme: "light" });
+    mockLoadGeneralSettings.mockClear();
+    mockSetTheme.mockClear();
+    mockChangeLanguage.mockClear();
+
+    rerender();
+
+    expect(result.current.settings.theme).toBe("dark");
+    expect(result.current.isLoading).toBe(false);
+    expect(mockLoadGeneralSettings).not.toHaveBeenCalled();
+    expect(mockSetTheme).not.toHaveBeenCalled();
+    expect(mockChangeLanguage).not.toHaveBeenCalled();
+  });
+
+  it("syncs when the theme setter changes while preserving edited settings", () => {
+    const { result, rerender } = renderHook(() => useGeneralSettings());
+    act(() => result.current.updateEditorFontSize("large"));
+    const edited = result.current.settings;
+    const replacementSetTheme = vi.fn();
+    stableTheme.setTheme = replacementSetTheme;
+    const saved = { ...DEFAULT_GENERAL_SETTINGS, theme: "dark" as const, locale: "en" as const };
+    mockLoadGeneralSettings.mockReturnValue(saved);
+    mockChangeLanguage.mockClear();
+
+    rerender();
+
+    expect(result.current.settings).toEqual(edited);
+    expect(result.current.isLoading).toBe(false);
+    expect(replacementSetTheme).toHaveBeenCalledExactlyOnceWith("dark");
+    expect(mockChangeLanguage).toHaveBeenCalledExactlyOnceWith("en");
+  });
+
+  it("syncs when the language provider changes while preserving edited settings", () => {
+    const { result, rerender } = renderHook(() => useGeneralSettings());
+    act(() => result.current.updateEditorFontSize("large"));
+    const edited = result.current.settings;
+    const replacementChangeLanguage = vi.fn();
+    stableI18n = { changeLanguage: replacementChangeLanguage };
+    const saved = { ...DEFAULT_GENERAL_SETTINGS, theme: "light" as const, locale: "en" as const };
+    mockLoadGeneralSettings.mockReturnValue(saved);
+    mockSetTheme.mockClear();
+
+    rerender();
+
+    expect(result.current.settings).toEqual(edited);
+    expect(result.current.isLoading).toBe(false);
+    expect(mockSetTheme).toHaveBeenCalledExactlyOnceWith("light");
+    expect(replacementChangeLanguage).toHaveBeenCalledExactlyOnceWith("en");
   });
 
   it("loads stored settings and syncs theme + locale on mount", async () => {

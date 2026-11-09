@@ -41,6 +41,31 @@ function useCarousel() {
   return context;
 }
 
+/** Keeps scroll availability until Embla publishes an update. / Embla のスクロール可否を保持する。 */
+function createScrollStore() {
+  let snapshot = { canScrollPrev: false, canScrollNext: false };
+  return {
+    getSnapshot: () => snapshot,
+    subscribe: (api: CarouselApi, listener: () => void) => {
+      const update = () => {
+        if (!api) return;
+        const canScrollPrev = api.canScrollPrev();
+        const canScrollNext = api.canScrollNext();
+        if (snapshot.canScrollPrev !== canScrollPrev || snapshot.canScrollNext !== canScrollNext) {
+          snapshot = { canScrollPrev, canScrollNext };
+          listener();
+        }
+      };
+      update();
+      api?.on("reInit", update);
+      api?.on("select", update);
+      return () => {
+        api?.off("select", update);
+      };
+    },
+  };
+}
+
 const Carousel = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & CarouselProps
@@ -52,17 +77,16 @@ const Carousel = React.forwardRef<
     },
     plugins,
   );
-  const [canScrollPrev, setCanScrollPrev] = React.useState(false);
-  const [canScrollNext, setCanScrollNext] = React.useState(false);
-
-  const onSelect = React.useCallback((api: CarouselApi) => {
-    if (!api) {
-      return;
-    }
-
-    setCanScrollPrev(api.canScrollPrev());
-    setCanScrollNext(api.canScrollNext());
-  }, []);
+  const [scrollStore] = React.useState(createScrollStore);
+  const subscribe = React.useCallback(
+    (listener: () => void) => scrollStore.subscribe(api, listener),
+    [api, scrollStore],
+  );
+  const { canScrollPrev, canScrollNext } = React.useSyncExternalStore(
+    subscribe,
+    scrollStore.getSnapshot,
+    scrollStore.getSnapshot,
+  );
 
   const scrollPrev = React.useCallback(() => {
     api?.scrollPrev();
@@ -92,20 +116,6 @@ const Carousel = React.forwardRef<
 
     setApi(api);
   }, [api, setApi]);
-
-  React.useEffect(() => {
-    if (!api) {
-      return;
-    }
-
-    onSelect(api);
-    api.on("reInit", onSelect);
-    api.on("select", onSelect);
-
-    return () => {
-      api?.off("select", onSelect);
-    };
-  }, [api, onSelect]);
 
   return (
     <CarouselContext.Provider
