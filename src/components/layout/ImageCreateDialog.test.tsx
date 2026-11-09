@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AIProviderType, APIMode } from "@/types/ai";
 
@@ -240,5 +240,55 @@ describe("ImageCreateDialog", () => {
 
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:second-preview");
     expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
+  });
+
+  it("resets the preview and processing choice after a parent closes and reopens it", async () => {
+    const user = userEvent.setup();
+    const props = { onOpenChange, onCreated };
+    const { rerender } = render(<ImageCreateDialog open={true} {...props} />);
+    await advanceToPreview(user);
+    await user.click(screen.getByLabelText(/テキスト抽出/));
+
+    rerender(<ImageCreateDialog open={false} {...props} />);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:preview");
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+    rerender(<ImageCreateDialog open={true} {...props} />);
+
+    expect(screen.queryByAltText("Selected")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /キャンセル/ })).toBeEnabled();
+    await advanceToPreview(user);
+    expect(screen.getByLabelText(/画像のみ/)).toBeChecked();
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("aborts an upload on parent close and ignores its late result", async () => {
+    let finishUpload!: (url: string) => void;
+    uploadImage.mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          finishUpload = resolve;
+        }),
+    );
+    const user = userEvent.setup();
+    const props = { onOpenChange, onCreated };
+    const { rerender } = render(<ImageCreateDialog open={true} {...props} />);
+    await advanceToPreview(user);
+    await user.click(screen.getByRole("button", { name: /作成/ }));
+    expect(uploadImage).toHaveBeenCalledTimes(1);
+    const signal = uploadImage.mock.calls[0][1].signal as AbortSignal;
+    expect(signal.aborted).toBe(false);
+
+    rerender(<ImageCreateDialog open={false} {...props} />);
+    expect(signal.aborted).toBe(true);
+    await act(async () => {
+      finishUpload("https://cdn.example.com/late.webp");
+    });
+    rerender(<ImageCreateDialog open={true} {...props} />);
+
+    expect(screen.queryByAltText("Selected")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /キャンセル/ })).toBeEnabled();
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
   });
 });

@@ -12,7 +12,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { ApiErrorRow, ApiErrorStatus, GetApiErrorsResponse } from "@/api/admin";
+import type {
+  ApiErrorRow,
+  ApiErrorStatus,
+  ApiErrorSeverity,
+  GetApiErrorsResponse,
+} from "@/api/admin";
 
 // `getApiErrors` を mock してネットワーク呼び出しを避ける。
 // Mock the REST helper so the hook's bootstrap fetch returns a fixed payload.
@@ -146,6 +151,16 @@ afterEach(() => {
   // Strip our fake so the next test boots from a clean slate.
   delete (globalThis as { EventSource?: unknown }).EventSource;
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 describe("useApiErrors", () => {
   it("loads via REST and exposes the rows", async () => {
@@ -355,5 +370,152 @@ describe("useApiErrors", () => {
     });
 
     expect(result.current.errors[0]?.title).toBe("fresh");
+  });
+
+  it("keeps one SSE connection and matches both latest filters after rerender", async () => {
+    vi.mocked(getApiErrors)
+      .mockClear()
+      .mockResolvedValue({ errors: [], total: 0, limit: 50, offset: 0 });
+    const { result, rerender } = renderHook(
+      ({ status, severity }: { status: ApiErrorStatus; severity: ApiErrorSeverity }) =>
+        useApiErrors({ status, severity, limit: 50, offset: 0, intervalMs: 0 }),
+      { initialProps: { status: "open" as ApiErrorStatus, severity: "high" as ApiErrorSeverity } },
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    const connection = getInstance();
+
+    rerender({ status: "resolved", severity: "low" });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(getInstance()).toBe(connection);
+    expect(connection.closed).toBe(false);
+    expect(getApiErrors).toHaveBeenCalledTimes(2);
+    expect(getApiErrors).toHaveBeenLastCalledWith({
+      status: "resolved",
+      severity: "low",
+      limit: 50,
+      offset: 0,
+    });
+    act(() => {
+      connection.dispatch(
+        "update",
+        makePushed({ id: "wrong-status", status: "open", severity: "low" }),
+      );
+      connection.dispatch(
+        "update",
+        makePushed({ id: "wrong-severity", status: "resolved", severity: "high" }),
+      );
+    });
+    expect(result.current.errors).toEqual([]);
+    expect(result.current.total).toBe(0);
+
+    const matching = makePushed({ status: "resolved", severity: "low" });
+    act(() => connection.dispatch("update", matching));
+    expect(result.current.errors).toEqual([matching]);
+    expect(result.current.total).toBe(1);
+  });
+
+  it("sets loading for changed pagination, keeps the error until success, and uses new arguments", async () => {
+    const pending = deferred<GetApiErrorsResponse>();
+    vi.mocked(getApiErrors)
+      .mockClear()
+      .mockRejectedValueOnce(new Error("REST failed"))
+      .mockReturnValueOnce(pending.promise);
+    const { result, rerender } = renderHook(
+      ({ limit, offset }) => useApiErrors({ limit, offset, intervalMs: 0, enableStream: false }),
+      { initialProps: { limit: 50, offset: 0 } },
+    );
+    await waitFor(() => expect(result.current.error).toBe("REST failed"));
+    expect(result.current.loading).toBe(false);
+
+    rerender({ limit: 25, offset: 25 });
+    expect(result.current.loading).toBe(true);
+    expect(result.current.error).toBe("REST failed");
+    expect(getApiErrors).toHaveBeenCalledTimes(2);
+    expect(getApiErrors).toHaveBeenLastCalledWith({
+      status: undefined,
+      severity: undefined,
+      limit: 25,
+      offset: 25,
+    });
+    await act(async () => {
+      pending.resolve(FIXED_RESPONSE);
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(false);
+    expect(result.current.errors).toEqual(FIXED_RESPONSE.errors);
+  });
+
+  it("refreshes without a loading indicator and retains rows until the response", async () => {
+    const pending = deferred<GetApiErrorsResponse>();
+    vi.mocked(getApiErrors)
+      .mockClear()
+      .mockResolvedValueOnce(FIXED_RESPONSE)
+      .mockReturnValueOnce(pending.promise);
+    const { result } = renderHook(() => useApiErrors({ intervalMs: 0, enableStream: false }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let refresh!: Promise<void>;
+    act(() => {
+      refresh = result.current.refetch();
+    });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.errors).toEqual(FIXED_RESPONSE.errors);
+    expect(getApiErrors).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      pending.resolve({ errors: [], total: 0, limit: 50, offset: 0 });
+      await refresh;
+    });
+    expect(result.current.errors).toEqual([]);
+    expect(result.current.total).toBe(0);
+  });
+
+  it("ignores stale failures and their completion while a newer request is loading", async () => {
+    const old = deferred<GetApiErrorsResponse>();
+    const current = deferred<GetApiErrorsResponse>();
+    vi.mocked(getApiErrors)
+      .mockClear()
+      .mockReturnValueOnce(old.promise)
+      .mockReturnValueOnce(current.promise);
+    const { result, rerender } = renderHook(
+      ({ status }: { status: ApiErrorStatus }) =>
+        useApiErrors({ status, intervalMs: 0, enableStream: false }),
+      { initialProps: { status: "open" as ApiErrorStatus } },
+    );
+    expect(result.current.loading).toBe(true);
+    rerender({ status: "resolved" });
+
+    await act(async () => {
+      old.reject(new Error("stale failure"));
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(true);
+    await act(async () => {
+      current.resolve(FIXED_RESPONSE);
+    });
+    expect(result.current.errors).toEqual(FIXED_RESPONSE.errors);
+    expect(result.current.loading).toBe(false);
+    expect(getApiErrors).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops polling and closes the stream when unmounted with a pending request", async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = deferred<GetApiErrorsResponse>();
+      vi.mocked(getApiErrors).mockClear().mockReturnValue(pending.promise);
+      const { unmount } = renderHook(() => useApiErrors({ intervalMs: 1000 }));
+      const connection = getInstance();
+
+      unmount();
+      expect(connection.closed).toBe(true);
+      await act(async () => {
+        pending.resolve(FIXED_RESPONSE);
+        connection.dispatch("ready", "");
+        connection.dispatch("update", makePushed());
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+      expect(getApiErrors).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

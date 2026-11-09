@@ -73,15 +73,15 @@ export function useProfile(): UseProfileReturn {
     const cached = loadCachedProfile();
     return cached ?? { displayName: "", avatarUrl: "" };
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(true);
+  const isLoading = isSignedIn ? isFetching : false;
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
+  useEffect((): void => {
     if (!isSignedIn) {
-      setIsLoading(false);
       return;
     }
-    const fetchProfile = async () => {
+    const fetchProfile = async (): Promise<void> => {
       try {
         const res = await fetch(`${getApiBaseUrl()}/api/users/me`, {
           credentials: "include",
@@ -104,7 +104,7 @@ export function useProfile(): UseProfileReturn {
       } catch (error) {
         console.warn("Failed to fetch profile:", error);
       } finally {
-        setIsLoading(false);
+        setIsFetching(false);
       }
     };
     fetchProfile();

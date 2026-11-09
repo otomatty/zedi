@@ -20,9 +20,7 @@ import {
 } from "./SecondFactorViews";
 
 type Loaded =
-  | { status: "loading" }
-  | { status: "failed" }
-  | { status: "loaded"; methods: SecondFactorMethods };
+  { status: "loading" } | { status: "failed" } | { status: "loaded"; methods: SecondFactorMethods };
 
 /** A change waiting for the user to say yes. */
 type Confirming = { kind: "passkey"; id: string } | { kind: "totp" } | null;

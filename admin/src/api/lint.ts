@@ -5,12 +5,7 @@ import { adminFetch, getErrorMessage } from "./client";
  * Lint rule name type.
  */
 export type LintRule =
-  | "orphan"
-  | "ghost_many"
-  | "title_similar"
-  | "conflict"
-  | "broken_link"
-  | "stale";
+  "orphan" | "ghost_many" | "title_similar" | "conflict" | "broken_link" | "stale";
 
 /**
  * Lint 重要度の型。

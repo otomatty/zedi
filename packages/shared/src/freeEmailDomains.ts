@@ -77,9 +77,7 @@ export const FREE_EMAIL_DOMAINS: ReadonlySet<string> = new Set([
  * map them to HTTP status codes or user-facing messages.
  */
 export type DomainValidationError =
-  | { kind: "empty" }
-  | { kind: "invalid_format" }
-  | { kind: "free_email"; domain: string };
+  { kind: "empty" } | { kind: "invalid_format" } | { kind: "free_email"; domain: string };
 
 /**
  * ドメイン入力を正規化した結果。成功時は小文字・`@` 無しのドメイン文字列、
@@ -89,8 +87,7 @@ export type DomainValidationError =
  * string or a {@link DomainValidationError}.
  */
 export type DomainValidationResult =
-  | { ok: true; domain: string }
-  | { ok: false; error: DomainValidationError };
+  { ok: true; domain: string } | { ok: false; error: DomainValidationError };
 
 /**
  * RFC 1035 ベースのラフなドメイン検証。IDN / punycode は将来対応。

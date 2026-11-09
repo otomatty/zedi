@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type JSX } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Badge,
@@ -64,7 +64,7 @@ function formatDetail(entry: ActivityEntry): string {
  * 管理画面「活動ログ」ページ。`__index__` 再構築ボタンも備える。
  * Admin Activity Log page.
  */
-export default function ActivityLog() {
+export default function ActivityLog(): JSX.Element {
   const { t } = useTranslation();
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [total, setTotal] = useState(0);
@@ -83,21 +83,21 @@ export default function ActivityLog() {
   // request resolves.
   const requestIdRef = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback((): Promise<void> => {
     const requestId = ++requestIdRef.current;
-    if (mountedRef.current) setLoading(true);
-    if (mountedRef.current) setError(null);
-    try {
-      const result = await listActivity({ kind: kindFilter, actor: actorFilter, limit: 100 });
-      if (!mountedRef.current || requestId !== requestIdRef.current) return;
-      setEntries(result.entries);
-      setTotal(result.total);
-    } catch (e) {
-      if (!mountedRef.current || requestId !== requestIdRef.current) return;
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      if (mountedRef.current && requestId === requestIdRef.current) setLoading(false);
-    }
+    return listActivity({ kind: kindFilter, actor: actorFilter, limit: 100 })
+      .then((result): void => {
+        if (!mountedRef.current || requestId !== requestIdRef.current) return;
+        setEntries(result.entries);
+        setTotal(result.total);
+      })
+      .catch((e): void => {
+        if (!mountedRef.current || requestId !== requestIdRef.current) return;
+        setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally((): void => {
+        if (mountedRef.current && requestId === requestIdRef.current) setLoading(false);
+      });
   }, [kindFilter, actorFilter]);
 
   useEffect(() => {
@@ -108,14 +108,34 @@ export default function ActivityLog() {
     };
   }, [load]);
 
-  const onKind = (v: string) => setKindFilter(v === ANY ? undefined : (v as ActivityKind));
-  const onActor = (v: string) => setActorFilter(v === ANY ? undefined : (v as ActivityActor));
+  const onKind = (v: string): void => {
+    const kind = v === ANY ? undefined : (v as ActivityKind);
+    if (kind === kindFilter) return;
+    setLoading(true);
+    setError(null);
+    setKindFilter(kind);
+  };
+  const onActor = (v: string): void => {
+    const actor = v === ANY ? undefined : (v as ActivityActor);
+    if (actor === actorFilter) return;
+    setLoading(true);
+    setError(null);
+    setActorFilter(actor);
+  };
 
   return (
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold">{t("activityLog.title")}</h1>
-        <Button type="button" onClick={() => void load()} disabled={loading}>
+        <Button
+          type="button"
+          onClick={(): void => {
+            setLoading(true);
+            setError(null);
+            void load();
+          }}
+          disabled={loading}
+        >
           {loading ? t("common.loading") : t("common.reload")}
         </Button>
       </div>

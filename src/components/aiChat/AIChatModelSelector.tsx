@@ -5,7 +5,8 @@ import { useAIChatStore } from "../../stores/aiChatStore";
 import { fetchServerModels } from "../../lib/aiService";
 import { getSonnetBaseline, formatCostMultiplierLabel } from "../../lib/aiCostUtils";
 import { loadAISettings } from "../../lib/aiSettings";
-import type { AIModel, AIProviderType } from "../../types/ai";
+import type { JSX } from "react";
+import type { AIModel, AIProviderType, AISettings } from "../../types/ai";
 import { getInteractionMode } from "../../types/ai";
 import { cn } from "@zedi/ui";
 import { resolveServerInitialSelection } from "../../lib/resolveServerModel";
@@ -19,6 +20,12 @@ interface DisplayModel {
   outputCostUnits?: number;
 }
 
+interface ModelLoadResult {
+  settings: AISettings | null;
+  models: AIModel[];
+  systemDefaultModelId: string | null;
+}
+
 /**
  * Chat-panel model selector. Behaviour varies by interaction mode:
  * - default: shows all available server models
@@ -26,69 +33,78 @@ interface DisplayModel {
  *
  * チャットパネルのモデルセレクター。利用モードに応じて動作が変わる。
  */
-export function AIChatModelSelector() {
+export function AIChatModelSelector(): JSX.Element {
   const { t } = useTranslation();
   const { setSelectedModel, isStreaming } = useAIChatStore();
   const [models, setModels] = useState<DisplayModel[]>([]);
   const [serverAIModels, setServerAIModels] = useState<AIModel[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const loadModels = useCallback(async () => {
-    setLoading(true);
-    try {
+  useEffect((): (() => void) => {
+    let cancelled = false;
+    const loadModels = async (): Promise<ModelLoadResult> => {
       const settings = await loadAISettings();
-      const currentMode = settings ? getInteractionMode(settings) : "default";
+      const serverModels = await fetchServerModels();
+      return { settings, ...serverModels };
+    };
 
-      const { models: serverModels, systemDefaultModelId } = await fetchServerModels();
-      let available = serverModels.filter((m) => m.available);
-      if (currentMode === "user_api_key" && settings) {
-        available = available.filter((m) => m.provider === settings.provider);
-      }
-      setServerAIModels(available);
-      setModels(
-        available.map((m) => ({
-          id: m.id,
-          provider: m.provider,
-          modelId: m.modelId,
-          displayName: m.displayName,
-          inputCostUnits: m.inputCostUnits,
-          outputCostUnits: m.outputCostUnits,
-        })),
-      );
-
-      const current = useAIChatStore.getState().selectedModel;
-      if (available.length === 0) {
-        setSelectedModel(null);
-      } else {
-        const initial = resolveServerInitialSelection(
-          available,
-          current,
-          settings?.modelId,
-          systemDefaultModelId,
-        );
-        if (initial) {
-          setSelectedModel({
-            id: initial.id,
-            provider: initial.provider,
-            model: initial.modelId,
-            displayName: initial.displayName,
-            inputCostUnits: initial.inputCostUnits,
-            outputCostUnits: initial.outputCostUnits,
-          });
+    void loadModels()
+      .then(({ settings, models: serverModels, systemDefaultModelId }): void => {
+        if (cancelled) return;
+        const currentMode = settings ? getInteractionMode(settings) : "default";
+        let available = serverModels.filter((m): boolean => m.available);
+        if (currentMode === "user_api_key" && settings) {
+          available = available.filter((m): boolean => m.provider === settings.provider);
         }
-      }
-    } catch {
-      // fallback: use settings model
-    } finally {
-      setLoading(false);
-    }
-  }, [setSelectedModel]);
+        setServerAIModels(available);
+        setModels(
+          available.map((m): DisplayModel => ({
+            id: m.id,
+            provider: m.provider,
+            modelId: m.modelId,
+            displayName: m.displayName,
+            inputCostUnits: m.inputCostUnits,
+            outputCostUnits: m.outputCostUnits,
+          })),
+        );
 
-  useEffect(() => {
-    loadModels();
-  }, [loadModels]);
+        const current = useAIChatStore.getState().selectedModel;
+        if (available.length === 0) {
+          setSelectedModel(null);
+        } else {
+          const initial = resolveServerInitialSelection(
+            available,
+            current,
+            settings?.modelId,
+            systemDefaultModelId,
+          );
+          if (initial) {
+            setSelectedModel({
+              id: initial.id,
+              provider: initial.provider,
+              model: initial.modelId,
+              displayName: initial.displayName,
+              inputCostUnits: initial.inputCostUnits,
+              outputCostUnits: initial.outputCostUnits,
+            });
+          }
+        }
+      })
+      .catch((): void => {
+        if (cancelled) return;
+        // fallback: use settings model
+      })
+      .finally((): void => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+
+    return (): void => {
+      cancelled = true;
+    };
+  }, [setSelectedModel]);
 
   useEffect(() => {
     if (!open) return;

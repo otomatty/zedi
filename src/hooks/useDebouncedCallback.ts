@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from "react";
+import { useCallback, useRef, useEffect, useLayoutEffect } from "react";
 
 /**
  * Returns a stable function that, when called, invokes the latest callback
@@ -11,7 +11,9 @@ export function useDebouncedCallback<T extends (...args: unknown[]) => void>(
   const callbackRef = useRef(callback);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  callbackRef.current = callback;
+  useLayoutEffect((): void => {
+    callbackRef.current = callback;
+  }, [callback]);
 
   useEffect(() => {
     return () => {

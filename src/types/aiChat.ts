@@ -61,10 +61,7 @@ export interface ChatTreeState {
 
 /** AI がプロアクティブに提案するアクション */
 export type ChatAction =
-  | CreatePageAction
-  | AppendToPageAction
-  | CreateMultiplePagesAction
-  | SuggestWikiLinksAction;
+  CreatePageAction | AppendToPageAction | CreateMultiplePagesAction | SuggestWikiLinksAction;
 
 /**
  * Proposes creating a single new page from chat (Markdown body + optional outline for staged generation).

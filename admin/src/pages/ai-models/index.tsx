@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type JSX } from "react";
 import { useTranslation } from "react-i18next";
 import type { AiModelAdmin, SyncPreviewResult, SyncResultItem } from "@/api/admin";
 import { getAiModels, previewSyncAiModels, syncAiModels as syncAiModelsApi } from "@/api/admin";
@@ -10,7 +10,7 @@ import { useAiModelsDragReorder } from "./useAiModelsDragReorder";
  * AI モデル管理ページのコンテナコンポーネント。
  * Container component for the admin AI models page.
  */
-export default function AiModels() {
+export default function AiModels(): JSX.Element {
   const { t } = useTranslation();
   const [models, setModels] = useState<AiModelAdmin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,22 +23,31 @@ export default function AiModels() {
   const isMountedRef = useRef(true);
   const originalModelsRef = useRef<AiModelAdmin[]>([]);
 
-  const load = useCallback(async (showLoading = true) => {
-    if (showLoading && isMountedRef.current) setLoading(true);
-    if (isMountedRef.current) setError(null);
-    try {
-      const nextModels = await getAiModels();
-      if (!isMountedRef.current) return;
-      setModels(nextModels);
-      originalModelsRef.current = nextModels;
-      setError(null);
-    } catch (e) {
-      if (!isMountedRef.current) return;
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      if (isMountedRef.current) setLoading(false);
-    }
+  const fetchModels = useCallback((): Promise<void> => {
+    return getAiModels()
+      .then((nextModels): void => {
+        if (!isMountedRef.current) return;
+        setModels(nextModels);
+        originalModelsRef.current = nextModels;
+        setError(null);
+      })
+      .catch((e): void => {
+        if (!isMountedRef.current) return;
+        setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally((): void => {
+        if (isMountedRef.current) setLoading(false);
+      });
   }, []);
+
+  const load = useCallback(
+    (showLoading = true): Promise<void> => {
+      if (showLoading && isMountedRef.current) setLoading(true);
+      if (isMountedRef.current) setError(null);
+      return fetchModels();
+    },
+    [fetchModels],
+  );
 
   const { handleModelUpdate, handleToggleActive, handleTierChange, handleSetSystemDefault } =
     useAiModelActions({
@@ -56,13 +65,13 @@ export default function AiModels() {
     load,
   });
 
-  useEffect(() => {
+  useEffect((): (() => void) => {
     isMountedRef.current = true;
-    void load();
+    void fetchModels();
     return () => {
       isMountedRef.current = false;
     };
-  }, [load]);
+  }, [fetchModels]);
 
   const handlePreviewClick = useCallback(async () => {
     setPreviewData(null);

@@ -513,6 +513,25 @@ describe("TagExtension input rule", () => {
       }
     });
 
+    it("marks the tag and inserts a newline when Enter confirms it", () => {
+      const editor = makeEditor("<p>#tech</p>");
+      try {
+        editor.commands.setTextSelection(6);
+        const { view } = editor;
+
+        const handled = view.someProp("handleKeyDown", (handler) =>
+          handler(view, new KeyboardEvent("keydown", { key: "Enter" })),
+        );
+
+        expect(handled).toBe(true);
+        expect(editor.state.doc.textContent).toBe("#tech\n");
+        expect(editor.getHTML()).toContain('data-name="tech"');
+        expect(editor.getHTML()).toContain("data-tag");
+      } finally {
+        editor.destroy();
+      }
+    });
+
     it("preserves the user-typed terminator after applying the mark", () => {
       // `markInputRule` は終端文字を削除してしまうため独自ハンドラを使った。
       // 終端文字（空白）が消えていないことを後置確認する。

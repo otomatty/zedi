@@ -6,6 +6,11 @@ import Users from "./index";
 import * as adminApi from "@/api/admin";
 import type { UserAdmin } from "@/api/admin";
 
+vi.mock("@/api/admin", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/admin")>()),
+  getUsers: vi.fn(),
+}));
+
 const selectCallbacks: Map<string, (v: string) => void> = new Map();
 
 vi.mock("@zedi/ui", () => {
@@ -163,6 +168,16 @@ const singleActiveUser: UserAdmin = {
 
 function mockListResponse(users: UserAdmin[] = [singleActiveUser], total = users.length) {
   return vi.spyOn(adminApi, "getUsers").mockResolvedValue({ users, total });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
 describe("Users (admin)", () => {
@@ -461,5 +476,118 @@ describe("Users (admin)", () => {
     await waitFor(() => {
       expect(screen.getByText("delete failed")).toBeInTheDocument();
     });
+  });
+
+  it("reloads with the latest search, status, and page after a pending role change completes", async () => {
+    vi.useFakeTimers();
+    const getUsers = mockListResponse([singleActiveUser], 100);
+    const pending = deferred<Awaited<ReturnType<typeof adminApi.patchUserRole>>>();
+    const patchUserRole = vi.spyOn(adminApi, "patchUserRole").mockReturnValue(pending.promise);
+    render(<Users />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => {
+      selectCallbacks.get("user")?.("admin");
+    });
+    fireEvent.click(screen.getByRole("button", { name: "変更する" }));
+    expect(patchUserRole).toHaveBeenCalledWith("user-1", "admin");
+    fireEvent.change(screen.getByLabelText("メールで検索"), { target: { value: " alice " } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    act(() => {
+      selectCallbacks.get("all")?.("suspended");
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "次へ" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getUsers).toHaveBeenLastCalledWith({
+      search: "alice",
+      status: "suspended",
+      limit: 50,
+      offset: 50,
+    });
+    expect(getUsers).toHaveBeenCalledTimes(4);
+
+    await act(async () => {
+      pending.resolve({ user: { ...singleActiveUser, role: "admin" } });
+    });
+
+    expect(getUsers).toHaveBeenCalledTimes(5);
+    expect(getUsers).toHaveBeenLastCalledWith({
+      search: "alice",
+      status: "suspended",
+      limit: 50,
+      offset: 50,
+    });
+  });
+
+  it.each([
+    {
+      outcome: "success",
+      complete: (
+        request: ReturnType<typeof deferred<Awaited<ReturnType<typeof adminApi.getUsers>>>>,
+      ) =>
+        request.resolve({ users: [{ ...singleActiveUser, email: "stale@example.com" }], total: 1 }),
+    },
+    {
+      outcome: "failure",
+      complete: (
+        request: ReturnType<typeof deferred<Awaited<ReturnType<typeof adminApi.getUsers>>>>,
+      ) => request.reject(new Error("stale users failure")),
+    },
+  ])("ignores stale $outcome while a newer status request is loading", async ({ complete }) => {
+    const old = deferred<Awaited<ReturnType<typeof adminApi.getUsers>>>();
+    const current = deferred<Awaited<ReturnType<typeof adminApi.getUsers>>>();
+    const getUsers = vi
+      .spyOn(adminApi, "getUsers")
+      .mockReturnValueOnce(old.promise)
+      .mockReturnValueOnce(current.promise);
+    render(<Users />);
+    expect(screen.getByText("読み込み中...")).toBeInTheDocument();
+    act(() => {
+      selectCallbacks.get("all")?.("suspended");
+    });
+
+    await act(async () => {
+      complete(old);
+    });
+    expect(screen.getByText("読み込み中...")).toBeInTheDocument();
+    expect(screen.queryByText("stale@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByText("stale users failure")).not.toBeInTheDocument();
+    await act(async () => {
+      current.resolve({ users: [singleActiveUser], total: 1 });
+    });
+    expect(screen.getByText("user@example.com")).toBeInTheDocument();
+    expect(getUsers).toHaveBeenCalledTimes(2);
+    expect(getUsers).toHaveBeenLastCalledWith({
+      search: undefined,
+      status: "suspended",
+      limit: 50,
+      offset: 0,
+    });
+  });
+
+  it("cancels a pending search debounce when unmounted", async () => {
+    vi.useFakeTimers();
+    const getUsers = mockListResponse();
+    const { unmount } = render(<Users />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.change(screen.getByLabelText("メールで検索"), { target: { value: "alice" } });
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(getUsers).toHaveBeenCalledTimes(1);
   });
 });
