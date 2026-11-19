@@ -232,3 +232,11 @@ CI（`.github/workflows/ci.yml`）の `app-test` が型チェック・単体テ�
 - オンラインに戻るとページが作成され、ローカル複製のない別ブラウザからも本文が見えること
 - サインアウトと、それに伴う API キャッシュ・ページのローカル複製の削除
 - ページエラーがないこと
+
+### Mutation テスト
+
+- `bun run test:mutation` は対象全体を実行します（約 10 分）。
+- `bun run test:mutation:changed` は変わったファイルのうち対象だけを実行します。`STRYKER_DIFF_BASE=main` でブランチと `main` の差分を対象にできます。
+- `bun run mutation:report:summary` は結果の Markdown 要約を生成します。
+
+Stryker は単体テストでミュータントを判定します。workerd の統合テストでは Stryker がミュータントを判定できません。統合テストやブラウザのスモークテストでしか守られていないファイルは `scripts/mutation/targets.mjs` の一覧で対象外にしています。スコアは結果の確認に使い、実行の成否には影響しません。

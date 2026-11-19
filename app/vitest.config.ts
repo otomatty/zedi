@@ -11,7 +11,8 @@ export default defineConfig({
     jsx: { runtime: "automatic", importSource: "hono/jsx/dom" },
   },
   test: {
-    include: ["src/**/*.test.{ts,tsx}"],
+    // Script unit tests also run in Node.
+    include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.mjs"],
     // *.worker.test.ts run inside workerd via vitest.config.worker.ts.
     exclude: ["src/**/*.worker.test.ts"],
     environment: "node",
