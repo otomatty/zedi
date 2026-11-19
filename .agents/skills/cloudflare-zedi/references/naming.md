@@ -44,6 +44,7 @@
 ## GitHub の変数・Secrets / GitHub vars & secrets
 
 GitHub Environments は `staging` と `production` を使う。旧 Environment `development` は運用対象外。
+両方の Environment で、デプロイできるブランチを `main` のみに制限する。
 
 - **Secrets** `CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` を各 Environment に設定する。
 - **任意の変数** `APP_URL` を設定すると、デプロイ後にその URL を確認する。

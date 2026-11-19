@@ -1,5 +1,6 @@
 # app/ の Worker を選んだ環境に手動デプロイする。
 # Manually deploy the app/ Worker to the selected environment.
+# staging・本番ともに main からのみ実行する。 / Run from main only for both staging and production.
 name: Deploy
 
 on:
@@ -35,12 +36,18 @@ jobs:
     env:
       TARGET_ENV: ${{ inputs.environment }}
     steps:
-      # 本番は main からだけ。staging はどのブランチからでもデプロイできる。
-      # Production requires main. Staging can deploy from any branch.
-      - name: Require main for production
-        if: inputs.environment == 'production' && github.ref != 'refs/heads/main'
+      # staging・本番ともに main からのみデプロイする。この検査は入力ミスを早く知らせるために使う。
+      # ブランチ側でこの検査を削除できるため、GitHub の staging と production の Environment で
+      # デプロイできるブランチを main のみに制限する。Cloudflare の API トークンはアカウント共通で、
+      # staging の Secrets にあるトークンでも本番の Worker と D1 を操作できる。
+      # Both staging and production deploy from main only. This check catches an incorrect ref early.
+      # A branch can remove this check, so enforce main-only deployments in both GitHub environments,
+      # staging and production. The Cloudflare API token is account-scoped, so the token in staging
+      # secrets can also modify the production Worker and D1 database.
+      - name: Require main
+        if: github.ref != 'refs/heads/main'
         run: |
-          echo "::error::Production deploys only run from main (got ${GITHUB_REF})."
+          echo "::error::Deploys only run from main (got ${GITHUB_REF})."
           exit 1
 
       # 本番には同じコミットの staging 成功が必要。ジョブの environment が自動で記録する GitHub Deployments で確認する。

@@ -121,7 +121,7 @@ e2e/                 # Playwright
 
 - ルート `workspaces` は **`packages/*` と `admin` のみ**。`app/` は **workspace 外**（独自の `bun.lock`）→ `cd app && bun install`。
 - CI: ルートは lint / typecheck / test / build / E2E。`app/` は `app-test`（型チェック・単体・workerd 統合・ビルド）と `app-smoke`（ブラウザのスモークテスト）。
-- **デプロイ**: `deploy.yml` を手動で実行して `app/` をデプロイする。本番は `main` から実行し、同じコミットの staging デプロイが成功済みで、GitHub の Environment `production` の承認を受けた場合だけ実行できる。旧バックエンドとそのデプロイ（Railway・dev の API / MCP Worker）、現行フロント / admin のデプロイ（`deploy-dev.yml` / `deploy-prod.yml`）は削除済み。
+- **デプロイ**: staging・本番ともに `main` から `deploy.yml` を手動で実行して `app/` をデプロイする。本番は同じコミットの staging デプロイが成功済みで、GitHub の Environment `production` の承認を受けた場合だけ実行できる。旧バックエンドとそのデプロイ（Railway・dev の API / MCP Worker）、現行フロント / admin のデプロイ（`deploy-dev.yml` / `deploy-prod.yml`）は削除済み。
 
 ### `@zedi/shared` / Shared constants
 

@@ -42,8 +42,8 @@ Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in know
   スモークテスト）は GitHub Actions。デプロイは [`deploy.yml`](../../../.github/workflows/deploy.yml) を
   手動で実行し、`staging` または `production` を選ぶ。型チェック、テスト、ビルドの順に実行し、
   `wrangler d1 migrations apply DB --env <env> --remote`、`wrangler deploy --env <env>` の順で反映する。
-  staging は任意のブランチから実行できる。本番は `main` から、同じコミットの staging デプロイが成功済みの場合だけ実行できる。
-  _GitHub Actions runs quality gates and dispatches Wrangler deployments to the selected environment._
+  staging・本番ともに `main` からのみ実行できる。本番には同じコミットの staging デプロイの成功と Environment `production` の承認が必要。
+  _GitHub Actions runs quality gates and dispatches Wrangler deployments to the selected environment from `main` only._
 - Durable Objects を持つ Worker では次の制約を前提に設計する（数値・仕様はデプロイ前に公式で再確認）:
   - バージョン URL（プレビュー URL）が作られない。
   - 段階デプロイでは各 DO が 1 つのバージョンに固定される。
@@ -71,6 +71,8 @@ Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in know
    必要スコープは [references/token-scopes.md](references/token-scopes.md)。
 3. GitHub の Environment `staging` と `production` にそれぞれ
    `CLOUDFLARE_API_TOKEN`（`zedi-github-deploy`）と `CLOUDFLARE_ACCOUNT_ID` を Secrets として設定する。
+   両方の Environment で、デプロイできるブランチを `main` のみに制限する。Cloudflare の API トークンは
+   アカウント共通で、staging の Secrets にあるトークンでも本番の Worker と D1 を操作できるため。
    デプロイ後の確認を有効にするには変数 `APP_URL` を設定する。Cloudflare Access 用の
    `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` は任意の Secrets。
 
