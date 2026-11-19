@@ -32,6 +32,36 @@ describe("createPageOutbox", () => {
     expect(reloaded.get("a")).toEqual(page("a"));
   });
 
+  it("keeps pages added by both tabs before either reloads", () => {
+    const storage = memoryStorage();
+    const first = outboxWith(storage);
+    const second = outboxWith(storage);
+    first.all();
+    second.all();
+
+    first.add(page("a"));
+    second.add(page("b"));
+
+    expect(outboxWith(storage).all()).toEqual([page("a"), page("b")]);
+    expect(second.all()).toEqual([page("a"), page("b")]);
+  });
+
+  it("keeps another tab's pending page when a flush removes an accepted page", async () => {
+    const storage = memoryStorage();
+    const first = outboxWith(storage);
+    first.add(page("a"));
+    const second = outboxWith(storage);
+    second.all();
+    first.add(page("b"));
+
+    const result = await second.flush(async (p) => {
+      if (p.id === "b") throw new TypeError("Failed to fetch");
+    });
+
+    expect(result).toEqual({ sent: [page("a")], refused: [] });
+    expect(outboxWith(storage).all()).toEqual([page("b")]);
+  });
+
   it("sends pending pages in order and removes the ones the server accepted", async () => {
     const outbox = outboxWith();
     outbox.add(page("a"));
@@ -158,5 +188,21 @@ describe("createPageOutbox", () => {
     outbox.add(page("b"));
 
     expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it("notifies subscribers with the snapshot that includes another tab's addition", () => {
+    const storage = memoryStorage();
+    const first = outboxWith(storage);
+    const second = outboxWith(storage);
+    const before = second.all();
+    const snapshots: PendingPage[][] = [];
+    second.subscribe(() => void snapshots.push(second.all()));
+
+    first.add(page("a"));
+    second.add(page("b"));
+
+    expect(snapshots).toEqual([[page("a"), page("b")]]);
+    expect(second.all()).toBe(snapshots[0]);
+    expect(second.all()).not.toBe(before);
   });
 });

@@ -43,22 +43,22 @@ export function createPageOutbox(
   let cache: PendingPage[] | null = null;
   const notify = () => listeners.forEach((listener) => listener());
 
-  const read = (): PendingPage[] => {
-    if (cache) return cache;
+  const readStorage = (): PendingPage[] => {
     try {
       const parsed: unknown = JSON.parse(storage.getItem(key) ?? "[]");
-      cache = Array.isArray(parsed) ? (parsed as PendingPage[]) : [];
+      return Array.isArray(parsed) ? (parsed as PendingPage[]) : [];
     } catch {
-      cache = [];
+      return [];
     }
-    return cache;
   };
+  const read = (): PendingPage[] => (cache ??= readStorage());
   const write = (pages: PendingPage[]) => {
     storage.setItem(key, JSON.stringify(pages));
     cache = pages;
     notify();
   };
-  const remove = (id: string) => write(read().filter((p) => p.id !== id));
+  // Mutations read storage directly because another tab's storage event may still be pending.
+  const remove = (id: string) => write(readStorage().filter((p) => p.id !== id));
 
   const run = async (send: (page: PendingPage) => Promise<void>): Promise<FlushResult> => {
     const result: FlushResult = { sent: [], refused: [] };
@@ -85,7 +85,7 @@ export function createPageOutbox(
     all: read,
     list: (noteId?: string) => read().filter((p) => noteId === undefined || p.noteId === noteId),
     get: (id: string) => read().find((p) => p.id === id),
-    add: (page: PendingPage) => write([...read().filter((p) => p.id !== page.id), page]),
+    add: (page: PendingPage) => write([...readStorage().filter((p) => p.id !== page.id), page]),
     /** Forgets every pending page (sign-out). */
     clear: () => write([]),
     /** Re-reads storage after another tab changed it. */
