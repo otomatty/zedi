@@ -87,6 +87,10 @@ Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in know
    staging と Preview に限定する（otomatty/zedi#1156）。
 3. ドメインを設定するときは、対象環境の `routes` に `{ "pattern": "<domain>", "custom_domain": true }` を足す。
    常設環境の通常デプロイには上記の `deploy.yml` を使う。
+4. [`.github/workflows/deploy.yml`](../../../.github/workflows/deploy.yml) の `workflow_dispatch` にある
+   `inputs.environment.options` に新しい環境名を足す。既存の `staging` と `production` は残す。
+5. GitHub に同じ名前の Environment を作り、`CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` を
+   Secrets として設定する。デプロイできるブランチは `main` のみに制限する。
 
 ## 旧リソースの片付け / Cleaning up old resources
 
