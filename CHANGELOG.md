@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.0.0 (2026-11-19)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🔧 Maintenance
+* chore(deps): bump @anthropic-ai/sdk from 0.104.2 to 0.106.0 in the minor-and-patch group by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1101
+* chore(deps-dev): bump @types/node from 25.9.4 to 26.0.1 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1103
+* chore(deps-dev): bump the minor-and-patch group in /server/hocuspocus with 2 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1099
+* chore(deps-dev): bump @types/node from 25.9.4 to 26.0.1 in /server/hocuspocus by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1100
+* chore(deps-dev): bump the minor-and-patch group in /server/api with 2 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1102
+* chore(deps-dev): bump @types/node from 25.9.4 to 26.0.1 in /server/api by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1104
+* chore(deps): bump tauri-apps/tauri-action from 0.6.2 to 1.0.0 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1108
+* chore(deps): bump @anthropic-ai/sdk from 0.106.0 to 0.110.0 in the minor-and-patch group by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1109
+* chore(deps-dev): bump the minor-and-patch group in /server/hocuspocus with 2 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1112
+* chore(deps-dev): bump the minor-and-patch group in /server/api with 2 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1114
+* chore(deps-dev): bump typescript from 6.0.3 to 7.0.2 in /server/hocuspocus by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1113
+* chore(deps-dev): bump @cloudflare/workers-types from 4.20260702.1 to 5.20260706.1 in /server/api by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1110
+* chore(deps-dev): bump typescript from 6.0.3 to 7.0.2 in /server/api by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1115
+* chore(deps): bump actions/setup-node from 6 to 7 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1124
+* chore(deps): bump the minor-and-patch group with 2 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1125
+* chore(deps): bump @hono/node-server from 1.19.14 to 2.0.11 in /server/mcp in the npm_and_yarn group across 1 directory by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1127
+* chore(deps): bump actions/checkout from 7.0.0 to 7.0.1 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1128
+* chore(deps): bump @anthropic-ai/sdk from 0.112.5 to 0.115.0 in the minor-and-patch group by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1130
+* chore(deps-dev): bump @testing-library/jest-dom from 6.10.0 to 7.0.0 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1131
+* chore(deps): bump @polar-sh/sdk from 0.48.1 to 0.49.0 in /server/api in the minor-and-patch group by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1129
+* chore(deps-dev): bump vitest from 4.1.10 to 5.1.0 in /app by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1185
+* chore(deps-dev): bump eslint-plugin-jsdoc from 63.0.0 to 65.4.2 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1170
+* chore(deps): bump @hookform/resolvers from 5.2.2 to 7.0.3 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1172
+* chore(deps): bump @anthropic-ai/sdk from 0.115.0 to 1.6.0 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1174
+* chore(deps): bump the minor-and-patch group in /app with 17 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1190
+* chore(deps-dev): bump @stryker-mutator/core from 9.6.0 to 10.1.1 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1193
+* chore(deps-dev): bump @stryker-mutator/vitest-runner from 9.6.0 to 10.1.1 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1169
+
+
+**Full Changelog**: https://github.com/otomatty/zedi/compare/zedi-v0.24.0...zedi-v1.0.0
+
 ## 0.24.0 (2026-06-14)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
