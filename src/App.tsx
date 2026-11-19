@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import { Toaster } from "@zedi/ui";
 import { Toaster as Sonner } from "@zedi/ui/components/sonner";
 import { TooltipProvider } from "@zedi/ui";
@@ -19,10 +20,7 @@ import NotesDiscover from "./pages/NotesDiscover";
 import OfficialGuidePlaceholder from "./pages/OfficialGuidePlaceholder";
 import SignIn from "./pages/SignIn";
 import AuthCallback from "./pages/AuthCallback";
-import ExtensionAuth from "./pages/ExtensionAuth";
-import ExtensionAuthCallback from "./pages/ExtensionAuthCallback";
 import McpAuthorize from "./pages/McpAuthorize";
-import PdfReaderPage from "./pages/PdfKnowledge/PdfReaderPage";
 import Settings from "./pages/Settings";
 import Account from "./pages/Account";
 import WikiSchemaPage from "./pages/WikiSchemaPage";
@@ -33,7 +31,6 @@ import SearchResults from "./pages/SearchResults";
 import NotFound from "./pages/NotFound";
 import NoteView from "./pages/NoteView";
 import NotePageView from "./pages/NotePageView";
-import WikiComposePage from "./pages/WikiComposePage";
 import NoteSettings from "./pages/NoteSettings";
 import GeneralSection from "./pages/NoteSettings/sections/GeneralSection";
 import VisibilitySection from "./pages/NoteSettings/sections/VisibilitySection";
@@ -53,7 +50,6 @@ import { GlobalShortcutsProvider } from "./components/layout/GlobalShortcutsProv
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AIChatProvider } from "./contexts/AIChatContext";
 import { AIChatConversationsProvider } from "./hooks/aiChat/useAIChatConversations";
-import { FilePreviewDialogHost } from "./components/note/FilePreviewDialogHost";
 import { AppLayout } from "./components/layout/AppLayout";
 
 const queryClient = new QueryClient();
@@ -69,13 +65,7 @@ function LegacyAIChatConversationRedirect() {
 
 /**
  * Redirect legacy `/home` to `/notes/me`, preserving search and hash.
- * Chrome 拡張（`/home?clipUrl=...&from=chrome-extension`）など、`/home` を直接
- * 叩いてくる旧クライアントを救済するため、クエリ・ハッシュをそのまま転送する
- * （issue #826）。
- *
- * Forwards `/home?<query>#<hash>` to `/notes/me?<query>#<hash>` so legacy
- * Chrome-extension hand-offs (e.g. `/home?clipUrl=...`) keep working until the
- * extension itself is updated to call `/notes/me` directly (issue #826).
+ * 旧 `/home` へのブックマークを救済するため、クエリ・ハッシュをそのまま転送する。
  */
 function LegacyHomeRedirect() {
   const { search, hash } = useLocation();
@@ -153,16 +143,15 @@ function AppShellRoute() {
  * Root app component. Sets up providers and route tree.
  * ルートアプリコンポーネント。プロバイダーとルートを構成する。
  */
-const App = () => (
+const App = (): JSX.Element => (
   <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        {/* unstable_useTransitions を無効化: リンク後の表示が遅れる問題を防ぐ（RR v7 は future 廃止）
-            Disable unstable_useTransitions: prevents display delay after link navigation (RR v7 removed future flags) */}
-        <BrowserRouter unstable_useTransitions={false}>
-          <FilePreviewDialogHost />
+        {/* useTransitions を無効化: リンク後の表示が遅れる問題を防ぐ（RR 7.18 で正式名に変更）
+            Disable useTransitions: prevents display delay after link navigation (stable name since RR 7.18) */}
+        <BrowserRouter useTransitions={false}>
           <AIChatProvider>
             <AIChatConversationsProvider>
               <GlobalShortcutsProvider>
@@ -173,8 +162,6 @@ const App = () => (
                     <Route path="/" element={<Landing />} />
                     <Route path="/sign-in/*" element={<SignIn />} />
                     <Route path="/auth/callback" element={<AuthCallback />} />
-                    <Route path="/auth/extension" element={<ExtensionAuth />} />
-                    <Route path="/auth/extension-callback" element={<ExtensionAuthCallback />} />
                     <Route path="/mcp/authorize" element={<McpAuthorize />} />
                     <Route path="/invite" element={<InvitePage />} />
                     <Route path="/invite-links/:token" element={<InviteLinkPage />} />
@@ -186,23 +173,6 @@ const App = () => (
                         </ProtectedRoute>
                       }
                     />
-                    {/* Wiki Compose split-screen UI (issue #950).
-                        Rendered chrome-less (outside `AppShellRoute`) so the
-                        focused authoring view owns the whole viewport — no
-                        global Header or mobile BottomNav — which keeps the
-                        split panes from being clipped on small screens.
-                        Optional `:sessionId` keeps one route element so URL
-                        persistence does not remount and abort the first SSE run.
-
-                        Wiki Compose は集中作業用の全画面ビュー。グローバル
-                        Header / モバイル BottomNav を出さないよう
-                        `AppShellRoute` の外に置き、狭い画面で分割ペインが
-                        見切れないようにする。 */}
-                    <Route
-                      path="/notes/:noteId/:pageId/compose/:sessionId?"
-                      element={<WikiComposePage />}
-                    />
-
                     {/* App shell routes: wrapped with the shared AppLayout
                         so every page gets the common Header + primary nav + user menu + AI dock.
                         共通 AppLayout（ヘッダー + 機能ナビ + ユーザーメニュー + AI ドック）でラップ。 */}
@@ -228,17 +198,10 @@ const App = () => (
                       />
                       {/*
                           Legacy `/home` — redirect to `/notes/me` so existing
-                          bookmarks, browser extensions, and external links keep
-                          working (issue #825 acceptance criteria). Search and
-                          hash are preserved by `LegacyHomeRedirect`, which is
-                          required so the Chrome-extension `clipUrl` hand-off
-                          (`/home?clipUrl=...`) keeps round-tripping through
-                          `/notes/me?clipUrl=...` (issue #826).
-                          旧 `/home`: 既存のブックマーク / 拡張 / 外部リンク救済
-                          のため `/notes/me` にリダイレクトする（issue #825）。
-                          `LegacyHomeRedirect` で search / hash を保持し、Chrome
-                          拡張の `/home?clipUrl=...` ハンドオフを `/notes/me`
-                          経由でも動作させる（issue #826）。
+                          bookmarks and external links keep working (issue #825
+                          acceptance criteria). Search and hash are preserved.
+                          旧 `/home`: 既存のブックマーク / 外部リンク救済のため
+                          `/notes/me` にリダイレクトする（issue #825）。
                        */}
                       <Route path="/home" element={<LegacyHomeRedirect />} />
                       <Route path="/ai/history" element={<AIChatHistory />} />
@@ -266,11 +229,6 @@ const App = () => (
                           ページのリンクが 404 にならないよう URL を確保する。 */}
                       <Route path="/notes/official-guide" element={<OfficialGuidePlaceholder />} />
                       <Route path="/notes" element={<Notes />} />
-                      {/* PDF 知識化ビューア (issue otomatty/zedi#389).
-                          Web から開いた場合は `PdfReaderUnsupported` を表示。
-                          PDF knowledge viewer; web falls back to the
-                          desktop-only placeholder. */}
-                      <Route path="/sources/:sourceId/pdf" element={<PdfReaderPage />} />
                       <Route path="/settings" element={<Settings />} />
                       {/* `/account` — mobile-friendly account hub. The
                           bottom-nav Account tab links here instead of

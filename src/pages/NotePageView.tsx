@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Download, FileText, History, Trash2 } from "lucide-react";
@@ -33,9 +33,7 @@ import {
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { ContentWithAIChat } from "@/components/aiChat/ContentWithAIChat";
-import { NoteWorkspaceProvider, useNoteWorkspaceOptional } from "@/contexts/NoteWorkspaceContext";
 import { useAIChatContext } from "@/contexts/AIChatContext";
-import { NoteWorkspaceToolbar } from "@/components/note/NoteWorkspaceToolbar";
 import { useMarkdownExport } from "@/components/editor/PageEditor/useMarkdownExport";
 import { usePdfExport } from "@/components/editor/PageEditor/usePdfExport";
 import { usePagePublicContent } from "@/hooks/pages/usePagePublicContent";
@@ -186,8 +184,6 @@ function NotePageEditorEditable({
   const [title, setTitle] = useState(page.title);
   const { api } = useNoteApi();
   const { setPageContext, contentAppendHandlerRef, insertAtCursorRef } = useAIChatContext();
-  const noteWorkspace = useNoteWorkspaceOptional();
-  const workspaceRoot = noteWorkspace?.workspaceRoot ?? null;
   const editorInsertRef = useRef<((content: unknown) => boolean) | null>(null);
   const pageActionHubRef = useRef<PageActionHubHandle | null>(null);
   const { isSignedIn: editorIsSignedIn } = useAuth();
@@ -211,12 +207,11 @@ function NotePageEditorEditable({
       type: "editor",
       pageId: page.id,
       noteId: page.noteId,
-      claudeWorkspaceRoot: workspaceRoot ?? undefined,
       pageTitle: title,
       pageContent: editorContent.slice(0, 3000),
       pageFullContent: editorContent,
     });
-  }, [page.id, page.noteId, title, editorContent, setPageContext, workspaceRoot]);
+  }, [page.id, page.noteId, title, editorContent, setPageContext]);
 
   useEffect(() => {
     return () => setPageContext(null);
@@ -273,47 +268,49 @@ function NotePageEditorEditable({
   const suppressTitleSaveEffectsRef = useRef(false);
 
   const persistTitleRef = useRef<(nextTitle: string) => Promise<void>>(async () => {});
-  persistTitleRef.current = async (nextTitle: string) => {
-    const previousTitle = lastSavedTitleRef.current;
-    try {
-      // Issue #889 Phase 4: 旧来の `getPageContent` + `putPageContent` 経由のタイトル
-      // 更新は撤廃し、Y.Doc バイト列を介さない `PUT /api/pages/:id` (metadata only)
-      // に一本化する。`local` モード廃止に伴い、すべてのページは note 配下にあり
-      // `updatePageMetadata` が単一の正規 REST 経路。
-      // Issue #889 Phase 4: drop the legacy `getPageContent` + `putPageContent`
-      // round-trip and rename via `PUT /api/pages/:id` (metadata only). Every
-      // page now belongs to a note, so `updatePageMetadata` is the single
-      // canonical REST entry point for title saves.
-      await api.updatePageMetadata(page.id, { title: nextTitle });
-      // 削除完了後はキャッシュ無効化も lastSaved 更新もスキップする。
-      // After cancel (delete path), skip cache invalidation and lastSaved update —
-      // `useRemovePageFromNote` has already invalidated note caches.
-      if (suppressTitleSaveEffectsRef.current) return;
-      lastSavedTitleRef.current = nextTitle;
-      // ノート側のキャッシュは `noteKeys.*` 配下にあるため、タイトル変更を
-      // ノート表示やサイドバーに反映させるために明示的に無効化する。
-      // The note view and sidebar pull from `noteKeys.*`, so invalidate those
-      // explicitly to propagate the rename.
-      queryClient.invalidateQueries({ queryKey: noteKeys.page(noteId, page.id) });
-      queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(noteId) });
-    } catch (error) {
-      // 削除済みページに対する失敗は予期されたもの。toast / rollback を抑止する。
-      // Expected failure path when the page was just deleted out from under us;
-      // suppress toast + rollback + rethrow so we don't surface
-      // `errors.titleSaveFailedTitle` right after a successful delete.
-      if (suppressTitleSaveEffectsRef.current) return;
-      if (pendingTitleRef.current === null) {
-        setTitle(previousTitle);
+  useLayoutEffect((): void => {
+    persistTitleRef.current = async (nextTitle: string): Promise<void> => {
+      const previousTitle = lastSavedTitleRef.current;
+      try {
+        // Issue #889 Phase 4: 旧来の `getPageContent` + `putPageContent` 経由のタイトル
+        // 更新は撤廃し、Y.Doc バイト列を介さない `PUT /api/pages/:id` (metadata only)
+        // に一本化する。`local` モード廃止に伴い、すべてのページは note 配下にあり
+        // `updatePageMetadata` が単一の正規 REST 経路。
+        // Issue #889 Phase 4: drop the legacy `getPageContent` + `putPageContent`
+        // round-trip and rename via `PUT /api/pages/:id` (metadata only). Every
+        // page now belongs to a note, so `updatePageMetadata` is the single
+        // canonical REST entry point for title saves.
+        await api.updatePageMetadata(page.id, { title: nextTitle });
+        // 削除完了後はキャッシュ無効化も lastSaved 更新もスキップする。
+        // After cancel (delete path), skip cache invalidation and lastSaved update —
+        // `useRemovePageFromNote` has already invalidated note caches.
+        if (suppressTitleSaveEffectsRef.current) return;
+        lastSavedTitleRef.current = nextTitle;
+        // ノート側のキャッシュは `noteKeys.*` 配下にあるため、タイトル変更を
+        // ノート表示やサイドバーに反映させるために明示的に無効化する。
+        // The note view and sidebar pull from `noteKeys.*`, so invalidate those
+        // explicitly to propagate the rename.
+        queryClient.invalidateQueries({ queryKey: noteKeys.page(noteId, page.id) });
+        queryClient.invalidateQueries({ queryKey: noteKeys.detailsByNoteId(noteId) });
+      } catch (error) {
+        // 削除済みページに対する失敗は予期されたもの。toast / rollback を抑止する。
+        // Expected failure path when the page was just deleted out from under us;
+        // suppress toast + rollback + rethrow so we don't surface
+        // `errors.titleSaveFailedTitle` right after a successful delete.
+        if (suppressTitleSaveEffectsRef.current) return;
+        if (pendingTitleRef.current === null) {
+          setTitle(previousTitle);
+        }
+        console.error("Failed to save page title:", error);
+        toast({
+          title: t("errors.titleSaveFailedTitle"),
+          description: t("errors.titleSaveFailedDescription"),
+          variant: "destructive",
+        });
+        throw error;
       }
-      console.error("Failed to save page title:", error);
-      toast({
-        title: t("errors.titleSaveFailedTitle"),
-        description: t("errors.titleSaveFailedDescription"),
-        variant: "destructive",
-      });
-      throw error;
-    }
-  };
+    };
+  });
 
   // タイトル保存を直列化する。保存中なら何もせず、完了後に pending があれば
   // 追随保存する。これにより「古いリクエストが遅延完了して新しい値を上書きする」
@@ -322,26 +319,28 @@ function NotePageEditorEditable({
   // completes if a newer title is pending. This prevents an out-of-order
   // response from overwriting a more recent edit.
   const flushPendingTitleRef = useRef<() => void>(() => {});
-  flushPendingTitleRef.current = () => {
-    if (isSavingTitleRef.current) return;
-    const pending = pendingTitleRef.current;
-    if (pending === null) return;
-    pendingTitleRef.current = null;
-    isSavingTitleRef.current = true;
-    void (async () => {
-      try {
-        await persistTitleRef.current(pending);
-      } catch {
-        // persistTitleRef で toast + console.error 済み。ここは coalesce 継続のため握る。
-        // Already logged + toasted inside persistTitleRef; swallow so we keep coalescing.
-      } finally {
-        isSavingTitleRef.current = false;
-        if (pendingTitleRef.current !== null) {
-          flushPendingTitleRef.current();
+  useLayoutEffect((): void => {
+    flushPendingTitleRef.current = (): void => {
+      if (isSavingTitleRef.current) return;
+      const pending = pendingTitleRef.current;
+      if (pending === null) return;
+      pendingTitleRef.current = null;
+      isSavingTitleRef.current = true;
+      void (async (): Promise<void> => {
+        try {
+          await persistTitleRef.current(pending);
+        } catch {
+          // persistTitleRef で toast + console.error 済み。ここは coalesce 継続のため握る。
+          // Already logged + toasted inside persistTitleRef; swallow so we keep coalescing.
+        } finally {
+          isSavingTitleRef.current = false;
+          if (pendingTitleRef.current !== null) {
+            flushPendingTitleRef.current();
+          }
         }
-      }
-    })();
-  };
+      })();
+    };
+  });
 
   const handleTitleChange = useCallback((newTitle: string) => {
     setTitle(newTitle);
@@ -460,7 +459,6 @@ function NotePageEditorEditable({
           menuItems={menuItems}
           supplementalRightContent={supplementalRightContent}
         />
-        <NoteWorkspaceToolbar />
         <PageEditorContent
           content={editorContent}
           title={title}
@@ -468,7 +466,6 @@ function NotePageEditorEditable({
           currentPageId={page.id}
           pageId={page.id}
           isNewPage={false}
-          isWikiGenerating={false}
           isReadOnly={false}
           // ノートネイティブページは IndexedDB に永続化されない（個人ページ
           // しか同期しない）ため、`linkedPagesMode="repo"` だと `usePage` が
@@ -494,12 +491,6 @@ function NotePageEditorEditable({
           pageNoteId={page.noteId}
           initialContent={initialContent}
           onInitialContentApplied={onInitialContentApplied}
-          wikiComposeHref={
-            // Issue #950: surface the Wiki Compose entry point on every
-            // note-native page. `WikiGeneratorButton` itself decides whether to
-            // render based on title presence.
-            page.noteId ? `/notes/${page.noteId}/${page.id}/compose` : undefined
-          }
           bottomBarTrailingAction={
             <PageActionHubFab
               canEdit
@@ -975,32 +966,30 @@ const NotePageView: React.FC = () => {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className={bodyClassName}>
-        <NoteWorkspaceProvider key={note.id} noteId={note.id}>
-          {canEdit ? (
-            <NotePageEditorEditable
-              key={page.id}
-              noteId={note.id}
-              page={page}
-              collaboration={collaboration}
-              isCollaborationEnabled={isCollaborationEnabled}
-              isTitleEditable={isTitleEditable}
-              initialContent={pendingInitialContent}
-              onInitialContentApplied={handleInitialContentApplied}
-              onBack={handleBack}
-              onRequestDelete={handleRequestDelete}
-              isDeletePending={isDeletePending}
-              supplementalRightContent={supplementalRightContent}
-              cancelPendingTitleSaveRef={cancelPendingTitleSaveRef}
-            />
-          ) : (
-            <NotePageReadOnly
-              page={page}
-              onBack={handleBack}
-              supplementalRightContent={supplementalRightContent}
-              canViewHistory={isSignedIn}
-            />
-          )}
-        </NoteWorkspaceProvider>
+        {canEdit ? (
+          <NotePageEditorEditable
+            key={page.id}
+            noteId={note.id}
+            page={page}
+            collaboration={collaboration}
+            isCollaborationEnabled={isCollaborationEnabled}
+            isTitleEditable={isTitleEditable}
+            initialContent={pendingInitialContent}
+            onInitialContentApplied={handleInitialContentApplied}
+            onBack={handleBack}
+            onRequestDelete={handleRequestDelete}
+            isDeletePending={isDeletePending}
+            supplementalRightContent={supplementalRightContent}
+            cancelPendingTitleSaveRef={cancelPendingTitleSaveRef}
+          />
+        ) : (
+          <NotePageReadOnly
+            page={page}
+            onBack={handleBack}
+            supplementalRightContent={supplementalRightContent}
+            canViewHistory={isSignedIn}
+          />
+        )}
       </div>
       <NotePageDeleteConfirmDialog
         open={deleteConfirmOpen}

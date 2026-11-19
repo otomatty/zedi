@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AdminGuard } from "./components/AdminGuard";
 import Layout from "./pages/Layout";
@@ -13,11 +14,11 @@ import Errors from "./pages/errors";
  * Root component for the admin SPA: sets up routing and the admin auth guard.
  * 管理画面 SPA のルート。ルーティングと管理者向け認証ガードを構成する。
  */
-function App() {
+function App(): JSX.Element {
   return (
-    // Match main app: disable startTransition wrapping so navigation updates apply immediately (RR v7 API).
-    // メインアプリと同様: startTransition ラップを無効化し遷移を即時反映（RR v7 は unstable_useTransitions）。
-    <BrowserRouter unstable_useTransitions={false}>
+    // Match main app: disable useTransitions so navigation updates apply immediately (stable name since RR 7.18).
+    // メインアプリと同様: useTransitions を無効化し遷移を即時反映（RR 7.18 で正式名に変更）。
+    <BrowserRouter useTransitions={false}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route

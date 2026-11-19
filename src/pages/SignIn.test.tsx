@@ -60,12 +60,17 @@ describe("SignIn returnTo forwarding", () => {
   it("uses the bare callback URL when no returnTo is present", async () => {
     renderAt("/sign-in");
 
-    fireEvent.click(screen.getByText("auth.signIn.github"));
+    fireEvent.click(screen.getByText("auth.signIn.google"));
 
     await waitFor(() => expect(signInSocial).toHaveBeenCalledTimes(1));
     const arg = signInSocial.mock.calls[0][0] as { provider: string; callbackURL: string };
-    expect(arg.provider).toBe("github");
+    expect(arg.provider).toBe("google");
     expect(arg.callbackURL).toBe(`${window.location.origin}/auth/callback`);
+  });
+
+  it("does not offer GitHub sign-in", () => {
+    renderAt("/sign-in");
+    expect(screen.queryByText("auth.signIn.github")).not.toBeInTheDocument();
   });
 
   it("drops an unsafe returnTo (protocol-relative) to prevent open redirect", async () => {

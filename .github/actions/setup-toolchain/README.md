@@ -40,7 +40,6 @@ callers should wrap `actions/checkout` with `Wandalen/wretry.action@v3`
 | `README.md`     | 使用方法・引数の文書化 / usage and input documentation |
 
 呼び出し元 / called from: `.github/workflows/ci.yml`,
-`.github/workflows/deploy-dev.yml`, `.github/workflows/deploy-prod.yml`,
 `.github/workflows/nightly-mutation.yml`.
 
 ---
@@ -95,7 +94,7 @@ jobs:
       - name: Checkout (with retry)
         uses: Wandalen/wretry.action@v3
         with:
-          action: actions/checkout@v6.0.2
+          action: actions/checkout@v7.0.0
           attempt_limit: 3
           attempt_delay: 5000
 
@@ -106,18 +105,18 @@ jobs:
 
 ### 2. 履歴が必要なジョブ / Jobs that need full git history
 
-PR のベースとの diff を取る `drizzle-migration-check` や `security` などは
+PR のベースとの diff を取る `security` などは
 checkout の `with:` で `fetch-depth: 0` を渡す。
 
-Jobs that diff against the PR base (e.g. `drizzle-migration-check` /
-`security`) pass `fetch-depth: 0` to the inner checkout:
+Jobs that diff against the PR base (e.g. `security`) pass `fetch-depth: 0`
+to the inner checkout:
 
 ```yaml
 steps:
   - name: Checkout (with retry)
     uses: Wandalen/wretry.action@v3
     with:
-      action: actions/checkout@v6.0.2
+      action: actions/checkout@v7.0.0
       with: |
         fetch-depth: 0
       attempt_limit: 3
@@ -128,12 +127,10 @@ steps:
 
 ### 3. Node のみのジョブ / Node-only jobs
 
-`drizzle-migration-check` / `drizzle-schema-drift-check` のように Node
-スクリプトだけ動かすジョブは `setup-bun: "false"` を渡せば Bun のセット
-アップと `bun install` を丸ごとスキップできる。
+Node スクリプトだけ動かすジョブは `setup-bun: "false"` を渡せば Bun の
+セットアップと `bun install` を丸ごとスキップできる。
 
-Node-only jobs (e.g. `drizzle-migration-check` /
-`drizzle-schema-drift-check`) can skip the Bun setup and the root install
+Jobs that only run Node scripts can skip the Bun setup and the root install
 entirely:
 
 ```yaml
@@ -141,7 +138,7 @@ steps:
   - name: Checkout (with retry)
     uses: Wandalen/wretry.action@v3
     with:
-      action: actions/checkout@v6.0.2
+      action: actions/checkout@v7.0.0
       attempt_limit: 3
       attempt_delay: 5000
 
@@ -152,18 +149,18 @@ steps:
 
 ### 4. ワークスペース個別 install / Workspace-only install
 
-`server/mcp` のようにルートでは install せず特定ワークスペースだけ install
+`app` のようにルートでは install せず特定ディレクトリだけ install
 するジョブは `install-deps: "false"` を渡し、後段で個別に install する。
 
 For jobs that skip the root install and instead install inside a specific
-workspace (e.g. `server/mcp`):
+directory (e.g. `app`):
 
 ```yaml
 steps:
   - name: Checkout (with retry)
     uses: Wandalen/wretry.action@v3
     with:
-      action: actions/checkout@v6.0.2
+      action: actions/checkout@v7.0.0
       attempt_limit: 3
       attempt_delay: 5000
 
@@ -171,8 +168,8 @@ steps:
     with:
       install-deps: "false"
 
-  - name: Install MCP dependencies
-    working-directory: server/mcp
+  - name: Install app dependencies
+    working-directory: app
     run: bun install --frozen-lockfile
 ```
 
@@ -200,7 +197,7 @@ composite action (see samples above).
 
 | ステップ / step                 | リトライ実装 / retry mechanism          | 試行回数 / attempts | 待機 / delay                                |
 | ------------------------------- | --------------------------------------- | ------------------- | ------------------------------------------- |
-| `actions/checkout@v6.0.2`       | caller 側 / `Wandalen/wretry.action@v3` | 3                   | 5000 ms                                     |
+| `actions/checkout@v7.0.0`       | caller 側 / `Wandalen/wretry.action@v3` | 3                   | 5000 ms                                     |
 | `actions/setup-node@v6`         | `Wandalen/wretry.action@v3`             | 3                   | 5000 ms                                     |
 | `oven-sh/setup-bun@v2`          | `Wandalen/wretry.action@v3`             | 3                   | 5000 ms                                     |
 | `bun install --frozen-lockfile` | shell 内ループ / inline shell loop      | 3                   | 5s → 10s（線形バックオフ / linear backoff） |
@@ -220,12 +217,11 @@ first try.
   / Composite wrapper that retries `uses:`-style actions. Tracked by the
   repository's existing `github-actions` Dependabot configuration.
 
-シェルレベルのコマンドリトライには既に `nick-fields/retry@v4` を使っているが
-（`deploy-*.yml`）、本 action のターゲットは `uses:` の JS アクションなので
-`wretry` のほうが適切。
+シェルレベルのコマンドリトライなら `nick-fields/retry` が使えるが、本 action の
+ターゲットは `uses:` の JS アクションなので `wretry` のほうが適切。
 
-`nick-fields/retry@v4` is already used elsewhere for shell-command retries
-(`deploy-*.yml`), but it cannot wrap `uses:` invocations — hence `wretry`.
+`nick-fields/retry` handles shell-command retries, but it cannot wrap `uses:`
+invocations — hence `wretry`.
 
 ---
 

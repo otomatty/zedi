@@ -234,11 +234,13 @@ describe("InviteLinkPage", () => {
       ).toBeInTheDocument();
     });
 
-    it("renders Google and GitHub sign-in buttons", () => {
+    it("renders Google sign-in only", () => {
       renderAt("/invite-links/share-token");
 
       expect(screen.getByRole("button", { name: "invite.signInWithGoogle" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "invite.signInWithGitHub" })).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "invite.signInWithGitHub" }),
+      ).not.toBeInTheDocument();
     });
 
     it("starts Google social sign-in with returnTo callback URL", async () => {
@@ -248,17 +250,6 @@ describe("InviteLinkPage", () => {
       await waitFor(() => expect(mockSignInSocial).toHaveBeenCalledTimes(1));
       expect(mockSignInSocial).toHaveBeenCalledWith({
         provider: "google",
-        callbackURL: `${window.location.origin}/auth/callback?returnTo=%2Finvite-links%2Fshare-token`,
-      });
-    });
-
-    it("starts GitHub social sign-in with returnTo callback URL", async () => {
-      renderAt("/invite-links/share-token");
-      fireEvent.click(screen.getByRole("button", { name: "invite.signInWithGitHub" }));
-
-      await waitFor(() => expect(mockSignInSocial).toHaveBeenCalledTimes(1));
-      expect(mockSignInSocial).toHaveBeenCalledWith({
-        provider: "github",
         callbackURL: `${window.location.origin}/auth/callback?returnTo=%2Finvite-links%2Fshare-token`,
       });
     });

@@ -29,7 +29,6 @@ export default tseslint.config(
       ".stryker-tmp",
       "**/.stryker-tmp/**",
       ".claude",
-      "src-tauri/target",
       ".wrangler",
       "*.config.js",
       "*.config.mjs",
@@ -177,9 +176,16 @@ export default tseslint.config(
       "react/no-multi-comp": "off",
     },
   },
-  // スクリプト・e2e・サーバー: console 可、行数制限は緩め
+  // app/: CONTRIBUTING の「関数には戻り値の型を指定」を ESLint で必須にする
   {
-    files: ["scripts/**/*.ts", "e2e/**/*.ts", "server/**/*.ts", "terraform/**/*.ts"],
+    files: ["app/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/explicit-module-boundary-types": "error",
+    },
+  },
+  // スクリプト・e2e: console 可、行数制限は緩め
+  {
+    files: ["scripts/**/*.ts", "e2e/**/*.ts"],
     rules: {
       "no-console": "off",
       "max-lines-per-function": "off",

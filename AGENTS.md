@@ -1,200 +1,146 @@
 # Zedi - AI Agent Guidelines
 
-プロジェクト全体の AI エージェント向け共通ガイドライン。
-Cursor, Claude Code, GitHub Copilot, Codex 等すべてのエージェントが参照する。
+## テスト駆動開発（必守） / TDD (mandatory)
 
-## 仕様・ドキュメント（最重要） / Specification & documentation (critical)
+Zedi は **TDD を徹底**する。実装を先に書いてテストを後付けしない。
 
-- **仕様の正（source of truth）はコードの TSDoc / JSDoc とテスト**。詳細は [`SPECIFICATION_POLICY.md`](SPECIFICATION_POLICY.md)。  
-  _Source of truth: TSDoc/JSDoc and tests; see SPECIFICATION_POLICY.md._
-- **Git に追跡させない** — `.gitignore` で `docs/` およびルートの `journal/` を除外する。長文の仕様・メモをリモートに載せない。  
-  _Do not track long-form prose: `docs/` and root `journal/` are gitignored._
-- **ローカル専用の `docs/`** — 調査・下書き・作業ログ用に、追跡されない `docs/` 以下へファイルを置いてよい（構成は下記「ローカル専用メモ」）。これらは契約や CI の根拠にはしない。  
-  _Optional local-only `docs/` for drafts and notes; not contract or CI truth._
-- **不要になった説明は削除する**（ローカルファイル含む）。エージェントに古い文面を渡さず、コンテキストを浪費しない。  
-  _Delete obsolete explanations (including local files) to avoid stale context._
-- **`docs/` を勝手に読まない**。ユーザーが `@ファイル` で添付したファイルは読む（`.cursor/rules/specification-and-docs.mdc`）。  
-  _Do not browse `docs/` unless the user attaches a file via `@`._
-- **公開入口 Markdown（README / CONTRIBUTING 等）** — 英語が正本、日本語は `.ja.md` ペアで完全版を維持する。更新時は同一 PR で両方を揃える。詳細は [`DOCUMENTATION.md`](DOCUMENTATION.md)（gitignored な `docs/` とは別）。  
-  _User-facing GitHub entry docs: English canonical + `.ja.md` Japanese pair; update both in the same PR. See `DOCUMENTATION.md` (not the gitignored `docs/` tree)._
+### サイクル / Cycle
 
-## 技術スタック
+1. **Red** — 期待する振る舞いを表すテストを書き、失敗することを確認する。
+2. **Green** — そのテストを通す最小実装だけを書く。
+3. **Refactor** — テストを緑のまま整理する。振る舞い変更はテストを先に直す。
 
-- **フロント**: React, TypeScript, Vite
-- **ランタイム**: Bun
-- **API**: `server/api`（Hono on Bun）
-- **リアルタイム**: `server/hocuspocus`（Y.js 同期サーバー）
-- **MCP サーバー**: `server/mcp`（Claude Code 等の外部 MCP クライアントに Zedi のページ・ノート・検索を公開する。stdio / HTTP 両対応。詳細は [`server/mcp/README.md`](server/mcp/README.md)）  
-  _MCP server exposing Zedi data to external MCP clients (stdio + HTTP); see `server/mcp/README.md`._
-- **管理画面**: `admin/`（Vite + React + Tailwind）
-- **Lint**: ESLint, Prettier
-- **テスト**: Vitest（単体）, Playwright（E2E）
-- **インフラ**: Terraform（Cloudflare）, Railway, GitHub Actions
+### 禁止事項 / Do not
 
-## ビルド・テスト
+- 実装を読んで期待値を合わせる「写し絵テスト」（バグを仕様として固定化する）。
+- テスト失敗時に、根拠なく期待値だけを実装に合わせて書き換えること。
+
+### 品質指標 / Quality metrics
+
+| 指標                           | 方針                                                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| **Mutation score（第一指標）** | Stryker。PR の `mutation-light` は `stryker.config.mjs` の `thresholds.break: 70`。目標は golden list で 85%+。     |
+| **行カバレッジ**               | 80% 以上を目標。Mutation が取れないスコープ（例: `app/`）では coverage + 強いアサーションで担保。                   |
+| **CI**                         | `mutation-light`（限定 mutate）/ nightly（観測、`break: null`）。コマンドは `package.json` と `.github/workflows`。 |
+
+### コマンド / Commands
 
 ```bash
-bun run init           # 初回セットアップ（deps + hooks + .env + build + agent mirrors）
-bun run dev            # API + フロント開発サーバー
-bun run dev:admin      # 管理画面開発サーバー
-bun run lint           # ESLint
-bun run format:check   # Prettier チェック
-bun run test:run       # Vitest 単体テスト
+bun run test:run                 # ワークスペース横断の Vitest
+bun run test:coverage            # カバレッジ
+bun run test:e2e                 # Playwright
+bun run test:mutation:dry        # Stryker dry-run
+bun run test:mutation            # Stryker（フロント中心）
+bun run test:mutation:changed    # 変更ファイルのみ Mutation
+bun run test:mutation:changed:list
 ```
 
-## テスト（TDD）
+- フロント変更の Mutation: `.agents/skills/stryker-mutation-diff/SKILL.md` または `scripts/stryker-mutate-changed.mjs`。
+- `app/` は Stryker 対象外 → coverage とアサーション強度で検証。
 
-- **テストは実装の前に書く**。期待する振る舞いをテストで先に定義し、そのテストが通るように実装する。
-- **Mutation スコアを品質の第一指標**とする。カバレッジ 80% 以上を目標としつつ、Mutation の閾値を優先する。
-- CI では `mutation-light` / nightly 等のワークフローがある場合がある（`package.json` / `.github/workflows` を参照）。
+### エージェント用パイプライン / Agent test pipeline
 
-## コードスタイル
+新規・既存モジュールのテスト強化は次を使う（詳細は `.agents/skills/README-test-pipeline.md`）:
 
-- TypeScript strict。`any` 禁止、型を明示する。
-- export する関数・型・インターフェースには TSDoc / JSDoc を付与する。
-  - 例外: `packages/ui/src/components/` 直下の shadcn/ui 由来コンポーネントは対象外。自前実装（`packages/ui` の hooks / lib / sidebar 分割実装）は `jsdoc/require-jsdoc` を error で強制する（`eslint.config.js` 参照）。
-    _Exception: shadcn/ui-vendored components under `packages/ui/src/components/` are exempt; in-house code (hooks / lib / the split sidebar implementation) enforces `jsdoc/require-jsdoc` as an error (see `eslint.config.js`)._
-- コメントやドキュメントは、原則として日本語と英語の両方を併記する。
-- `bun run lint` と `bun run format:check` が通る状態を維持する。
-- 既存のディレクトリ構成・命名規則に合わせる。
-- Conventional Commits 形式でコミット（`feat:`, `fix:`, `docs:` 等）。
+| スキル           | 用途                                                                          |
+| ---------------- | ----------------------------------------------------------------------------- |
+| `test-inventory` | ギャップ分析・優先順位（テストは書かない）                                    |
+| `spec-test`      | 仕様抽出 → **実装を読まない**テスト設計 → Mutation / アサーション検証         |
+| サブエージェント | `spec-extractor` / `test-designer` / `mutation-verifier`（`.agents/agents/`） |
 
-## DB スキーマ変更（必読） / Database schema changes (must read)
-
-- **TS スキーマと SQL マイグレーションは常に対で更新する**。`server/api/src/schema/**/*.ts` を編集したら、必ず `server/api/drizzle/NNNN_*.sql` を新規追加し、`server/api/drizzle/meta/_journal.json` にエントリを追記する。  
-  Always pair TS schema edits with a SQL migration: add a new `server/api/drizzle/NNNN_*.sql` and append an entry to `server/api/drizzle/meta/_journal.json`. Skipping this caused production 500s in PR #728 on `/api/onboarding/status` and `/api/pages`.
-- **正本のマイグレーション置き場は `server/api/drizzle/` のみ**。CI (`deploy-{dev,prod}.yml`) は `bunx drizzle-kit migrate` だけを実行するため、ここ以外に SQL を置いても本番には適用されない。  
-  _Source of truth is `server/api/drizzle/`. CI runs only `bunx drizzle-kit migrate`; SQL placed elsewhere is dead code._
-- **マイグレーションの書き方**:
-  - 既存の手書き例（`0017_add_link_type.sql` など）の体裁に合わせ、ステートメント間に `--> statement-breakpoint` を入れる。
-  - 既存環境で重複適用されても安全になるよう、原則として `IF NOT EXISTS` / `ON CONFLICT DO NOTHING` を使う。
-  - 必要であればバックフィル（既存行への初期値投入）も同じファイル内で行う。
-  - `bunx drizzle-kit generate` で雛形を作るときは、過去スナップショットが欠落しているため巨大な diff が出ることがある。その場合は `--name` 指定の出力を手で削減し、既存マイグレーション間で重複しない形に整えてから commit する（snapshot ファイルは生成物のみ、当面コミットしない方針）。
-- **CI ガード**: `.github/workflows/ci.yml` の `drizzle-migration-check` ジョブが PR で `server/api/src/schema/**` の変更と新規 `server/api/drizzle/*.sql` がペアになっているかを検証する。例外的に SQL 不要な場合（コメント/JSDoc 修正のみなど）は PR 本文かコミットメッセージに `[skip drizzle-check]` を入れる。  
-  _CI guard `drizzle-migration-check` enforces the schema/migration pairing. Use the `[skip drizzle-check]` marker only for non-DDL edits (comments, JSDoc, type aliases that do not affect SQL)._
-- **環境別の自動適用**: `develop` への push → `deploy-dev.yml` が development DB へ migrate。`main` への push → `deploy-prod.yml` が production DB へ migrate。スキーマ追従はこの 2 本だけ。  
-  _Auto-apply: push to `develop` migrates dev DB; push to `main` migrates prod DB. No other path applies migrations._
-
-## ブランチ・PR の命名規則
-
-- **ブランチ**: `feature/説明`、`fix/説明`、`hotfix/説明`、`chore/説明` など（例: `feature/ai-models-ui`, `fix/search-crash`）。Issue 番号から作る場合は `feature/123`。
-- **PR タイトル**: コミットメッセージに合わせる。単一トピックの PR は代表的なコミットをそのまま使う。Conventional Commits 形式（例: `feat(admin): AIモデル管理UI拡張 (#218)`）。変更内容を正しく表すタイトルにし、「Config argument parsing」のように無関係な文言にしない。
-- **Cursor Cloud Agent で PR を作る場合**: 起動プロンプトに「PR タイトルは Conventional Commits で変更内容を表すこと」を含める。[Cloud Agents API](https://cursor.com/docs/background-agent/api/overview) の `target.branchName` でブランチ名を指定可能。
-
-## マージ方法
-
-- **main → develop** の同期 PR は必ず **Create a merge commit** でマージする（Squash だと develop → main の PR でコンフリクトが再発しやすい）。
-
-## PR レビュー観点
-
-- セキュリティ・パフォーマンスへの影響。
-- 公開 API や型の破壊的変更。
-- エラーハンドリングとログの適切さ。
-- 日本語・英語のコメントがプロジェクトのトーンに合っているか。
-
-## PR レビューコメント対応フロー
-
-レビューコメントへの対応は [`.agents/skills/handle-pr-review/SKILL.md`](.agents/skills/handle-pr-review/SKILL.md) の手順に従う（Cursor / Claude Code 共通。ミラー: `.claude/skills/` / `.cursor/skills/`）。
-
-**基本方針**: コメントをそのまま受け入れるのではなく、TSDoc/テスト/型定義に照らして妥当性を検証し、「修正する / 代替案で対応 / 対応不要」の 3 択で判断する。対応不要の場合は仕様根拠を添えて丁寧に説明する。
-
-## ディレクトリ構成
-
-```
-src/              # フロントエンドアプリ
-admin/            # 管理画面アプリ
-server/api/       # API サーバー
-server/hocuspocus/ # リアルタイムサーバー
-server/mcp/       # MCP サーバー (stdio / HTTP) — Claude Code 連携
-terraform/        # インフラ定義
-.agents/          # Agent Skills & サブエージェント定義（正本）。初回: `bun run init`
-```
-
-### 命名規則 / Naming conventions
-
-- **機能・ドメインのディレクトリは camelCase**（例: `src/lib/aiChat/`, `src/components/tagFilterBar/`）。kebab-case は使わない。  
-  _Feature/domain directories use camelCase. Do not use kebab-case._
-- **単一コンポーネント（とその付属ファイル群）をまとめるディレクトリは PascalCase**（例: `src/components/editor/PageEditor/`, `src/components/layout/Header/`）。  
-  _Directories wrapping a single component (and its satellites) use PascalCase._
-- **`src/pages/` 直下のページディレクトリは PascalCase**（例: `src/pages/NoteSettings/`）。  
-  _Page directories under `src/pages/` use PascalCase._
-- **例外**: `packages/ui/src/components/` は shadcn/ui 由来の kebab-case を維持する。  
-  _Exception: `packages/ui/src/components/` keeps shadcn/ui's kebab-case._
-- ファイル名: React コンポーネントは PascalCase `.tsx`、フックは `use` プレフィックス + camelCase、それ以外のユーティリティは camelCase `.ts`。  
-  _Files: components = PascalCase `.tsx`; hooks = `use*` camelCase; utilities = camelCase `.ts`._
-
-### 配置規則 / Placement rules
-
-- `src/hooks/` には **React フック（`use*`）のみ**を置く。フックでないヘルパーは `src/lib/` へ。  
-  _`src/hooks/` is for React hooks only; non-hook helpers belong in `src/lib/`._
-- `src/pages/` にフックを置かない。ページ専用フックも `src/hooks/` へ。  
-  _Do not place hooks under `src/pages/`; page-specific hooks also go to `src/hooks/`._
-- `src/hooks/` 配下も同一ドメインのフックが **2 つ以上**になったらサブディレクトリへまとめる（例: `useAIChat*` 系は `src/hooks/aiChat/`）。ドメインに属さない汎用フック（`useDebouncedValue` など）は `src/hooks/` 直下に置く。テストは対象フックと同じサブディレクトリに同居させる。  
-  _Group two or more same-domain hooks under a `src/hooks/<domain>/` subdirectory (e.g. `useAIChat*` lives in `src/hooks/aiChat/`). Keep generic, domain-agnostic hooks (e.g. `useDebouncedValue`) directly under `src/hooks/`. Colocate tests in the same subdirectory as the hook._
-- フックへの import（コンポーネント・ページ等からの利用を含む）、フック間、およびフックから他ディレクトリへの import は相対パスではなく `@/` エイリアスを使う（サブディレクトリ移動時に壊れないため）。  
-  _Import hooks via the `@/` alias (from components, pages, and other hooks alike), and likewise import other directories from hooks via `@/` rather than relative paths, so they survive moving between subdirectories._
-- `src/lib/` 直下に同一ドメインのファイルが **2 つ以上**になったらサブディレクトリへまとめる（例: `aiChat*` 系は `src/lib/aiChat/`）。  
-  _Group two or more same-domain files under a `src/lib/<domain>/` subdirectory._
-- `server/api` では再利用ロジックの置き場を区別する: ドメインロジックは `src/services/`、汎用ヘルパー（HTTP/環境変数/外部 API ラッパー等）は `src/lib/`。`*Service.ts` は `services/` に置く。  
-  _In `server/api`, domain logic lives in `src/services/`; generic helpers in `src/lib/`. `*Service.ts` files belong in `services/`._
+`spec-test` の Zedi overlay（`overlay: zedi`）がテスト配置・コマンド・Mutation 範囲の正。  
+_Overlay: `.agents/skills/spec-test/references/overlays/zedi.md`._
 
 ### テスト配置 / Test placement
 
-- **クライアント側**（`src/`, `admin/`, `packages/*`）と `server/hocuspocus`: テストは対象ファイルと**同じディレクトリに同居**させる（`foo.ts` → `foo.test.ts`）。  
-  _Client-side workspaces and `server/hocuspocus` colocate tests next to sources._
-- **`server/api` と `server/mcp`**: `src/__tests__/` 配下にソースツリーをミラーして集約する。新規テストを同居型で追加しない。  
-  _`server/api` and `server/mcp` centralize tests under `src/__tests__/`, mirroring the source tree. Do not add colocated tests there._
+| スコープ                       | 配置                                                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `src/`, `admin/`, `packages/*` | 実装と同階層（`foo.ts` → `foo.test.ts`）                                                                |
+| `app/`                         | 実装と同階層。workerd 上の統合テストは `*.worker.test.ts`、Node でしか動かないテストは `*.node.test.ts` |
+| E2E                            | `e2e/*.spec.ts`（Playwright）                                                                           |
 
-## ワークスペース構成とデプロイ / Workspaces layout and deploy
+---
 
-- ルート `package.json` の `workspaces` は `packages/*` と `admin` のみを含む。`server/api`, `server/hocuspocus`, `server/mcp` は **意図的にルートの Bun workspace から外して**、個別の Bun プロジェクトとして管理する。  
-  _Root `workspaces` covers only `packages/*` and `admin`. The three `server/*` services (`api`, `hocuspocus`, `mcp`) are intentionally kept **outside** the root Bun workspace and managed as standalone Bun projects._
+## 技術スタック / Stack
 
-### サーバ／クライアント間で共有する定数 / Sharing constants between server and client
+- **新アプリ（作り直し中）**: `app/`。`hono/jsx/dom` のクライアント、Hono の API、Better Auth、D1、Durable Objects（共同編集）を Cloudflare Worker 1 本で配信する。現行の `src/`・`admin/` の機能をここへ移し、揃ったらドメインを切り替えてリポジトリ直下へ移す（本番データはないので移行なし）。詳細は [`app/README.ja.md`](app/README.ja.md)、構成を決めた検証は [`app/docs/verification.ja.md`](app/docs/verification.ja.md)
+- **フロント（現行）**: React, TypeScript, Vite（`src/`）
+- **ランタイム**: Bun（Node ≥ 24 / Bun ≥ 1）
+- **旧バックエンド**: `server/api`・`server/hocuspocus`・`server/mcp` は削除済み。API・認証・共同編集は `app/` の Worker が持つ。現行の `src/`・`admin/` は接続先がなく、作り直しの参照用に残している
+- **管理画面**: `admin/`
+- **共有パッケージ**: `packages/ui`（`@zedi/ui`）、`packages/shared`（`@zedi/shared`）
+- **対応プラットフォーム**: Web アプリ（PWA）のみ。Tauri のデスクトップ版は廃止済み
+- **Lint / Format**: ESLint, Prettier
+- **テスト**: Vitest, Playwright, Stryker
+- **インフラ（方針）**: **Cloudflare へ完全移行予定**（Workers / Static Assets / R2 / D1・KV 等。Issue [#1088](https://github.com/otomatty/zedi/issues/1088)）。構成の正本は `app/wrangler.jsonc`。**Railway・Terraform は使用しない**（どちらも削除済み）。品質ゲートは GitHub Actions、デプロイは `wrangler deploy` へ寄せる。詳細は [`.agents/skills/cloudflare-zedi/SKILL.md`](.agents/skills/cloudflare-zedi/SKILL.md)。
 
-- `packages/shared`（`@zedi/shared`）は、フロント・admin・サーバすべてで共通利用したいピュアな TypeScript 定数を集約するためのワークスペースパッケージ。React や Node 専用 API には依存させない。  
-  _`packages/shared` (`@zedi/shared`) is a workspace package for pure TypeScript constants shared by client, admin, and (logically) server code. Keep it free of React or Node-only dependencies._
-- フロント (`src/`) と `admin/` はワークスペース内なので `import { ... } from "@zedi/shared/..."` で直接利用できる。  
-  _Workspace consumers (`src/`, `admin/`) import via `@zedi/shared/...`._
-- `server/api` 等のサーバプロジェクトはワークスペース外なので `@zedi/shared` を **直接 import できない**。代わりに同じ値を当該サーバ内に二重定義し、フロント側の vitest が `fs.readFileSync` でサーバファイルを読んで両者の文字列一致を検証するドリフト検知テスト（例: `src/lib/tagCharacterClassSync.test.ts`）を置くことで CI で同期を担保する。  
-  _Server projects (e.g. `server/api`) cannot import `@zedi/shared` because they are intentionally outside the workspace. Duplicate the constant inside the server source and add a client-side vitest (e.g. `src/lib/tagCharacterClassSync.test.ts`) that reads the server file via `fs.readFileSync` and asserts the two literals match. This keeps drift detectable in CI._
-- 値を更新する際は **`packages/shared` とサーバ側コピーを同時に編集すること**。ドリフト検知テストが落ちたら、片方しか変更していないサインなのでもう一方も追従させる。  
-  _When updating a shared value, edit `packages/shared` and the server-side copy together. If the drift test fails, the change touched only one side; sync the other._
-- 理由 / Rationale:
-  - Railway の Dockerfile ビルドは「各サービスの Root Directory」を build context に取る (例: `server/mcp`)。ここからルート `bun.lock` を参照するのは面倒で、context をサービス単位に閉じるほうが再現性が高い。  
-    _Railway Dockerfile builds take each service's Root Directory as the build context. Scoping `bun.lock` per service keeps the build self-contained and reproducible._
-  - Bun workspace が Railway 上で安定して扱えるようになった時点で再検討する（`.github/workflows/ci.yml` の `api-typecheck` / `api-test` / `mcp-test` / `hocuspocus-test` ジョブにも同じメモあり）。  
-    _Revisit when Bun workspaces are first-class on Railway (the same note lives in `ci.yml`)._
-- 運用上の影響 / Operational impact:
-  - ルートで `bun install` を実行しても `server/*` の依存は入らない。各サービスに入るには `cd server/<service> && bun install` する必要がある。  
-    _Running `bun install` at the repo root does **not** install `server/*` dependencies; run `bun install` inside each service directory._
-  - CI (`.github/workflows/ci.yml`) でも各サービスディレクトリで個別に `bun install` してから typecheck / test を実行する。具体的には `server/api` は `api-typecheck`（型チェック）と `api-test`（vitest）、`server/mcp` は `mcp-test`（型チェック + テスト）、`server/hocuspocus` は `hocuspocus-test`（vitest）の各ジョブが担当する。  
-    _CI installs each service individually, then runs its checks: `server/api` via `api-typecheck` (types) + `api-test` (vitest), `server/mcp` via `mcp-test` (types + tests), and `server/hocuspocus` via `hocuspocus-test` (vitest)._
-- デプロイ / Deploy:
-  - `server/api`, `server/hocuspocus`, `server/mcp` は Railway の GitHub 連携で自動デプロイされる (Root Directory をサービスディレクトリに設定)。CI (`deploy-dev.yml` / `deploy-prod.yml`) はフロントエンド (Cloudflare Pages) のデプロイと DB マイグレーションを担当する。  
-    _All three `server/*` services auto-deploy via Railway's GitHub integration (each Railway service is configured with the matching Root Directory). The `deploy-*.yml` workflows cover Cloudflare Pages deploys and DB migrations only._
-  - `server/mcp` は `/health` を Railway のヘルスチェックに使う (`server/mcp/railway.json`)。必須環境変数: `ZEDI_API_URL` (API の内部 URL、例: `http://api.railway.internal:3000`), `BETTER_AUTH_SECRET` (API と同値)。API サービス側には `MCP_REDIRECT_URI_ALLOW` を設定する。  
-    _`server/mcp` uses `/health` as its Railway healthcheck. Required env vars: `ZEDI_API_URL` (internal API URL), `BETTER_AUTH_SECRET` (must match the API service). The API service additionally requires `MCP_REDIRECT_URI_ALLOW`._
-  - 関連 Issue: [#564](https://github.com/otomatty/zedi/issues/564).
+---
 
-### ローカル専用メモ（`docs/`・Git 追跡外）
+## ディレクトリ構成 / Layout
 
-クローン直後は `docs/` は存在しない。必要なら次で作成する（コミットされない）。
-
-```bash
-mkdir -p docs/reviews docs/spec docs/plan docs/journal
+```
+app/                 # 作り直し中のアプリ（Worker 1 本。ルート workspace 外、独自の bun.lock）
+src/                 # フロントエンド（現行）
+admin/               # 管理画面
+packages/
+  ui/                # @zedi/ui
+  shared/            # @zedi/shared（ピュア TS 定数）
+e2e/                 # Playwright
+.agents/             # Agent Skills / サブエージェント正本（`bun run init` でミラー）
 ```
 
-| パス            | 用途                                         |
-| --------------- | -------------------------------------------- |
-| `docs/reviews/` | 調査・セルフレビューなどの長文               |
-| `docs/spec/`    | 仕様の下書き（正の仕様は常にソースとテスト） |
-| `docs/plan/`    | 実装手順の下書き                             |
-| `docs/journal/` | 作業ログ（例: `today.md`）                   |
+### 命名規則 / Naming
 
-**移行**: 以前ルートに `journal/` だけあった場合は、内容を `docs/journal/` へ移す。ルートの `journal/` は `.gitignore` 対象のまま残してもよいが、新規は `docs/journal/` を使う。
+- **機能・ドメインディレクトリ**: camelCase（例: `src/lib/aiChat/`）。kebab-case 禁止。
+- **単一コンポーネント束**: PascalCase（例: `src/components/editor/PageEditor/`）。
+- **`src/pages/` 直下**: PascalCase（例: `NoteSettings/`）。
+- **例外**: `packages/ui/src/components/` は shadcn の kebab-case を維持。
+- ファイル: コンポーネント `PascalCase.tsx`、フック `use*.ts(x)`、それ以外 `camelCase.ts`。
 
-## その他
+### 配置規則 / Placement
 
-- 変更が大きい場合は小さな PR に分ける。
-- 環境変数やシークレットはリポジトリに含めず `.env.example` で示す。
+- `src/hooks/` は **`use*` のみ**。非フックは `src/lib/`。
+- `src/pages/` にフックを置かない。ページ専用フックも `src/hooks/`。
+- 同一ドメインのフックが **2 つ以上** → `src/hooks/<domain>/`。汎用フックは `src/hooks/` 直下。テストは同居。
+- フック関連の import は相対パスではなく `@/`。
+- `src/lib/` も同一ドメインが 2 つ以上ならサブディレクトリ化。
+
+---
+
+## ワークスペースとデプロイ / Workspaces & deploy
+
+### 移行方針 / Migration target（Cloudflare）
+
+- **目標**: `app/` の Worker 1 本（Static Assets + API + D1 + Durable Objects）で配信する。Pages は使わない（Railway・Terraform は削除済み）。
+- **構成の正本**: `app/wrangler.jsonc`。DNS とドメインも Worker の `custom_domain` で管理する。
+- **CI/CD**: lint / test / typecheck は GitHub Actions。デプロイ・プレビューは `wrangler deploy` / `wrangler versions upload`（`app/` のデプロイは未作成）。
+- **カットオーバー**: 本番データがないので移行はせず、ドメインを `app/` の Worker に切り替える。手順は `cloudflare-zedi` スキルと [#1088](https://github.com/otomatty/zedi/issues/1088) を正とする。
+- Cloudflare 作業時は汎用 Cloudflare 知識より **[`.agents/skills/cloudflare-zedi/SKILL.md`](.agents/skills/cloudflare-zedi/SKILL.md)** を先に読む。
+
+### 現状（移行中） / Current (transitional)
+
+- ルート `workspaces` は **`packages/*` と `admin` のみ**。`app/` は **workspace 外**（独自の `bun.lock`）→ `cd app && bun install`。
+- CI: ルートは lint / typecheck / test / build / E2E。`app/` は `app-test`（型チェック・単体・workerd 統合・ビルド）と `app-smoke`（ブラウザのスモークテスト）。
+- **デプロイ**: なし。旧バックエンドとそのデプロイ（Railway・dev の API / MCP Worker）、現行フロント / admin のデプロイ（`deploy-dev.yml` / `deploy-prod.yml`）は削除済み。`app/` のデプロイは D1 などの本番リソースを用意してから追加する。
+
+### `@zedi/shared` / Shared constants
+
+- `packages/shared` は React / Node 専用 API に依存しないピュア TS。
+- フロント・admin は `import { … } from "@zedi/shared/…"`。
+
+---
+
+## DB スキーマ変更（必読） / Database schema changes
+
+- DB は `app/` の D1 だけ。**正本は `app/migrations/NNNN_*.sql`**（`wrangler d1 migrations apply`）。
+- **Drizzle のスキーマ（`app/src/worker/db/schema.ts`）と SQL は常に対**。表や列を変えたら同じ PR で SQL を追加する。FTS5 とトリガーは SQL にだけある。  
+  _Skipping this caused production 500s in PR #728（旧 API で）._
+- 適用済みのマイグレーションは書き換えず、新しいファイルを足す。
+
+---
+
+## ブランチ・PR・マージ / Branch, PR, merge
+
+- **ブランチ**: `feature/…`, `fix/…`, `hotfix/…`, `chore/…`（Issue なら `feature/123` 等）。
+- **PR タイトル**: Conventional Commits で変更内容を表す（無関係な定型文禁止）。Cloud Agent 起動時も同様に指示。
+- **main → develop** の同期は必ず **Create a merge commit**（Squash 禁止）。

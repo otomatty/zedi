@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { AIChatPanelContent } from "./AIChatPanelContent";
 
 const mocks = vi.hoisted(() => ({
-  activeViewTab: "workflow" as "chat" | "branch" | "workflow",
+  activeViewTab: "chat" as "chat" | "branch",
   setActiveViewTab: vi.fn(),
 }));
 
@@ -48,13 +48,6 @@ vi.mock("@/hooks/wiki/usePromoteToWiki", () => ({
   }),
 }));
 
-vi.mock("@/lib/platform", () => ({
-  isTauriDesktop: vi.fn(() => false),
-}));
-
-const platformMod = () =>
-  import("@/lib/platform") as Promise<{ isTauriDesktop: ReturnType<typeof vi.fn> }>;
-
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string) => key,
@@ -95,31 +88,12 @@ vi.mock("./PromoteToWikiDialog", () => ({
 }));
 
 describe("AIChatPanelContent", () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    mocks.activeViewTab = "workflow";
-    const { isTauriDesktop } = await platformMod();
-    isTauriDesktop.mockReturnValue(false);
-  });
-
-  it("falls back to chat when workflow tab is persisted on web", () => {
-    render(
-      <AIChatPanelContent
-        activeConversationId={null}
-        setActiveConversation={vi.fn()}
-        contextEnabled={false}
-        showConversationList={false}
-      />,
-    );
-
-    expect(mocks.setActiveViewTab).toHaveBeenCalledWith("chat");
-  });
-
-  it("does not force a fallback on desktop", async () => {
-    const { isTauriDesktop } = await platformMod();
-    isTauriDesktop.mockReturnValue(true);
     mocks.activeViewTab = "chat";
+  });
 
+  const renderPanel = () =>
     render(
       <AIChatPanelContent
         activeConversationId={null}
@@ -129,7 +103,20 @@ describe("AIChatPanelContent", () => {
       />,
     );
 
+  it("shows the messages and the input on the chat tab", () => {
+    renderPanel();
+
+    expect(screen.getByTestId("ai-chat-messages")).toBeInTheDocument();
+    expect(screen.getByTestId("ai-chat-input")).toBeInTheDocument();
     expect(mocks.setActiveViewTab).not.toHaveBeenCalled();
+  });
+
+  it("keeps the input but not the messages on the branch tab", () => {
+    mocks.activeViewTab = "branch";
+
+    renderPanel();
+
+    expect(screen.queryByTestId("ai-chat-messages")).not.toBeInTheDocument();
     expect(screen.getByTestId("ai-chat-input")).toBeInTheDocument();
   });
 });

@@ -21,15 +21,6 @@ export interface Conversation {
   updatedAt: number;
 }
 
-/**
- * ツール実行状況の 1 エントリ。
- * A single tool execution status entry.
- */
-export interface ToolExecution {
-  toolName: string;
-  status: "running" | "completed";
-}
-
 /** メッセージ */
 export interface ChatMessage {
   id: string;
@@ -39,11 +30,6 @@ export interface ChatMessage {
   referencedPages?: ReferencedPage[]; // このメッセージに添付された参照ページ
   /** このメッセージの生成に使用されたモデル表示名 */
   modelDisplayName?: string;
-  /**
-   * ストリーミング中のツール実行状況リスト（Claude Code のみ）。
-   * Tool execution status list during streaming (Claude Code only).
-   */
-  toolExecutions?: ToolExecution[];
   timestamp: number;
   isStreaming?: boolean;
   error?: string;
@@ -75,10 +61,7 @@ export interface ChatTreeState {
 
 /** AI がプロアクティブに提案するアクション */
 export type ChatAction =
-  | CreatePageAction
-  | AppendToPageAction
-  | CreateMultiplePagesAction
-  | SuggestWikiLinksAction;
+  CreatePageAction | AppendToPageAction | CreateMultiplePagesAction | SuggestWikiLinksAction;
 
 /**
  * Proposes creating a single new page from chat (Markdown body + optional outline for staged generation).
@@ -167,11 +150,6 @@ export interface PageContext {
    * ノート内に表示している linked personal page は `undefined` のままにする。
    */
   noteId?: string;
-  /**
-   * Linked local workspace root for Claude Code cwd (desktop, not sent to API server).
-   * Claude Code cwd 用のローカルワークスペース（デスクトップ、API サーバには送らない）。
-   */
-  claudeWorkspaceRoot?: string;
   pageTitle?: string;
   pageContent?: string;
   /** Full editor content for local actions such as AI-driven page updates. */

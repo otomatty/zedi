@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   isStorageConfiguredForUpload: vi.fn(() => true),
   getSettingsForUpload: vi.fn((settings: unknown) => settings),
   convertToWebP: vi.fn(async (file: File) => file),
+  isAnimatedPng: vi.fn(async (_file: File) => false),
   storageSettings: {
     settings: {
       provider: "s3",
@@ -44,6 +45,7 @@ vi.mock("@/lib/storage", () => ({
   getSettingsForUpload: (settings: unknown) => mocks.getSettingsForUpload(settings),
   isStorageConfiguredForUpload: () => mocks.isStorageConfiguredForUpload(),
   convertToWebP: (file: File) => mocks.convertToWebP(file),
+  isAnimatedPng: (file: File) => mocks.isAnimatedPng(file),
 }));
 
 import { useImageUpload } from "@/hooks/media/useImageUpload";
@@ -62,6 +64,7 @@ describe("useImageUpload", () => {
     mocks.providerUploadImage.mockResolvedValue("https://cdn.example.com/image.webp");
     mocks.isStorageConfiguredForUpload.mockReturnValue(true);
     mocks.convertToWebP.mockImplementation(async (file: File) => file);
+    mocks.isAnimatedPng.mockResolvedValue(false);
     mocks.storageSettings = {
       settings: {
         provider: "s3",
@@ -193,6 +196,22 @@ describe("useImageUpload", () => {
         await result.current.uploadImage(original);
       });
 
+      expect(mocks.convertToWebP).not.toHaveBeenCalled();
+      expect(mocks.providerUploadImage).toHaveBeenCalledWith(original, expect.any(Object));
+    });
+
+    it("does NOT convert an APNG (animated image/png) to WebP", async () => {
+      // APNG は MIME が image/png でも acTL を持つためアニメーションを保持してそのまま上げる。
+      // Pin that an animated PNG skips WebP conversion (preserve animation).
+      mocks.isAnimatedPng.mockResolvedValueOnce(true);
+      const original = makeFile("image/png", "anim.png");
+      const { result } = renderHook(() => useImageUpload());
+
+      await act(async () => {
+        await result.current.uploadImage(original);
+      });
+
+      expect(mocks.isAnimatedPng).toHaveBeenCalledWith(original);
       expect(mocks.convertToWebP).not.toHaveBeenCalled();
       expect(mocks.providerUploadImage).toHaveBeenCalledWith(original, expect.any(Object));
     });
@@ -380,9 +399,14 @@ describe("useImageUpload", () => {
     it("returns URLs in input order (Promise.all preserves order)", async () => {
       // 戻り値は入力順を保つ（Promise.all のセマンティクスに依存）。
       // Pin in-order URL return so a `.map` → `.reverse` mutation is caught.
-      mocks.providerUploadImage
-        .mockResolvedValueOnce("https://cdn.example.com/1.webp")
-        .mockResolvedValueOnce("https://cdn.example.com/2.webp");
+      // provider 解決順ではなくファイル名で URL を決め、変換経路の await 深さ差に依存しない。
+      // Map URL by file name (not call order) so the assertion is robust to
+      // differing await depths between the JPEG / PNG conversion paths.
+      mocks.providerUploadImage.mockImplementation(async (file: File) =>
+        file.name === "first.png"
+          ? "https://cdn.example.com/1.webp"
+          : "https://cdn.example.com/2.webp",
+      );
       const { result } = renderHook(() => useImageUpload());
 
       let urls: string[] = [];

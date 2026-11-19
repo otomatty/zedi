@@ -16,9 +16,6 @@ import { useFloatingActionButtonHandlers } from "./useFloatingActionButtonHandle
  * Common FAB props. When `noteId` is supplied the FAB creates pages scoped to
  * that note and routes to `/notes/:noteId/:pageId` instead of the
  * standalone `/pages/:id`.
- *
- * When initialClipUrl is provided, onClipDialogClosedWithInitialUrl is required
- * so the dialog can be closed and URL cleared.
  */
 type FloatingActionButtonProps = {
   noteId?: string;
@@ -30,16 +27,7 @@ type FloatingActionButtonProps = {
    * all — page creation requires sign-in (issue #1020).
    */
   hiddenOptions?: FABMenuOption[];
-} & (
-  | {
-      initialClipUrl?: null;
-      onClipDialogClosedWithInitialUrl?: never;
-    }
-  | {
-      initialClipUrl: string;
-      onClipDialogClosedWithInitialUrl: () => void;
-    }
-);
+};
 
 /**
  * ホーム／ノート詳細用フローティングアクションボタン。新規・URL・画像作成メニューを表示する。
@@ -47,8 +35,6 @@ type FloatingActionButtonProps = {
  * When `noteId` is supplied the created page is linked to that note.
  */
 const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
-  initialClipUrl,
-  onClipDialogClosedWithInitialUrl,
   noteId,
   hiddenOptions: extraHiddenOptions,
 }) => {
@@ -65,15 +51,9 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
       // サインアウト遷移ではコンポーネントは unmount されず `null` を返すだけ
       // なので、開いたままのメニュー / ダイアログ状態が残ると再サインイン時に
       // 突然再表示される。ローカル UI 状態をここで畳む（PR #1023 CodeRabbit）。
-      // `initialClipUrl` の破棄はしない — サインイン往復（#826 の clipUrl
-      // handoff）ではセッション読込中に一時的に未サインイン判定になるため、
-      // ここで親に閉じ通知すると正規の handoff を壊してしまう。
       // On sign-out the component stays mounted and merely renders null, so
       // stale open-menu/dialog state would resurface on the next sign-in.
-      // Collapse the local UI state here (PR #1023 CodeRabbit review). Do NOT
-      // clear `initialClipUrl`: the sign-in round trip (#826 clipUrl handoff)
-      // passes through a transient unauthenticated state, and notifying the
-      // parent here would destroy the legitimate handoff.
+      // Collapse the local UI state here (PR #1023 CodeRabbit review).
       queueMicrotask(() => {
         setIsMenuOpen(false);
         setIsWebClipperOpen(false);
@@ -81,8 +61,6 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
       });
     }
   }, [isSignedIn]);
-
-  const isWebClipperOpenDerived = isWebClipperOpen || Boolean(initialClipUrl && isSignedIn);
 
   const handlers = useFloatingActionButtonHandlers({
     createNewPage,
@@ -142,15 +120,9 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
 
       {isSignedIn && (
         <WebClipperDialog
-          open={isWebClipperOpenDerived}
-          onOpenChange={(open) => {
-            setIsWebClipperOpen(false);
-            if (!open && initialClipUrl && onClipDialogClosedWithInitialUrl) {
-              onClipDialogClosedWithInitialUrl();
-            }
-          }}
+          open={isWebClipperOpen}
+          onOpenChange={setIsWebClipperOpen}
           onClipped={handlers.handleWebClipped}
-          initialUrl={initialClipUrl ?? undefined}
         />
       )}
 

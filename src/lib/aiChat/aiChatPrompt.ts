@@ -1,6 +1,5 @@
 import i18n from "@/i18n";
 import type { PageContext, ReferencedPage } from "@/types/aiChat";
-import type { McpServerEntry } from "@/types/mcp";
 import { getAiChatActionFormatBlock } from "./aiChatPromptActionFormat";
 
 /**
@@ -60,33 +59,6 @@ function buildReferencedPagesSection(referencedPages: ReferencedPage[]): string 
 }
 
 /**
- * 有効な MCP サーバー節。Enabled MCP servers block.
- */
-function buildMcpSection(mcpServers: McpServerEntry[]): string {
-  const enabled = mcpServers.filter((s) => s.enabled);
-  if (enabled.length === 0) return "";
-  const t = i18n.getFixedT(i18n.language);
-
-  let section = `\n${t("aiPrompt.mcp.section")}\n`;
-  section += `${t("aiPrompt.mcp.intro")}\n`;
-  section += `${t("aiPrompt.mcp.notation")}\n\n`;
-
-  for (const server of enabled) {
-    section += `- **${server.name}**`;
-    if (server.tools && server.tools.length > 0) {
-      const toolNames = server.tools.map((x) => x.name).join(", ");
-      section += ` (${t("aiPrompt.mcp.toolsPrefix")} ${toolNames})`;
-    }
-    if (server.status === "connected") {
-      section += ` ${t("aiPrompt.mcp.connected")}`;
-    }
-    section += "\n";
-  }
-
-  return section;
-}
-
-/**
  * システム本文（役割・ガイドライン・既存タイトル説明）を `t` で連結。
  * System body: role, guidelines, existing-page list intro/footer.
  */
@@ -117,15 +89,14 @@ ${t("aiPrompt.system.existingListFooter")}
 }
 
 /**
- * 現在のコンテキスト・既存ページ・参照・MCP から AI チャット用システムプロンプトを返す。
+ * 現在のコンテキスト・既存ページ・参照から AI チャット用システムプロンプトを返す。
  * Returns the full AI chat system prompt.
  */
 export function buildSystemPrompt(
   context: PageContext | null,
   existingPageTitles: string[],
   referencedPages: ReferencedPage[] = [],
-  mcpServers: McpServerEntry[] = [],
 ): string {
   const core = buildSystemCore(existingPageTitles);
-  return `${core}${context ? buildContextSection(context) : ""}${buildReferencedPagesSection(referencedPages)}${buildMcpSection(mcpServers)}`;
+  return `${core}${context ? buildContextSection(context) : ""}${buildReferencedPagesSection(referencedPages)}`;
 }

@@ -1,5 +1,4 @@
-import { Monitor, Moon, Palette, Sun, Terminal, Type } from "lucide-react";
-import { Checkbox } from "@zedi/ui";
+import { Monitor, Moon, Palette, Sun, Type } from "lucide-react";
 import { Input } from "@zedi/ui";
 import { Label } from "@zedi/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@zedi/ui";
@@ -20,11 +19,9 @@ export interface DisplaySettingsCardProps {
   editorFontSize: EditorFontSize;
   customFontSizePx?: number;
   editorFontSizePx: number;
-  executableCodeConfirmBeforeRun: boolean;
   updateTheme: (v: ThemeMode) => void;
   updateEditorFontSize: (v: EditorFontSize) => void;
   updateCustomFontSizePx: (px: number) => void;
-  updateExecutableCodeConfirmBeforeRun: (v: boolean) => void;
 }
 
 /**
@@ -36,11 +33,9 @@ export function DisplaySettingsCard({
   editorFontSize,
   customFontSizePx,
   editorFontSizePx,
-  executableCodeConfirmBeforeRun,
   updateTheme,
   updateEditorFontSize,
   updateCustomFontSizePx,
-  updateExecutableCodeConfirmBeforeRun,
 }: DisplaySettingsCardProps) {
   const { t } = useTranslation();
   const customPxInput = editorFontSize === "custom" ? (customFontSizePx ?? 16) : 16;
@@ -157,26 +152,6 @@ export function DisplaySettingsCard({
               {t("generalSettings.fontSize.preview")}
             </p>
             <p className="text-foreground mt-1.5">{t("generalSettings.fontSize.previewText")}</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <Terminal className="text-muted-foreground h-4 w-4 shrink-0" aria-hidden />
-            <p className="text-sm font-medium">{t("generalSettings.executableCode.title")}</p>
-          </div>
-          <p className="text-muted-foreground text-sm">
-            {t("generalSettings.executableCode.description")}
-          </p>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="executable-code-confirm"
-              checked={executableCodeConfirmBeforeRun}
-              onCheckedChange={(v) => updateExecutableCodeConfirmBeforeRun(v === true)}
-            />
-            <Label htmlFor="executable-code-confirm" className="text-sm font-normal">
-              {t("generalSettings.executableCode.confirmBeforeRun")}
-            </Label>
           </div>
         </div>
       </CardContent>

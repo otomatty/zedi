@@ -78,4 +78,51 @@ describe("McpAuthorize sign-in redirect", () => {
     const expectedReturnTo = `/mcp/authorize${search}`;
     expect(target).toBe(`/sign-in?returnTo=${encodeURIComponent(expectedReturnTo)}`);
   });
+
+  it.each(["?code_challenge=abc", "?redirect_uri=http%3A%2F%2F127.0.0.1%3A9876%2Fcb", ""])(
+    "shows missing parameter errors without sending a request: %s",
+    (search) => {
+      render(
+        <MemoryRouter initialEntries={[`/mcp/authorize${search}`]}>
+          <McpAuthorize />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByText("redirect_uri and code_challenge are required")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("shows the authorization API error and permits another approval attempt", async () => {
+    const search =
+      "?redirect_uri=http%3A%2F%2F127.0.0.1%3A9876%2Fcb&code_challenge=abc&state=xyz&scopes=mcp%3Aread";
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "Authorization denied" }), { status: 403 }),
+    );
+    render(
+      <MemoryRouter initialEntries={[`/mcp/authorize${search}`]}>
+        <McpAuthorize />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+
+    expect(await screen.findByText("Authorization denied")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/mcp/authorize-code"),
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({
+          redirect_uri: "http://127.0.0.1:9876/cb",
+          code_challenge: "abc",
+          state: "xyz",
+          scopes: ["mcp:read"],
+        }),
+      }),
+    );
+  });
 });

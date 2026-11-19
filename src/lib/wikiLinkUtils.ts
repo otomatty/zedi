@@ -42,8 +42,7 @@ export function extractWikiLinksFromContent(content: string): WikiLinkInfo[] {
             (mark as Record<string, unknown>).type === "wikiLink"
           ) {
             const attrs = (mark as Record<string, unknown>).attrs as
-              | Record<string, unknown>
-              | undefined;
+              Record<string, unknown> | undefined;
             if (attrs?.title) {
               wikiLinks.push({
                 title: attrs.title as string,
@@ -111,8 +110,7 @@ export function updateWikiLinkAttributes(
             (mark as Record<string, unknown>).type === "wikiLink"
           ) {
             const attrs = (mark as Record<string, unknown>).attrs as
-              | Record<string, unknown>
-              | undefined;
+              Record<string, unknown> | undefined;
             if (attrs?.title) {
               const normalizedTitle = (attrs.title as string).toLowerCase().trim();
               const newExists = pageTitles.has(normalizedTitle);

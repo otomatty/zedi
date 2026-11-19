@@ -5,15 +5,13 @@ import { useAIChatTreeLoaders } from "@/hooks/aiChat/useAIChatTreeLoaders";
 
 vi.mock("@/lib/conversationMigration", () => ({
   migrateConversation: vi.fn((c: Conversation) => c),
-  flatMessagesToTree: vi.fn(
-    (msgs: ChatMessage[]): ChatTreeState => ({
-      messageMap: Object.fromEntries(
-        msgs.map((m, i) => [m.id, { ...m, parentId: i === 0 ? null : msgs[i - 1].id }]),
-      ),
-      rootMessageId: msgs.length > 0 ? msgs[0].id : null,
-      activeLeafId: msgs.length > 0 ? msgs[msgs.length - 1].id : null,
-    }),
-  ),
+  flatMessagesToTree: vi.fn((msgs: ChatMessage[]): ChatTreeState => ({
+    messageMap: Object.fromEntries(
+      msgs.map((m, i) => [m.id, { ...m, parentId: i === 0 ? null : msgs[i - 1].id }]),
+    ),
+    rootMessageId: msgs.length > 0 ? msgs[0].id : null,
+    activeLeafId: msgs.length > 0 ? msgs[msgs.length - 1].id : null,
+  })),
 }));
 
 import { migrateConversation, flatMessagesToTree } from "@/lib/conversationMigration";

@@ -23,19 +23,5 @@
  *   `぀-ヿ` (U+3040..U+30FF) covers both contiguously.
  * - CJK 統合漢字 + 拡張 A: U+3400..U+9FFF (`㐀-鿿`)
  *   CJK Unified Ideographs + Extension A.
- *
- * 同期義務 / Sync obligation:
- * - 本ファイルを編集したら、`server/api/src/services/ydocRenameRewrite.ts`
- *   の `TAG_NAME_CHAR_CLASS_STRING` も一致させること。`server/api` はワーク
- *   スペース外（自前の `bun.lock` を持つ Railway ビルド）なのでこの定数を
- *   直接 import できない。代わりに `src/lib/tagCharacterClassSync.test.ts`
- *   が両者の文字列一致を CI でチェックする。
- *
- *   When this file changes, also update
- *   `server/api/src/services/ydocRenameRewrite.ts`'s
- *   `TAG_NAME_CHAR_CLASS_STRING` to match. `server/api` lives outside the
- *   Bun workspace (its own `bun.lock` is consumed by Railway), so it cannot
- *   import this constant. `src/lib/tagCharacterClassSync.test.ts` enforces
- *   the equality in CI.
  */
 export const TAG_NAME_CHAR_CLASS = "A-Za-z0-9_\\-぀-ヿ㐀-鿿";

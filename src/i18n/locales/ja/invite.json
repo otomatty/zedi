@@ -9,7 +9,6 @@
   "joining": "参加中...",
   "signInToAccept": "招待を承認するにはサインインしてください",
   "signInWithGoogle": "Google でサインイン",
-  "signInWithGitHub": "GitHub でサインイン",
   "emailMismatch": "このアカウント ({{userEmail}}) は招待先 ({{email}}) と異なります。",
   "emailMismatchHelp": "以下のいずれかの方法で招待を受諾できます。",
   "sendMagicLinkCta": "{{email}} 宛にサインインリンクを送る",

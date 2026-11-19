@@ -19,7 +19,6 @@ import { PageActionHub } from "@/components/editor/PageActionHub/PageActionHub";
 import { useTiptapEditorController } from "./TiptapEditor/useTiptapEditorController";
 import { useBubbleMenuWikiLink } from "./TiptapEditor/useBubbleMenuWikiLink";
 import { useEditorWikiLinkShortcuts } from "@/hooks/wiki/useEditorWikiLinkShortcuts";
-import { SlashAgentLoadingOverlay } from "./TiptapEditor/SlashAgentLoadingOverlay";
 import { useVirtualKeyboardOffset } from "@/hooks/useVirtualKeyboardOffset";
 
 // Re-export types for consumers
@@ -47,11 +46,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
   pageActionHubRef,
   initialContent,
   onInitialContentApplied,
-  isWikiGenerating = false,
-  wikiContentForCollab,
-  onWikiContentApplied,
   pageNoteId = null,
-  wikiComposeHref,
   bottomBarTrailingAction,
 }) => {
   const { t } = useTranslation();
@@ -96,11 +91,6 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     storageSetupDialogOpen,
     setStorageSetupDialogOpen,
     handleGoToStorageSettings,
-    slashAgentBusy,
-    claudeAgentSlashAvailable,
-    onSlashAgentBusyChange,
-    claudeWorkspaceRoot,
-    claudeWorkspaceNoteId,
     pageNoteId: resolvedPageNoteId,
   } = useTiptapEditorController({
     content,
@@ -117,11 +107,7 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
     pageActionHubRef,
     initialContent,
     onInitialContentApplied,
-    isWikiGenerating,
-    wikiContentForCollab,
-    onWikiContentApplied,
     pageNoteId,
-    wikiComposeHref,
   });
 
   // 入力バーへフォーカスを移すための imperative ハンドル（issue #928 §Cmd+K）。
@@ -228,13 +214,8 @@ const TiptapEditor: React.FC<TiptapEditorProps> = ({
           position={slashPos}
           suggestionRef={slashRef}
           onClose={handleSlashClose}
-          claudeAgentSlashAvailable={claudeAgentSlashAvailable}
-          onAgentBusyChange={onSlashAgentBusyChange}
-          claudeWorkspaceRoot={claudeWorkspaceRoot}
-          claudeWorkspaceNoteId={claudeWorkspaceNoteId}
         />
       )}
-      {slashAgentBusy ? <SlashAgentLoadingOverlay label={t("editor.slashAgentRunning")} /> : null}
       <MermaidGeneratorDialog
         open={mermaidDialogOpen}
         onOpenChange={setMermaidDialogOpen}

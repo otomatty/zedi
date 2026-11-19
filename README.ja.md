@@ -150,84 +150,9 @@ bun run dev
 
 ポートが使用中の場合は、自動的に次の利用可能なポートが使用されます。
 
-### Dockerを使った並列開発（オプション）
-
-複数のアプリケーションインスタンスを並列で開発する場合、Dockerを使用できます：
-
-```bash
-# Dockerイメージをビルド
-bun run docker:build
-
-# すべてのインスタンスを起動（3つ同時に起動）
-bun run docker:up
-
-# バックグラウンドで起動
-bun run docker:up:d
-
-# 停止
-bun run docker:down
-
-# ログを確認
-bun run docker:logs
-```
-
-起動後、以下のURLでアクセスできます：
-
-- インスタンス1: http://localhost:30000
-- インスタンス2: http://localhost:30001
-- インスタンス3: http://localhost:30002
-
-Docker で複数インスタンスを動かす場合は、ポートをずらして起動する（チーム内で手順を共有する）。
-
-> **Note:** Dockerを使う場合、最低8GBのRAM（推奨: 16GB以上）が必要です。軽量な並列開発が必要な場合は、環境変数によるポート設定の方が適しています。
-
-### デスクトップアプリ（Tauri）
-
-Zedi は [Tauri 2.0](https://v2.tauri.app/) によるデスクトップアプリとしても起動できます。
-
-#### 前提条件（Desktop）
-
-- [Rust](https://www.rust-lang.org/tools/install) (rustup で stable を導入)
-- **Windows**: Microsoft C++ Build Tools + Windows 11 SDK
-- **macOS**: Xcode Command Line Tools (`xcode-select --install`)
-- **Linux**: `libwebkit2gtk-4.1-dev`, `build-essential`, `libssl-dev` 等（[詳細](https://v2.tauri.app/guides/prerequisites/)）
-
-#### デスクトップアプリの起動
-
-```bash
-# 開発モード（Vite dev server + Tauri WebView）
-bun run tauri:dev
-
-# プロダクションビルド（インストーラー生成）
-bun run tauri:build
-```
-
-- **Claude Code sidecar** ([Issue #456](https://github.com/otomatty/zedi/issues/456)): `externalBin` 用の sidecar は `src-tauri/binaries/` に配置する。初回 `tauri:dev` で自動ビルド、手動は `bun run sidecar:build`。
-
-> **Windows + Git Bash の場合**: MSVC のビルドツールが PATH に含まれていない場合、
-> Developer Command Prompt for VS 2022 から実行するか、
-> `.bashrc` に `LIB`, `INCLUDE`, `PATH` を設定してください。
-> 詳細は [Issue #49](https://github.com/otomatty/zedi/issues/49) を参照。
-> **Note**: デスクトップ版は現在 Phase D（開発中）です。ストレージは暫定的に IndexedDB を使用しており、
-> Tauri 固有のストレージ (SQLite) は [#50](https://github.com/otomatty/zedi/issues/50) で対応予定です。
-
 ### 環境変数の設定（オプション）
 
-AI 機能・認証・API 連携を使う場合は、`.env.local` を作成してください。サンプルは [.env.example](.env.example) を参照してください。
-
-```bash
-# REST API（Hono on Bun: server/api）。フロントから叩く API のベース URL。
-VITE_API_BASE_URL=http://localhost:3000
-
-# リアルタイム共同編集（Hocuspocus / Y.js: server/hocuspocus）
-VITE_REALTIME_URL=ws://localhost:1234   # 本番は wss://realtime.zedi-note.app など
-
-# Pro プラン課金（Polar、オプション）
-# VITE_POLAR_PRO_MONTHLY_PRODUCT_ID=...
-# VITE_POLAR_PRO_YEARLY_PRODUCT_ID=...
-```
-
-サーバー側（`server/api`）では Better Auth 用の `BETTER_AUTH_SECRET` / `BETTER_AUTH_URL`、PostgreSQL 接続情報、Polar の `POLAR_ACCESS_TOKEN`、メール送信用 `RESEND_API_KEY` などを設定します。詳細は [.env.example](.env.example) を参照してください。
+旧バックエンド（`server/api`・`server/hocuspocus`・`server/mcp`）は削除済みのため、現行フロントにはサインインや同期の接続先がありません。[.env.example](.env.example) はビルドに必要な値だけを持ちます。作り直したアプリ（`app/`）の設定は `app/.dev.vars` に置きます（[app/README.ja.md](app/README.ja.md) を参照）。
 
 > **Note:** 環境変数なしでもフロント単体はローカルで動作します（一部データは IndexedDB に保存）。AI 機能はアプリの設定画面から各プロバイダの API キーを入力して使用できます。
 
@@ -235,32 +160,25 @@ VITE_REALTIME_URL=ws://localhost:1234   # 本番は wss://realtime.zedi-note.app
 
 ## 🛠 Tech Stack
 
-| Category          | Technology                                                                                                 |
-| ----------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Frontend**      | React 19 + TypeScript 6 / React Router v7                                                                  |
-| **Build Tool**    | Vite 8 (`@vitejs/plugin-react-swc`) / Bun                                                                  |
-| **Desktop**       | Tauri 2.0 (Rust) — `src-tauri/`                                                                            |
-| **Editor**        | Tiptap 3 (ProseMirror) — tables / math (KaTeX) / code (lowlight) / collaboration (Y.js)                    |
-| **Styling**       | Tailwind CSS v4 + shadcn/ui (Radix UI primitives) / `next-themes`                                          |
-| **State / Data**  | Zustand 5 + TanStack Query 5 / React Hook Form + Zod                                                       |
-| **i18n**          | i18next + react-i18next                                                                                    |
-| **Visualization** | Recharts / `@xyflow/react` (React Flow) / Mermaid / KaTeX / Tesseract.js (OCR)                             |
-| **Auth**          | [Better Auth](https://better-auth.com/) (OAuth / セッション cookie)                                        |
-| **API**           | `server/api` — Hono on Bun + Drizzle ORM (PostgreSQL)                                                      |
-| **Database**      | PostgreSQL (Drizzle migrations: `server/api/drizzle/`) / IndexedDB (local・ブラウザ)                       |
-| **Realtime**      | `server/hocuspocus` — Hocuspocus (Y.js) によるリアルタイム共同編集                                         |
-| **MCP**           | `server/mcp` — Claude Code 連携（stdio / HTTP、詳細は [server/mcp/README.ja.md](server/mcp/README.ja.md)） |
-| **Storage**       | AWS S3（API 経由でアップロード、`@aws-sdk/client-s3`）                                                     |
-| **Billing**       | [Polar](https://polar.sh/) (`@polar-sh/sdk`) — Pro プラン                                                  |
-| **Email**         | Resend                                                                                                     |
-| **AI**            | OpenAI / Anthropic / Google Gemini（OpenRouter で価格情報を取得）                                          |
-| **Browser Ext.**  | `extension/` — Manifest v3 (Chrome 拡張)                                                                   |
-| **Admin**         | `admin/` — 別 Vite + React アプリ                                                                          |
-| **Workspaces**    | Bun workspaces: `packages/ui`（shadcn）, `packages/claude-sidecar` / `admin`                               |
-| **Deploy**        | Cloudflare Pages（フロント） + Railway（`server/api`, `hocuspocus`, `mcp`） / Terraform (Cloudflare)       |
-| **CI/CD**         | GitHub Actions（lint / typecheck / test / mutation / deploy）                                              |
-| **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker（Mutation Testing）                                      |
-| **Tooling**       | ESLint 9 / Prettier / Husky + lint-staged / commitlint / Knip                                              |
+| Category          | Technology                                                                                               |
+| ----------------- | -------------------------------------------------------------------------------------------------------- |
+| **Frontend**      | React 19 + TypeScript 6 / React Router v7                                                                |
+| **Build Tool**    | Vite 8 (`@vitejs/plugin-react-swc`) / Bun                                                                |
+| **Editor**        | Tiptap 3 (ProseMirror) — tables / math (KaTeX) / code (lowlight) / collaboration (Y.js)                  |
+| **Styling**       | Tailwind CSS v4 + shadcn/ui (Radix UI primitives) / `next-themes`                                        |
+| **State / Data**  | Zustand 5 + TanStack Query 5 / React Hook Form + Zod                                                     |
+| **i18n**          | i18next + react-i18next                                                                                  |
+| **Visualization** | Recharts / `@xyflow/react` (React Flow) / Mermaid / KaTeX / Tesseract.js (OCR)                           |
+| **Auth**          | [Better Auth](https://better-auth.com/) (OAuth / セッション cookie)                                      |
+| **Backend**       | `app/`（作り直し中）— Cloudflare Worker 1 本: Hono + Better Auth + D1 (Drizzle) + Durable Objects (Y.js) |
+| **Database**      | D1（マイグレーション: `app/migrations/`）/ IndexedDB (local・ブラウザ)                                   |
+| **AI**            | OpenAI / Anthropic / Google Gemini（OpenRouter で価格情報を取得）                                        |
+| **Admin**         | `admin/` — 別 Vite + React アプリ                                                                        |
+| **Workspaces**    | Bun workspaces: `packages/ui`（shadcn）, `packages/shared` / `admin`                                     |
+| **Deploy**        | 現在はなし。作り直した `app/` を Cloudflare Worker 1 本としてデプロイする予定（`wrangler deploy`）       |
+| **CI/CD**         | GitHub Actions（lint / typecheck / test / mutation）                                                     |
+| **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker（Mutation Testing）                                    |
+| **Tooling**       | ESLint 9 / Prettier / Husky + lint-staged / commitlint / Knip                                            |
 
 ---
 
@@ -302,48 +220,31 @@ bun run test:mutation:dry
 bun run test:mutation
 ```
 
-品質指標・テスト方針・仕様の書き方は [AGENTS.md](AGENTS.md) と [SPECIFICATION_POLICY.md](SPECIFICATION_POLICY.md) を参照してください。
+品質指標・テスト方針（TDD / Mutation）・仕様の書き方は [AGENTS.md](AGENTS.md) を参照してください。
 
 ---
 
 ## 📁 Project Structure
 
+Zedi は `app/` で Cloudflare Worker 1 本の構成（hono/jsx/dom、Hono、Better Auth、D1、Durable Objects）に作り直しています。現行アプリの機能が揃ったら `src/`・`admin/` を置き換えます。旧バックエンド（`server/*`）は削除済みです。詳細は [app/README.ja.md](app/README.ja.md)。
+
 ```
+app/                     # 作り直し中のアプリ（Worker 1 本。ルート workspace 外）
 src/                     # フロントエンド本体（React + Vite）
 ├── components/          # React コンポーネント（editor / page / search / layout / ui ほか）
 ├── hooks/               # カスタムフック
-├── lib/                 # ユーティリティ（`claudeCode/` = Tauri↔Claude Code ブリッジ）
+├── lib/                 # ユーティリティ
 ├── pages/               # ルートに対応するページコンポーネント（React Router v7）
 ├── stores/              # Zustand ストア
 └── types/               # TypeScript 型定義
 
-src-tauri/               # Tauri 2.0 デスクトップバックエンド（Rust）
-├── src/
-│   ├── main.rs          # デスクトップ エントリポイント
-│   ├── lib.rs           # Tauri アプリ本体・Commands 定義
-│   └── claude_sidecar.rs # Claude Code sidecar プロセス管理（Issue #456）
-├── binaries/            # externalBin（`bun run sidecar:build`、gitignore）
-├── capabilities/        # セキュリティ権限定義
-├── icons/               # アプリアイコン（各 OS 用）
-├── Cargo.toml           # Rust 依存管理
-└── tauri.conf.json      # Tauri 設定
-
-server/                  # Railway で個別デプロイされる Bun プロジェクト群
-├── api/                 # REST / Auth API（Hono on Bun + Better Auth + Drizzle ORM）
-├── hocuspocus/          # リアルタイム共同編集サーバー（Hocuspocus / Y.js）
-└── mcp/                 # MCP サーバー — Claude Code 連携（stdio / HTTP）。詳細は [server/mcp/README.ja.md](server/mcp/README.ja.md)
-
 packages/                # Bun workspaces（共有ライブラリ）
-├── ui/                  # `@zedi/ui` — shadcn/ui ベースの共有 UI コンポーネント
-└── claude-sidecar/      # Tauri sidecar 用 Claude Code クライアント
+└── ui/                  # `@zedi/ui` — shadcn/ui ベースの共有 UI コンポーネント
 
 admin/                   # 管理画面アプリ（別 Vite + React + Tailwind / `@zedi/ui` 利用）
-extension/               # ブラウザ拡張（Manifest v3、Web Clipper）
-server/api/drizzle/      # PostgreSQL マイグレーション（drizzle-kit が読む正本 / source of truth）
-terraform/cloudflare/    # Cloudflare 関連インフラ定義
 e2e/                     # Playwright E2E テスト
-scripts/                 # セットアップ / sidecar ビルド / Stryker / 拡張ビルド等のスクリプト
-.github/workflows/       # GitHub Actions（lint / typecheck / test / mutation / deploy）
+scripts/                 # セットアップ / Stryker / 保守用スクリプト
+.github/workflows/       # GitHub Actions（lint / typecheck / test / mutation）
 ```
 
 ---
@@ -372,13 +273,12 @@ scripts/                 # セットアップ / sidecar ビルド / Stryker / �
 
 - [Tiptap](https://tiptap.dev/) — エディタフレームワーク（ProseMirror）
 - [shadcn/ui](https://ui.shadcn.com/) / [Radix UI](https://www.radix-ui.com/) — UI コンポーネント
-- [Hocuspocus](https://hocuspocus.dev/) / [Y.js](https://yjs.dev/) — リアルタイム共同編集
+- [Y.js](https://yjs.dev/) / [PartyServer](https://github.com/cloudflare/partykit) — リアルタイム共同編集
 - [Better Auth](https://better-auth.com/) — 認証（OAuth / セッション cookie）
-- [Hono](https://hono.dev/) — API フレームワーク（Bun 上）
+- [Hono](https://hono.dev/) — API フレームワーク（Cloudflare Workers 上）
 - [Drizzle ORM](https://orm.drizzle.team/) — TypeScript ORM
 - [Polar](https://polar.sh/) — Pro プランの課金基盤
-- [Tauri](https://tauri.app/) — クロスプラットフォーム デスクトップ
-- [Cloudflare Pages](https://pages.cloudflare.com/) / [Railway](https://railway.com/) — ホスティング
+- [Cloudflare](https://www.cloudflare.com/) — ホスティング
 
 ---
 

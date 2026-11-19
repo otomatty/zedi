@@ -1,10 +1,10 @@
 /**
- * サーバーの `ALLOWED_UPLOAD_TYPES`（server/api/src/routes/media.ts）と一致させた
- * クライアント側の許可 MIME セット。ここが緩いとサーバーに弾かれて生の HTTP 415
- * 文字列がユーザーに見えてしまうため、二重定義してでも同期させる。
+ * クライアント側の許可 MIME セット。旧 API（削除済み）の `ALLOWED_UPLOAD_TYPES` と
+ * 同じ値。ここが緩いとサーバーに弾かれて生の HTTP 415 文字列がユーザーに見えてしまう。
  *
- * Mirror of the server's `ALLOWED_UPLOAD_TYPES` so we surface a friendly,
- * localized error before the request ever hits the server.
+ * Allowed MIME types on the client, the same values as the removed API's
+ * `ALLOWED_UPLOAD_TYPES`, so we surface a friendly, localized error before the
+ * request ever hits the server.
  */
 export const ALLOWED_IMAGE_MIME = new Set([
   "image/jpeg",

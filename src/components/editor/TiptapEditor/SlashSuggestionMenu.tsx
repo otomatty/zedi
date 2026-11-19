@@ -1,11 +1,10 @@
 /**
- * Slash command menu content (keyboard via ref). Blocks + optional Claude agent rows.
- * スラッシュコマンドメニュー本体（ref でキーボード）。ブロック＋任意の Claude エージェント行。
+ * Slash command menu content (keyboard via ref).
+ * スラッシュコマンドメニュー本体（ref でキーボード）。
  */
 
 import { forwardRef } from "react";
 import { SlashMenuRows } from "./SlashMenuRows";
-import { SlashPathCompletionSection } from "./SlashPathCompletionSection";
 import type { SlashSuggestionHandle } from "./slashSuggestionHandle";
 import { useSlashSuggestionMenu } from "./useSlashSuggestionMenu";
 import type { SlashSuggestionMenuProps } from "./slashSuggestionMenuProps";
@@ -18,19 +17,7 @@ export type { SlashSuggestionMenuProps };
  */
 export const SlashSuggestionMenu = forwardRef<SlashSuggestionHandle, SlashSuggestionMenuProps>(
   (props, ref) => {
-    const {
-      t,
-      items,
-      listRef,
-      pathSectionRef,
-      selectedIndex,
-      pathCompletionEnabled,
-      pathSuggestions,
-      pathSectionActive,
-      pathSelectedIndex,
-      selectItem,
-      applyPathPick,
-    } = useSlashSuggestionMenu(props, ref);
+    const { t, items, listRef, selectedIndex, selectItem } = useSlashSuggestionMenu(props, ref);
 
     if (items.length === 0) {
       return (
@@ -53,19 +40,10 @@ export const SlashSuggestionMenu = forwardRef<SlashSuggestionHandle, SlashSugges
           <SlashMenuRows
             items={items}
             selectedIndex={selectedIndex}
-            onSelectIndex={(i) => void selectItem(i)}
+            onSelectIndex={selectItem}
             t={t}
           />
         </div>
-        {pathCompletionEnabled && pathSuggestions.length > 0 ? (
-          <SlashPathCompletionSection
-            ref={pathSectionRef}
-            suggestions={pathSuggestions}
-            onPick={applyPathPick}
-            t={t}
-            selectedIndex={pathSectionActive ? pathSelectedIndex : -1}
-          />
-        ) : null}
       </div>
     );
   },

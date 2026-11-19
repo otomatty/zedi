@@ -4,7 +4,7 @@
  */
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import NoteView from "./index";
 import { useNote } from "@/hooks/notes/useNoteQueries";
@@ -93,24 +93,9 @@ vi.mock("@/components/aiChat/ContentWithAIChat", () => ({
   ),
 }));
 vi.mock("@/components/layout/FloatingActionButton", () => ({
-  default: ({
-    initialClipUrl,
-    onClipDialogClosedWithInitialUrl,
-  }: {
-    initialClipUrl?: string | null;
-    onClipDialogClosedWithInitialUrl?: () => void;
-  }) => (
-    <div data-testid="fab" data-initial-clip-url={initialClipUrl ?? ""}>
+  default: (props: Record<string, unknown>) => (
+    <div data-testid="fab" data-props={Object.keys(props).sort().join(",")}>
       FAB
-      {initialClipUrl && (
-        <button
-          type="button"
-          data-testid="fab-close-clip"
-          onClick={() => onClipDialogClosedWithInitialUrl?.()}
-        >
-          close-clip
-        </button>
-      )}
     </div>
   ),
 }));
@@ -261,49 +246,23 @@ describe("NoteView", () => {
     expect(screen.getByRole("heading", { name: "notes.untitledNote" })).toBeInTheDocument();
   });
 
-  describe("clipUrl handoff (issue #826)", () => {
-    function setEditableNote() {
-      vi.mocked(useNote).mockReturnValue({
-        note: { id: "n1", title: "My Note", visibility: "private", isOfficial: false },
-        access: {
-          canView: true,
-          canEdit: true,
-          canManageMembers: true,
-          canDeletePage: vi.fn(() => true),
-        },
-        source: "local",
-        isLoading: false,
-      } as never);
-    }
-
-    it("forwards a validated `clipUrl` query into FloatingActionButton.initialClipUrl", () => {
-      setEditableNote();
-      const clipUrl = "https://example.com/article";
-      renderNoteView("n1", `?clipUrl=${encodeURIComponent(clipUrl)}`);
-      expect(screen.getByTestId("fab")).toHaveAttribute("data-initial-clip-url", clipUrl);
-    });
-
-    it("ignores a `clipUrl` that fails the URL policy check", () => {
-      setEditableNote();
-      renderNoteView("n1", `?clipUrl=${encodeURIComponent("chrome://extensions")}`);
-      // 検証 NG: FAB は initialClipUrl を受け取らない（空文字属性）。
-      // Invalid URL: FAB receives no initialClipUrl (empty attribute).
-      expect(screen.getByTestId("fab")).toHaveAttribute("data-initial-clip-url", "");
-    });
-
-    it("strips `clipUrl` from the URL when the clip dialog closes, keeping other params", () => {
-      setEditableNote();
-      const clipUrl = "https://example.com/article";
-      renderNoteView("n1", `?keep=1&clipUrl=${encodeURIComponent(clipUrl)}`);
-      expect(screen.getByTestId("current-search")).toHaveTextContent(
-        `?keep=1&clipUrl=${encodeURIComponent(clipUrl)}`,
-      );
-      act(() => {
-        fireEvent.click(screen.getByTestId("fab-close-clip"));
-      });
-      // clipUrl のみ削除され、他のクエリは残る。
-      // Only `clipUrl` is removed; other query params survive.
-      expect(screen.getByTestId("current-search")).toHaveTextContent("?keep=1");
-    });
+  it("ignores a `clipUrl` query: the browser-extension hand-off was removed", () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "n1", title: "My Note", visibility: "private", isOfficial: false },
+      access: {
+        canView: true,
+        canEdit: true,
+        canManageMembers: true,
+        canDeletePage: vi.fn(() => true),
+      },
+      source: "local",
+      isLoading: false,
+    } as never);
+    const search = `?keep=1&clipUrl=${encodeURIComponent("https://example.com/article")}`;
+    renderNoteView("n1", search);
+    // FAB には noteId だけを渡し、URL のクエリにも手を付けない。
+    // The FAB only gets the note id, and the query string is left as it was.
+    expect(screen.getByTestId("fab")).toHaveAttribute("data-props", "noteId");
+    expect(screen.getByTestId("current-search")).toHaveTextContent(search);
   });
 });

@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import NotePageView from "./NotePageView";
 import {
@@ -205,6 +205,9 @@ vi.mock("@/components/note/PageEditorContent", () => ({
       <div data-testid="page-title">{title}</div>
       <button type="button" onClick={() => onTitleChange?.("Edited title")}>
         change-title
+      </button>
+      <button type="button" onClick={() => onTitleChange?.("Latest title")}>
+        change-title-again
       </button>
     </div>
   ),
@@ -1113,6 +1116,136 @@ describe("NotePageView", () => {
       title: "Edited title",
     });
     expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("uses the latest API client when a pending title save fires after rerender", async () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: true },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Original title",
+        content: "{}",
+        ownerUserId: "user-other",
+        noteId: "note-1",
+      },
+      isLoading: false,
+    } as never);
+    const latestApi = {
+      updatePageMetadata: vi.fn().mockResolvedValue({ id: "page-1", title: "Edited title" }),
+    };
+    const { rerender } = renderNotePageView();
+    fireEvent.click(screen.getByText("change-title"));
+
+    vi.mocked(useNoteApi).mockReturnValue({
+      api: latestApi,
+      userId: "user-1",
+      userEmail: undefined,
+      isSignedIn: true,
+      isLoaded: true,
+    } as never);
+    rerender(
+      <MemoryRouter initialEntries={["/notes/note-1/page-1"]}>
+        <AIChatProvider>
+          <Routes>
+            <Route path="/notes/:noteId/:pageId" element={<NotePageView />} />
+          </Routes>
+        </AIChatProvider>
+      </MemoryRouter>,
+    );
+    await vi.advanceTimersByTimeAsync(499);
+    expect(mockApi.updatePageMetadata).not.toHaveBeenCalled();
+    expect(latestApi.updatePageMetadata).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(latestApi.updatePageMetadata).toHaveBeenCalledExactlyOnceWith("page-1", {
+      title: "Edited title",
+    });
+    expect(mockApi.updatePageMetadata).not.toHaveBeenCalled();
+    expect(mockUpdatePageMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("flushes a pending title exactly once when the page unmounts", async () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: true },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Original title",
+        content: "{}",
+        ownerUserId: "user-other",
+        noteId: "note-1",
+      },
+      isLoading: false,
+    } as never);
+    mockApi.updatePageMetadata.mockResolvedValue({ id: "page-1", title: "Edited title" });
+    const { unmount } = renderNotePageView();
+    fireEvent.click(screen.getByText("change-title"));
+    expect(mockApi.updatePageMetadata).not.toHaveBeenCalled();
+
+    unmount();
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(mockApi.updatePageMetadata).toHaveBeenCalledTimes(1);
+    expect(mockApi.updatePageMetadata).toHaveBeenCalledWith("page-1", { title: "Edited title" });
+  });
+
+  it("serializes title saves and persists the newest edit after the in-flight save", async () => {
+    vi.mocked(useNote).mockReturnValue({
+      note: { id: "note-1" },
+      access: { canView: true, canEdit: true },
+      source: "local",
+      isLoading: false,
+    } as never);
+    vi.mocked(useNotePage).mockReturnValue({
+      data: {
+        id: "page-1",
+        title: "Original title",
+        content: "{}",
+        ownerUserId: "user-other",
+        noteId: "note-1",
+      },
+      isLoading: false,
+    } as never);
+    let finishFirst!: (value: unknown) => void;
+    mockApi.updatePageMetadata
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishFirst = resolve;
+          }),
+      )
+      .mockResolvedValue({ id: "page-1", title: "Latest title" });
+    renderNotePageView();
+    fireEvent.click(screen.getByText("change-title"));
+    await vi.advanceTimersByTimeAsync(500);
+    expect(mockApi.updatePageMetadata).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByText("change-title-again"));
+    await vi.advanceTimersByTimeAsync(500);
+    expect(mockApi.updatePageMetadata).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("page-title")).toHaveTextContent("Latest title");
+    await act(async () => {
+      finishFirst({ id: "page-1", title: "Edited title" });
+    });
+
+    expect(mockApi.updatePageMetadata).toHaveBeenCalledTimes(2);
+    expect(mockApi.updatePageMetadata).toHaveBeenNthCalledWith(1, "page-1", {
+      title: "Edited title",
+    });
+    expect(mockApi.updatePageMetadata).toHaveBeenNthCalledWith(2, "page-1", {
+      title: "Latest title",
+    });
+    expect(screen.getByTestId("page-title")).toHaveTextContent("Latest title");
   });
 
   it("rolls back the visible title when a note-native title save fails", async () => {

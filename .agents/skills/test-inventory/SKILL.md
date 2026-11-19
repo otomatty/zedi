@@ -5,7 +5,7 @@ description: >
   成果物は project-profile と test-backlog。次の spec-test 実行対象を決める入口スキル。
   Analyze untested or lightly tested repos — detect test stack, map gaps, produce prioritized backlog
   for spec-test. Use when starting test adoption, improving coverage strategy, or before /spec-test
-  on a new project. Args - repo root or target directory (optional scope, e.g. src/ or server/api/).
+  on a new project. Args - repo root or target directory (optional scope, e.g. src/ or app/).
 ---
 
 # test-inventory — テストギャップ分析

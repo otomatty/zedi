@@ -13,14 +13,12 @@ const DOC_PAIRS = [
   { en: "README.md", ja: "README.ja.md" },
   { en: "CONTRIBUTING.md", ja: "CONTRIBUTING.ja.md" },
   { en: "SECURITY.md", ja: "SECURITY.ja.md" },
-  { en: "DOCUMENTATION.md", ja: "DOCUMENTATION.ja.md" },
-  { en: "extension/README.md", ja: "extension/README.ja.md" },
-  { en: "server/mcp/README.md", ja: "server/mcp/README.ja.md" },
+
   { en: "admin/README.md", ja: "admin/README.ja.md" },
-  {
-    en: "terraform/cloudflare/README.md",
-    ja: "terraform/cloudflare/README.ja.md",
-  },
+  { en: "app/README.md", ja: "app/README.ja.md" },
+  { en: "app/docs/verification.md", ja: "app/docs/verification.ja.md" },
+  { en: "app/docs/tauriRemoval.md", ja: "app/docs/tauriRemoval.ja.md" },
+  { en: "app/docs/secondFactorRecovery.md", ja: "app/docs/secondFactorRecovery.ja.md" },
 ];
 
 const EN_BANNER = /> \*\*Language:\*\* English \|/m;

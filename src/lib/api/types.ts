@@ -233,12 +233,6 @@ export type CreatePageResponse = SyncPageItem;
  * After issue #823 every page belongs to exactly one note (the caller's
  * default note for legacy "personal" rows), so `note_id` is always present
  * even in shared search results. Issue #825 tightened the type accordingly.
- *
- * Issue #864 (PDF highlight integration): result rows are now a discriminated
- * union keyed on `kind`. `kind="page"` is the existing page result; the new
- * `kind="pdf_highlight"` row carries the source id, PDF page number and
- * optional derived page id so the UI can deep-link back to where the user was
- * reading. Clients must branch on `kind` before reading kind-specific fields.
  */
 export type SearchPageResultRow = {
   kind: "page";
@@ -252,46 +246,7 @@ export type SearchPageResultRow = {
   updated_at: string;
 };
 
-/**
- * Issue #864: PDF ハイライト本文がヒットした結果行。所有検証 (`owner_id` フィルタ)
- * 済みなので、他ユーザーのハイライトは決して含まれない。
- *
- * Issue #864: a result row for a `pdf_highlights.text` match. The server
- * enforces ownership (`owner_id = userId`) before returning, so other users'
- * highlights cannot appear here.
- *
- * @property highlight_id   ハイライトの一意 ID。Highlight UUID.
- * @property source_id      元 PDF ソースの ID。Owning `sources.id` (kind="pdf_local").
- * @property pdf_page       1 始まり PDF ページ番号。1-indexed PDF page.
- * @property text           ハイライト本文テキスト（プレビュー用）。Highlight body text.
- * @property derived_page_id 派生 Zedi ページがあればその ID。Optional derived page id.
- * @property derived_page_note_id 派生 Zedi ページの所属ノート ID（Issue #889 Phase 3 で
- *   `/notes/:noteId/:pageId` 遷移のために追加）。Derived page's owning note id.
- * @property source_display_name UI 用ファイル名。Display filename.
- * @property source_title   PDF メタデータ由来のタイトル（あれば）。Optional PDF title.
- * @property updated_at     ハイライトの最終更新時刻 ISO。Highlight `updated_at` ISO.
- */
-export type SearchPdfHighlightResultRow = {
-  kind: "pdf_highlight";
-  highlight_id: string;
-  source_id: string;
-  owner_id: string;
-  pdf_page: number;
-  text: string;
-  derived_page_id: string | null;
-  /**
-   * 派生 Zedi ページの所属ノート ID（派生が無い場合は null）。
-   * `derived_page_id` と組で `/notes/:noteId/:pageId` を組み立てる。
-   * Derived page's owning note id (null when no derived page exists).
-   * Paired with `derived_page_id` to build the `/notes/:noteId/:pageId` URL.
-   */
-  derived_page_note_id: string | null;
-  source_display_name: string | null;
-  source_title: string | null;
-  updated_at: string;
-};
-
-export type SearchResultRow = SearchPageResultRow | SearchPdfHighlightResultRow;
+export type SearchResultRow = SearchPageResultRow;
 
 export interface SearchSharedResponse {
   results: SearchResultRow[];

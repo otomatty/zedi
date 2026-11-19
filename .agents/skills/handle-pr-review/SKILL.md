@@ -37,7 +37,7 @@ gh pr list --head "$(git branch --show-current)" --json number,url,title --jq '.
 2. `gh pr diff <番号>` で差分を取得
 3. 変更対象ファイルの TSDoc/JSDoc コメントを読み、仕様上の意図を把握する
 4. 関連するテストコードを読み、振る舞いの契約を確認する
-5. `AGENTS.md` / `SPECIFICATION_POLICY.md` の方針を参照する
+5. `AGENTS.md` の方針（仕様・TDD・配置規則）を参照する
 
 **この段階で「この PR は何を達成しようとしているか」を明確にする。**
 

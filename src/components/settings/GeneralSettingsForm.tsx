@@ -27,7 +27,6 @@ export const GeneralSettingsForm: React.FC = () => {
     updateEditorFontSize,
     updateCustomFontSizePx,
     updateLocale,
-    updateExecutableCodeConfirmBeforeRun,
     editorFontSizePx,
   } = useGeneralSettings();
 
@@ -155,11 +154,9 @@ export const GeneralSettingsForm: React.FC = () => {
         editorFontSize={settings.editorFontSize}
         customFontSizePx={settings.customFontSizePx}
         editorFontSizePx={editorFontSizePx}
-        executableCodeConfirmBeforeRun={settings.executableCodeConfirmBeforeRun !== false}
         updateTheme={updateTheme}
         updateEditorFontSize={updateEditorFontSize}
         updateCustomFontSizePx={updateCustomFontSizePx}
-        updateExecutableCodeConfirmBeforeRun={updateExecutableCodeConfirmBeforeRun}
       />
 
       <LanguageSettingsCard locale={settings.locale} onLocaleChange={updateLocale} />

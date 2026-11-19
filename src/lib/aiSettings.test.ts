@@ -162,6 +162,26 @@ describe("aiSettings - 回帰テスト", () => {
     });
   });
 
+  describe("loadAISettings - 削除したプロバイダー / removed providers", () => {
+    it("デスクトップ版の Claude Code 設定は破棄して既定の設定に戻す / drops settings saved for the removed Claude Code provider", async () => {
+      localStorage.setItem(
+        "zedi-ai-settings",
+        JSON.stringify({
+          provider: "claude-code",
+          apiKey: "",
+          apiMode: "api_server",
+          model: "",
+          modelId: "claude-code:",
+          isConfigured: true,
+        }),
+      );
+
+      expect(await loadAISettings()).toBeNull();
+      expect(localStorage.getItem("zedi-ai-settings")).toBeNull();
+      expect(await isAIConfigured()).toBe(true);
+    });
+  });
+
   describe("clearAISettings", () => {
     it("設定をクリアできる", async () => {
       const settings: AISettings = {

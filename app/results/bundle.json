@@ -1,0 +1,44 @@
+{
+  "assets": [
+    {
+      "path": "assets/AiChatPage-C1PpBIcS.js",
+      "initial": false,
+      "raw": 54530,
+      "gzip": 17024,
+      "brotli": 15444
+    },
+    {
+      "path": "assets/EditorPage-BCtuC0zp.js",
+      "initial": false,
+      "raw": 561587,
+      "gzip": 177317,
+      "brotli": 150733
+    },
+    {
+      "path": "assets/authClient-KmrCVLrO.js",
+      "initial": false,
+      "raw": 30799,
+      "gzip": 11484,
+      "brotli": 10261
+    },
+    {
+      "path": "assets/index-CKaym_ED.css",
+      "initial": true,
+      "raw": 6438,
+      "gzip": 1882,
+      "brotli": 1596
+    },
+    {
+      "path": "assets/index-CjOBNWF7.js",
+      "initial": true,
+      "raw": 96821,
+      "gzip": 31571,
+      "brotli": 27995
+    }
+  ],
+  "initialJs": {
+    "raw": 96821,
+    "gzip": 31571,
+    "brotli": 27995
+  }
+}

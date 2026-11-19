@@ -43,9 +43,7 @@ function normalizeMode(raw: unknown): MediaPlaceholderMode {
 }
 
 type UploadState =
-  | { kind: "idle" }
-  | { kind: "uploading"; progress: number }
-  | { kind: "error"; message: string };
+  { kind: "idle" } | { kind: "uploading"; progress: number } | { kind: "error"; message: string };
 
 /**
  * MediaPlaceholder の NodeView。File 選択 / URL 入力 / ドラッグ＆ドロップを

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type JSX } from "react";
 import type { LintFindingItem, LintRule, LintRunSummaryItem } from "@/api/lint";
 import { getLintFindings, runLint, resolveLintFinding } from "@/api/lint";
 import { WikiHealthContent } from "./WikiHealthContent";
@@ -10,7 +10,7 @@ import { WikiHealthContent } from "./WikiHealthContent";
  * Admin "Wiki Health" page.
  * Runs lint and displays findings in a table.
  */
-export default function WikiHealth() {
+export default function WikiHealth(): JSX.Element {
   const [findings, setFindings] = useState<LintFindingItem[]>([]);
   const [summary, setSummary] = useState<LintRunSummaryItem[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,20 +26,20 @@ export default function WikiHealth() {
   // overwrite a newer one (e.g. reload tapped twice or resolve+reload race).
   const requestIdRef = useRef(0);
 
-  const loadFindings = useCallback(async () => {
+  const loadFindings = useCallback((): Promise<void> => {
     const requestId = ++requestIdRef.current;
-    if (isMountedRef.current) setLoading(true);
-    if (isMountedRef.current) setError(null);
-    try {
-      const result = await getLintFindings();
-      if (!isMountedRef.current || requestId !== requestIdRef.current) return;
-      setFindings(result.findings);
-    } catch (e) {
-      if (!isMountedRef.current || requestId !== requestIdRef.current) return;
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      if (isMountedRef.current && requestId === requestIdRef.current) setLoading(false);
-    }
+    return getLintFindings()
+      .then((result): void => {
+        if (!isMountedRef.current || requestId !== requestIdRef.current) return;
+        setFindings(result.findings);
+      })
+      .catch((e): void => {
+        if (!isMountedRef.current || requestId !== requestIdRef.current) return;
+        setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally((): void => {
+        if (isMountedRef.current && requestId === requestIdRef.current) setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function WikiHealth() {
     };
   }, [loadFindings]);
 
-  const handleRunLint = useCallback(async () => {
+  const handleRunLint = useCallback(async (): Promise<void> => {
     if (isMountedRef.current) setRunning(true);
     if (isMountedRef.current) setError(null);
     try {
@@ -58,6 +58,8 @@ export default function WikiHealth() {
       if (!isMountedRef.current) return;
       setSummary(result.summary);
       // findings を再取得 / Reload findings
+      setLoading(true);
+      setError(null);
       await loadFindings();
     } catch (e) {
       if (!isMountedRef.current) return;
@@ -68,10 +70,12 @@ export default function WikiHealth() {
   }, [loadFindings]);
 
   const handleResolve = useCallback(
-    async (id: string) => {
+    async (id: string): Promise<void> => {
       try {
         await resolveLintFinding(id);
         if (!isMountedRef.current) return;
+        setLoading(true);
+        setError(null);
         await loadFindings();
       } catch (e) {
         if (!isMountedRef.current) return;

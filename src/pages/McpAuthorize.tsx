@@ -15,7 +15,7 @@
  *
  * MCP authorization consent page used by the local CLI login flow.
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 function getApiBase(): string {
@@ -33,7 +33,7 @@ function isObject(v: unknown): v is Record<string, unknown> {
  * MCP authorization consent page component.
  * MCP 認可同意ページコンポーネント。
  */
-const McpAuthorize: React.FC = () => {
+const McpAuthorize: React.FC = (): React.JSX.Element => {
   const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -114,11 +114,7 @@ const McpAuthorize: React.FC = () => {
     }
   };
 
-  // Render error state when params are malformed.
-  // パラメータ不備の場合はエラー表示。
-  useEffect(() => {
-    if (paramError) setError(paramError);
-  }, [paramError]);
+  const shownError = error ?? paramError;
 
   if (done) {
     return (
@@ -151,7 +147,7 @@ const McpAuthorize: React.FC = () => {
             <code className="break-all">{redirectUri}</code>
           </p>
         </div>
-        {error ? <p className="text-destructive mb-4 text-sm">{error}</p> : null}
+        {shownError ? <p className="text-destructive mb-4 text-sm">{shownError}</p> : null}
         <button
           type="button"
           onClick={onApprove}

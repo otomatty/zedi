@@ -150,81 +150,9 @@ bun run dev
 
 If the port is in use, the next available port is chosen automatically.
 
-### Parallel Development with Docker (Optional)
-
-To run multiple application instances in parallel:
-
-```bash
-# Build Docker image
-bun run docker:build
-
-# Start all instances (3 at once)
-bun run docker:up
-
-# Start in background
-bun run docker:up:d
-
-# Stop
-bun run docker:down
-
-# View logs
-bun run docker:logs
-```
-
-After startup, access:
-
-- Instance 1: http://localhost:30000
-- Instance 2: http://localhost:30001
-- Instance 3: http://localhost:30002
-
-When running multiple Docker instances, offset ports as needed (share the procedure within your team).
-
-> **Note:** Docker requires at least 8 GB RAM (16 GB+ recommended). For lightweight parallel dev, port configuration via environment variables is simpler.
-
-### Desktop App (Tauri)
-
-Zedi can also run as a desktop app via [Tauri 2.0](https://v2.tauri.app/).
-
-#### Desktop Prerequisites
-
-- [Rust](https://www.rust-lang.org/tools/install) (install stable via rustup)
-- **Windows**: Microsoft C++ Build Tools + Windows 11 SDK
-- **macOS**: Xcode Command Line Tools (`xcode-select --install`)
-- **Linux**: `libwebkit2gtk-4.1-dev`, `build-essential`, `libssl-dev`, etc. ([details](https://v2.tauri.app/guides/prerequisites/))
-
-#### Running the Desktop App
-
-```bash
-# Dev mode (Vite dev server + Tauri WebView)
-bun run tauri:dev
-
-# Production build (generates installer)
-bun run tauri:build
-```
-
-- **Claude Code sidecar** ([Issue #456](https://github.com/otomatty/zedi/issues/456)): Tauri bundles a compiled helper under `src-tauri/binaries/` (`externalBin`). On first `bun run tauri:dev`, a missing binary is built automatically; run `bun run sidecar:build` manually if needed.
-
-> **Windows + Git Bash**: If MSVC build tools are not on PATH, run from Developer Command Prompt for VS 2022 or set `LIB`, `INCLUDE`, and `PATH` in `.bashrc`. See [Issue #49](https://github.com/otomatty/zedi/issues/49).
->
-> **Note**: The desktop edition is currently Phase D (in development). Storage temporarily uses IndexedDB; Tauri-native storage (SQLite) is planned in [#50](https://github.com/otomatty/zedi/issues/50).
-
 ### Environment Variables (Optional)
 
-For AI features, authentication, and API integration, create `.env.local`. See [.env.example](.env.example).
-
-```bash
-# REST API (Hono on Bun: server/api). Base URL the frontend calls.
-VITE_API_BASE_URL=http://localhost:3000
-
-# Real-time collaboration (Hocuspocus / Y.js: server/hocuspocus)
-VITE_REALTIME_URL=ws://localhost:1234   # Production: wss://realtime.zedi-note.app etc.
-
-# Pro plan billing (Polar, optional)
-# VITE_POLAR_PRO_MONTHLY_PRODUCT_ID=...
-# VITE_POLAR_PRO_YEARLY_PRODUCT_ID=...
-```
-
-On the server (`server/api`), configure Better Auth (`BETTER_AUTH_SECRET` / `BETTER_AUTH_URL`), PostgreSQL, Polar `POLAR_ACCESS_TOKEN`, email `RESEND_API_KEY`, etc. See [.env.example](.env.example).
+The old backend (`server/api`, `server/hocuspocus`, `server/mcp`) has been removed, so the current frontend has no API to sign in to or sync with. [.env.example](.env.example) only holds the values it needs to build. The rebuilt app in `app/` keeps its settings in `app/.dev.vars` (see [app/README.md](app/README.md)).
 
 > **Note:** The frontend runs locally without env vars (some data in IndexedDB). AI features can use provider API keys entered in the app settings.
 
@@ -232,32 +160,25 @@ On the server (`server/api`), configure Better Auth (`BETTER_AUTH_SECRET` / `BET
 
 ## 🛠 Tech Stack
 
-| Category          | Technology                                                                                              |
-| ----------------- | ------------------------------------------------------------------------------------------------------- |
-| **Frontend**      | React 19 + TypeScript 6 / React Router v7                                                               |
-| **Build Tool**    | Vite 8 (`@vitejs/plugin-react-swc`) / Bun                                                               |
-| **Desktop**       | Tauri 2.0 (Rust) — `src-tauri/`                                                                         |
-| **Editor**        | Tiptap 3 (ProseMirror) — tables / math (KaTeX) / code (lowlight) / collaboration (Y.js)                 |
-| **Styling**       | Tailwind CSS v4 + shadcn/ui (Radix UI primitives) / `next-themes`                                       |
-| **State / Data**  | Zustand 5 + TanStack Query 5 / React Hook Form + Zod                                                    |
-| **i18n**          | i18next + react-i18next                                                                                 |
-| **Visualization** | Recharts / `@xyflow/react` (React Flow) / Mermaid / KaTeX / Tesseract.js (OCR)                          |
-| **Auth**          | [Better Auth](https://better-auth.com/) (OAuth / session cookies)                                       |
-| **API**           | `server/api` — Hono on Bun + Drizzle ORM (PostgreSQL)                                                   |
-| **Database**      | PostgreSQL (Drizzle migrations: `server/api/drizzle/`) / IndexedDB (local browser)                      |
-| **Realtime**      | `server/hocuspocus` — Hocuspocus (Y.js) real-time collaboration                                         |
-| **MCP**           | `server/mcp` — Claude Code integration (stdio / HTTP; see [server/mcp/README.md](server/mcp/README.md)) |
-| **Storage**       | AWS S3 (upload via API, `@aws-sdk/client-s3`)                                                           |
-| **Billing**       | [Polar](https://polar.sh/) (`@polar-sh/sdk`) — Pro plan                                                 |
-| **Email**         | Resend                                                                                                  |
-| **AI**            | OpenAI / Anthropic / Google Gemini (pricing via OpenRouter)                                             |
-| **Browser Ext.**  | `extension/` — Manifest v3 (Chrome extension)                                                           |
-| **Admin**         | `admin/` — separate Vite + React app                                                                    |
-| **Workspaces**    | Bun workspaces: `packages/ui` (shadcn), `packages/claude-sidecar` / `admin`                             |
-| **Deploy**        | Cloudflare Pages (frontend) + Railway (`server/api`, `hocuspocus`, `mcp`) / Terraform (Cloudflare)      |
-| **CI/CD**         | GitHub Actions (lint / typecheck / test / mutation / deploy)                                            |
-| **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker (mutation testing)                                    |
-| **Tooling**       | ESLint 9 / Prettier / Husky + lint-staged / commitlint / Knip                                           |
+| Category          | Technology                                                                                           |
+| ----------------- | ---------------------------------------------------------------------------------------------------- |
+| **Frontend**      | React 19 + TypeScript 6 / React Router v7                                                            |
+| **Build Tool**    | Vite 8 (`@vitejs/plugin-react-swc`) / Bun                                                            |
+| **Editor**        | Tiptap 3 (ProseMirror) — tables / math (KaTeX) / code (lowlight) / collaboration (Y.js)              |
+| **Styling**       | Tailwind CSS v4 + shadcn/ui (Radix UI primitives) / `next-themes`                                    |
+| **State / Data**  | Zustand 5 + TanStack Query 5 / React Hook Form + Zod                                                 |
+| **i18n**          | i18next + react-i18next                                                                              |
+| **Visualization** | Recharts / `@xyflow/react` (React Flow) / Mermaid / KaTeX / Tesseract.js (OCR)                       |
+| **Auth**          | [Better Auth](https://better-auth.com/) (OAuth / session cookies)                                    |
+| **Backend**       | `app/` (rebuild) — one Cloudflare Worker: Hono + Better Auth + D1 (Drizzle) + Durable Objects (Y.js) |
+| **Database**      | D1 (migrations: `app/migrations/`) / IndexedDB (local browser)                                       |
+| **AI**            | OpenAI / Anthropic / Google Gemini (pricing via OpenRouter)                                          |
+| **Admin**         | `admin/` — separate Vite + React app                                                                 |
+| **Workspaces**    | Bun workspaces: `packages/ui` (shadcn), `packages/shared` / `admin`                                  |
+| **Deploy**        | None at the moment; the rebuilt `app/` will deploy as one Cloudflare Worker (`wrangler deploy`)      |
+| **CI/CD**         | GitHub Actions (lint / typecheck / test / mutation)                                                  |
+| **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker (mutation testing)                                 |
+| **Tooling**       | ESLint 9 / Prettier / Husky + lint-staged / commitlint / Knip                                        |
 
 ---
 
@@ -299,48 +220,31 @@ bun run test:mutation:dry
 bun run test:mutation
 ```
 
-Quality metrics, testing policy, and how to write specifications: [AGENTS.md](AGENTS.md) and [SPECIFICATION_POLICY.md](SPECIFICATION_POLICY.md).
+Quality metrics, testing policy (TDD / mutation), and how to write specifications: [AGENTS.md](AGENTS.md).
 
 ---
 
 ## 📁 Project Structure
 
+Zedi is being rebuilt in `app/` on a single Cloudflare Worker (hono/jsx/dom, Hono, Better Auth, D1, Durable Objects). Once it covers the current app's features it replaces `src/` and `admin/`. The old backend (`server/*`) has been removed. See [app/README.md](app/README.md).
+
 ```
+app/                     # The rebuilt app (one Worker; outside the root workspace)
 src/                     # Frontend (React + Vite)
 ├── components/          # React components (editor / page / search / layout / ui etc.)
 ├── hooks/               # Custom hooks
-├── lib/                 # Utilities (`claudeCode/` = Tauri↔Claude Code bridge)
+├── lib/                 # Utilities
 ├── pages/               # Route page components (React Router v7)
 ├── stores/              # Zustand stores
 └── types/               # TypeScript types
 
-src-tauri/               # Tauri 2.0 desktop backend (Rust)
-├── src/
-│   ├── main.rs          # Desktop entry point
-│   ├── lib.rs           # Tauri app + command definitions
-│   └── claude_sidecar.rs # Claude Code sidecar process (Issue #456)
-├── binaries/            # externalBin (`bun run sidecar:build`, gitignored)
-├── capabilities/        # Security capability definitions
-├── icons/               # App icons (per OS)
-├── Cargo.toml           # Rust dependencies
-└── tauri.conf.json      # Tauri config
-
-server/                  # Bun projects deployed separately on Railway
-├── api/                 # REST / Auth API (Hono on Bun + Better Auth + Drizzle ORM)
-├── hocuspocus/          # Real-time collaboration (Hocuspocus / Y.js)
-└── mcp/                 # MCP server — Claude Code (stdio / HTTP). See [server/mcp/README.md](server/mcp/README.md)
-
 packages/                # Bun workspaces (shared libraries)
-├── ui/                  # `@zedi/ui` — shadcn/ui shared components
-└── claude-sidecar/      # Claude Code client for Tauri sidecar
+└── ui/                  # `@zedi/ui` — shadcn/ui shared components
 
 admin/                   # Admin SPA (separate Vite + React + Tailwind / `@zedi/ui`)
-extension/               # Browser extension (Manifest v3, Web Clipper)
-server/api/drizzle/      # PostgreSQL migrations (drizzle-kit source of truth)
-terraform/cloudflare/    # Cloudflare infrastructure
 e2e/                     # Playwright E2E tests
-scripts/                 # Setup / sidecar build / Stryker / extension build scripts
-.github/workflows/       # GitHub Actions (lint / typecheck / test / mutation / deploy)
+scripts/                 # Setup / Stryker / maintenance scripts
+.github/workflows/       # GitHub Actions (lint / typecheck / test / mutation)
 ```
 
 ---
@@ -369,13 +273,12 @@ This project is released under the **Business Source License 1.1 (BSL 1.1)** (so
 
 - [Tiptap](https://tiptap.dev/) — Editor framework (ProseMirror)
 - [shadcn/ui](https://ui.shadcn.com/) / [Radix UI](https://www.radix-ui.com/) — UI components
-- [Hocuspocus](https://hocuspocus.dev/) / [Y.js](https://yjs.dev/) — Real-time collaboration
+- [Y.js](https://yjs.dev/) / [PartyServer](https://github.com/cloudflare/partykit) — Real-time collaboration
 - [Better Auth](https://better-auth.com/) — Authentication (OAuth / session cookies)
-- [Hono](https://hono.dev/) — API framework (on Bun)
+- [Hono](https://hono.dev/) — API framework (on Cloudflare Workers)
 - [Drizzle ORM](https://orm.drizzle.team/) — TypeScript ORM
 - [Polar](https://polar.sh/) — Pro plan billing
-- [Tauri](https://tauri.app/) — Cross-platform desktop
-- [Cloudflare Pages](https://pages.cloudflare.com/) / [Railway](https://railway.com/) — Hosting
+- [Cloudflare](https://www.cloudflare.com/) — Hosting
 
 ---
 

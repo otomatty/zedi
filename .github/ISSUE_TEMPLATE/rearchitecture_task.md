@@ -36,6 +36,6 @@ assignees: ""
 
 ## 参照（リポジトリ内）
 
-- [SPECIFICATION_POLICY.md](../../SPECIFICATION_POLICY.md) — 仕様はソースの TSDoc に置く方針
+- [AGENTS.md](../../AGENTS.md) — 仕様はソースの TSDoc / テストに置く方針（TDD）
 - [AGENTS.md](../../AGENTS.md) — 開発ガイドライン
 - 過去の長文仕様書は git history にのみ存在する場合がある

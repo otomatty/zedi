@@ -98,7 +98,14 @@ const NoteSettings: React.FC = () => {
             </Button>
           </header>
 
-          <div className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 md:grid-cols-[minmax(0,12rem)_1fr] md:gap-8 lg:grid-cols-[minmax(0,13.5rem)_1fr]">
+          {/* base は grid-cols-1（= minmax(0,1fr)）で単一カラムを viewport 幅に
+              制約する。これを省くと暗黙の auto カラムが max-content まで広がり、
+              overflow-x-auto なタブ列（aside）がクリップせずページごと横にはみ出す。
+              md 以降はサイドナビ + 本文の 2 カラムに切り替える。
+              Pin the mobile column to grid-cols-1 (minmax(0,1fr)). Without it the
+              implicit auto column grows to max-content, so the horizontally
+              scrollable tab strip can't clip and the whole page overflows. */}
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-6 sm:gap-6 md:grid-cols-[minmax(0,12rem)_1fr] md:gap-8 lg:grid-cols-[minmax(0,13.5rem)_1fr]">
             <aside className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-10 -mx-4 border-b px-4 pb-2 backdrop-blur-sm sm:-mx-6 sm:px-6 md:top-24 md:z-auto md:mx-0 md:self-start md:border-b-0 md:bg-transparent md:px-0 md:pb-0 md:backdrop-blur-none">
               <NoteSettingsSidebar noteId={note.id} sidebarRole={sidebarRole} />
             </aside>

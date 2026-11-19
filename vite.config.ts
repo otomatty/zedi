@@ -13,14 +13,6 @@ const packageJson = JSON.parse(readFileSync(path.resolve(__dirname, "package.jso
 };
 const appVersion = packageJson.version ?? "0.0.0";
 
-/**
- * Parse a truthy env string (e.g. `TAURI_ENV_DEBUG`). Non-empty strings like `"false"` are not treated as true.
- * 環境変数の真偽フラグを解釈する。`"false"` などは true にしない。
- */
-function envFlagIsTrue(value: string | undefined): boolean {
-  return /^(1|true|yes)$/i.test(String(value ?? "").trim());
-}
-
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Load all env vars (including non-VITE_ prefixed) for vite.config use
@@ -32,24 +24,10 @@ export default defineConfig(({ mode }) => {
   // Uses ZEDI_API_PROXY_TARGET (no VITE_ prefix) so client code doesn't see it.
   const apiTarget = env.ZEDI_API_PROXY_TARGET || "";
 
-  // Tauri CLI は子プロセスの process.env に TAURI_* を注入する。loadEnv は .env 由来のみのため
-  // process.env とマージして参照する（strictPort / build.target の分岐を確実にする）。
-  // Tauri CLI injects TAURI_* into the dev server process; merge with loadEnv for reliable detection.
-  const tauriPlatform = process.env.TAURI_ENV_PLATFORM ?? env.TAURI_ENV_PLATFORM;
-  const tauriDevHost = process.env.TAURI_DEV_HOST ?? env.TAURI_DEV_HOST;
-  const tauriEnvDebug = envFlagIsTrue(process.env.TAURI_ENV_DEBUG ?? env.TAURI_ENV_DEBUG);
-  const isTauri = !!tauriPlatform;
-
   return {
-    clearScreen: false,
     server: {
-      host: tauriDevHost || "::",
+      host: "::",
       port,
-      strictPort: isTauri, // Tauri はポート固定を期待 / Tauri expects a fixed port
-      hmr: tauriDevHost ? { protocol: "ws", host: tauriDevHost, port: 1421 } : undefined,
-      watch: {
-        ignored: ["**/src-tauri/**"],
-      },
       ...(apiTarget
         ? {
             proxy: {
@@ -62,22 +40,14 @@ export default defineConfig(({ mode }) => {
           }
         : {}),
     },
-    // Vite はプレフィックスの前方一致のみ（ワイルドカードなし）。TAURI_ENV_* は使えない。
-    envPrefix: ["VITE_", "TAURI_ENV_"],
     build: {
-      target: isTauri ? (tauriPlatform === "windows" ? "chrome105" : "safari13") : "esnext",
-      minify: tauriEnvDebug ? false : "esbuild",
-      sourcemap: tauriEnvDebug,
+      target: "esnext",
+      minify: "esbuild",
     },
     define: {
       "import.meta.env.VITE_APP_VERSION": JSON.stringify(appVersion),
     },
     optimizeDeps: {
-      // `pdfjs-dist` を事前バンドルに含めておかないと、毎回のコールドスタートで
-      // Vite が再評価し、初期化コストが累積する。
-      // Force `pdfjs-dist` to be pre-bundled so Vite doesn't re-evaluate it on
-      // every cold start.
-      include: ["pdfjs-dist"],
       esbuildOptions: {
         target: "esnext",
       },

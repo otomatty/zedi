@@ -135,7 +135,7 @@ bun run dev
 3. **変更を実装**
    - コードを書く
    - テストを追加
-   - ドキュメントを更新（英語正本 + 該当する場合は `.ja.md` ペア — [DOCUMENTATION.ja.md](./DOCUMENTATION.ja.md) 参照）
+   - ドキュメントを更新（英語正本 + 該当する場合は `.ja.md` ペア — [AGENTS.md](./AGENTS.md) の「公開入口 Markdown」参照）
 
 4. **テストとコード品質チェック**
 

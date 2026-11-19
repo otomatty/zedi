@@ -12,7 +12,6 @@ import {
   resolveEffectiveAIModel,
   streamAssistantCompletion,
 } from "@/hooks/aiChat/useAIChatExecuteHelpers";
-import { useMcpConfigStore } from "@/stores/mcpConfigStore";
 
 /**
  * Parameters for {@link executeRegenerateAssistant}.
@@ -110,9 +109,7 @@ export async function executeRegenerateAssistant(
 
   const context = contextEnabled ? pageContext : null;
   const uniqueRefs = collectReferencedPagesFromMessages(basePath);
-  const mcpServers =
-    effectiveSettings.provider === "claude-code" ? useMcpConfigStore.getState().servers : [];
-  const systemPrompt = buildSystemPrompt(context, existingPageTitles, uniqueRefs, mcpServers);
+  const systemPrompt = buildSystemPrompt(context, existingPageTitles, uniqueRefs);
 
   const apiMessages: AIServiceRequest["messages"] = [
     { role: "system", content: systemPrompt },
@@ -126,9 +123,6 @@ export async function executeRegenerateAssistant(
     options: {
       stream: true,
       feature: "chat",
-      ...(effectiveSettings.provider === "claude-code" && context?.claudeWorkspaceRoot
-        ? { cwd: context.claudeWorkspaceRoot }
-        : {}),
     },
   };
 

@@ -1,17 +1,14 @@
-import React, { useRef, useCallback, useMemo } from "react";
+import React, { useRef, useCallback } from "react";
 import type { MutableRefObject } from "react";
 import TiptapEditor from "@/components/editor/TiptapEditor";
 import type { ContentError } from "@/components/editor/TiptapEditor/useContentSanitizer";
 import type { CollaborationConfig } from "@/components/editor/TiptapEditor/types";
 import type { PageActionHubHandle } from "@/components/editor/PageActionHub/types";
 import { SourceUrlBadge } from "@/components/editor/SourceUrlBadge";
-import { WikiGeneratorButton } from "@/components/editor/WikiGeneratorButton";
 import { LinkedPagesSection } from "@/components/page/LinkedPagesSection";
 import { LintSuggestions } from "@/components/page/LintSuggestions";
 import Container from "@/components/layout/Container";
-import { isContentNotEmpty } from "@/lib/contentUtils";
 import type { UseCollaborationReturn } from "@/lib/collaboration/types";
-import type { WikiGeneratorStatus } from "@/hooks/wiki/useWikiGenerator";
 import { PageTitleBlock } from "./PageTitleBlock";
 import { EditorSkeleton } from "./EditorSkeleton";
 
@@ -64,7 +61,6 @@ interface PageEditorContentProps {
   currentPageId: string | null;
   pageId: string;
   isNewPage: boolean;
-  isWikiGenerating: boolean;
   isReadOnly?: boolean;
   isSyncingLinks?: boolean;
   /**
@@ -90,13 +86,6 @@ interface PageEditorContentProps {
   initialContent?: string;
   /** initialContent をエディタに反映したあとに呼ぶ */
   onInitialContentApplied?: () => void;
-  /** Wiki 生成ステータス */
-  wikiStatus?: WikiGeneratorStatus;
-  /** Wiki 生成コールバック */
-  onGenerateWiki?: () => void;
-  /** コラボモード時、Wiki生成内容を Y.Doc に反映する用。反映後に onWikiContentApplied でクリア */
-  wikiContentForCollab?: string | null;
-  onWikiContentApplied?: () => void;
   /**
    * カーソル位置にコンテンツを挿入するコールバック ref。TiptapEditor に透過的に渡す。
    * Ref to insert content at the editor's cursor. Forwarded to TiptapEditor.
@@ -124,12 +113,6 @@ interface PageEditorContentProps {
    * Trailing control rendered beside the floating Wiki Link input bar.
    */
   bottomBarTrailingAction?: React.ReactNode;
-  /**
-   * Wiki Compose 画面 (`/compose`) への遷移先 URL。指定すると `WikiGeneratorButton`
-   * が Compose 画面に遷移する経路を取り、本文ありでも表示される (#950 U2)。
-   * Pass-through to the WikiGeneratorButton's `composeHref`.
-   */
-  wikiComposeHref?: string;
 }
 
 /**
@@ -143,7 +126,6 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   currentPageId,
   pageId,
   isNewPage,
-  isWikiGenerating,
   isReadOnly,
   isSyncingLinks = false,
   linkedPagesMode = "repo",
@@ -155,18 +137,12 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   collaboration,
   initialContent,
   onInitialContentApplied,
-  wikiStatus,
-  onGenerateWiki,
-  wikiContentForCollab = null,
-  onWikiContentApplied,
   insertAtCursorRef,
   pageActionHubRef,
   pageNoteId = null,
   bottomBarTrailingAction,
-  wikiComposeHref,
 }) => {
-  const isEditorReadOnly = isReadOnly ?? isWikiGenerating;
-  const hasContent = useMemo(() => isContentNotEmpty(content), [content]);
+  const isEditorReadOnly = isReadOnly ?? false;
 
   const contentFocusRef = useRef<(() => void) | null>(null);
   const focusContent = useCallback(() => {
@@ -194,7 +170,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
   return (
     <div className="flex-1 pt-6 pb-32">
       <Container>
-        {/* ページタイトルと Wiki 生成ボタン（同一行） */}
+        {/* ページタイトル / Page title */}
         <div className="flex items-start gap-3 pt-6 pb-2">
           <div className="min-w-0 flex-1">
             <PageTitleBlock
@@ -205,34 +181,13 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
               onEnterMoveToContent={!isEditorReadOnly ? focusContent : undefined}
             />
           </div>
-          {/* Wiki 生成ボタンの表示条件:
-              - 旧経路: `wikiStatus` + `onGenerateWiki` 両方ある場合（インライン生成）
-              - 新経路: `wikiComposeHref` がある場合（Compose 画面に遷移、#950）
-              いずれも `WikiGeneratorButton` 自身がタイトル / 本文条件で更に
-              フィルタする。
-
-              Show the Wiki generation button when either:
-              - legacy: both `wikiStatus` + `onGenerateWiki` are supplied
-                (inline generation), or
-              - new: `wikiComposeHref` is supplied (navigate to Compose, #950).
-              `WikiGeneratorButton` itself filters on title/content state. */}
-          {((wikiStatus && onGenerateWiki) || wikiComposeHref) && (
-            <div className="shrink-0">
-              <WikiGeneratorButton
-                title={title}
-                hasContent={hasContent}
-                onGenerate={onGenerateWiki ?? (() => undefined)}
-                status={wikiStatus ?? "idle"}
-                composeHref={wikiComposeHref}
-              />
-            </div>
-          )}
         </div>
 
         {/* Source URL Badge - クリップしたページの場合に表示 */}
         {sourceUrl && <SourceUrlBadge sourceUrl={sourceUrl} />}
 
-        {/* エディター（生成中はオーバーレイを表示） */}
+        {/* エディター（コラボ初期同期中はスケルトンを表示）
+            Editor (shows a skeleton while the initial collaboration sync is pending). */}
         <div className="relative">
           {showCollaborationLoading && <EditorSkeleton />}
           {showEditor && (
@@ -245,7 +200,6 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
                 pageId={currentPageId || pageId || undefined}
                 pageTitle={title}
                 isReadOnly={isEditorReadOnly}
-                isWikiGenerating={isWikiGenerating}
                 showToolbar={showToolbar}
                 onContentError={onContentError}
                 collaborationConfig={collaborationConfig}
@@ -254,10 +208,7 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
                 pageActionHubRef={pageActionHubRef}
                 initialContent={initialContent}
                 onInitialContentApplied={onInitialContentApplied}
-                wikiContentForCollab={wikiContentForCollab ?? undefined}
-                onWikiContentApplied={onWikiContentApplied}
                 pageNoteId={pageNoteId}
-                wikiComposeHref={wikiComposeHref}
                 bottomBarTrailingAction={bottomBarTrailingAction}
               />
             </>
@@ -266,11 +217,11 @@ export const PageEditorContent: React.FC<PageEditorContentProps> = ({
 
         {/* Linked Pages Section
             ゴーストリンクは編集可能なときだけ表示する。`isEditorReadOnly` は
-            読み取り専用ページ（公開ゲスト閲覧や Wiki 生成中）で true になるため、
+            読み取り専用ページ（公開ゲスト閲覧など）で true になるため、
             それらの経路では `useCreatePage` mutation を呼び得ない UI を出さない。
             Ghost links render only while the editor is writable. `isEditorReadOnly`
-            covers guest public views and Wiki generation, both of which must not
-            expose the authenticated `useCreatePage` mutation. */}
+            covers guest public views, which must not expose the authenticated
+            `useCreatePage` mutation. */}
         {currentPageId && (
           <LinkedPagesSection
             pageId={currentPageId}

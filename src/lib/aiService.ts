@@ -9,7 +9,6 @@ import {
   type APIMode,
   type AIProviderType,
   type AIResponseUsage,
-  isAPIProvider,
 } from "@/types/ai";
 import { callOpenAI, callAnthropic, callGoogle } from "./aiServiceDirectProviders";
 import { callAIWithServer } from "./aiServiceServer";
@@ -30,11 +29,6 @@ export interface AIServiceRequest {
     webSearchOptions?: { search_context_size: "medium" | "low" | "high" };
     useWebSearch?: boolean;
     useGoogleSearch?: boolean;
-    /**
-     * Claude Code sidecar cwd (note-linked workspace, desktop only).
-     * Claude Code サイドカーの cwd（ノート連動ワークスペース、デスクトップのみ）。
-     */
-    cwd?: string;
   };
 }
 
@@ -57,16 +51,6 @@ export interface AIServiceCallbacks {
   onComplete?: (response: AIServiceResponse) => void;
   onError?: (error: Error) => void;
   onUsageUpdate?: (usage: AIResponseUsage) => void;
-  /**
-   * ツール実行開始時のコールバック（Claude Code のみ）。
-   * Callback when a tool starts executing (Claude Code only).
-   */
-  onToolUseStart?: (toolName: string) => void;
-  /**
-   * ツール実行完了時のコールバック（Claude Code のみ）。
-   * Callback when a tool finishes executing (Claude Code only).
-   */
-  onToolUseComplete?: (toolName: string) => void;
 }
 
 /**
@@ -99,10 +83,6 @@ export async function callAIService(
   callbacks: AIServiceCallbacks,
   abortSignal?: AbortSignal,
 ): Promise<void> {
-  if (settings.provider === "claude-code") {
-    return await callAIWithClaudeCode(settings, request, callbacks, abortSignal);
-  }
-
   const apiMode = getEffectiveAPIMode(settings);
 
   if (apiMode === "user_api_key") {
@@ -126,10 +106,6 @@ async function callAIWithUserKey(
   callbacks: AIServiceCallbacks,
   abortSignal?: AbortSignal,
 ): Promise<void> {
-  if (!isAPIProvider(settings.provider)) {
-    callbacks.onError?.(new Error(`${settings.provider} は直接 API プロバイダーではありません`));
-    return;
-  }
   try {
     switch (settings.provider) {
       case "openai":
@@ -149,72 +125,6 @@ async function callAIWithUserKey(
   } catch (error) {
     callbacks.onError?.(
       error instanceof Error ? error : new Error(i18n.t("errors.aiApiCallError")),
-    );
-  }
-}
-
-/**
- * Claude Code sidecar 経由で呼び出し (Issue #457)。
- * 統一プロバイダーの AsyncIterable をコールバックに変換する。
- *
- * Calls the Claude Code sidecar via the unified provider interface.
- * Adapts AsyncIterable to the existing callback pattern.
- */
-async function callAIWithClaudeCode(
-  _settings: AISettings,
-  request: AIServiceRequest,
-  callbacks: AIServiceCallbacks,
-  abortSignal?: AbortSignal,
-): Promise<void> {
-  try {
-    const { createClaudeCodeProvider } = await import("@/lib/aiProviders/claudeCodeProvider");
-    const provider = createClaudeCodeProvider();
-
-    const available = await provider.isAvailable();
-    if (!available) {
-      throw new Error(i18n.t("errors.claudeCodeUnavailable"));
-    }
-
-    let fullContent = "";
-    for await (const chunk of provider.query(
-      {
-        prompt: request.messages.map((m) => m.content).join("\n\n"),
-        model: request.model,
-        messages: request.messages,
-        options: {
-          maxTokens: request.options?.maxTokens,
-          temperature: request.options?.temperature,
-          stream: request.options?.stream,
-          cwd: request.options?.cwd,
-        },
-      },
-      abortSignal,
-    )) {
-      if (abortSignal?.aborted) throw new Error("ABORTED");
-
-      switch (chunk.type) {
-        case "text":
-          fullContent += chunk.content;
-          callbacks.onChunk?.(chunk.content);
-          break;
-        case "tool_use_start":
-          callbacks.onToolUseStart?.(chunk.toolName ?? "unknown");
-          break;
-        case "tool_use_complete":
-          callbacks.onToolUseComplete?.(chunk.toolName ?? "unknown");
-          break;
-        case "error":
-          throw new Error(chunk.content);
-        case "done":
-          callbacks.onComplete?.({ content: fullContent, finishReason: "stop" });
-          return;
-      }
-    }
-
-    callbacks.onComplete?.({ content: fullContent, finishReason: fullContent ? "stop" : "abort" });
-  } catch (error) {
-    callbacks.onError?.(
-      error instanceof Error ? error : new Error(i18n.t("errors.claudeCodeCallError")),
     );
   }
 }

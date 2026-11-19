@@ -40,30 +40,18 @@ vi.mock("@/lib/aiSettings", () => ({
   loadAISettings: () => Promise.resolve(aiSettingsState.current),
 }));
 
-vi.mock("@/lib/platform", () => ({
-  isTauriDesktop: vi.fn(() => true),
-}));
-
-const platformMod = () =>
-  import("@/lib/platform") as Promise<{ isTauriDesktop: ReturnType<typeof vi.fn> }>;
-
-vi.mock("./McpStatusIndicator", () => ({
-  McpStatusIndicator: () => <div data-testid="mcp-status-indicator" />,
-}));
-
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, fallback?: string) => fallback ?? key,
+    // The second argument is either a fallback string or interpolation options.
+    t: (key: string, fallback?: unknown) => (typeof fallback === "string" ? fallback : key),
   }),
 }));
 
 describe("AIChatHeader", () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
     storeState.activeConversationId = null;
     aiSettingsState.current = null;
-    const { isTauriDesktop } = await platformMod();
-    isTauriDesktop.mockReturnValue(true);
   });
 
   function renderHeader() {
@@ -91,40 +79,19 @@ describe("AIChatHeader", () => {
     expect(closePanel).toHaveBeenCalled();
   });
 
-  it("shows McpStatusIndicator when claude_code mode is active on desktop", async () => {
+  it("names the provider in the badge in own-key mode", async () => {
     aiSettingsState.current = {
-      provider: "claude-code",
-      apiKey: "",
-      apiMode: "api_server",
-      model: "default",
-      modelId: "claude-code:default",
-      isConfigured: true,
-    };
-    renderHeader();
-    await waitFor(() => {
-      expect(screen.getByTestId("mcp-status-indicator")).toBeInTheDocument();
-    });
-  });
-
-  it("hides McpStatusIndicator on web even if settings claim claude_code mode", async () => {
-    const { isTauriDesktop } = await platformMod();
-    isTauriDesktop.mockReturnValue(false);
-    aiSettingsState.current = {
-      provider: "claude-code",
-      apiKey: "",
-      apiMode: "api_server",
-      model: "default",
-      modelId: "claude-code:default",
+      provider: "openai",
+      apiKey: "sk-test",
+      apiMode: "user_api_key",
+      model: "gpt-5",
+      modelId: "openai:gpt-5",
       isConfigured: true,
     };
     renderHeader();
 
-    // Wait for async loadAISettings to settle so the badge would have rendered if not gated.
-    // 非同期 loadAISettings 解決後に確認することで、ガードが効いていることを保証する。
     await waitFor(() => {
-      expect(screen.getByText("aiChat.mode.default")).toBeInTheDocument();
+      expect(screen.getByText("aiChat.mode.apiKeyWithProvider")).toBeInTheDocument();
     });
-    expect(screen.queryByTestId("mcp-status-indicator")).not.toBeInTheDocument();
-    expect(screen.queryByText("aiChat.mode.claudeCode")).not.toBeInTheDocument();
   });
 });

@@ -14,7 +14,6 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { SiblingNavigator } from "./SiblingNavigator";
 import { AIChatMessageSkeleton } from "./AIChatMessageSkeleton";
-import { ToolExecutionStatus } from "./ToolExecutionStatus";
 
 interface AIChatMessageProps {
   message: ChatMessage;
@@ -198,10 +197,6 @@ export function AIChatMessage({
             onSwitch={onSwitchBranch}
             className="mt-1"
           />
-        )}
-
-        {!isUser && message.toolExecutions && message.toolExecutions.length > 0 && (
-          <ToolExecutionStatus toolExecutions={message.toolExecutions} className="mt-1" />
         )}
 
         {message.error && <div className="text-destructive mt-1 text-xs">{message.error}</div>}

@@ -1,5 +1,5 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
-import type { ChatMessage, ChatTreeState, ReferencedPage, ToolExecution } from "@/types/aiChat";
+import type { ChatMessage, ChatTreeState, ReferencedPage } from "@/types/aiChat";
 import type { AISettings } from "@/types/ai";
 import { callAIService, type AIServiceRequest } from "@/lib/aiService";
 import { parseActions } from "@/lib/aiChat/aiChatActions";
@@ -113,8 +113,6 @@ export async function streamAssistantCompletion(
     setError,
   } = deps;
 
-  const toolExecutions: ToolExecution[] = [];
-
   try {
     await callAIService(
       effectiveSettings,
@@ -126,37 +124,12 @@ export async function streamAssistantCompletion(
             ...prev,
             messageMap: patchMessageInTree(prev.messageMap, assistantMessageId, {
               content: streamingContentRef.current,
-              toolExecutions: toolExecutions.length > 0 ? [...toolExecutions] : undefined,
-            }),
-          }));
-        },
-        onToolUseStart: (toolName) => {
-          toolExecutions.push({ toolName, status: "running" });
-          setTree((prev) => ({
-            ...prev,
-            messageMap: patchMessageInTree(prev.messageMap, assistantMessageId, {
-              toolExecutions: [...toolExecutions],
-            }),
-          }));
-        },
-        onToolUseComplete: (toolName) => {
-          const entry = toolExecutions.find(
-            (e) => e.toolName === toolName && e.status === "running",
-          );
-          if (entry) entry.status = "completed";
-          setTree((prev) => ({
-            ...prev,
-            messageMap: patchMessageInTree(prev.messageMap, assistantMessageId, {
-              toolExecutions: [...toolExecutions],
             }),
           }));
         },
         onComplete: (response) => {
           const finalContent = response.content || streamingContentRef.current;
           const actions = parseActions(finalContent);
-          toolExecutions.forEach((e) => {
-            e.status = "completed";
-          });
           setTree((prev) => ({
             ...prev,
             messageMap: patchMessageInTree(prev.messageMap, assistantMessageId, {
@@ -164,22 +137,17 @@ export async function streamAssistantCompletion(
               isStreaming: false,
               modelDisplayName,
               actions: actions.length > 0 ? actions : undefined,
-              toolExecutions: toolExecutions.length > 0 ? [...toolExecutions] : undefined,
             }),
           }));
           setStreaming(false);
         },
         onError: (err) => {
-          toolExecutions.forEach((e) => {
-            if (e.status === "running") e.status = "completed";
-          });
           setTree((prev) => ({
             ...prev,
             messageMap: patchMessageInTree(prev.messageMap, assistantMessageId, {
               content: streamingContentRef.current || "",
               isStreaming: false,
               error: err.message,
-              toolExecutions: toolExecutions.length > 0 ? [...toolExecutions] : undefined,
             }),
           }));
           setStreaming(false);
@@ -190,16 +158,12 @@ export async function streamAssistantCompletion(
     );
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    toolExecutions.forEach((e) => {
-      if (e.status === "running") e.status = "completed";
-    });
     setTree((prev) => ({
       ...prev,
       messageMap: patchMessageInTree(prev.messageMap, assistantMessageId, {
         content: streamingContentRef.current || "",
         isStreaming: false,
         error: errorMessage,
-        toolExecutions: toolExecutions.length > 0 ? [...toolExecutions] : undefined,
       }),
     }));
     setStreaming(false);

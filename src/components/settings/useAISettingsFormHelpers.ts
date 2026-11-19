@@ -6,7 +6,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast as sonnerToast } from "@zedi/ui/components/sonner";
-import { isTauriDesktop } from "@/lib/platform";
 import { fetchServerModels, FetchServerModelsError } from "@/lib/aiService";
 import { resolvePreferredServerModel } from "@/lib/resolveServerModel";
 import type { AIModel } from "@/types/ai";
@@ -56,36 +55,6 @@ export function useSavedIndicator() {
   );
 
   return { savedAt, clear, markSaved };
-}
-
-/**
- * Checks Claude Code availability once on mount (Tauri desktop only).
- * マウント時に Claude Code の利用可否を判定する（Tauri デスクトップのみ）。
- */
-export function useClaudeCodeAvailability(): boolean | null {
-  const [available, setAvailable] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (!isTauriDesktop()) {
-      setAvailable(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const { checkClaudeInstallation } = await import("@/lib/claudeCode/bridge");
-        const result = await checkClaudeInstallation();
-        if (!cancelled) setAvailable(result.installed);
-      } catch {
-        if (!cancelled) setAvailable(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return available;
 }
 
 /**

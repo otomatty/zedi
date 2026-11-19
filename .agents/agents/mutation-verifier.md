@@ -1,6 +1,6 @@
 ---
 name: mutation-verifier
-description: 作成済みテストの検出力を Mutation テスト（Stryker）で検証し、生存ミュータントを「不足しているテスト観点」に翻訳して報告するエージェント。Stryker の対象外（server/*、admin、packages/*）ではアサーション強度レビューで代替する。/spec-test の Phase 4 で使う。Verifies test strength via mutation testing and translates surviving mutants into missing test perspectives.
+description: 作成済みテストの検出力を Mutation テスト（Stryker）で検証し、生存ミュータントを「不足しているテスト観点」に翻訳して報告するエージェント。Stryker の対象外（app/、admin、packages/*）ではアサーション強度レビューで代替する。/spec-test の Phase 4 で使う。Verifies test strength via mutation testing and translates surviving mutants into missing test perspectives.
 tools: Bash, Read, Grep, Glob
 ---
 

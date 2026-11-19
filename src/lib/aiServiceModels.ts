@@ -12,7 +12,7 @@ const getAIAPIBaseUrl = (): string => (import.meta.env.VITE_API_BASE_URL as stri
 const SERVER_MODELS_CACHE_KEY = "zedi-ai-server-models";
 const SERVER_MODELS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
-const VALID_PROVIDERS = ["openai", "anthropic", "google", "claude-code"] as const;
+const VALID_PROVIDERS = ["openai", "anthropic", "google"] as const;
 const isValidProvider = (v: unknown): v is AIModel["provider"] =>
   typeof v === "string" && (VALID_PROVIDERS as readonly string[]).includes(v);
 const toStr = (v: unknown, fallback = ""): string => (typeof v === "string" ? v : fallback);

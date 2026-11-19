@@ -42,7 +42,11 @@ interface ImageCreateDialogProps {
 export /**
  *
  */
-const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChange, onCreated }) => {
+const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({
+  open,
+  onOpenChange,
+  onCreated,
+}): React.JSX.Element => {
   /**
    *
    */
@@ -71,6 +75,20 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
    * OCR 進捗 (0-100)。null の場合は非表示 / OCR progress 0-100; null hides the UI.
    */
   const [ocrProgress, setOcrProgress] = useState<number | null>(null);
+  const [previousOpen, setPreviousOpen] = useState(open);
+
+  if (open !== previousOpen) {
+    setPreviousOpen(open);
+    if (!open) {
+      setStep("source");
+      setSelectedImage(null);
+      setPreviewUrl(null);
+      setProcessingMode("none");
+      setError(null);
+      setOcrProgress(null);
+      setIsProcessing(false);
+    }
+  }
 
   /**
    *
@@ -99,40 +117,37 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
   /**
    * describe モードが現時点で利用できない理由を返す。
    * - `not-configured`: AI 設定が未構成
-   * - `unsupported-provider`: 現在のプロバイダーは describe 未対応
    * - `api-server`: `api_server` モード（本 PR では Vision 非対応、ユーザー API キーモードが必要）
    *
    * Why the describe mode is currently unavailable. Covers:
    * - `not-configured`: AI settings are not configured
-   * - `unsupported-provider`: the selected provider cannot describe images yet
    * - `api-server`: `api_server` mode (server-side Vision not yet supported in this PR)
    */
-  const describeUnavailableReason: "not-configured" | "unsupported-provider" | "api-server" | null =
-    !aiSettings.isConfigured
-      ? "not-configured"
-      : aiSettings.provider === "claude-code"
-        ? "unsupported-provider"
-        : getEffectiveAPIMode(aiSettings) === "api_server"
-          ? "api-server"
-          : null;
+  const describeUnavailableReason: "not-configured" | "api-server" | null = !aiSettings.isConfigured
+    ? "not-configured"
+    : getEffectiveAPIMode(aiSettings) === "api_server"
+      ? "api-server"
+      : null;
 
-  const clearPreviewUrl = useCallback((updateState = true) => {
+  const releasePreviewUrl = useCallback((): void => {
     if (previewUrlRef.current) {
       URL.revokeObjectURL(previewUrlRef.current);
       previewUrlRef.current = null;
     }
-    if (updateState) {
-      setPreviewUrl(null);
-    }
   }, []);
 
+  const clearPreviewUrl = useCallback((): void => {
+    releasePreviewUrl();
+    setPreviewUrl(null);
+  }, [releasePreviewUrl]);
+
   const updatePreviewUrl = useCallback(
-    (nextPreviewUrl: string) => {
-      clearPreviewUrl(false);
+    (nextPreviewUrl: string): void => {
+      releasePreviewUrl();
       previewUrlRef.current = nextPreviewUrl;
       setPreviewUrl(nextPreviewUrl);
     },
-    [clearPreviewUrl],
+    [releasePreviewUrl],
   );
 
   // ダイアログを閉じたときにリセット
@@ -156,30 +171,21 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
   }, [clearPreviewUrl, onOpenChange]);
 
   // コンポーネントアンマウント時も abort する / Also abort on unmount.
-  useEffect(() => {
-    return () => {
+  useEffect((): (() => void) => {
+    return (): void => {
       abortRef.current?.abort();
-      clearPreviewUrl(false);
+      releasePreviewUrl();
     };
-  }, [clearPreviewUrl]);
+  }, [releasePreviewUrl]);
 
-  // 親が直接 `open=false` にしたケース（DialogContent の Esc/オーバーレイ以外、
-  // たとえば外部状態で閉じる場合）に備え、`open` の遷移を監視して
-  // 進行中の OCR / describe を必ず中断し、内部状態をリセットする。
-  // Without this, closing via the parent could leave a previous run state
-  // (preview / progress) when the dialog reopens.
-  useEffect(() => {
+  // 親から閉じた場合も外部リソースを解放する。表示用 state は上で調整する。
+  // Release external resources after a parent closes the dialog.
+  useEffect((): void => {
     if (open) return;
     abortRef.current?.abort();
     abortRef.current = null;
-    setStep("source");
-    setSelectedImage(null);
-    clearPreviewUrl();
-    setProcessingMode("none");
-    setError(null);
-    setOcrProgress(null);
-    setIsProcessing(false);
-  }, [open, clearPreviewUrl]);
+    releasePreviewUrl();
+  }, [open, releasePreviewUrl]);
 
   // 画像選択
   /**
@@ -512,15 +518,6 @@ const ImageCreateDialog: React.FC<ImageCreateDialogProps> = ({ open, onOpenChang
                 </AlertDescription>
               </Alert>
             )}
-            {processingMode === "describe" &&
-              describeUnavailableReason === "unsupported-provider" && (
-                <Alert variant="destructive">
-                  <AlertDescription>
-                    Claude Code では現在この画像解析機能は未対応です。OpenAI、Anthropic、Google
-                    のいずれかを「ユーザー API キー」モードで選択してください。
-                  </AlertDescription>
-                </Alert>
-              )}
             {processingMode === "describe" && describeUnavailableReason === "api-server" && (
               <Alert variant="destructive">
                 <AlertDescription>

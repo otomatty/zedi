@@ -6,7 +6,7 @@
  * Re-exports split modules for backward compatibility.
  */
 export type { ClippedContent, OGPData, FetchHtmlFn } from "./types";
-export { isValidUrl, isClipUrlAllowed } from "./urlPolicy";
+export { isValidUrl } from "./urlPolicy";
 export { sanitizeHtml } from "./sanitizeHtml";
 export { getClipErrorMessage } from "./getClipErrorMessage";
 export { extractOGPData, clipWebPage } from "./clipWebPage";

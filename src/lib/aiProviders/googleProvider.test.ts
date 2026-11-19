@@ -32,7 +32,6 @@ describe("createGoogleProvider", () => {
     const p = createGoogleProvider("key");
     expect(p.id).toBe("google");
     expect(p.capabilities.textGeneration).toBe(true);
-    expect(p.capabilities.fileAccess).toBe(false);
   });
 
   describe("isAvailable", () => {

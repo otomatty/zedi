@@ -1,5 +1,5 @@
 /**
- * Lucide icon map for slash menu (blocks + agent commands).
+ * Lucide icon map for slash menu blocks.
  * スラッシュメニュー用の Lucide アイコンマップ。
  */
 
@@ -22,16 +22,7 @@ import {
   GitBranch,
   Sigma,
   Radical,
-  Terminal,
-  Bot,
-  FileSearch,
-  Search,
-  ListChecks,
-  FlaskConical,
-  HelpCircle,
-  AlignLeft,
 } from "lucide-react";
-import type { AgentSlashCommandId } from "@/lib/agentSlashCommands/types";
 
 /** Map icon name string → Lucide component / アイコン名 → Lucide コンポーネント */
 export const slashMenuIconMap: Record<string, FC<SVGProps<SVGSVGElement>>> = {
@@ -52,24 +43,4 @@ export const slashMenuIconMap: Record<string, FC<SVGProps<SVGSVGElement>>> = {
   GitBranch,
   Sigma,
   Radical,
-  Terminal,
-  Bot,
-  FileSearch,
-  Search,
-  ListChecks,
-  FlaskConical,
-  HelpCircle,
-  AlignLeft,
-};
-
-/** Agent row icon names (keys into {@link slashMenuIconMap}). / エージェント行のアイコン名 */
-export const agentSlashIconName: Record<AgentSlashCommandId, string> = {
-  "agent-analyze": "FileSearch",
-  "agent-git-summary": "GitBranch",
-  "agent-run": "Terminal",
-  "agent-research": "Search",
-  "agent-review": "ListChecks",
-  "agent-test": "FlaskConical",
-  "agent-explain": "HelpCircle",
-  "agent-summarize": "AlignLeft",
 };

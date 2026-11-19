@@ -66,8 +66,7 @@ export function extractTagsFromContent(content: string): TagInfo[] {
             (mark as Record<string, unknown>).type === "tag"
           ) {
             const attrs = (mark as Record<string, unknown>).attrs as
-              | Record<string, unknown>
-              | undefined;
+              Record<string, unknown> | undefined;
             const name = normalizeTagNameAttr(attrs?.name);
             if (name) {
               tags.push({
@@ -137,8 +136,7 @@ export function updateTagAttributes(
             (mark as Record<string, unknown>).type === "tag"
           ) {
             const attrs = (mark as Record<string, unknown>).attrs as
-              | Record<string, unknown>
-              | undefined;
+              Record<string, unknown> | undefined;
             const name = normalizeTagNameAttr(attrs?.name);
             if (name && attrs) {
               const normalizedName = name.toLowerCase();

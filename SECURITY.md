@@ -16,7 +16,7 @@ If you discover a security vulnerability, **do not report it as a public Issue**
 
 ### How to report
 
-1. **Email**: security@example.com (replace with the project security contact)
+1. **Email**: akimasa.sugai@saedgewell.com
 2. **GitHub Security Advisories**: Use Private vulnerability reporting from the repository Security tab
 
 ### What to include
@@ -43,7 +43,7 @@ If you discover a security vulnerability, **do not report it as a public Issue**
 #### Data storage
 
 - Local-only mode may use IndexedDB in the browser
-- Authenticated user data is stored in PostgreSQL (via `server/api`)
+- Authenticated user data is stored in Cloudflare D1 (via the Worker in `app/`)
 - All remote communication uses HTTPS
 
 #### Authentication

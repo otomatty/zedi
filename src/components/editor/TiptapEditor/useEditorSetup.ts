@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   type MutableRefObject,
@@ -34,30 +33,6 @@ import i18n from "@/i18n";
  */
 const CONTENT_CHANGE_DEBOUNCE_MS = 300;
 
-/**
- * Keeps latest `workspaceRoot` in a ref without re-running `useEditor` (Issue #461).
- * `useEditor` を再実行せずに最新のワークスペースルートを ref に保持する（Issue #461）。
- */
-function useWorkspaceRootRef(workspaceRoot: string | null) {
-  const r = useRef(workspaceRoot);
-  useLayoutEffect(() => {
-    r.current = workspaceRoot;
-  }, [workspaceRoot]);
-  return r;
-}
-
-/**
- * Keeps latest `noteId` in a ref without re-running `useEditor` (Issue #461).
- * `useEditor` を再実行せずに最新のノート ID を ref に保持する（Issue #461）。
- */
-function useNoteIdRef(noteId: string | null) {
-  const r = useRef(noteId);
-  useLayoutEffect(() => {
-    r.current = noteId;
-  }, [noteId]);
-  return r;
-}
-
 interface UseEditorSetupOptions {
   content: TiptapEditorProps["content"];
   onChange: TiptapEditorProps["onChange"];
@@ -85,10 +60,6 @@ interface UseEditorSetupOptions {
   suggestionRef: RefObject<WikiLinkSuggestionHandle | null>;
   slashRef: RefObject<SlashSuggestionHandle | null>;
   tagSuggestionRef: RefObject<TagSuggestionHandle | null>;
-  /** Note-linked workspace root for `@file:` (Issue #461). / `@file:` 用ワークスペースルート */
-  workspaceRoot: string | null;
-  /** Current note id for Tauri workspace registry reads (Issue #461). */
-  noteId: string | null;
   /**
    * インライン・ゴースト補完（issue #930）に渡す候補一覧の getter。ref ベースで
    * 最新値を返すことで、候補が更新されても `useEditor` を再実行せずに済む。
@@ -132,8 +103,6 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     suggestionRef,
     slashRef,
     tagSuggestionRef,
-    workspaceRoot,
-    noteId,
     getGhostCompletionCandidates,
   } = options;
 
@@ -174,9 +143,6 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
     suggestionStateRef.current = suggestionState;
     tagSuggestionStateRef.current = tagSuggestionState;
   }, [slashState, suggestionState, tagSuggestionState]);
-
-  const workspaceRootRef = useWorkspaceRootRef(workspaceRoot);
-  const noteIdRef = useNoteIdRef(noteId);
 
   // 入力が落ち着いてから最新の document を一度だけシリアライズして通知する。
   // editorRef は常に最新エディタを指すため、debounce 発火時点の内容を読む。
@@ -227,10 +193,6 @@ export function useEditorSetup(options: UseEditorSetupOptions) {
                 user: collaborationConfig.user,
               }
             : undefined,
-        fileReference: {
-          getWorkspaceRoot: () => workspaceRootRef.current,
-          getNoteId: () => noteIdRef.current,
-        },
         getGhostCompletionCandidates,
       }),
       /* eslint-enable react-hooks/refs */

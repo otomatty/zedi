@@ -17,7 +17,7 @@ Full-repo mutation (`bun run test:mutation`) mutates thousands of mutants and is
 ## Prerequisites
 
 - Repository root: `zedi` (frontend Stryker config: `stryker.config.mjs`, Vitest).
-- **Scope**: only `src/**/*.ts(x)` excluding `*.test.*`, `*.spec.*`, `__tests__`. **`server/api` is not mutated** (different test setup; use `cd server/api && bun run test:run` for API tests).
+- **Scope**: only `src/**/*.ts(x)` excluding `*.test.*`, `*.spec.*`, `__tests__`. **`app/` is not mutated** (separate workspace and test setup; use `cd app && bun run test` for its tests).
 
 ## Config vs full-repo mutation
 
@@ -122,7 +122,7 @@ For full-repo thresholds, use `stryker.config.mjs` instead.
 1. Prefer `bun run test:mutation:changed` over editing `stryker.config.mjs` `mutate` globs for one-off runs.
 2. On **timeout** during initial test run, retry with `--dryRunTimeoutMinutes 30` before other changes.
 3. Pass through extra Stryker flags after `--`: e.g. `-- --ignoreStatic --timeoutMS 120000`.
-4. Do not claim mutation coverage for `server/api` from this skill; point to Vitest under `server/api` instead.
+4. Do not claim mutation coverage for `app/` from this skill; point to Vitest under `app/` instead.
 5. If the initial dry run fails with **failed tests** (not timeout), fix unit tests first (`bun run test:run`); Stryker aborts when the unmutated suite fails.
 6. Do **not** treat a low mutation score on `test:mutation:changed` as a CI gate failure; use **`bun run test:mutation`** for repo-wide thresholds.
 7. To **explain results to the user**, run **`bun run mutation:report:summary`** and read **`reports/mutation/mutation-summary.md`** — never read `mutation.html` into context.

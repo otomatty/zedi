@@ -56,7 +56,6 @@ vi.mock("./useAISettingsFormHelpers", () => ({
     clear: mockClearSavedIndicator,
     markSaved: mockMarkSaved,
   }),
-  useClaudeCodeAvailability: () => true,
   useServerModels: () => ({
     models: [],
     loading: false,

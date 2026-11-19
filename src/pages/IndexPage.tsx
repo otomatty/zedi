@@ -115,32 +115,13 @@ async function rebuildIndex(): Promise<IndexRebuildResponse> {
  *
  * インデックス閲覧ページ。マウント時は GET、再構築ボタン押下で POST。
  */
-const IndexPage: React.FC = () => {
+const IndexPage: React.FC = (): React.JSX.Element => {
   const { toast } = useToast();
   const { t } = useTranslation();
   const [data, setData] = useState<IndexViewModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [rebuilding, setRebuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await fetchIndex();
-      setData({
-        pageId: result.pageId,
-        noteId: result.noteId,
-        totalPages: result.totalPages,
-        categories: result.categories,
-        timestamp: result.lastBuiltAt,
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   const rebuild = useCallback(async () => {
     setRebuilding(true);
@@ -162,9 +143,32 @@ const IndexPage: React.FC = () => {
     }
   }, [toast, t]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect((): (() => void) => {
+    let cancelled = false;
+    void fetchIndex()
+      .then((result): void => {
+        if (cancelled) return;
+        setData({
+          pageId: result.pageId,
+          noteId: result.noteId,
+          totalPages: result.totalPages,
+          categories: result.categories,
+          timestamp: result.lastBuiltAt,
+        });
+      })
+      .catch((e: unknown): void => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally((): void => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+
+    return (): void => {
+      cancelled = true;
+    };
+  }, []);
 
   const busy = loading || rebuilding;
 

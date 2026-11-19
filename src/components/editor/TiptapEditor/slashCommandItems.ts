@@ -1,6 +1,5 @@
 import type { Editor } from "@tiptap/core";
 import i18n from "@/i18n";
-import { isTauriDesktop } from "@/lib/platform";
 
 /**
  * Check if the current device is a mobile device (phone or tablet).
@@ -90,19 +89,6 @@ export const slashCommandItems: SlashCommandItem[] = [
     id: "codeBlock",
     icon: "Code2",
     action: (editor, range) => editor.chain().focus().deleteRange(range).setCodeBlock().run(),
-  },
-  {
-    // Claude Code Bash 実行ノード。Tauri デスクトップ（Claude Code sidecar）でのみ意味があるため、
-    // Web ではメニューから隠す。NodeView 自体は既存ノートとの互換のためエディタには登録され続ける。
-    // The Claude Code Bash executable node: only meaningful in the Tauri desktop app (Claude Code sidecar),
-    // so it is hidden from the slash menu on web. The node view stays registered for note compatibility.
-    id: "executableCodeBlock",
-    icon: "Terminal",
-    isAvailable: (editor) =>
-      isTauriDesktop() &&
-      !!editor.extensionManager.extensions.find((e) => e.name === "executableCodeBlock"),
-    action: (editor, range) =>
-      editor.chain().focus().deleteRange(range).insertExecutableCodeBlock().run(),
   },
   {
     id: "horizontalRule",
@@ -208,33 +194,6 @@ export const slashCommandItems: SlashCommandItem[] = [
         .focus()
         .deleteRange(range)
         .insertHtmlArtifact({ content: trimmed, title: title?.trim() || "" })
-        .run();
-    },
-  },
-  {
-    // MCP リソース埋め込み。フェッチは Claude Code sidecar 経由のため Tauri デスクトップ専用。
-    // 既存ノートとの互換のため拡張自体はエディタに残るが、挿入導線は web で非表示にする。
-    // MCP resource embed. Fetching goes through the Claude Code sidecar, so it is desktop-only.
-    // The extension stays registered for backward compatibility, but the insert entry point is hidden on web.
-    id: "mcpResource",
-    icon: "Plug",
-    isAvailable: (editor) =>
-      isTauriDesktop() &&
-      !!editor.extensionManager.extensions.find((e) => e.name === "mcpResource"),
-    action: (editor, range) => {
-      const server = window.prompt(i18n.t("editor.mcpResourceEmbed.promptServer"), "");
-      if (server === null) return;
-      const trimmedServer = server.trim();
-      if (!trimmedServer) return;
-      const resource = window.prompt(i18n.t("editor.mcpResourceEmbed.promptResource"), "");
-      if (resource === null) return;
-      const trimmedResource = resource.trim();
-      if (!trimmedResource) return;
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertMcpResource({ server: trimmedServer, resource: trimmedResource })
         .run();
     },
   },

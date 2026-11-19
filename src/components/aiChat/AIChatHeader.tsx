@@ -11,8 +11,6 @@ import {
   getProviderById,
   DEFAULT_AI_SETTINGS,
 } from "@/types/ai";
-import { isTauriDesktop } from "@/lib/platform";
-import { McpStatusIndicator } from "./McpStatusIndicator";
 
 /**
  * AI chat dock header: list, new chat, open full page, close, and mode badge.
@@ -36,12 +34,7 @@ export function AIChatHeader() {
       const settings = await loadAISettings();
       if (cancelled) return;
       const s = settings ?? DEFAULT_AI_SETTINGS;
-      const rawMode = getInteractionMode(s);
-      // Web 環境では Claude Code モードに到達できないが、設定ストアに残っている等の理由で
-      // claude_code が返ったときは default 表示にフォールバックする（防御的ガード）。
-      // Defensive guard: claude_code mode is hidden on web; fall back to default if it leaks through.
-      const mode: AIInteractionMode =
-        rawMode === "claude_code" && !isTauriDesktop() ? "default" : rawMode;
+      const mode = getInteractionMode(s);
       const providerName =
         mode === "user_api_key" ? (getProviderById(s.provider)?.name ?? s.provider) : undefined;
       setModeInfo({ mode, providerName });
@@ -83,8 +76,6 @@ export function AIChatHeader() {
         return modeInfo.providerName
           ? t("aiChat.mode.apiKeyWithProvider", { provider: modeInfo.providerName })
           : t("aiChat.mode.apiKey");
-      case "claude_code":
-        return t("aiChat.mode.claudeCode");
     }
   })();
 
@@ -101,7 +92,6 @@ export function AIChatHeader() {
         >
           {modeLabel}
         </button>
-        {modeInfo.mode === "claude_code" && isTauriDesktop() && <McpStatusIndicator />}
       </div>
       <div className="flex items-center gap-2">
         <button

@@ -1,6 +1,6 @@
 // 一般設定を管理するカスタムフック
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useTheme } from "next-themes";
 import {
   GeneralSettings,
@@ -20,8 +20,6 @@ interface UseGeneralSettingsReturn {
   updateEditorFontSize: (fontSize: EditorFontSize) => void;
   updateCustomFontSizePx: (px: number) => void;
   updateLocale: (locale: UILocale) => void;
-  /** Toggle confirmation before running executable code blocks (Claude Code). */
-  updateExecutableCodeConfirmBeforeRun: (value: boolean) => void;
   save: () => Promise<boolean>;
   /** エディタ用のフォントサイズ px 値 */
   editorFontSizePx: number;
@@ -33,18 +31,17 @@ interface UseGeneralSettingsReturn {
  */
 export function useGeneralSettings(): UseGeneralSettingsReturn {
   const [settings, setSettings] = useState<GeneralSettings>(() => loadGeneralSettings());
-  const [isLoading, setIsLoading] = useState(true);
+  const isLoading = false;
   const [isSaving, setIsSaving] = useState(false);
   const { setTheme } = useTheme();
   const { i18n } = useTranslation();
 
-  // 初期読み込み時にテーマと言語を同期
-  useEffect(() => {
+  // Sync external theme and locale without replacing the settings being edited.
+  // 編集中の設定を上書きせず、外部のテーマと言語だけを同期する。
+  useEffect((): void => {
     const loaded = loadGeneralSettings();
-    setSettings(loaded);
     setTheme(loaded.theme);
     i18n.changeLanguage(loaded.locale);
-    setIsLoading(false);
   }, [setTheme, i18n]);
 
   const updateTheme = useCallback(
@@ -88,14 +85,6 @@ export function useGeneralSettings(): UseGeneralSettingsReturn {
     [i18n],
   );
 
-  const updateExecutableCodeConfirmBeforeRun = useCallback((value: boolean) => {
-    setSettings((prev) => {
-      const next = { ...prev, executableCodeConfirmBeforeRun: value };
-      saveGeneralSettings(next);
-      return next;
-    });
-  }, []);
-
   const save = useCallback(async (): Promise<boolean> => {
     setIsSaving(true);
     try {
@@ -123,7 +112,6 @@ export function useGeneralSettings(): UseGeneralSettingsReturn {
     updateEditorFontSize,
     updateCustomFontSizePx,
     updateLocale,
-    updateExecutableCodeConfirmBeforeRun,
     save,
     editorFontSizePx,
   };

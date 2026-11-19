@@ -115,7 +115,7 @@ bun run dev
 3. **Implement changes**
    - Write code
    - Add tests
-   - Update documentation (English canonical + Japanese `.ja.md` pair when applicable — see [DOCUMENTATION.md](./DOCUMENTATION.md))
+   - Update documentation (English canonical + Japanese `.ja.md` pair when applicable — see [AGENTS.md](./AGENTS.md) § Public entry docs)
 
 4. **Run tests and quality checks**
 

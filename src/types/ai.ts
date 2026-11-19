@@ -1,19 +1,19 @@
 // AI関連の型定義 / AI-related type definitions
 
 /**
- * AI プロバイダー種別。API 直接呼び出し 3 種 + Claude Code (Tauri desktop only)。
- * AI provider type. Three direct-API providers plus Claude Code (Tauri desktop only).
+ * AI プロバイダー種別（API 直接呼び出し）。
+ * AI provider type (direct API providers).
  */
-export type AIProviderType = "openai" | "anthropic" | "google" | "claude-code";
+export type AIProviderType = "openai" | "anthropic" | "google";
 
 /** User API key vs Zedi server API. */
 export type APIMode = "user_api_key" | "api_server";
 
 /**
- * 利用モードの論理的な 3 分類。`AISettings` の `provider` + `apiMode` から導出する。
- * Logical interaction mode derived from `AISettings.provider` + `apiMode`.
+ * 利用モード。`AISettings` の `apiMode` から導出する。
+ * Logical interaction mode derived from `AISettings.apiMode`.
  */
-export type AIInteractionMode = "default" | "user_api_key" | "claude_code";
+export type AIInteractionMode = "default" | "user_api_key";
 
 /** Subscription tier for model access. */
 export type UserTier = "free" | "pro";
@@ -35,16 +35,8 @@ export interface AISettings {
 export interface AICapabilities {
   /** テキスト生成 / Text generation */
   textGeneration: boolean;
-  /** ローカルファイルアクセス（Claude Code のみ） / Local file access (Claude Code only) */
-  fileAccess: boolean;
-  /** コマンド実行（Claude Code のみ） / Command execution (Claude Code only) */
-  commandExecution: boolean;
   /** Web 検索 / Web search */
   webSearch: boolean;
-  /** MCP 統合（Claude Code のみ） / MCP integration (Claude Code only) */
-  mcpIntegration: boolean;
-  /** エージェントループ（Claude Code のみ） / Agent loop (Claude Code only) */
-  agentLoop: boolean;
 }
 
 /**
@@ -61,11 +53,6 @@ export interface AIProvider {
   requiresApiKey: boolean;
   description?: string;
   capabilities: AICapabilities;
-  /**
-   * デスクトップ環境（Tauri）でのみ利用可能か。
-   * Whether this provider requires a desktop (Tauri) environment.
-   */
-  desktopOnly?: boolean;
 }
 
 // サーバーから取得するモデル情報
@@ -121,21 +108,7 @@ export interface CachedServerModels {
 /** API 経由のプロバイダー共通ケーパビリティ / Common capabilities for direct-API providers */
 const API_PROVIDER_CAPABILITIES: AICapabilities = {
   textGeneration: true,
-  fileAccess: false,
-  commandExecution: false,
   webSearch: true,
-  mcpIntegration: false,
-  agentLoop: false,
-};
-
-/** Claude Code (Sidecar) のケーパビリティ / Claude Code sidecar capabilities */
-const CLAUDE_CODE_CAPABILITIES: AICapabilities = {
-  textGeneration: true,
-  fileAccess: true,
-  commandExecution: true,
-  webSearch: true,
-  mcpIntegration: true,
-  agentLoop: true,
 };
 
 // モデル方針: Gemini 3.x / GPT-5 / Claude 4 以上のみ
@@ -174,18 +147,6 @@ export const AI_PROVIDERS: AIProvider[] = [
     description: "Anthropic Claude 4 モデル",
     capabilities: API_PROVIDER_CAPABILITIES,
   },
-  {
-    id: "claude-code",
-    name: "Claude Code",
-    defaultModels: [],
-    apiKeyPrefix: "",
-    apiKeyHelpUrl: "https://docs.anthropic.com/en/docs/claude-code/overview",
-    placeholder: "",
-    requiresApiKey: false,
-    description: "Claude Code (デスクトップ専用 / Desktop only)",
-    capabilities: CLAUDE_CODE_CAPABILITIES,
-    desktopOnly: true,
-  },
 ];
 
 /** Default settings when none are stored yet. */
@@ -199,28 +160,20 @@ export const DEFAULT_AI_SETTINGS: AISettings = {
 };
 
 /**
- * サーバー API で使えるプロバイダーのみ（claude-code 除外）。
- * Providers usable via server API (excludes claude-code).
+ * サーバー API で使えるプロバイダー。
+ * Providers usable via server API.
  */
-export type APIProviderType = Exclude<AIProviderType, "claude-code">;
+export type APIProviderType = AIProviderType;
 
 /**
  * API 直接呼び出し用プロバイダーのみのリスト。
- * List of direct-API providers only (no desktop-only entries).
+ * List of direct-API providers.
  */
-export const API_ONLY_PROVIDERS: AIProvider[] = AI_PROVIDERS.filter((p) => !p.desktopOnly);
+export const API_ONLY_PROVIDERS: AIProvider[] = AI_PROVIDERS;
 
 /** Look up provider metadata by id. */
 export function getProviderById(id: AIProviderType): AIProvider | undefined {
   return AI_PROVIDERS.find((p) => p.id === id);
-}
-
-/**
- * プロバイダーが API キー方式（直接 API）のプロバイダーかどうか。
- * Whether the provider type is a direct-API provider (not claude-code).
- */
-export function isAPIProvider(id: AIProviderType): id is APIProviderType {
-  return id !== "claude-code";
 }
 
 /** First default model id for a provider. */
@@ -240,7 +193,6 @@ export function getDefaultModels(provider: AIProviderType): string[] {
  * Derives the logical interaction mode from settings.
  */
 export function getInteractionMode(settings: AISettings): AIInteractionMode {
-  if (settings.provider === "claude-code") return "claude_code";
   if (settings.apiMode === "user_api_key") return "user_api_key";
   return "default";
 }

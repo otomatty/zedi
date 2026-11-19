@@ -6,14 +6,6 @@ import type {
   TreeChatMessage,
 } from "../types/aiChat";
 
-/**
- * Whether a stored conversation still uses the legacy flat `messages` array.
- * 保存済み会話が旧形式のフラット `messages` かどうか。
- */
-export function needsMigration(conversation: Conversation): boolean {
-  return conversation.messageMap === undefined && conversation.messages !== undefined;
-}
-
 /** Attach `parentId` for tree storage. / ツリー保存用に `parentId` を付与 */
 function toTreeMessage(message: ChatMessage, parentId: string | null): TreeChatMessage {
   return { ...message, parentId };

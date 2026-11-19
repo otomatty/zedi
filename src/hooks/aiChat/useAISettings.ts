@@ -100,16 +100,13 @@ export function useAISettings(): UseAISettingsReturn {
   const save = useCallback(async (): Promise<boolean> => {
     setIsSaving(true);
     try {
-      const isClaudeCode = settings.provider === "claude-code";
       const isServerMode = settings.apiMode === "api_server";
       const provider = getProviderById(settings.provider);
 
-      const needsApiKey = !isClaudeCode && !isServerMode && provider?.requiresApiKey;
+      const needsApiKey = !isServerMode && provider?.requiresApiKey;
       const isConfigured = needsApiKey ? settings.apiKey.trim() !== "" : true;
 
-      const modelId = isClaudeCode
-        ? "claude-code:default"
-        : `${settings.provider}:${settings.model}`;
+      const modelId = `${settings.provider}:${settings.model}`;
 
       const settingsToSave = {
         ...settings,

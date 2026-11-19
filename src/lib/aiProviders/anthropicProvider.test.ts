@@ -32,7 +32,6 @@ describe("createAnthropicProvider", () => {
     const p = createAnthropicProvider("key");
     expect(p.id).toBe("anthropic");
     expect(p.capabilities.textGeneration).toBe(true);
-    expect(p.capabilities.fileAccess).toBe(false);
   });
 
   describe("isAvailable", () => {

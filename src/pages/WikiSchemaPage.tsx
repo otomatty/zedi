@@ -2,7 +2,7 @@
  * Wiki Schema editing page — the user-defined "constitution" for their wiki.
  * ユーザー定義の Wiki スキーマ（「憲法」）を編集するページ。
  */
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { Save, Loader2 } from "lucide-react";
 import { Button, useToast } from "@zedi/ui";
 import Container from "@/components/layout/Container";
@@ -27,21 +27,14 @@ const WikiSchemaPage: React.FC = () => {
   // Track the data id to know when remote data has changed.
   const [syncedId, setSyncedId] = useState<string | null>(null);
 
-  // Sync from remote only when the page id changes (initial load / after save).
-  useEffect(() => {
-    if (data && data.pageId !== syncedId) {
-      setSyncedId(data.pageId);
-    }
-  }, [data, syncedId]);
-
-  // Apply remote data when syncedId changes (avoids setState-in-render).
-  useEffect(() => {
-    if (!data) return;
+  // 同じページの再取得では編集中の内容を保持する。
+  // Adopt remote values only when switching to a different page.
+  if (data && data.pageId !== syncedId) {
+    setSyncedId(data.pageId);
     setTitle(data.title || "Wiki Schema");
     setContent(data.content || "");
     setIsDirty(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally sync once per pageId
-  }, [syncedId]);
+  }
 
   const handleSave = useCallback(async () => {
     try {

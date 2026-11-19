@@ -12,16 +12,15 @@ interface ProtectedRouteProps {
  * Redirects to the sign-in page if the user is not signed in.
  *
  * 未ログイン時は元のパス + クエリ + ハッシュを `returnTo` として `/sign-in` に
- * 渡すことで、サインイン → OAuth コールバック経由で同じ URL（例:
- * `/notes/me?clipUrl=...`）に復帰できるようにする。`returnTo` は
+ * 渡すことで、サインイン → OAuth コールバック経由で同じ URL に復帰できるように
+ * する。`returnTo` は
  * `AuthCallback` 側の `getSafeReturnTarget` で `ALLOWED_RETURN_PATHS` と
  * 突き合わせるため、許可リストに含まれないパスは自動的に既定ランディングへ
  * フォールバックされる。
  *
  * On guest access, the original `pathname + search + hash` is forwarded as a
  * `returnTo` query parameter to `/sign-in`, so the post-auth callback can
- * resume the same URL (e.g. the Chrome-extension `clipUrl` hand-off via
- * `/notes/me?clipUrl=...`). `AuthCallback` validates `returnTo` against
+ * resume the same URL. `AuthCallback` validates `returnTo` against
  * `ALLOWED_RETURN_PATHS` so any unrecognized path falls back to the default
  * landing.
  *
