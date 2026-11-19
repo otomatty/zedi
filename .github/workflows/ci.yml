@@ -254,49 +254,92 @@ jobs:
           path: admin/playwright-report/
           retention-days: 7
 
-  mutation-light:
-    name: Mutation (light)
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+  # PR で変わった app/ のファイルだけを Mutation の対象とし、スコアで失敗させず Summary に結果を出す（#1159）。
+  # 判定には単体テストを使う。Stryker は workerd の統合テストを実行できない。
+  # main への push では実行せず、全体は nightly-mutation.yml で毎週確認する。
+  # Run mutation tests on changed app/ files in PRs and report scores in the Summary without a score gate (#1159).
+  # Stryker uses unit tests only because it cannot run workerd integration tests.
+  # Skip pushes to main. The weekly nightly-mutation.yml workflow covers the full scope.
+  app-mutation:
+    name: App (rebuild) — mutation (changed files)
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     continue-on-error: true
+    env:
+      STRYKER_DIFF_BASE: origin/${{ github.base_ref }}
     steps:
-      - name: Record job start time
-        run: echo "MUTATION_START=$(date +%s)" >> "$GITHUB_ENV"
-
       - name: Checkout (with retry)
         uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
           action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+          with: |
+            fetch-depth: 0
           attempt_limit: 3
           attempt_delay: 5000
 
       - uses: ./.github/actions/setup-toolchain
+        with:
+          install-deps: "false"
 
-      # Golden list of files with stable mutation scores (Phase 1/2 of Epic #468).
-      # 安定したスコアを持つファイルを段階的に追加し、PR で退行を早めに検知する。
-      # Local scores measured 2026-04-26 with `stryker.config.mutation-changed.mjs`:
-      #   dateUtils.ts                94.03% / useContainerColumns.ts        86.67%
-      #   noteViewHelpers.ts         100.00% / aiChatConversationTitle.ts   100.00%
-      #   aiCostUtils.ts              91.18% / encryption.ts                 96.43%
-      #   mcpServerImportHelpers.ts  100.00% / onboardingState.ts            83.82%
-      - name: Run mutation tests (limited scope)
-        run: bun run test:mutation -- --mutate "src/lib/dateUtils.ts,src/hooks/useContainerColumns.ts,src/pages/NoteView/noteViewHelpers.ts,src/lib/aiChatConversationTitle.ts,src/lib/aiCostUtils.ts,src/lib/encryption.ts,src/lib/mcpServerImportHelpers.ts,src/lib/onboardingState.ts"
+      - name: Install app dependencies
+        working-directory: app
+        run: bun install --frozen-lockfile
+
+      - name: List changed mutation targets
+        id: targets
+        working-directory: app
+        run: |
+          node scripts/mutation/runChanged.mjs --list > "$RUNNER_TEMP/mutation-targets.txt"
+          node scripts/mutation/runChanged.mjs --list-skipped > "$RUNNER_TEMP/mutation-skipped.txt"
+          echo "count=$(grep -c . "$RUNNER_TEMP/mutation-targets.txt" || true)" >> "$GITHUB_OUTPUT"
+
+      - name: Run mutation tests (changed files)
+        if: steps.targets.outputs.count != '0'
+        working-directory: app
+        run: bun run test:mutation:changed
 
       - name: Upload mutation report
-        if: always()
+        if: always() && steps.targets.outputs.count != '0'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: mutation-report
-          path: reports/mutation/
+          name: mutation-report-app
+          path: app/reports/mutation/
           retention-days: 7
 
-      - name: Write job duration to Summary
+      - name: Write mutation summary
         if: always()
+        working-directory: app
+        env:
+          MUTATION_TARGET_COUNT: ${{ steps.targets.outputs.count }}
         run: |
-          end=$(date +%s)
-          elapsed=$((end - MUTATION_START))
-          echo "### Mutation (light)" >> "$GITHUB_STEP_SUMMARY"
-          echo "Duration: ${elapsed}s ($((elapsed / 60))m)" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Mutation (app/, changed files)"
+            echo
+            if [ -s "$RUNNER_TEMP/mutation-targets.txt" ]; then
+              echo '#### Mutation 対象のファイル'
+              echo '```'
+              cat "$RUNNER_TEMP/mutation-targets.txt"
+              echo '```'
+              echo
+              if [ -f reports/mutation/mutation.json ]; then
+                STRYKER_SUMMARY_MAX_SURVIVED=30 node scripts/mutation/summarize.mjs --stdout-only
+              else
+                echo "レポートがない（最初のテスト実行が失敗したか、時間切れ）。"
+              fi
+            elif [ "$MUTATION_TARGET_COUNT" = "0" ]; then
+              echo "この PR で変わった Mutation 対象のファイルはない。"
+            else
+              echo "Mutation 対象のファイル一覧を取得できなかった。"
+            fi
+            if [ -s "$RUNNER_TEMP/mutation-skipped.txt" ]; then
+              echo
+              echo '#### 変わったが Mutation では判定していないファイル（単体テストが読み込まない。workerd の統合テストかスモークテストで確かめる）'
+              echo '```'
+              cat "$RUNNER_TEMP/mutation-skipped.txt"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
   app-test:
     name: App (rebuild) — types, tests, build
