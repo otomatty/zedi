@@ -1,129 +1,62 @@
 ---
 name: stryker-mutation-diff
 description: >
-  Runs Stryker mutation tests only on git-changed production files under `src/`
-  via `scripts/stryker-mutate-changed.mjs` and `bun run test:mutation:changed`.
-  Uses `stryker.config.mutation-changed.mjs` so partial runs do not fail on global
-  `thresholds.break`.   Use when the user asks for mutation testing on changed files
-  only, incremental mutation test, diff-based Stryker, or "差分だけミューテーション" /
-  "mutation test for current changes". After a run, use `bun run mutation:report:summary`
-  and attach `reports/mutation/mutation-summary.md` for AI explanation (not HTML).
+  Run Stryker on changed files under app/src/ to verify how well the unit tests detect changes.
+  List eligible files, run the changed-file mutation tests, and review the Markdown report for
+  Survived and NoCoverage mutants.
 ---
 
-# Stryker mutation test (diff / changed files only)
+# Stryker mutation tests for changed app files
 
-Full-repo mutation (`bun run test:mutation`) mutates thousands of mutants and is slow. For **local or branch-scoped runs**, use the **changed-file** workflow below.
+Use this skill after changing files under `app/src/` to check whether the unit tests detect changes in behavior. Zedi no longer runs mutation tests for the root `src/`.
 
-## Prerequisites
+## Run the changed-file tests
 
-- Repository root: `zedi` (frontend Stryker config: `stryker.config.mjs`, Vitest).
-- **Scope**: only `src/**/*.ts(x)` excluding `*.test.*`, `*.spec.*`, `__tests__`. **`app/` is not mutated** (separate workspace and test setup; use `cd app && bun run test` for its tests).
+1. From the repository root, enter `app/` and list the changed files eligible for mutation testing.
 
-## Config vs full-repo mutation
+   ```bash
+   cd app
+   bun run test:mutation:changed:list
+   ```
 
-- **`bun run test:mutation`** uses `stryker.config.mjs` (includes `thresholds.break`, e.g. 70%).
-- **`bun run test:mutation:changed`** uses **`stryker.config.mutation-changed.mjs`**, which is the same settings except **`thresholds.break` is `null`**. Reason: partial `--mutate` runs often produce a **low global score** and many **`# no cov`** mutants that do **not** mean the same thing as a full-repo score; failing the process on CI-style thresholds is usually misleading for diff-only runs.
+2. Run mutation tests for those files. The command exits successfully without running Stryker if there are no eligible changes.
 
-## Primary command (automated file list)
+   ```bash
+   bun run test:mutation:changed
+   ```
 
-Collects paths from git, joins them as a single `--mutate` argument (comma-separated), and invokes the local `@stryker-mutator/core` CLI.
+   To use the branch diff against `main`, set `STRYKER_DIFF_BASE=main` for both the list and the run. In Bash, prefix each command with the assignment.
 
-```bash
-# Working tree vs HEAD (staged + unstaged + untracked under src/)
-bun run test:mutation:changed
+   ```bash
+   STRYKER_DIFF_BASE=main bun run test:mutation:changed:list
+   STRYKER_DIFF_BASE=main bun run test:mutation:changed
+   ```
 
-# Recommended for slow machines / first failure: extend initial test run timeout
-# (repo default is 20 minutes via `stryker.config.mjs` dryRunTimeoutMinutes)
-bun run test:mutation:changed -- --dryRunTimeoutMinutes 30
+   In Windows PowerShell, from `app/`:
 
-# Optional: ignore static mutants (often much faster)
-bun run test:mutation:changed -- --ignoreStatic
+   ```powershell
+   $env:STRYKER_DIFF_BASE = 'main'; bun run test:mutation:changed:list; bun run test:mutation:changed; Remove-Item Env:STRYKER_DIFF_BASE
+   ```
 
-# Dry-run only (initial test run + coverage; no mutants executed)
-bun run test:mutation:changed -- --dryRunOnly
-```
+3. After a run produces a report, read its Markdown summary.
 
-### Compare against a base branch (e.g. PR scope)
+   ```bash
+   bun run mutation:report:summary -- --stdout-only
+   ```
 
-Uses `git diff <base>...HEAD --name-only` instead of working-tree diffs.
+4. Review `Survived` mutants for missing assertions and `NoCoverage` mutants for behaviors the unit tests never exercise. Add tests or strengthen assertions, then rerun the changed-file tests. If all mutants in a new file show `NoCoverage`, add unit tests or add the file to `INTEGRATION_ONLY`.
 
-```bash
-STRYKER_DIFF_BASE=main bun run test:mutation:changed
-```
+## Scope and reports
 
-On Windows PowerShell: `$env:STRYKER_DIFF_BASE="main"; bun run test:mutation:changed`
+- Stryker targets `.ts` and `.tsx` files under `app/src/`, excluding tests, type declarations, `src/worker/integration/` (relative to `app/`), and files listed in `INTEGRATION_ONLY`.
+- Stryker evaluates mutants using only the Node and happy-dom unit tests configured in `app/vitest.config.ts`. The workerd integration tests (`*.worker.test.ts`) cannot evaluate mutants.
+- `INTEGRATION_ONLY` lists files the unit tests do not load. Verify those files with workerd integration tests or browser smoke tests, and use coverage and strong assertions to check test strength. Remove a file from the list when unit tests cover it.
+- The score does not fail the run (`thresholds.break: null`). Stryker uses 85 and 75 as its high and low display thresholds. Per-file thresholds have yet to be set. The full run on 2026-11-19, with 81 files before the exclusions, scored about 77% among mutants for which tests ran.
+- Reports are under `app/reports/mutation/`. The summary reads `mutation.json`. Set `STRYKER_HTML_REPORT=1` to enable the optional HTML report.
 
-### List files only (no Stryker)
+## References
 
-```bash
-bun run test:mutation:changed:list
-# or: STRYKER_DIFF_BASE=main bun run test:mutation:changed:list
-```
-
-### Skip HTML report (JSON + terminal only; faster)
-
-```bash
-STRYKER_HTML_REPORT=0 bun run test:mutation:changed
-```
-
-## Troubleshooting (symptom → action)
-
-| Symptom                                                  | Likely cause                                                                                                             | Action                                                                                                       |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| `Initial test run timed out`                             | Repo dry-run limit is **20 minutes** (`stryker.config.mjs`); Vitest + `perTest` coverage can exceed it on slow machines. | Retry with `--dryRunTimeoutMinutes 30`.                                                                      |
-| `There were failed tests in the initial test run`        | Unit tests fail under Stryker.                                                                                           | Fix tests: `bun run test:run` until green.                                                                   |
-| `No changed files under src/`                            | Only tests / `server/` / non-`src` changed, or nothing to diff.                                                          | Ensure production files under `src/` exist; use `STRYKER_DIFF_BASE` for branch scope.                        |
-| Low `% Mutation score` / many `# no cov` on changed runs | **Expected** for scoped `--mutate`: many mutants are not mapped to a test in this mode.                                  | Use the report to **review survivors**; do not compare the number to full-repo `test:mutation` expectations. |
-| Run is very slow                                         | Many mutants + `perTest` coverage.                                                                                       | Try `--ignoreStatic`; reduce scope (fewer files); use `--dryRunOnly` to validate setup first.                |
-
-## Reading the report
-
-- **Do not load `mutation.html` in chat** — it embeds megabytes of JS/data and wastes context.
-- **Machine-readable JSON**: `reports/mutation/mutation.json` (from the `json` reporter in `stryker.config.mjs`).
-- **Compact summary for AI** (recommended): after any mutation run, generate Markdown and attach it with `@`:
-
-```bash
-bun run mutation:report:summary
-# → reports/mutation/mutation-summary.md
-```
-
-- **Stdout only** (no file; paste-safe for chat): `bun run mutation:report:summary -- --stdout-only`
-- **Mutation + summary in one step**: `bun run test:mutation:changed:summary`
-
-Optional: `STRYKER_SUMMARY_MAX_SURVIVED=120` (default 80), `STRYKER_SUMMARY_OUT=path/to/out.md`.
-
-- **HTML** (browser only): `reports/mutation/mutation.html` — use locally; not for AI context.
-- **Column meanings**: `# killed` = tests caught the mutation; `# survived` = weakness to address; `# no cov` = no test matched in this run (often high on partial `--mutate`).
-
-## If the script reports no files
-
-- Ensure there are changed **production** files under `src/` (not only tests or `server/`).
-- For branch-only mode, set `STRYKER_DIFF_BASE` or commit changes so `git diff HEAD` lists files.
-
-## Manual invocation (explicit files)
-
-When the agent or user already knows the exact paths:
-
-```bash
-bunx stryker run --mutate "src/lib/foo.ts,src/hooks/bar.ts" --dryRunOnly stryker.config.mutation-changed.mjs
-```
-
-For full-repo thresholds, use `stryker.config.mjs` instead.
-
-## Implementation reference
-
-- Script: [`scripts/stryker-mutate-changed.mjs`](../../../scripts/stryker-mutate-changed.mjs)
-- Summary generator: [`scripts/stryker-mutation-report-summarize.mjs`](../../../scripts/stryker-mutation-report-summarize.mjs)
-- Changed-file config: [`stryker.config.mutation-changed.mjs`](../../../stryker.config.mutation-changed.mjs)
-- Package scripts: `test:mutation:changed`, `mutation:report:summary` in root [`package.json`](../../../package.json)
-
-## Agent checklist
-
-1. Prefer `bun run test:mutation:changed` over editing `stryker.config.mjs` `mutate` globs for one-off runs.
-2. On **timeout** during initial test run, retry with `--dryRunTimeoutMinutes 30` before other changes.
-3. Pass through extra Stryker flags after `--`: e.g. `-- --ignoreStatic --timeoutMS 120000`.
-4. Do not claim mutation coverage for `app/` from this skill; point to Vitest under `app/` instead.
-5. If the initial dry run fails with **failed tests** (not timeout), fix unit tests first (`bun run test:run`); Stryker aborts when the unmutated suite fails.
-6. Do **not** treat a low mutation score on `test:mutation:changed` as a CI gate failure; use **`bun run test:mutation`** for repo-wide thresholds.
-7. To **explain results to the user**, run **`bun run mutation:report:summary`** and read **`reports/mutation/mutation-summary.md`** — never read `mutation.html` into context.
-8. For deeper debugging: `stryker run --fileLogLevel trace --logLevel debug` (see [Stryker troubleshooting](https://stryker-mutator.io/docs/stryker-js/troubleshooting/)).
+- [Stryker configuration](../../../app/stryker.config.mjs)
+- [Target selection and exclusions](../../../app/scripts/mutation/targets.mjs)
+- [Changed-file runner](../../../app/scripts/mutation/runChanged.mjs)
+- [Markdown report summarizer](../../../app/scripts/mutation/summarize.mjs)

@@ -27,9 +27,9 @@ Rules merged by spec-test / test-inventory when `project_profile.overlay: zedi`.
 
 ## Mutation
 
-- フロント `src/` のみ: `bun run test:mutation:changed`
-- スコープ確認: `node scripts/stryker-mutate-changed.mjs --list`
-- `app/` は Stryker 対象外 → 該当スコープは `verification_level: B`（coverage + §5）
+- Stryker の対象は `app/` のみ。差分実行は `cd app && bun run test:mutation:changed`。
+- スコープ確認は `cd app && bun run test:mutation:changed:list`。
+- 対象外の `INTEGRATION_ONLY`（`app/scripts/mutation/targets.mjs`）と `src/`・`admin/`・`packages/*` は `verification_level: B`（coverage + §5）。
 
 ## モックヘルパー（example 探索キーワード）
 
@@ -39,7 +39,7 @@ Rules merged by spec-test / test-inventory when `project_profile.overlay: zedi`.
 ## ドキュメント
 
 - TDD 方針: ルート `AGENTS.md`
-- Mutation 差分実行: `.agents/skills/stryker-mutation-diff/SKILL.md` または `scripts/stryker-mutate-changed.mjs`
+- Mutation 差分実行: [`stryker-mutation-diff`](../../../stryker-mutation-diff/SKILL.md) と [`app/scripts/mutation/`](../../../../../app/scripts/mutation/)
 
 ## コメント
 

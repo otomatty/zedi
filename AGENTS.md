@@ -17,11 +17,11 @@ Zedi は **TDD を徹底**する。実装を先に書いてテストを後付け
 
 ### 品質指標 / Quality metrics
 
-| 指標                           | 方針                                                                                                                |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| **Mutation score（第一指標）** | Stryker。PR の `mutation-light` は `stryker.config.mjs` の `thresholds.break: 70`。目標は golden list で 85%+。     |
-| **行カバレッジ**               | 80% 以上を目標。Mutation が取れないスコープ（例: `app/`）では coverage + 強いアサーションで担保。                   |
-| **CI**                         | `mutation-light`（限定 mutate）/ nightly（観測、`break: null`）。コマンドは `package.json` と `.github/workflows`。 |
+| 指標                           | 方針                                                                                                                                                                                                                                                                                     |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Mutation score（第一指標）** | Stryker の対象は `app/`。PR では変わった対象ファイルだけを実行し、Job Summary に結果を出す。目標は 85% 以上（`thresholds.high`）。スコアでは失敗させない。                                                                                                                               |
+| **行カバレッジ**               | 80% 以上を目標。単体テストが読み込まないファイル（`app/scripts/mutation/targets.mjs` の `INTEGRATION_ONLY`）と `src/`・`admin/`・`packages/*` は coverage + 強いアサーションで担保。                                                                                                     |
+| **CI**                         | PR の `app-mutation` は変わった対象ファイルを実行する。対象がなければスキップし、必須チェックにはしない（`continue-on-error`）。毎週金曜に `nightly-mutation.yml` で対象全体を実行し、Job Summary と artifact に結果を出す。どちらもスコアでは失敗させない（`thresholds.break: null`）。 |
 
 ### コマンド / Commands
 
@@ -29,14 +29,18 @@ Zedi は **TDD を徹底**する。実装を先に書いてテストを後付け
 bun run test:run                 # ワークスペース横断の Vitest
 bun run test:coverage            # カバレッジ
 bun run test:e2e                 # Playwright
-bun run test:mutation:dry        # Stryker dry-run
-bun run test:mutation            # Stryker（フロント中心）
-bun run test:mutation:changed    # 変更ファイルのみ Mutation
-bun run test:mutation:changed:list
+
+(cd app && bun run test:mutation)                  # 対象全体（4 コアで約 10 分）
+(cd app && bun run test:mutation:changed)          # 変更された対象のみ。対象がなければ正常終了
+(cd app && STRYKER_DIFF_BASE=main bun run test:mutation:changed) # main との差分
+(cd app && bun run test:mutation:changed:list)     # 変更された対象の一覧
+(cd app && bun run mutation:report:summary)        # app/reports/mutation/mutation.json の Markdown 要約
+(cd app && bun run mutation:report:summary -- --stdout-only) # 標準出力だけに要約
+(cd app && bunx stryker run --mutate src/client/lib/outbox.ts) # 1 ファイルだけ試す
 ```
 
-- フロント変更の Mutation: `.agents/skills/stryker-mutation-diff/SKILL.md` または `scripts/stryker-mutate-changed.mjs`。
-- `app/` は Stryker 対象外 → coverage とアサーション強度で検証。
+- Mutation は `app/` のみ。差分実行は [`stryker-mutation-diff`](.agents/skills/stryker-mutation-diff/SKILL.md) を参照。
+- `INTEGRATION_ONLY` のファイルは workerd の統合テストかブラウザのスモークテストで確かめ、`src/` とともに coverage とアサーション強度で検証する。
 
 ### エージェント用パイプライン / Agent test pipeline
 
