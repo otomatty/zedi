@@ -175,7 +175,7 @@ The old backend (`server/api`, `server/hocuspocus`, `server/mcp`) has been remov
 | **AI**            | OpenAI / Anthropic / Google Gemini (pricing via OpenRouter)                                          |
 | **Admin**         | `admin/` — separate Vite + React app                                                                 |
 | **Workspaces**    | Bun workspaces: `packages/ui` (shadcn), `packages/shared` / `admin`                                  |
-| **Deploy**        | None at the moment; the rebuilt `app/` will deploy as one Cloudflare Worker (`wrangler deploy`)      |
+| **Deploy**        | Manual GitHub Actions workflow for the `app/` Worker (`staging` / `production`)                      |
 | **CI/CD**         | GitHub Actions (lint / typecheck / test / mutation)                                                  |
 | **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker (mutation testing)                                 |
 | **Tooling**       | ESLint 9 / Prettier / Husky + lint-staged / commitlint / Knip                                        |
@@ -254,10 +254,10 @@ scripts/                 # Setup / Stryker / maintenance scripts
 Contributions are welcome!
 
 1. Fork this repository
-2. Create a feature branch from `develop` (`git checkout -b feature/amazing-feature`)
+2. Create a feature branch from `main` (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request against `develop`
+5. Open a Pull Request against `main`
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) (branch, PR, and merge policy).
 

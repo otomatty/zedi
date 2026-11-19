@@ -1,10 +1,10 @@
 {
-  "name": "main/develop ブランチ保護",
+  "name": "main ブランチ保護",
   "target": "branch",
   "enforcement": "active",
   "conditions": {
     "ref_name": {
-      "include": ["refs/heads/main", "refs/heads/develop"],
+      "include": ["refs/heads/main"],
       "exclude": []
     }
   },

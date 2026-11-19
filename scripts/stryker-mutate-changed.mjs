@@ -13,7 +13,7 @@
  *   --list  Print mutable src/ paths that would be mutated (one per line), then exit 0. Does not run Stryker.
  *
  * Environment:
- *   STRYKER_DIFF_BASE=develop  — compare against base branch (git diff base...HEAD) instead of working tree vs HEAD
+ *   STRYKER_DIFF_BASE=main  — compare against base branch (git diff base...HEAD) instead of working tree vs HEAD
  *   STRYKER_HTML_REPORT=0      — omit HTML report (JSON + terminal only); see stryker.config.mjs
  *
  * Config: `stryker.config.mutation-changed.mjs` (extends `stryker.config.mjs`; `thresholds.break` disabled for partial `--mutate` runs).
@@ -88,7 +88,7 @@ if (paths.length === 0) {
     "stryker-mutate-changed: No changed files under src/ (excluding *.test.* / __tests__).",
   );
   console.error(
-    "  Tip: commit or stage changes, or set STRYKER_DIFF_BASE=develop to diff against a branch.",
+    "  Tip: commit or stage changes, or set STRYKER_DIFF_BASE=main to diff against a branch.",
   );
   process.exit(1);
 }

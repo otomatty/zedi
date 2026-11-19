@@ -48,16 +48,16 @@ bun run test:mutation:changed -- --dryRunOnly
 Uses `git diff <base>...HEAD --name-only` instead of working-tree diffs.
 
 ```bash
-STRYKER_DIFF_BASE=develop bun run test:mutation:changed
+STRYKER_DIFF_BASE=main bun run test:mutation:changed
 ```
 
-On Windows PowerShell: `$env:STRYKER_DIFF_BASE="develop"; bun run test:mutation:changed`
+On Windows PowerShell: `$env:STRYKER_DIFF_BASE="main"; bun run test:mutation:changed`
 
 ### List files only (no Stryker)
 
 ```bash
 bun run test:mutation:changed:list
-# or: STRYKER_DIFF_BASE=develop bun run test:mutation:changed:list
+# or: STRYKER_DIFF_BASE=main bun run test:mutation:changed:list
 ```
 
 ### Skip HTML report (JSON + terminal only; faster)

@@ -19,23 +19,16 @@ Zedi 固有の前提**を確認する。汎用知識は古い可能性がある�
 _Before any Cloudflare work in Zedi, load this skill for project-specific facts.
 Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in knowledge._
 
-## 現状（2026-10） / Status
+## 現状（2026-11） / Status
 
-- **アプリは `app/` に作り直している。** Worker 1 本（`zedi-app`）が Static Assets・Hono の API・
-  Better Auth・D1・Durable Objects（共同編集）を持つ。構成の正本は
-  [`app/wrangler.jsonc`](../../../app/wrangler.jsonc)。D1 の `database_id` はまだプレースホルダーで、
-  ローカル（`wrangler dev` / `wrangler d1 migrations apply DB --local`）でだけ動かしている。
-  _The rebuilt app is one Worker; it only runs locally for now._
-- **デプロイは何もしていない。** 旧バックエンド（`server/api`・`server/mcp`・`server/hocuspocus`）、
-  Railway、dev の API / MCP Worker、現行フロント / admin のデプロイ（`deploy-dev.yml` /
-  `deploy-prod.yml`）はリポジトリから削除済み。
-  _Nothing is deployed from the repository right now._
-- **Terraform は削除済み。** ただし、Terraform が作ったリソースは Cloudflare に残っている
-  （コードを消してもリソースは消えない）。ダッシュボードで削除する:
-  - 旧フロント / admin の Pages プロジェクト（`zedi` / `zedi-admin` / `zedi-dev` / `zedi-admin-dev`）と、
-    そのカスタムドメインの CNAME（`zedi-note.app`・`admin`・`dev`・`admin-dev`）
-  - Railway 向けの `api` / `realtime` の CNAME と検証用 TXT（Apply Shared を実行しないまま
-    Terraform を消したため、ゾーンに残っている）
+- **常設環境は staging と本番。** 実装と試験はローカルの `wrangler dev` で行う。
+- **両環境の Worker はデプロイ済み。** `env.production` は `zedi-app`、`env.staging` は
+  `zedi-app-staging`。各 Worker が Static Assets・Hono の API・Better Auth・D1・Durable Objects（共同編集）を持つ。
+  独自ドメインの設定は今後行う。`workers_dev` と `preview_urls` は両環境で `false`。
+- **D1 は両環境とも作成済み。** 本番は `zedi-app`、staging は `zedi-app-staging`。
+  ID は [`app/wrangler.jsonc`](../../../app/wrangler.jsonc) にあり、最上位のローカル用 `database_id` だけがプレースホルダー。
+- **ドメインの予定** は本番が `zedi-note.app`、staging が `staging.zedi-note.app`。staging は Cloudflare Access の内側に置く。
+  Preview（`<名前>.preview.zedi-note.app`）、管理用の Worker、探索的テストは #1157 の残作業。
 - **本番データはない。** カットオーバーはドメインを `app/` の Worker に向けるだけで、データ移行や
   デュアルライトはしない。
 
@@ -46,9 +39,11 @@ Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in know
   _Source of truth = `app/wrangler.jsonc`; Terraform has been removed._
 - **Pages は使わない。** 静的ファイルは `app/` の Worker の Static Assets で配信する。
 - **CI/CD はハイブリッド。** 品質ゲート（lint / vitest / typecheck / workerd 統合テスト /
-  スモークテスト）は GitHub Actions、デプロイは `wrangler deploy`、PR プレビューは
-  `wrangler versions upload` またはプレビュー環境。
-  _Hybrid CI/CD: GitHub Actions for gates, `wrangler deploy` for rollout._
+  スモークテスト）は GitHub Actions。デプロイは [`deploy.yml`](../../../.github/workflows/deploy.yml) を
+  手動で実行し、`staging` または `production` を選ぶ。型チェック、テスト、ビルドの順に実行し、
+  `wrangler d1 migrations apply DB --env <env> --remote`、`wrangler deploy --env <env>` の順で反映する。
+  staging・本番ともに `main` からのみ実行できる。本番には同じコミットの staging デプロイの成功と Environment `production` の承認が必要。
+  _GitHub Actions runs quality gates and dispatches Wrangler deployments to the selected environment from `main` only._
 - Durable Objects を持つ Worker では次の制約を前提に設計する（数値・仕様はデプロイ前に公式で再確認）:
   - バージョン URL（プレビュー URL）が作られない。
   - 段階デプロイでは各 DO が 1 つのバージョンに固定される。
@@ -62,7 +57,7 @@ Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in know
 | D1 への SQL 実行・確認                 | MCP `d1_database_query`                                                                                                 |
 | Worker のログ・メトリクス              | MCP `cloudflare-observability`（`query_worker_observability`）/ `wrangler tail`                                         |
 | Cloudflare ドキュメント確認            | MCP `cloudflare-docs` の `search_cloudflare_documentation`                                                              |
-| ローカル dev / deploy / secret 設定    | `app/` で `bunx wrangler`（汎用 `wrangler` スキル参照）                                                                 |
+| ローカル dev / secret 設定             | `app/` で `bunx wrangler`（汎用 `wrangler` スキル参照）                                                                 |
 
 **重要 / Important:** MCP ツールは呼ぶ前に必ず
 `mcps/<server>/tools/<tool>.json` のスキーマを読む。
@@ -74,32 +69,33 @@ Fetch live docs via the `cloudflare-docs` MCP rather than trusting baked-in know
 2. **ローカル Wrangler**: `bunx wrangler whoami`。未ログインなら `wrangler login`、
    またはトークンを env に設定（`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`）。
    必要スコープは [references/token-scopes.md](references/token-scopes.md)。
-3. GitHub Secrets `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` は **同一アカウント・同一ゾーン**。
-   今は使っているワークフローがない（`app/` のデプロイを足すときに使う）。
+3. GitHub の Environment `staging` と `production` にそれぞれ
+   `CLOUDFLARE_API_TOKEN`（`zedi-github-deploy`）と `CLOUDFLARE_ACCOUNT_ID` を Secrets として設定する。
+   両方の Environment で、デプロイできるブランチを `main` のみに制限する。Cloudflare の API トークンは
+   アカウント共通で、staging の Secrets にあるトークンでも本番の Worker と D1 を操作できるため。
+   デプロイ後の確認を有効にするには変数 `APP_URL` を設定する。Cloudflare Access 用の
+   `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` は任意の Secrets。
 
 ドメイン・Worker 名・バケット名の固定値は [references/naming.md](references/naming.md)。
 
-## `app/` を初めてデプロイするとき / First deploy of app/
+## 新しい環境を足すとき / Adding an environment
 
-1. D1 を作る（`wrangler d1 create`）。`app/wrangler.jsonc` の `database_id` を実際の ID に置き換え、
-   `wrangler d1 migrations apply DB --remote` を流す。
-2. Secrets を登録する（`wrangler secret put BETTER_AUTH_SECRET` など。必要な鍵は
-   [`app/.dev.vars.example`](../../../app/.dev.vars.example) を参照）。`ENVIRONMENT=development` は
-   サインインした誰もがページを一括投入できる入口を開くので、デプロイ先には絶対に設定しない。テスト用 IdP（`TEST_IDP`）は
-   staging と Preview にだけ置き、本番の環境には入れない（otomatty/zedi#1156）。
-3. 使うドメインに残っている旧 Pages のカスタムドメインと CNAME を、ダッシュボードで先に外す。
-   残っていると `custom_domain` の作成が衝突する（以前の dev デプロイが失敗した原因の一つ）。
-4. `routes` に `{ "pattern": "<domain>", "custom_domain": true }` を足して `wrangler deploy`。
-5. `wrangler tail` / observability でサインインと共同編集の疎通を確認する。
+1. D1 を作り（`wrangler d1 create`）、`app/wrangler.jsonc` の対象環境にバインディングと実際の ID を設定する。
+2. 対象環境の Worker Secrets を登録する（`wrangler secret put BETTER_AUTH_SECRET --env <env>` など）。
+   鍵は [`app/.dev.vars.example`](../../../app/.dev.vars.example) を参照。`ENVIRONMENT=development` は
+   サインインしたユーザーにページの一括投入を許可するため、ローカルに限定する。テスト用 IdP（`TEST_IDP`）は
+   staging と Preview に限定する（otomatty/zedi#1156）。
+3. ドメインを設定するときは、対象環境の `routes` に `{ "pattern": "<domain>", "custom_domain": true }` を足す。
+   常設環境の通常デプロイには上記の `deploy.yml` を使う。
+4. [`.github/workflows/deploy.yml`](../../../.github/workflows/deploy.yml) の `workflow_dispatch` にある
+   `inputs.environment.options` に新しい環境名を足す。既存の `staging` と `production` は残す。
+5. GitHub に同じ名前の Environment を作り、`CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` を
+   Secrets として設定する。デプロイできるブランチは `main` のみに制限する。
 
 ## 旧リソースの片付け / Cleaning up old resources
 
-Terraform のコードとワークフローは削除済み。残りはダッシュボードと各サービスで行う:
-
-- Cloudflare: 上の「現状」に挙げた Pages プロジェクトと DNS レコード、dev の Worker
-  （名前は [references/naming.md](references/naming.md)）を削除する。
-- Terraform Cloud: 組織 `Saedgewell` のワークスペース `cloudflare-shared`・`cloudflare-dev`・`cloudflare-prod` を削除する。
-- GitHub: Secret `TF_API_TOKEN` を削除する。
+旧 Pages プロジェクト、旧 DNS レコード、dev の Worker、Terraform Cloud のワークスペース、
+GitHub の `TF_API_TOKEN` / `DATABASE_URL` / 旧ビルド用変数は削除済み（#1154）。
 
 ## やってはいけないこと / Guardrails
 

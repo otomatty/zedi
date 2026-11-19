@@ -9,7 +9,7 @@ updates:
   # its update jobs fail with misconfigured_tooling.
   - package-ecosystem: bun
     directory: /
-    target-branch: develop
+    target-branch: main
     schedule:
       interval: weekly
       day: monday
@@ -125,7 +125,7 @@ updates:
   # The rebuilt app. Outside the root workspace, with its own bun.lock.
   - package-ecosystem: bun
     directory: /app
-    target-branch: develop
+    target-branch: main
     schedule:
       interval: weekly
       day: monday
@@ -148,7 +148,7 @@ updates:
   # GitHub Actions
   - package-ecosystem: github-actions
     directory: /
-    target-branch: develop
+    target-branch: main
     schedule:
       interval: weekly
       day: monday

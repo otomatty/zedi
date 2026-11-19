@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -42,6 +43,46 @@ describe("development mode in the Worker config", () => {
   it("is switched on for local runs through .dev.vars", () => {
     const example = readFileSync(join(appRoot, ".dev.vars.example"), "utf8");
     expect(example).toMatch(/^ENVIRONMENT=development$/m);
+  });
+});
+
+describe("deployment environments in the Worker config", () => {
+  it("isolates staging and production and keeps their default URLs disabled", () => {
+    // ステージングのデプロイが本番の Worker やデータに影響しないよう、リソースを分離する。
+    // 同じマイグレーションを使い、独自ドメインとアクセス制御を設定するまで既定 URL を無効にする。
+    // Use separate resources so staging deploys cannot affect the production Worker or data.
+    // Share migrations and keep default URLs disabled until custom domains and access controls are set up.
+    const config = readWranglerConfig();
+    const envs = (config.env ?? {}) as Record<string, Record<string, unknown>>;
+    const { production, staging } = envs;
+
+    const workerNames = [config.name, production?.name, staging?.name];
+    const databaseIds = [];
+    const databaseNames = [];
+
+    for (const name of ["production", "staging"]) {
+      const env = envs[name];
+      assert.ok(env, `Missing env.${name}`);
+      expect(env.workers_dev).toBe(false);
+      expect(env.preview_urls).toBe(false);
+
+      const databases = (env.d1_databases ?? []) as Record<string, unknown>[];
+      const bindings = databases.filter((database) => database.binding === "DB");
+      expect(bindings).toHaveLength(1);
+      const [database] = bindings;
+      assert.ok(database, `Missing DB binding in env.${name}`);
+      expect(database.database_id).toMatch(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i);
+      expect(database.database_id).not.toBe("00000000-0000-0000-0000-000000000000");
+      expect(database.database_name).toMatch(/\S/);
+      expect(database.migrations_dir).toBe("migrations");
+      databaseIds.push(String(database.database_id).toLowerCase());
+      databaseNames.push(database.database_name);
+    }
+
+    for (const name of workerNames) expect(name).toMatch(/\S/);
+    expect(new Set(workerNames).size).toBe(3);
+    expect(new Set(databaseIds).size).toBe(2);
+    expect(new Set(databaseNames).size).toBe(2);
   });
 });
 

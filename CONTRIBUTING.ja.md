@@ -118,12 +118,12 @@ bun run dev
 
 > 📖 **ブランチ・PR・マージ方法**: ルートの [AGENTS.md](./AGENTS.md) を参照してください。
 
-1. **develop ブランチから最新を取得**
+1. **main ブランチから最新を取得**
 
    ```bash
    git fetch origin
-   git checkout develop
-   git pull origin develop
+   git checkout main
+   git pull origin main
    ```
 
 2. **機能ブランチを作成**
@@ -168,7 +168,7 @@ bun run dev
    ```
 
 6. **Pull Request を作成**
-   - ベースブランチ: `develop`
+   - ベースブランチ: `main`
    - CIが自動的に実行され、すべてのチェックが通ることを確認
 
 ---
