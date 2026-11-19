@@ -98,12 +98,12 @@ bun run dev
 
 > 📖 **Branches, PRs, and merge policy**: See root [AGENTS.md](./AGENTS.md).
 
-1. **Sync latest from `develop`**
+1. **Sync latest from `main`**
 
    ```bash
    git fetch origin
-   git checkout develop
-   git pull origin develop
+   git checkout main
+   git pull origin main
    ```
 
 2. **Create a feature branch**
@@ -153,7 +153,7 @@ bun run dev
    ```
 
 6. **Open a Pull Request**
-   - Base branch: `develop`
+   - Base branch: `main`
    - CI runs automatically — ensure all checks pass
 
 ---

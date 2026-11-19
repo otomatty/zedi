@@ -113,7 +113,7 @@ e2e/                 # Playwright
 
 - **目標**: `app/` の Worker 1 本（Static Assets + API + D1 + Durable Objects）で配信する。Pages は使わない（Railway・Terraform は削除済み）。
 - **構成の正本**: `app/wrangler.jsonc`。DNS とドメインも Worker の `custom_domain` で管理する。
-- **CI/CD**: lint / test / typecheck は GitHub Actions。デプロイ・プレビューは `wrangler deploy` / `wrangler versions upload`（`app/` のデプロイは未作成）。
+- **CI/CD**: lint / test / typecheck は GitHub Actions。デプロイは [`deploy.yml`](.github/workflows/deploy.yml) を手動で実行し、`staging` または `production` を選ぶ。
 - **カットオーバー**: 本番データがないので移行はせず、ドメインを `app/` の Worker に切り替える。手順は `cloudflare-zedi` スキルと [#1088](https://github.com/otomatty/zedi/issues/1088) を正とする。
 - Cloudflare 作業時は汎用 Cloudflare 知識より **[`.agents/skills/cloudflare-zedi/SKILL.md`](.agents/skills/cloudflare-zedi/SKILL.md)** を先に読む。
 
@@ -121,7 +121,7 @@ e2e/                 # Playwright
 
 - ルート `workspaces` は **`packages/*` と `admin` のみ**。`app/` は **workspace 外**（独自の `bun.lock`）→ `cd app && bun install`。
 - CI: ルートは lint / typecheck / test / build / E2E。`app/` は `app-test`（型チェック・単体・workerd 統合・ビルド）と `app-smoke`（ブラウザのスモークテスト）。
-- **デプロイ**: なし。旧バックエンドとそのデプロイ（Railway・dev の API / MCP Worker）、現行フロント / admin のデプロイ（`deploy-dev.yml` / `deploy-prod.yml`）は削除済み。`app/` のデプロイは D1 などの本番リソースを用意してから追加する。
+- **デプロイ**: `deploy.yml` を手動で実行して `app/` をデプロイする。本番は `main` から実行し、同じコミットの staging デプロイが成功済みで、GitHub の Environment `production` の承認を受けた場合だけ実行できる。旧バックエンドとそのデプロイ（Railway・dev の API / MCP Worker）、現行フロント / admin のデプロイ（`deploy-dev.yml` / `deploy-prod.yml`）は削除済み。
 
 ### `@zedi/shared` / Shared constants
 
@@ -143,4 +143,4 @@ e2e/                 # Playwright
 
 - **ブランチ**: `feature/…`, `fix/…`, `hotfix/…`, `chore/…`（Issue なら `feature/123` 等）。
 - **PR タイトル**: Conventional Commits で変更内容を表す（無関係な定型文禁止）。Cloud Agent 起動時も同様に指示。
-- **main → develop** の同期は必ず **Create a merge commit**（Squash 禁止）。
+- 長く残すブランチは `main` のみ。作業ブランチは `main` から切り、PR は `main` に向ける。マージは **Squash and merge**。

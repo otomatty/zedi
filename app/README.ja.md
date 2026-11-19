@@ -28,6 +28,7 @@ Cloudflare Worker 1 本ですべてを配信します（`wrangler.jsonc`）。�
   - 戻り先は、リクエストが届いたのと同じオリジンのコールバックに限ります。サインインには `.dev.vars` の `TEST_IDP_PASSWORD` が必要で、`@test.zedi-note.app` のアドレスしか作れません。
   - 本番の環境（`wrangler.jsonc` の `env.production`）には `TEST_IDP` を置きません。単体テストでこれを確かめています。
 - `wrangler.jsonc` の最上位はローカル用（`zedi-app-local`）です。デプロイする環境は `env` の下にあり、`--env` を付けたときだけ使われます。
+- デプロイするには [`deploy.yml`](../.github/workflows/deploy.yml) を手動で実行し、`staging` または `production` を選びます。
 
 ### 2 段階認証
 

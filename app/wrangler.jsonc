@@ -34,8 +34,8 @@
   "observability": { "enabled": true },
   "env": {
     // Production signs in with Google only: no TEST_IDP binding and no ENVIRONMENT variable.
-    // workers.dev stays off until the custom domain is attached. Routes and the deploy
-    // workflow come with #1157.
+    // workers.dev stays off until the custom domain is attached. Deploy manually with
+    // .github/workflows/deploy.yml. Custom domain routes will be added in #1157.
     "production": {
       "name": "zedi-app",
       "workers_dev": false,

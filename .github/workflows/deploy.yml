@@ -1,0 +1,143 @@
+# app/ の Worker を選んだ環境に手動デプロイする。
+# Manually deploy the app/ Worker to the selected environment.
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "デプロイ先 / Target environment"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+
+permissions:
+  contents: read
+  deployments: read
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  WRANGLER_SEND_METRICS: "false"
+
+jobs:
+  deploy:
+    name: Deploy app (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ inputs.environment }}
+    env:
+      TARGET_ENV: ${{ inputs.environment }}
+    steps:
+      # 本番は main からだけ。staging はどのブランチからでもデプロイできる。
+      # Production requires main. Staging can deploy from any branch.
+      - name: Require main for production
+        if: inputs.environment == 'production' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Production deploys only run from main (got ${GITHUB_REF})."
+          exit 1
+
+      # 本番には同じコミットの staging 成功が必要。ジョブの environment が自動で記録する GitHub Deployments で確認する。
+      # Production requires staging success for this SHA. The job environment automatically records GitHub Deployments.
+      - name: Require a successful staging deploy of this commit
+        if: inputs.environment == 'production'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ids=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=staging&sha=${GITHUB_SHA}&per_page=100" --jq '.[].id')
+          for id in $ids; do
+            ok=$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${id}/statuses?per_page=100" --jq 'any(.[]; .state == "success")')
+            if [ "$ok" = "true" ]; then
+              echo "Staging deployment ${id} of ${GITHUB_SHA} succeeded."
+              exit 0
+            fi
+          done
+          echo "::error::${GITHUB_SHA} has no successful staging deployment. Run this workflow with environment=staging on the same commit first."
+          exit 1
+
+      - name: Checkout (with retry)
+        uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
+        with:
+          action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+          attempt_limit: 3
+          attempt_delay: 5000
+
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          install-deps: "false"
+
+      - name: Install app dependencies
+        working-directory: app
+        run: bun install --frozen-lockfile
+
+      - name: Type check
+        working-directory: app
+        run: bun run typecheck
+
+      # wranglerConfig.node.test.ts が本番にテスト用 IdP がないことを確認する。
+      # wranglerConfig.node.test.ts verifies that production has no test IdP.
+      - name: Unit and workerd integration tests
+        working-directory: app
+        run: bun run test
+
+      - name: Build
+        working-directory: app
+        run: bun run build
+
+      # Cloudflare API トークンとアカウント ID は選んだ GitHub Environment の Secrets から読む。
+      # Read the Cloudflare API token and account ID from the selected GitHub environment's secrets.
+      - name: Apply D1 migrations
+        working-directory: app
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bunx wrangler d1 migrations apply DB --env "$TARGET_ENV" --remote
+
+      # Worker のデプロイにも同じ Environment の Secrets を使う。
+      # Use the same environment secrets to deploy the Worker.
+      - name: Deploy Worker
+        working-directory: app
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bunx wrangler deploy --env "$TARGET_ENV"
+
+      # Environment の APP_URL があるときだけ確認する。公開ホスト名が付くまではスキップする。
+      # staging は Cloudflare Access の内側に置く予定。サービストークンがあればヘッダーに付ける。
+      # Run only when the environment has an APP_URL. Until there is a hostname, this step is skipped.
+      # Staging will be behind Cloudflare Access. Send service token headers when configured.
+      - name: Smoke check
+        if: vars.APP_URL != ''
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          args=(--silent --show-error --max-time 30 --retry 3 --retry-delay 5 --output /dev/null --write-out '%{http_code}')
+          if [ -n "${CF_ACCESS_CLIENT_ID:-}" ] && [ -n "${CF_ACCESS_CLIENT_SECRET:-}" ]; then
+            args+=(--header "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" --header "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}")
+          fi
+          code=$(curl "${args[@]}" "${APP_URL%/}/")
+          if [ "$code" != "200" ]; then
+            echo "::error::${APP_URL} returned HTTP ${code} after the deploy."
+            exit 1
+          fi
+
+      - name: Write summary
+        if: always()
+        run: |
+          {
+            echo "### Deploy"
+            echo ""
+            echo "- Environment: \`${TARGET_ENV}\`"
+            echo "- Ref: \`${GITHUB_REF_NAME}\`"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

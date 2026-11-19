@@ -1,48 +1,45 @@
 ---
 name: create-pull-request
 description: >
-  Run on the develop branch: create a new branch (name or issue number),
+  Run on the main branch: create a new branch (name or issue number),
   then create a pull request with a well-structured description following the
   project PR template. Use when the user asks to "create a PR", "make a pull
   request", "open a PR", or "PRを作成して". Branch name or issue number
   (e.g. "feature/add-login" or "123" → feature/123) should be obtained from
-  the user message or requested if missing. PR base (--base) must target the
-  current integration branch (e.g. develop or the branch you branched from),
-  never main unless the user explicitly requests a release PR.
+  the user message or requested if missing. Use main as the default PR base (--base).
+  For stacked work, use the parent branch as the base.
 ---
 
 # Create Pull Request
 
-This skill uses **`develop` as the default `--base` branch** for Zedi. **Do not use `main` as `--base`** unless the user explicitly asks for a release or mainline merge PR.
-
-**Skills / `.agents/skills/` (and similar workflow-only changes):** Open the PR so it **merges into the branch you were on when you created the topic branch** (the current integration line)—typically `develop` after `git checkout -b` from `develop`, or a parent feature branch if you branched from there. **Never open Skills-only PRs with `--base main`** by default.
+Create work branches from **`main`** and open their PRs against **`main`**. For stacked work, use the branch you branched from as the PR base.
 
 If the current branch already contains the intended commits, reuse that branch and create or update the PR from it. When creating a new branch, obtain the branch name from the user (e.g. `feature/add-login`) or derive it from an issue number (e.g. `123` → `feature/123`). If neither is provided, ask the user.
 
-**Recording `BASE_BRANCH`:** Right before `git checkout -b <topic>`, note the branch name you are leaving (e.g. `PARENT=$(git branch --show-current)`); use that as `BASE_BRANCH` for `gh pr create --base`. If you did not create a new branch, use `develop` when it is the integration branch, or the branch the user specifies.
+**Recording `BASE_BRANCH`:** Right before `git checkout -b <topic>`, note the branch name you are leaving (e.g. `PARENT=$(git branch --show-current)`); use that as `BASE_BRANCH` for `gh pr create --base`. If you did not create a new branch, use `main` when it is the integration branch, or the branch the user specifies.
 
 ## Preflight
 
 ```bash
 git status                          # current state
-git branch --show-current           # develop → new branch; other → reuse if has commits
+git branch --show-current           # main → new branch; other → reuse if has commits
 gh auth status                      # GitHub CLI authenticated
 ```
 
 ## Step 1: Decide whether to reuse the current branch or create a new one
 
-1. **If current branch is `develop`**
+1. **If current branch is `main`**
    - If the working tree is dirty, ask the user to commit or stash first, or create the new branch from the current state explicitly.
-   - Run `git pull --ff-only origin develop`.
+   - Run `git pull --ff-only origin main`.
    - Determine the new branch name: from user (e.g. `feature/add-login`) or issue number (e.g. `123` → `feature/123`). If missing, ask: "ブランチ名（例: feature/add-login）またはイシュー番号（例: 123）を教えてください."
-   - Before creating the topic branch, set the PR merge target: `BASE_BRANCH=$(git branch --show-current)` (on `develop`, this is `develop`—use this for `gh pr create --base`, not `main`).
+   - Before creating the topic branch, set the PR merge target: `BASE_BRANCH=$(git branch --show-current)`.
    - Create the branch: `git checkout -b <ブランチ名>`.
    - If the new branch is dirty after creation, commit with an appropriate message (Conventional Commits recommended).
 
-2. **If current branch is not `develop`**
-   - If `git log develop..HEAD --oneline` is non-empty, keep using the current branch (reuse for PR create/update).
-   - If the working tree is dirty, do not switch to `develop` and pull with carried-over changes; ask the user to commit or stash first, or to branch from the current state explicitly.
-   - If the current branch has no commits ahead of develop, you may switch to `develop` after a clean state, then follow the "If current branch is develop" path.
+2. **If current branch is not `main`**
+   - If `git log main..HEAD --oneline` is non-empty, keep using the current branch (reuse for PR create/update).
+   - If the working tree is dirty, do not switch to `main` and pull with carried-over changes; ask the user to commit or stash first, or to branch from the current state explicitly.
+   - If the current branch has no commits ahead of main, you may switch to `main` after a clean state, then follow the "If current branch is main" path.
 
 ## Step 2: Investigation workflow
 
@@ -51,9 +48,8 @@ Run **Phase 1** commands in parallel (they are independent), then **Phase 2**.
 ### Phase 1: Gather context (run in parallel)
 
 ```bash
-# BASE_BRANCH: branch to merge into (never default to main for Skills / routine work).
-# Prefer PARENT captured before `git checkout -b`, else develop for Zedi.
-BASE_BRANCH="${BASE_BRANCH:-develop}"
+# Use the recorded parent for stacked work. Otherwise, default to main.
+BASE_BRANCH="${BASE_BRANCH:-main}"
 CURRENT=$(git branch --show-current)
 echo "Branch: $CURRENT -> $BASE_BRANCH (merge target)"
 
@@ -206,16 +202,16 @@ Derive the PR title from commit messages:
 
 ## Decision points
 
-| Situation                    | Action                                                                                                                                    |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Not on develop (has commits) | Reuse current branch; create or update PR from it                                                                                         |
-| On develop                   | Pull, create new branch (get name from user), then create or update PR                                                                    |
-| Branch name / issue missing  | Ask user for branch name or issue number                                                                                                  |
-| Working tree dirty on branch | Commit on the new branch before investigation                                                                                             |
-| Existing PR found            | Update that PR's body instead of creating a new PR                                                                                        |
-| Base branch not specified    | Default to `develop`; never `main` unless user asks for release PR. For stacked work, use parent branch captured before `git checkout -b` |
-| PR is very large (>50 files) | Suggest splitting, but proceed if user confirms                                                                                           |
-| Lint/format/test fail        | Fix, commit, then re-run Step 3 before pushing                                                                                            |
+| Situation                    | Action                                                                                        |
+| ---------------------------- | --------------------------------------------------------------------------------------------- |
+| Not on main (has commits)    | Reuse current branch; create or update PR from it                                             |
+| On main                      | Pull, create new branch (get name from user), then create or update PR                        |
+| Branch name / issue missing  | Ask user for branch name or issue number                                                      |
+| Working tree dirty on branch | Commit on the new branch before investigation                                                 |
+| Existing PR found            | Update that PR's body instead of creating a new PR                                            |
+| Base branch not specified    | Default to `main`. For stacked work, use the parent branch recorded before `git checkout -b`. |
+| PR is very large (>50 files) | Suggest splitting, but proceed if user confirms                                               |
+| Lint/format/test fail        | Fix, commit, then re-run Step 3 before pushing                                                |
 
 ## Response format
 

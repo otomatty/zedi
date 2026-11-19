@@ -175,7 +175,7 @@ bun run dev
 | **AI**            | OpenAI / Anthropic / Google Gemini（OpenRouter で価格情報を取得）                                        |
 | **Admin**         | `admin/` — 別 Vite + React アプリ                                                                        |
 | **Workspaces**    | Bun workspaces: `packages/ui`（shadcn）, `packages/shared` / `admin`                                     |
-| **Deploy**        | 現在はなし。作り直した `app/` を Cloudflare Worker 1 本としてデプロイする予定（`wrangler deploy`）       |
+| **Deploy**        | GitHub Actions の手動ワークフローで `app/` の Worker をデプロイ（`staging` / `production`）              |
 | **CI/CD**         | GitHub Actions（lint / typecheck / test / mutation）                                                     |
 | **Testing**       | Vitest 4 + Testing Library / Playwright / Stryker（Mutation Testing）                                    |
 | **Tooling**       | ESLint 9 / Prettier / Husky + lint-staged / commitlint / Knip                                            |
@@ -254,10 +254,10 @@ scripts/                 # セットアップ / Stryker / 保守用スクリプ�
 コントリビューションを歓迎します！
 
 1. このリポジトリをフォーク
-2. `develop`ブランチから機能ブランチを作成 (`git checkout -b feature/amazing-feature`)
+2. `main`ブランチから機能ブランチを作成 (`git checkout -b feature/amazing-feature`)
 3. 変更をコミット (`git commit -m 'feat: add amazing feature'`)
 4. ブランチをプッシュ (`git push origin feature/amazing-feature`)
-5. `develop`ブランチに対して Pull Request を作成
+5. `main`ブランチに対して Pull Request を作成
 
 詳細は [CONTRIBUTING.ja.md](CONTRIBUTING.ja.md) と [AGENTS.md](AGENTS.md)（ブランチ・PR・マージ方法）を参照してください。
 

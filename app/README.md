@@ -28,6 +28,7 @@ One Cloudflare Worker serves everything (`wrangler.jsonc`). The front end and th
   - The redirect must go back to the callback on the origin the request arrived on. Signing in needs `TEST_IDP_PASSWORD` from `.dev.vars`, and only `@test.zedi-note.app` addresses can be created.
   - The production environment (`env.production` in `wrangler.jsonc`) has no `TEST_IDP`; a unit test checks this.
 - The top level of `wrangler.jsonc` is for local runs (`zedi-app-local`). Deployed environments live under `env` and are only used with `--env`.
+- To deploy, run [`deploy.yml`](../.github/workflows/deploy.yml) manually and select `staging` or `production`.
 
 ### Second factor
 

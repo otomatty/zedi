@@ -162,24 +162,6 @@ gh api -X POST repos/{owner}/{repo}/pulls/{number}/comments/{comment_id}/replies
 
 修正コミットを push し、再レビューを依頼する。
 
-### 対象 PR が develop → main（リリース PR）の場合
-
-develop に直接 push できない場合は、作業ブランチを作成し develop 向け PR を出す:
-
-1. 修正をコミットした状態で作業ブランチを作成:
-   ```bash
-   git checkout -b fix/pr-{number}-review-comment
-   ```
-2. push して develop ベースの PR を作成:
-   ```bash
-   git push -u origin fix/pr-{number}-review-comment
-   gh pr create --base develop --head fix/pr-{number}-review-comment \
-     --title "fix: address PR #{number} review comments" --body "..."
-   ```
-3. 元のリリース PR にはコメントで報告する。
-
-### 通常（feature ブランチなど）の場合
-
 ```bash
 git push origin HEAD
 
