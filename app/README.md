@@ -233,3 +233,11 @@ Browser checks:
 - Back online, the page is created and its text is visible from a fresh browser with no local copy
 - Sign-out, which also removes cached API data and local page copies
 - No page errors
+
+### Mutation tests
+
+- `bun run test:mutation` runs all mutation targets (about 10 minutes).
+- `bun run test:mutation:changed` runs only changed targets. Set `STRYKER_DIFF_BASE=main` to compare the branch with `main`.
+- `bun run mutation:report:summary` generates a Markdown summary of the results.
+
+Stryker uses the unit tests to evaluate mutants. The workerd integration tests cannot evaluate mutants in Stryker. The list in `scripts/mutation/targets.mjs` excludes files covered only by integration or browser smoke tests. The score is for review and does not fail the run.

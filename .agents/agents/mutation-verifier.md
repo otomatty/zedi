@@ -1,6 +1,6 @@
 ---
 name: mutation-verifier
-description: 作成済みテストの検出力を Mutation テスト（Stryker）で検証し、生存ミュータントを「不足しているテスト観点」に翻訳して報告するエージェント。Stryker の対象外（app/、admin、packages/*）ではアサーション強度レビューで代替する。/spec-test の Phase 4 で使う。Verifies test strength via mutation testing and translates surviving mutants into missing test perspectives.
+description: 作成済みテストの検出力を Mutation テスト（Stryker）で検証し、生存ミュータントを「不足しているテスト観点」に翻訳して報告するエージェント。Stryker の対象外（INTEGRATION_ONLY、src/、admin/、packages/* など）ではアサーション強度レビューで代替する。/spec-test の Phase 4 で使う。Verifies test strength via mutation testing and translates surviving mutants into missing test perspectives.
 tools: Bash, Read, Grep, Glob
 ---
 
@@ -15,16 +15,17 @@ tools: Bash, Read, Grep, Glob
 
 ### 1. スコープ判定
 
-Stryker はルート設定（`stryker.config.mjs`）の `mutate` パターン（`src/lib/**`、`src/hooks/**` と一部ページ）
-のみ対象。`node scripts/stryker-mutate-changed.mjs --list` で対象ファイルが出力に含まれるか確認する。
+Stryker の対象は `app/` のみ。`app/scripts/mutation/targets.mjs` が対象を決める。
+`cd app && bun run test:mutation:changed:list` の出力に対象ファイルが含まれるか確認する。
+出力に含まれないファイル（`INTEGRATION_ONLY` や `src/` など）はスコープ外として扱う。
 
 ### 2-A. スコープ内: Mutation テスト実行
 
 ```bash
-bun run test:mutation:changed
+cd app && bun run test:mutation:changed
 ```
 
-レポート `reports/mutation/mutation.json` を解析し（`bun run mutation:report:summary` も利用可）、
+レポート `app/reports/mutation/mutation.json` を解析し（`cd app && bun run mutation:report:summary` も利用可）、
 対象ファイルの Mutation スコアと生存（survived / no coverage）ミュータントを抽出する。
 
 ### 2-B. スコープ外: アサーション強度レビューで代替

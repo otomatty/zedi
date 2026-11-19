@@ -215,9 +215,9 @@ bun run test:e2e
 # Coverage
 bun run test:coverage
 
-# Mutation testing (Stryker; mutation score is the primary quality metric)
-bun run test:mutation:dry
-bun run test:mutation
+# Mutation testing for app/ (full scope and changed files)
+(cd app && bun run test:mutation)
+(cd app && bun run test:mutation:changed)
 ```
 
 Quality metrics, testing policy (TDD / mutation), and how to write specifications: [AGENTS.md](AGENTS.md).
@@ -243,7 +243,7 @@ packages/                # Bun workspaces (shared libraries)
 
 admin/                   # Admin SPA (separate Vite + React + Tailwind / `@zedi/ui`)
 e2e/                     # Playwright E2E tests
-scripts/                 # Setup / Stryker / maintenance scripts
+scripts/                 # Setup / maintenance scripts
 .github/workflows/       # GitHub Actions (lint / typecheck / test / mutation)
 ```
 

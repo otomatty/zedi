@@ -34,7 +34,7 @@ nul
 coverage/
 *.lcov
 .stryker-tmp/
-reports/mutation/
+**/reports/mutation/
 
 # Playwright
 playwright-report/

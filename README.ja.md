@@ -215,9 +215,9 @@ bun run test:e2e
 # テストカバレッジ
 bun run test:coverage
 
-# Mutation testing（Stryker; 品質の第一指標は Mutation スコア）
-bun run test:mutation:dry
-bun run test:mutation
+# app/ の Mutation テスト（対象全体と変更ファイル）
+(cd app && bun run test:mutation)
+(cd app && bun run test:mutation:changed)
 ```
 
 品質指標・テスト方針（TDD / Mutation）・仕様の書き方は [AGENTS.md](AGENTS.md) を参照してください。
@@ -243,7 +243,7 @@ packages/                # Bun workspaces（共有ライブラリ）
 
 admin/                   # 管理画面アプリ（別 Vite + React + Tailwind / `@zedi/ui` 利用）
 e2e/                     # Playwright E2E テスト
-scripts/                 # セットアップ / Stryker / 保守用スクリプト
+scripts/                 # セットアップ / 保守用スクリプト
 .github/workflows/       # GitHub Actions（lint / typecheck / test / mutation）
 ```
 

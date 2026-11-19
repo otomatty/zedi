@@ -1,12 +1,14 @@
-# Weekly full mutation testing (Issue #377 Phase 3 / #1050).
-# 全対象で mutation を実行し、スコア推移・レポートを週次確認する用（金曜夜に週 1 回）。
-# スコアでは fail させない（stryker.config.nightly.mjs: break 無効）。
-# 失敗時の原因分類は stryker.config.mjs の TSDoc を参照（timeout / score / test error）。
+# app/ の全 Mutation 対象（app/scripts/mutation/targets.mjs）を毎週実行する。4 コアで約 10 分。
+# app/stryker.config.mjs の thresholds.break: null でスコアによる失敗を無効にする。最初のテスト実行が落ちるとジョブは失敗する。
+# スケジュール実行が失敗すると、GitHub がワークフローを最後に変更した人に通知する。追加の通知は設定していない。
+# Run mutation tests on all app/ targets (app/scripts/mutation/targets.mjs) weekly. Takes about 10 minutes on four cores.
+# app/stryker.config.mjs disables the score gate with thresholds.break: null. An initial test run failure fails the job.
+# GitHub notifies the last workflow editor if a scheduled run fails. There are no additional notifications.
 name: Nightly Mutation
 
 on:
   schedule:
-    # 毎週金曜 14:00 UTC (JST 金曜 23:00)。全量実行は約 2.5 時間かかるため週 1 回で運用する。
+    # 毎週金曜 14:00 UTC（JST 金曜 23:00）。
     - cron: "0 14 * * 5"
   workflow_dispatch:
 
@@ -18,37 +20,44 @@ env:
 
 jobs:
   mutation-full:
-    name: Mutation (full)
+    name: App (rebuild) — mutation (full scope)
     runs-on: ubuntu-latest
-    # 完走実績は約 2.5 時間（dry run 約 5 分 + mutation 約 148 分）。余裕を持たせて 5 時間で打ち切る。
-    timeout-minutes: 300
+    timeout-minutes: 60
     steps:
       - name: Checkout (with retry)
         uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3
         with:
-          action: actions/checkout@v7.0.0
+          action: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
           attempt_limit: 3
           attempt_delay: 5000
 
       - uses: ./.github/actions/setup-toolchain
+        with:
+          install-deps: "false"
+
+      - name: Install app dependencies
+        working-directory: app
+        run: bun install --frozen-lockfile
 
       - name: Run mutation tests (full scope)
-        run: bun run test:mutation -- stryker.config.nightly.mjs
+        working-directory: app
+        run: bun run test:mutation
 
       - name: Upload mutation report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: mutation-report-nightly
-          path: reports/mutation/
+          path: app/reports/mutation/
           retention-days: 14
 
       # スコア推移を artifact を開かずに確認できるよう Job Summary に要約を出す（Issue #1050）。
       - name: Write mutation summary to job summary
         if: always()
+        working-directory: app
         run: |
           if [ -f reports/mutation/mutation.json ]; then
-            STRYKER_SUMMARY_MAX_SURVIVED=30 node scripts/stryker-mutation-report-summarize.mjs --stdout-only >> "$GITHUB_STEP_SUMMARY"
+            STRYKER_SUMMARY_MAX_SURVIVED=30 node scripts/mutation/summarize.mjs --stdout-only >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "No \`reports/mutation/mutation.json\` — run failed before reporting (dry-run timeout or test error). See stryker.config.mjs failure triage." >> "$GITHUB_STEP_SUMMARY"
+            echo "No \`reports/mutation/mutation.json\` — run failed before reporting (dry-run timeout or test error)." >> "$GITHUB_STEP_SUMMARY"
           fi

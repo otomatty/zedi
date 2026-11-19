@@ -17,15 +17,11 @@ updates:
       minor-and-patch:
         update-types: [minor, patch]
       # メジャー更新でも、同じ版が必要なものは 1 本の PR にまとめる。
-      # @vitest/coverage-v8 は同じ版の vitest、@stryker-mutator/vitest-runner は
-      # 同じ版の @stryker-mutator/core を要求する（#1173、#1169）。
+      # @vitest/coverage-v8 は同じ版の vitest を要求する（#1173）。
       # Group major updates that must stay on the same version into one PR.
-      # @vitest/coverage-v8 requires the same vitest version; @stryker-mutator/vitest-runner
-      # requires the same @stryker-mutator/core version (#1173, #1169).
+      # @vitest/coverage-v8 requires the same vitest version (#1173).
       vitest:
         patterns: ["vitest", "@vitest/*"]
-      stryker:
-        patterns: ["@stryker-mutator/*"]
     open-pull-requests-limit: 10
     labels: [dependencies]
     # ESLint 10: wait until typescript-eslint and plugins support it (closed PR #407).
@@ -48,12 +44,12 @@ updates:
       # 旧フロント（src/・admin/・packages/ui）は作り直しの参照用で、ドメイン切替時に削除する。
       # メジャー更新は追わず、minor と patch は minor-and-patch で続ける。
       # リポジトリ共通の道具（eslint のプラグイン、typescript-eslint、prettier、commitlint、
-      # husky、lint-staged、knip、vitest、stryker、playwright）は app/ にも効くので除外する。
+      # husky、lint-staged、knip、vitest、playwright）は app/ にも効くので除外する。
       # Sentry 11（#1166）と jsdom 30（#1171）のメジャー更新を閉じた経緯を反映する。
       # The legacy frontend (src/, admin/, packages/ui) stays only as a rebuild reference
       # and will be removed at domain cutover. Skip majors; keep minors and patches in minor-and-patch.
       # Repository-wide tools (eslint plugins, typescript-eslint, prettier, commitlint, husky,
-      # lint-staged, knip, vitest, stryker, playwright) also serve app/, so exclude them from this list.
+      # lint-staged, knip, vitest, playwright) also serve app/, so exclude them from this list.
       # This follows the closed major updates for Sentry 11 (#1166) and jsdom 30 (#1171).
       # ランタイム依存。
       # Runtime dependencies.
@@ -130,6 +126,10 @@ updates:
       interval: weekly
       day: monday
     groups:
+      # @stryker-mutator/vitest-runner は同じ版の @stryker-mutator/core を要求するので、1 本の PR にまとめる（#1169）。
+      # Group both packages in one PR because @stryker-mutator/vitest-runner requires the same @stryker-mutator/core version (#1169).
+      stryker:
+        patterns: ["@stryker-mutator/*"]
       minor-and-patch:
         update-types: [minor, patch]
     open-pull-requests-limit: 5

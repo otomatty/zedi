@@ -15,6 +15,10 @@
     "smoke": "node scripts/smoke.mjs",
     "test:unit": "vitest run",
     "test:worker": "vitest run -c vitest.config.worker.ts",
+    "test:mutation": "stryker run",
+    "test:mutation:changed": "node scripts/mutation/runChanged.mjs",
+    "test:mutation:changed:list": "node scripts/mutation/runChanged.mjs --list",
+    "mutation:report:summary": "node scripts/mutation/summarize.mjs",
     "db:migrate": "wrangler d1 migrations apply DB --local"
   },
   "dependencies": {
@@ -44,6 +48,8 @@
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.8.1",
     "@cloudflare/workers-types": "^5.20261113.1",
+    "@stryker-mutator/core": "^10.1.1",
+    "@stryker-mutator/vitest-runner": "^10.1.1",
     "@testing-library/dom": "^10.4.2",
     "@types/node": "^26.6.6",
     "fake-indexeddb": "^6.2.8",

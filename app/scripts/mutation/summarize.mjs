@@ -4,9 +4,9 @@
  * `mutation.html` は巨大なためチャットに含めない；本スクリプトの出力を `@` 添付する。
  *
  * Usage:
- *   node scripts/stryker-mutation-report-summarize.mjs
- *   node scripts/stryker-mutation-report-summarize.mjs path/to/mutation.json
- *   node scripts/stryker-mutation-report-summarize.mjs --stdout-only
+ *   node scripts/mutation/summarize.mjs
+ *   node scripts/mutation/summarize.mjs path/to/mutation.json
+ *   node scripts/mutation/summarize.mjs --stdout-only
  *
  * Flags:
  *   --stdout-only  Print Markdown to stdout only (no file write). Low token footprint for AI chat.
@@ -22,7 +22,7 @@ import { cwd } from "node:process";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const app = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 /**
  * Prefer repo-relative paths in shared reports (avoid leaking absolute local paths).
@@ -39,9 +39,9 @@ function displayPath(target) {
   return target;
 }
 
-const defaultInput = resolve(root, "reports/mutation/mutation.json");
+const defaultInput = resolve(app, "reports/mutation/mutation.json");
 const defaultOut =
-  process.env.STRYKER_SUMMARY_OUT?.trim() || resolve(root, "reports/mutation/mutation-summary.md");
+  process.env.STRYKER_SUMMARY_OUT?.trim() || resolve(app, "reports/mutation/mutation-summary.md");
 const maxSurvived = Math.max(
   1,
   Number.parseInt(process.env.STRYKER_SUMMARY_MAX_SURVIVED ?? "80", 10) || 80,
@@ -63,12 +63,12 @@ function parseArgs(argv) {
 Usage:
   bun run mutation:report:summary
   bun run mutation:report:summary -- --stdout-only
-  node scripts/stryker-mutation-report-summarize.mjs [path/to/mutation.json]
+  node scripts/mutation/summarize.mjs [path/to/mutation.json]
 
 Environment:
   STRYKER_SUMMARY_OUT, STRYKER_SUMMARY_MAX_SURVIVED
 
-See also: stryker.config.mjs (jsonReporter), STRYKER_HTML_REPORT=0 to skip HTML.`);
+See also: stryker.config.mjs (jsonReporter), STRYKER_HTML_REPORT=1 to also write HTML.`);
       process.exit(0);
     }
     if (a === "--stdout-only") {
@@ -132,12 +132,14 @@ function aggregate(report) {
   const survived = global["Survived"] ?? 0;
   const timeout = global["Timeout"] ?? 0;
   const noCov = global["NoCoverage"] ?? 0;
-  const detected = killed + survived + timeout;
+  const detected = killed + timeout;
+  const covered = detected + survived;
+  const valid = covered + noCov;
 
-  const scoreTotal = totalCounted(global) > 0 ? (100 * killed) / totalCounted(global) : Number.NaN;
-  const scoreCovered = detected > 0 ? (100 * killed) / detected : Number.NaN;
+  const scoreTotal = valid > 0 ? (100 * detected) / valid : Number.NaN;
+  const scoreCovered = valid > 0 ? (covered > 0 ? (100 * detected) / covered : 0) : Number.NaN;
 
-  return { perFile, global, killed, survived, timeout, noCov, scoreTotal, scoreCovered };
+  return { perFile, global, noCov, scoreTotal, scoreCovered };
 }
 
 /**
@@ -167,7 +169,7 @@ function main() {
     console.error(
       `stryker-mutation-report-summarize: cannot read ${displayPath(input)}\n` +
         `  Run mutation tests first (JSON reporter writes this file). Example:\n` +
-        `  STRYKER_HTML_REPORT=0 bun run test:mutation:changed -- --dryRunTimeoutMinutes 30`,
+        `  bun run test:mutation:changed -- --dryRunTimeoutMinutes 30`,
     );
     process.exit(1);
   }
@@ -214,7 +216,7 @@ function main() {
     "Pending",
   ];
   for (const k of order) {
-    const v = agg.global[k];
+    const v = k === "NoCoverage" ? agg.noCov : agg.global[k];
     if (v !== undefined) lines.push(`| ${k} | ${v} |`);
   }
   lines.push(`| **(all)** | **${totalCounted(agg.global)}** |`);
@@ -223,10 +225,10 @@ function main() {
   lines.push("## Scores / スコア（mutants から再計算）");
   lines.push("");
   lines.push(
-    `- **% total (killed / all mutants):** ${Number.isNaN(agg.scoreTotal) ? "n/a" : agg.scoreTotal.toFixed(2)}`,
+    `- **% total (detected / valid mutants):** ${Number.isNaN(agg.scoreTotal) ? "n/a" : agg.scoreTotal.toFixed(2)}`,
   );
   lines.push(
-    `- **% covered (killed / killed+survived+timeout):** ${Number.isNaN(agg.scoreCovered) ? "n/a" : agg.scoreCovered.toFixed(2)}`,
+    `- **% covered (detected / covered mutants):** ${Number.isNaN(agg.scoreCovered) ? "n/a" : agg.scoreCovered.toFixed(2)}`,
   );
   lines.push("");
 
@@ -287,7 +289,7 @@ function main() {
     "- **NoCoverage**: no test mapped to this mutant in this run (common on partial `--mutate`).",
   );
   lines.push(
-    "- **Thresholds** in `stryker.config.mjs` apply to full `bun run test:mutation`; diff runs may use `stryker.config.mutation-changed.mjs`.",
+    "- **Thresholds** in `stryker.config.mjs` highlight scores for both full and changed-file runs. Scores do not fail either run.",
   );
   lines.push("");
 
