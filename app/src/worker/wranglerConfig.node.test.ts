@@ -84,6 +84,38 @@ describe("deployment environments in the Worker config", () => {
     expect(new Set(databaseIds).size).toBe(2);
     expect(new Set(databaseNames).size).toBe(2);
   });
+
+  it("publishes each public hostname on its own Worker", () => {
+    // 公開ホストは環境ごとの Worker に付ける。preview.zedi-note.app はプレビュー専用で、
+    // ステージング本体のルートにはしない。
+    // Each public hostname belongs to one environment's Worker. preview.zedi-note.app is for
+    // preview deployments only, so it is not a route of the staging Worker itself.
+    const config = readWranglerConfig();
+    const envs = (config.env ?? {}) as Record<string, Record<string, unknown>>;
+
+    expect(envs.production?.routes).toEqual([
+      {
+        pattern: "zedi-note.app",
+        custom_domain: true,
+        enabled: true,
+        previews_enabled: false,
+      },
+    ]);
+    expect(envs.staging?.routes).toEqual([
+      {
+        pattern: "staging.zedi-note.app",
+        custom_domain: true,
+        enabled: true,
+        previews_enabled: false,
+      },
+      {
+        pattern: "preview.zedi-note.app",
+        custom_domain: true,
+        enabled: false,
+        previews_enabled: true,
+      },
+    ]);
+  });
 });
 
 describe("the test IdP Worker config", () => {
