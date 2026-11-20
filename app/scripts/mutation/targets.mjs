@@ -13,6 +13,7 @@ export const INTEGRATION_ONLY = [
   "src/testIdp/index.ts",
   "src/worker/app.tsx",
   "src/worker/auth.ts",
+  "src/worker/db/d1Schema.ts",
   "src/worker/db/schema.ts",
   "src/worker/index.ts",
   "src/worker/landing.tsx",
