@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  blob,
   foreignKey,
   index,
   integer,
@@ -25,6 +26,21 @@ import {
 const users = sqliteTable("users", {
   id: text("id").primaryKey(),
 });
+
+const ownerForeignKey: ForeignKeyShape = {
+  columns: ["owner_id"],
+  foreignTable: "users",
+  foreignColumns: ["id"],
+  onDelete: "CASCADE",
+  onUpdate: "NO ACTION",
+};
+
+const ownerIndex: IndexShape = {
+  name: "x",
+  unique: false,
+  partial: false,
+  columns: [{ name: "owner_id", desc: false }],
+};
 
 function column(overrides: Partial<ColumnShape> & Pick<ColumnShape, "name">): ColumnShape {
   return {
@@ -66,7 +82,50 @@ function expectOneDiff(drizzle: SchemaShape, fromSql: SchemaShape, ...needles: s
 describe("describeDrizzleSchema", () => {
   describe("columns and keys", describeDrizzleColumnsAndKeys);
   describe("indexes", describeDrizzleIndexes);
+  describe("raw index expressions", describeRawIndexExpressions);
+  describe("ordering and edge cases", describeDrizzleOrderingAndEdgeCases);
 });
+
+function describeDrizzleOrderingAndEdgeCases(): void {
+  it("sorts tables, columns, foreign keys, indexes, and unique constraints by name", () => {
+    const notes = sqliteTable(
+      "notes",
+      { z: text("z"), m: text("m").unique(), a: text("a"), b: text("b") },
+      (t) => [
+        foreignKey({ columns: [t.z], foreignColumns: [users.id] }),
+        foreignKey({ columns: [t.a], foreignColumns: [users.id] }),
+        index("notes_z").on(t.z),
+        index("notes_a").on(t.a),
+        unique("notes_z_b").on(t.z, t.b),
+        unique("notes_z_a").on(t.z, t.a),
+      ],
+    );
+
+    const shape = describeDrizzleSchema([users, notes]);
+    const [noteShape] = shape;
+    expect(shape.map(({ name }) => name)).toEqual(["notes", "users"]);
+    expect(noteShape?.columns.map(({ name }) => name)).toEqual(["a", "b", "m", "z"]);
+    expect(noteShape?.foreignKeys.map(({ columns }) => columns)).toEqual([["a"], ["z"]]);
+    expect(noteShape?.indexes.map(({ name }) => name)).toEqual(["notes_a", "notes_z"]);
+    expect(noteShape?.uniques).toEqual([["a", "z"], ["b", "z"], ["m"]]);
+  });
+
+  it.each([
+    { label: "Date", value: integer("date", { mode: "timestamp_ms" }).default(new Date(0)) },
+    { label: "object", value: blob("payload", { mode: "json" }).default({ version: 1 }) },
+  ])("rejects a default of type $label", ({ value }) => {
+    const notes = sqliteTable("notes", { value });
+
+    expect(() => describeDrizzleSchema([notes])).toThrow(/Unsupported column default/);
+  });
+
+  it("treats an empty enum as no enum", () => {
+    // @ts-expect-error Drizzle requires a nonempty tuple in TypeScript. Exercise JavaScript input.
+    const notes = sqliteTable("notes", { kind: text("kind", { enum: [] }) });
+
+    expect(describeDrizzleSchema([notes])[0]?.columns).toEqual([column({ name: "kind" })]);
+  });
+}
 
 function describeDrizzleColumnsAndKeys(): void {
   it("describes text, integer, timestamp_ms, and boolean columns", () => {
@@ -248,10 +307,43 @@ function describeDrizzleIndexes(): void {
   });
 }
 
+function describeRawIndexExpressions(): void {
+  it.each([
+    ["updated_at desc", "updated_at", true],
+    ["updated_at", "updated_at", false],
+    ["updated_at Desc", "updated_at", true],
+    ["  updated_at   DESC  ", "updated_at", true],
+    ["updated_at Asc", "updated_at", false],
+    ['"we""ird" DESC', 'we"ird', true],
+  ])("reads the index expression %s", (expression, name, desc) => {
+    const notes = sqliteTable("notes", { updatedAt: integer("updated_at") }, () => [
+      index("notes_expression").on(sql.raw(expression)),
+    ]);
+
+    expect(describeDrizzleSchema([notes])[0]?.indexes).toEqual([
+      { name: "notes_expression", unique: false, partial: false, columns: [{ name, desc }] },
+    ]);
+  });
+
+  it.each(["lower(title)", 'x"title" DESC', '"title" DESC x', "updated_at DESCENDING", "1col"])(
+    "rejects the index expression %s",
+    (expression) => {
+      const notes = sqliteTable("notes", { title: text("title") }, () => [
+        index("notes_expression").on(sql.raw(expression)),
+      ]);
+
+      expect(() => describeDrizzleSchema([notes])).toThrow(/notes_expression/);
+      expect(() => describeDrizzleSchema([notes])).toThrow(expression);
+    },
+  );
+}
+
 describe("diffSchemas", () => {
   describe("tables and columns", describeTableAndColumnDiffs);
   describe("constraints", describeConstraintDiffs);
   describe("indexes", describeIndexDiffs);
+  describe("exact diagnostics", describeDiffDiagnostics);
+  describe("multi-column keys", describeMultiColumnKeys);
 });
 
 function describeTableAndColumnDiffs(): void {
@@ -504,6 +596,141 @@ function describeIndexDiffs(): void {
   });
 }
 
+function describeDiffDiagnostics(): void {
+  const notes = table({ name: "notes" });
+
+  it("orders the full diff by table, column, and index names", () => {
+    const drizzle = [
+      table({ name: "zebra", columns: [column({ name: "title" })] }),
+      table({
+        name: "notes",
+        columns: [column({ name: "z" }), column({ name: "b" })],
+        indexes: [
+          { ...ownerIndex, name: "z" },
+          { ...ownerIndex, name: "b" },
+        ],
+      }),
+    ];
+    const fromSql = [
+      table({
+        name: "notes",
+        columns: [column({ name: "y" }), column({ name: "a" })],
+        indexes: [
+          { ...ownerIndex, name: "y" },
+          { ...ownerIndex, name: "a" },
+        ],
+      }),
+      table({ name: "zebra" }),
+      table({ name: "alpha" }),
+    ];
+
+    expect(diffSchemas(drizzle, fromSql)).toEqual([
+      "alpha: table is in SQL but not in Drizzle",
+      "notes.a: column is in SQL but not in Drizzle",
+      "notes.b: column is in Drizzle but not in SQL",
+      "notes.y: column is in SQL but not in Drizzle",
+      "notes.z: column is in Drizzle but not in SQL",
+      'notes: index "a" is in SQL but not in Drizzle',
+      'notes: index "b" is in Drizzle but not in SQL',
+      'notes: index "y" is in SQL but not in Drizzle',
+      'notes: index "z" is in Drizzle but not in SQL',
+      "zebra.title: column is in Drizzle but not in SQL",
+    ]);
+  });
+
+  it.each([
+    { label: "table", present: [notes], absent: [], subject: "notes: table" },
+    {
+      label: "column",
+      present: [{ ...notes, columns: [column({ name: "title" })] }],
+      absent: [notes],
+      subject: "notes.title: column",
+    },
+    {
+      label: "index",
+      present: [{ ...notes, indexes: [ownerIndex] }],
+      absent: [notes],
+      subject: 'notes: index "x"',
+    },
+    {
+      label: "foreign key",
+      present: [{ ...notes, foreignKeys: [ownerForeignKey] }],
+      absent: [notes],
+      subject: "notes: foreign key (owner_id)",
+    },
+    {
+      label: "unique",
+      present: [{ ...notes, uniques: [["a", "b"]] }],
+      absent: [notes],
+      subject: "notes: unique (a, b)",
+    },
+  ])("names the side with the missing $label", ({ present, absent, subject }) => {
+    expect(diffSchemas(present, absent)).toEqual([`${subject} is in Drizzle but not in SQL`]);
+    expect(diffSchemas(absent, present)).toEqual([`${subject} is in SQL but not in Drizzle`]);
+  });
+
+  it("prints changes to the foreign key update action and referenced columns", () => {
+    const withOwnerKey = (changes: Partial<ForeignKeyShape>): SchemaShape => [
+      { ...notes, foreignKeys: [{ ...ownerForeignKey, ...changes }] },
+    ];
+
+    expect(diffSchemas(withOwnerKey({}), withOwnerKey({ onUpdate: "RESTRICT" }))).toEqual([
+      "notes: foreign key (owner_id) onUpdate differs (Drizzle NO ACTION, SQL RESTRICT)",
+    ]);
+    expect(diffSchemas(withOwnerKey({}), withOwnerKey({ foreignColumns: ["uuid"] }))).toEqual([
+      "notes: foreign key (owner_id) foreignColumns differ (Drizzle id, SQL uuid)",
+    ]);
+  });
+
+  it("prints null defaults, enum values, and composite primary keys", () => {
+    const original = pages({
+      columns: [column({ name: "id" }), column({ name: "title" })],
+      primaryKey: ["id", "title"],
+    });
+    const updated = pages({
+      columns: [
+        column({ name: "id" }),
+        column({ name: "title", default: "''", enumValues: ["a", "b"] }),
+      ],
+      primaryKey: ["id"],
+    });
+
+    expect(diffSchemas([original], [updated])).toEqual([
+      "pages.title: default differs (Drizzle null, SQL '')",
+      "pages.title: enumValues differs (Drizzle null, SQL a, b)",
+      "pages: primaryKey differs (Drizzle id, title, SQL id)",
+    ]);
+    expect(diffSchemas([updated], [original])).toEqual([
+      "pages.title: default differs (Drizzle '', SQL null)",
+      "pages.title: enumValues differs (Drizzle a, b, SQL null)",
+      "pages: primaryKey differs (Drizzle id, SQL id, title)",
+    ]);
+  });
+}
+
+function describeMultiColumnKeys(): void {
+  it("distinguishes unique constraint columns with the same concatenated name", () => {
+    const drizzle = table({ name: "notes", uniques: [["ab", "c"]] });
+    const fromSql = table({ name: "notes", uniques: [["a", "bc"]] });
+
+    expect(diffSchemas([drizzle], [fromSql]).sort()).toEqual([
+      "notes: unique (a, bc) is in SQL but not in Drizzle",
+      "notes: unique (ab, c) is in Drizzle but not in SQL",
+    ]);
+  });
+
+  it("distinguishes foreign key columns with the same concatenated name", () => {
+    const target = { ...ownerForeignKey, foreignColumns: ["id", "scope"] };
+    const drizzle = table({ name: "notes", foreignKeys: [{ ...target, columns: ["ab", "c"] }] });
+    const fromSql = table({ name: "notes", foreignKeys: [{ ...target, columns: ["a", "bc"] }] });
+
+    expect(diffSchemas([drizzle], [fromSql]).sort()).toEqual([
+      "notes: foreign key (a, bc) is in SQL but not in Drizzle",
+      "notes: foreign key (ab, c) is in Drizzle but not in SQL",
+    ]);
+  });
+}
+
 describe("normalizeSqliteTable", () => {
   it("marks only the single primary key column as not null", () => {
     const id = column({ name: "id" });
@@ -543,6 +770,29 @@ describe("normalizeSqliteTable", () => {
 });
 
 describe("parseCheckEnums", () => {
+  it.each([
+    "CHECK (a IN ('x',))",
+    "CHECK (a IN ())",
+    "CHECK (a IN ('x' 'y'))",
+    "CHECK (lower(a) IN ('x'))",
+  ])("ignores %s and reads a valid CHECK that follows", (malformed) => {
+    const createTable = `CREATE TABLE docs (a TEXT, b TEXT, ${malformed}, CHECK (b IN ('y')))`;
+
+    expect(parseCheckEnums(createTable)).toEqual(new Map([["b", ["y"]]]));
+  });
+
+  it("ignores an unterminated string and preserves earlier valid checks", () => {
+    const createTable = "CREATE TABLE docs (b TEXT CHECK (b IN ('y')), a TEXT CHECK (a IN ('x))";
+
+    expect(parseCheckEnums(createTable)).toEqual(new Map([["b", ["y"]]]));
+  });
+
+  it.each(["check(a in ('x'))", "CHECK (a IN('x'))"])("accepts %s", (constraint) => {
+    const createTable = `CREATE TABLE docs (a TEXT ${constraint})`;
+
+    expect(parseCheckEnums(createTable)).toEqual(new Map([["a", ["x"]]]));
+  });
+
   it("keeps parentheses inside string literals", () => {
     const createTable = "CREATE TABLE docs (kind TEXT CHECK (kind IN ('a)', '(b')))";
 
