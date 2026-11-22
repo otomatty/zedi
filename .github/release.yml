@@ -1,3 +1,5 @@
+# PR labels determine categories. Unlabeled PRs go into the "*" category, which must come last.
+# PR の分類はラベルで決まります。ラベルのない PR は「*」の分類に入り、この分類は必ず最後に置きます。
 changelog:
   categories:
     - title: "✨ Features"
@@ -22,6 +24,9 @@ changelog:
         - "test"
         - "docs"
         - "dependencies"
+    - title: "📦 Other Changes"
+      labels:
+        - "*"
   exclude:
     labels:
       - "skip-changelog"
