@@ -63,6 +63,7 @@ A Google sign-in only opens the second step: every user needs a passkey or an au
 - **Short terms**: trigram cannot match terms under 3 characters, so those terms alone are filtered with escaped `LIKE`
 
 The Drizzle schema (`src/worker/db/schema.ts`) is kept paired with the SQL; FTS5 and the triggers exist only in SQL.
+In CI, `schema.worker.test.ts` (`src/worker/db/`) checks this pairing in the `app-test` job, excluding the FTS5 virtual table and triggers.
 
 ### Client
 

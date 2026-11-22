@@ -63,6 +63,7 @@ Google のサインインで通るのは 1 段階目だけです。すべての�
 - **短い語の検索**: trigram は 3 文字未満の語に一致しないため、その語だけ `LIKE`（エスケープ付き）で絞り込みます
 
 Drizzle のスキーマ（`src/worker/db/schema.ts`）は SQL と対にしています。FTS5 とトリガーは SQL にだけあります。
+CI の `app-test` で `src/worker/db/schema.worker.test.ts` が照合し、FTS5 の仮想表とトリガーは比較対象から外します。
 
 ### クライアント
 
