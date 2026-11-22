@@ -139,6 +139,7 @@ e2e/                 # Playwright
 - DB は `app/` の D1 だけ。**正本は `app/migrations/NNNN_*.sql`**（`wrangler d1 migrations apply`）。
 - **Drizzle のスキーマ（`app/src/worker/db/schema.ts`）と SQL は常に対**。表や列を変えたら同じ PR で SQL を追加する。FTS5 とトリガーは SQL にだけある。  
   _Skipping this caused production 500s in PR #728（旧 API で）._
+- `app/src/worker/db/schema.worker.test.ts` が CI の `app-test` で照合する。FTS5 の仮想表とトリガーは比較対象外。
 - 適用済みのマイグレーションは書き換えず、新しいファイルを足す。
 
 ---

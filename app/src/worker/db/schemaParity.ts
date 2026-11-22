@@ -79,6 +79,23 @@ export function describeDrizzleSchema(tables: SQLiteTable[]): SchemaShape {
 }
 
 /**
+ * Legacy SQLite can allow NULL in a non-INTEGER single-column primary key.
+ * The app always supplies a value, so the comparison treats that column as NOT NULL.
+ * SQLite の旧来の仕様では、INTEGER 以外の単一列の主キーが NULL を許す場合がある。
+ * アプリは常に値を入れるので、この比較ではその列を NOT NULL として扱う。
+ */
+export function normalizeSqliteTable(table: TableShape): TableShape {
+  if (table.primaryKey.length !== 1) return table;
+  const [primaryKey] = table.primaryKey;
+  return {
+    ...table,
+    columns: table.columns.map((column) =>
+      column.name === primaryKey ? { ...column, notNull: true } : column,
+    ),
+  };
+}
+
+/**
  * Lists one line per difference between a Drizzle shape and a SQL shape.
  * Drizzle 側と SQL 側の形の差を、1 件 1 行で返す。差がなければ空配列。
  */
@@ -443,6 +460,12 @@ function balancedInner(source: string, openIndex: number): string | null {
   let depth = 0;
   for (let i = openIndex; i < source.length; i++) {
     const ch = source[i];
+    if (ch === "'") {
+      const literal = readQuoted(source, i);
+      if (!literal) return null;
+      i = literal.next - 1;
+      continue;
+    }
     if (ch === "(") depth += 1;
     else if (ch === ")") {
       depth -= 1;

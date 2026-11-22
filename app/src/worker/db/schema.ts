@@ -1,10 +1,18 @@
 import { sql } from "drizzle-orm";
-import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 /*
  * Drizzle schema for D1. It mirrors migrations/*.sql (the source of truth that
  * `wrangler d1 migrations apply` runs); the FTS5 table and its triggers live only in SQL.
  * D1 用の Drizzle スキーマ。正本は migrations/*.sql（FTS5 とトリガーは SQL のみ）。
+ * `schema.worker.test.ts` checks parity in CI (`app-test`). / CI の `app-test` で `schema.worker.test.ts` が照合する。
  */
 
 const timestamps = {
@@ -77,16 +85,24 @@ export const verification = sqliteTable(
 );
 
 /** Notes: the sharing boundary. `page_count` is maintained by triggers (no COUNT(*) scans). */
-export const notes = sqliteTable("notes", {
-  id: text("id").primaryKey(),
-  ownerId: text("owner_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
-  pageCount: integer("page_count").notNull().default(0),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-});
+export const notes = sqliteTable(
+  "notes",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+    pageCount: integer("page_count").notNull().default(0),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("notes_one_default_per_owner")
+      .on(t.ownerId)
+      .where(sql`${t.isDefault} = 1`),
+  ],
+);
 
 /** Note members other than the owner. */
 export const noteMembers = sqliteTable(

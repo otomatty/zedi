@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import {
   describeDrizzleSchema,
   diffSchemas,
+  normalizeSqliteTable,
   parseCheckEnums,
   type ColumnShape,
   type ForeignKeyShape,
@@ -63,6 +64,11 @@ function expectOneDiff(drizzle: SchemaShape, fromSql: SchemaShape, ...needles: s
 }
 
 describe("describeDrizzleSchema", () => {
+  describe("columns and keys", describeDrizzleColumnsAndKeys);
+  describe("indexes", describeDrizzleIndexes);
+});
+
+function describeDrizzleColumnsAndKeys(): void {
   it("describes text, integer, timestamp_ms, and boolean columns", () => {
     const widgets = sqliteTable("widgets", {
       active: integer("active", { mode: "boolean" }).notNull().default(true),
@@ -189,7 +195,9 @@ describe("describeDrizzleSchema", () => {
       },
     ]);
   });
+}
 
+function describeDrizzleIndexes(): void {
   it("describes index(), uniqueIndex().where(), and a DESC expression", () => {
     const posts = sqliteTable(
       "posts",
@@ -238,9 +246,15 @@ describe("describeDrizzleSchema", () => {
     expect(() => describeDrizzleSchema([bad])).toThrow(/bad_lower_title/);
     expect(() => describeDrizzleSchema([bad])).toThrow(/lower/);
   });
-});
+}
 
 describe("diffSchemas", () => {
+  describe("tables and columns", describeTableAndColumnDiffs);
+  describe("constraints", describeConstraintDiffs);
+  describe("indexes", describeIndexDiffs);
+});
+
+function describeTableAndColumnDiffs(): void {
   it("returns no lines when the shapes match", () => {
     const shape = [
       pages({
@@ -348,7 +362,9 @@ describe("diffSchemas", () => {
       "enumValues",
     );
   });
+}
 
+function describeConstraintDiffs(): void {
   it("reports a primaryKey difference", () => {
     expectOneDiff([pages()], [pages({ primaryKey: ["id", "title"] })], "pages", "primaryKey");
   });
@@ -393,7 +409,9 @@ describe("diffSchemas", () => {
       "onDelete",
     );
   });
+}
 
+function describeIndexDiffs(): void {
   it("reports an index that exists only on one side", () => {
     const onlySql: IndexShape = {
       name: "notes_one_default_per_owner",
@@ -484,9 +502,59 @@ describe("diffSchemas", () => {
     const diff = diffSchemas([pages({ indexes: [drizzleIndex] })], [pages({ indexes: [asc] })]);
     expect(diff[0]).toMatch(/desc/i);
   });
+}
+
+describe("normalizeSqliteTable", () => {
+  it("marks only the single primary key column as not null", () => {
+    const id = column({ name: "id" });
+    const title = column({ name: "title" });
+    const slug = column({ name: "slug", notNull: true });
+    const source = table({ name: "pages", columns: [title, id, slug], primaryKey: ["id"] });
+
+    expect(normalizeSqliteTable(source)).toEqual({
+      ...source,
+      columns: [title, { ...id, notNull: true }, slug],
+    });
+  });
+
+  it.each([
+    { key: "composite", primaryKey: ["id", "title"] },
+    { key: "absent", primaryKey: [] },
+  ])("preserves column nullability when the primary key is $key", ({ primaryKey }) => {
+    const columns = [column({ name: "id" }), column({ name: "title", notNull: true })];
+    const source = table({ name: "pages", columns, primaryKey });
+    const original = structuredClone(source);
+
+    expect(normalizeSqliteTable(source)).toEqual(original);
+  });
+
+  it("does not mutate the input table", () => {
+    const source = table({
+      name: "pages",
+      columns: [column({ name: "id" })],
+      primaryKey: ["id"],
+    });
+    const original = structuredClone(source);
+
+    normalizeSqliteTable(source);
+
+    expect(source).toEqual(original);
+  });
 });
 
 describe("parseCheckEnums", () => {
+  it("keeps parentheses inside string literals", () => {
+    const createTable = "CREATE TABLE docs (kind TEXT CHECK (kind IN ('a)', '(b')))";
+
+    expect(Object.fromEntries(parseCheckEnums(createTable))).toEqual({ kind: ["(b", "a)"] });
+  });
+
+  it("keeps an escaped quote and a parenthesis in the same string literal", () => {
+    const createTable = "CREATE TABLE docs (kind TEXT CHECK (kind IN ('it''s)', 'other')))";
+
+    expect(Object.fromEntries(parseCheckEnums(createTable))).toEqual({ kind: ["it's)", "other"] });
+  });
+
   it("reads one CHECK (col IN (...)) list and sorts the values", () => {
     const createTable = "CREATE TABLE docs (status TEXT CHECK (status IN ('published', 'draft')))";
     expect(Object.fromEntries(parseCheckEnums(createTable))).toEqual({

@@ -1,4 +1,5 @@
 import {
+  normalizeSqliteTable,
   parseCheckEnums,
   type ForeignKeyShape,
   type IndexShape,
@@ -57,7 +58,7 @@ export async function readD1Schema(db: D1Database): Promise<SchemaShape> {
   const tables: TableShape[] = [];
   for (const row of master) {
     if (isSkippedTable(row.name)) continue;
-    tables.push(await readTable(db, row.name, row.sql ?? ""));
+    tables.push(normalizeSqliteTable(await readTable(db, row.name, row.sql ?? "")));
   }
   return tables.sort((left, right) => left.name.localeCompare(right.name));
 }
