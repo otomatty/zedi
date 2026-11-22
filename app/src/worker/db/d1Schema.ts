@@ -81,7 +81,7 @@ async function readTable(db: D1Database, name: string, createSql: string): Promi
   const enums = parseCheckEnums(createSql);
   const info = await queryAll<TableInfoRow>(
     db,
-    'SELECT name, type, "notnull" AS not_null, dflt_value, pk FROM pragma_table_info(?)',
+    'SELECT name, type, "notnull" AS not_null, dflt_value, pk FROM pragma_table_xinfo(?) WHERE hidden IN (0, 2, 3)',
     name,
   );
   const columns = info

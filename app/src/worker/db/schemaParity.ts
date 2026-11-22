@@ -123,8 +123,8 @@ export function diffSchemas(drizzle: SchemaShape, sql: SchemaShape): string[] {
 }
 
 /**
- * Reads CHECK (col IN ('a', 'b')) string lists from a CREATE TABLE statement.
- * CREATE TABLE 文から、文字列の CHECK (col IN (...)) だけを読んで値を並べ替える。
+ * Reads string CHECK IN lists from a CREATE TABLE statement and intersects the lists for each column.
+ * CREATE TABLE 文の文字列 CHECK IN を読み、列ごとに値の積集合を取って並べ替える。
  */
 export function parseCheckEnums(createTableSql: string): Map<string, string[]> {
   const result = new Map<string, string[]>();
@@ -135,7 +135,13 @@ export function parseCheckEnums(createTableSql: string): Map<string, string[]> {
     const body = balancedInner(createTableSql, openIndex);
     if (body === null) break;
     const parsed = parseStringInCheck(body);
-    if (parsed) result.set(parsed.name, parsed.values);
+    if (parsed) {
+      const previous = result.get(parsed.name);
+      const values = previous
+        ? [...new Set(previous)].filter((value) => parsed.values.includes(value))
+        : parsed.values;
+      result.set(parsed.name, values);
+    }
     checkRe.lastIndex = openIndex + body.length + 2;
   }
   return result;
@@ -356,16 +362,82 @@ function diffForeignKeys(
   left: ForeignKeyShape[],
   right: ForeignKeyShape[],
 ): string[] {
-  const leftMap = new Map(left.map((fk) => [fk.columns.join("\0"), fk]));
-  const rightMap = new Map(right.map((fk) => [fk.columns.join("\0"), fk]));
+  const leftMap = groupForeignKeys(left);
+  const rightMap = groupForeignKeys(right);
   const keys = [...new Set([...leftMap.keys(), ...rightMap.keys()])].sort((a, b) =>
-    a.localeCompare(b),
+    compareColumnLists(a.split("\0"), b.split("\0")),
   );
   const lines: string[] = [];
   for (const key of keys) {
-    lines.push(...diffForeignKey(table, leftMap.get(key), rightMap.get(key)));
+    lines.push(...diffForeignKeyGroup(table, leftMap.get(key) ?? [], rightMap.get(key) ?? []));
   }
   return lines;
+}
+
+function groupForeignKeys(keys: ForeignKeyShape[]): Map<string, ForeignKeyShape[]> {
+  const groups = new Map<string, ForeignKeyShape[]>();
+  for (const fk of keys) {
+    const key = fk.columns.join("\0");
+    const group = groups.get(key);
+    if (group) group.push(fk);
+    else groups.set(key, [fk]);
+  }
+  return groups;
+}
+
+function diffForeignKeyGroup(
+  table: string,
+  left: ForeignKeyShape[],
+  right: ForeignKeyShape[],
+): string[] {
+  // A single key on each side has an unambiguous counterpart. For multiple
+  // keys, identify each unmatched target, even when only one remains per side.
+  if (left.length <= 1 && right.length <= 1) {
+    return diffForeignKey(table, left[0], right[0]);
+  }
+
+  const unmatchedSql = [...right];
+  const unmatchedDrizzle = left.filter((fk) => {
+    const match = unmatchedSql.findIndex(
+      (sqlFk) =>
+        fk.foreignTable === sqlFk.foreignTable &&
+        sameStrings(fk.foreignColumns, sqlFk.foreignColumns) &&
+        fk.onDelete === sqlFk.onDelete &&
+        fk.onUpdate === sqlFk.onUpdate,
+    );
+    if (match === -1) return true;
+    unmatchedSql.splice(match, 1);
+    return false;
+  });
+
+  return [
+    ...unmatchedDrizzle.map((fk) => ({ fk, side: "Drizzle but not in SQL" })),
+    ...unmatchedSql.map((fk) => ({ fk, side: "SQL but not in Drizzle" })),
+  ]
+    .sort(
+      (a, b) =>
+        compareForeignKeyNames(a.fk.foreignTable, b.fk.foreignTable) ||
+        compareColumnLists(a.fk.foreignColumns, b.fk.foreignColumns),
+    )
+    .map(
+      ({ fk, side }) =>
+        `${table}: foreign key (${fk.columns.join(", ")}) -> ${fk.foreignTable} (${fk.foreignColumns.join(", ")}) is in ${side}`,
+    );
+}
+
+function compareForeignKeyNames(left: string, right: string): number {
+  if (left === right) return 0;
+  return left.localeCompare(right) || (left < right ? -1 : 1);
+}
+
+function compareColumnLists(left: string[], right: string[]): number {
+  for (const [index, name] of left.entries()) {
+    const other = right[index];
+    if (other === undefined) return 1;
+    const order = compareForeignKeyNames(name, other);
+    if (order !== 0) return order;
+  }
+  return left.length - right.length;
 }
 
 function diffForeignKey(

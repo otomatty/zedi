@@ -731,6 +731,68 @@ function describeMultiColumnKeys(): void {
   });
 }
 
+describe("diffSchemas with multiple foreign keys on the same columns", () => {
+  function notes(...foreignKeys: ForeignKeyShape[]): SchemaShape {
+    return [table({ name: "notes", foreignKeys })];
+  }
+
+  const toA = { ...ownerForeignKey, foreignTable: "a" };
+  const toB = { ...ownerForeignKey, foreignTable: "b" };
+  const toC = { ...ownerForeignKey, foreignTable: "c" };
+
+  it("reports the missing foreign key on either side after matching the shared key", () => {
+    expect(diffSchemas(notes(toA, toB), notes(toB))).toEqual([
+      "notes: foreign key (owner_id) -> a (id) is in Drizzle but not in SQL",
+    ]);
+    expect(diffSchemas(notes(toB), notes(toA, toB))).toEqual([
+      "notes: foreign key (owner_id) -> a (id) is in SQL but not in Drizzle",
+    ]);
+  });
+
+  it("matches the same foreign keys in either order", () => {
+    expect(diffSchemas(notes(toA, toB), notes(toB, toA))).toEqual([]);
+  });
+
+  it("reports both unmatched foreign keys when each side declares multiple keys", () => {
+    expect(diffSchemas(notes(toB, toA), notes(toC, toB))).toEqual([
+      "notes: foreign key (owner_id) -> a (id) is in Drizzle but not in SQL",
+      "notes: foreign key (owner_id) -> c (id) is in SQL but not in Drizzle",
+    ]);
+  });
+
+  it("sorts unmatched keys by local columns, referenced table, and referenced columns", () => {
+    const toAlternateColumn = { ...toA, foreignColumns: ["alternate_id"] };
+    const editor = { ...toB, columns: ["editor_id"] };
+    expect(diffSchemas(notes(toB, toA, editor), notes(toAlternateColumn))).toEqual([
+      "notes: foreign key (editor_id) is in Drizzle but not in SQL",
+      "notes: foreign key (owner_id) -> a (alternate_id) is in SQL but not in Drizzle",
+      "notes: foreign key (owner_id) -> a (id) is in Drizzle but not in SQL",
+      "notes: foreign key (owner_id) -> b (id) is in Drizzle but not in SQL",
+    ]);
+  });
+
+  it("reports each referenced target when the whole group is missing", () => {
+    expect(diffSchemas(notes(toB, toA), notes())).toEqual([
+      "notes: foreign key (owner_id) -> a (id) is in Drizzle but not in SQL",
+      "notes: foreign key (owner_id) -> b (id) is in Drizzle but not in SQL",
+    ]);
+  });
+
+  it("matches actions exactly and consumes each matching key only once", () => {
+    const alternateDelete = { ...toA, onDelete: "RESTRICT" };
+    const alternateUpdate = { ...toA, onUpdate: "CASCADE" };
+    expect(diffSchemas(notes(toA, toA, alternateDelete, alternateUpdate), notes(toA))).toEqual([
+      "notes: foreign key (owner_id) -> a (id) is in Drizzle but not in SQL",
+      "notes: foreign key (owner_id) -> a (id) is in Drizzle but not in SQL",
+      "notes: foreign key (owner_id) -> a (id) is in Drizzle but not in SQL",
+    ]);
+    expect(diffSchemas(notes(toA, alternateDelete), notes(toA, alternateUpdate))).toEqual([
+      "notes: foreign key (owner_id) -> a (id) is in Drizzle but not in SQL",
+      "notes: foreign key (owner_id) -> a (id) is in SQL but not in Drizzle",
+    ]);
+  });
+});
+
 describe("normalizeSqliteTable", () => {
   it("marks only the single primary key column as not null", () => {
     const id = column({ name: "id" });
@@ -766,6 +828,60 @@ describe("normalizeSqliteTable", () => {
     normalizeSqliteTable(source);
 
     expect(source).toEqual(original);
+  });
+});
+
+describe("overlapping CHECK IN constraints", () => {
+  const notesSql = `CREATE TABLE notes (
+    role TEXT CHECK (role IN ('owner')),
+    CHECK (role IN ('owner', 'editor'))
+  )`;
+
+  it("intersects two checks on the same column", () => {
+    expect(parseCheckEnums(notesSql)).toEqual(new Map([["role", ["owner"]]]));
+  });
+
+  it("intersects three checks and sorts the common values", () => {
+    const createTable = `CREATE TABLE notes (
+      role TEXT CHECK (role IN ('owner', 'reader', 'editor', 'guest')),
+      CHECK (role IN ('guest', 'owner', 'editor', 'viewer')),
+      CHECK (role IN ('staff', 'viewer', 'reader', 'owner', 'editor'))
+    )`;
+
+    expect(parseCheckEnums(createTable)).toEqual(new Map([["role", ["editor", "owner"]]]));
+  });
+
+  it("keeps an empty intersection and evaluates another column independently", () => {
+    const createTable = `CREATE TABLE notes (
+      role TEXT CHECK (role IN ('owner')),
+      kind TEXT CHECK (kind IN ('personal', 'editor')),
+      CHECK (role IN ('editor')),
+      CHECK (role IN ('owner', 'editor'))
+    )`;
+
+    expect(parseCheckEnums(createTable)).toEqual(
+      new Map([
+        ["role", []],
+        ["kind", ["editor", "personal"]],
+      ]),
+    );
+  });
+
+  it("reports the narrower SQL enum in the schema diff", () => {
+    const drizzle = table({
+      name: "notes",
+      columns: [column({ name: "role", enumValues: ["editor", "owner"] })],
+    });
+    const fromSql = table({
+      name: "notes",
+      columns: [
+        column({ name: "role", enumValues: parseCheckEnums(notesSql).get("role") ?? null }),
+      ],
+    });
+
+    expect(diffSchemas([drizzle], [fromSql])).toEqual([
+      "notes.role: enumValues differs (Drizzle editor, owner, SQL owner)",
+    ]);
   });
 });
 
