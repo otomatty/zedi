@@ -241,4 +241,4 @@ Browser checks:
 - `bun run test:mutation:changed` runs only changed targets. Set `STRYKER_DIFF_BASE=main` to compare the branch with `main`.
 - `bun run mutation:report:summary` generates a Markdown summary of the results.
 
-Stryker uses the unit tests to evaluate mutants. The workerd integration tests cannot evaluate mutants in Stryker. The list in `scripts/mutation/targets.mjs` excludes files covered only by integration or browser smoke tests. The score is for review and does not fail the run.
+Stryker uses the unit tests to evaluate mutants. The workerd integration tests cannot evaluate mutants in Stryker. The `INTEGRATION_ONLY` list in `scripts/mutation/targets.mjs` excludes files covered only by integration or browser smoke tests. The `TYPE_ONLY` list in the same file excludes type-only files, which leave no runtime code and cause Stryker to fail when it finds no tests that load them. The score is for review and does not fail the run.

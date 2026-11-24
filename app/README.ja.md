@@ -240,4 +240,4 @@ CI（`.github/workflows/ci.yml`）の `app-test` が型チェック・単体テ�
 - `bun run test:mutation:changed` は変わったファイルのうち対象だけを実行します。`STRYKER_DIFF_BASE=main` でブランチと `main` の差分を対象にできます。
 - `bun run mutation:report:summary` は結果の Markdown 要約を生成します。
 
-Stryker は単体テストでミュータントを判定します。workerd の統合テストでは Stryker がミュータントを判定できません。統合テストやブラウザのスモークテストでしか守られていないファイルは `scripts/mutation/targets.mjs` の一覧で対象外にしています。スコアは結果の確認に使い、実行の成否には影響しません。
+Stryker は単体テストでミュータントを判定します。workerd の統合テストでは Stryker がミュータントを判定できません。統合テストやブラウザのスモークテストでしか守られていないファイルは `scripts/mutation/targets.mjs` の `INTEGRATION_ONLY` で対象外にしています。実行時に何も残らない型だけのファイルは、Stryker が読み込むテストを見つけられず失敗するため、同じファイルの `TYPE_ONLY` で対象外にしています。スコアは結果の確認に使い、実行の成否には影響しません。
