@@ -1,4 +1,4 @@
-import { SELF, env, runInDurableObject } from "cloudflare:test";
+import { SELF, env, runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { getServerByName } from "partyserver";
 import * as encoding from "lib0/encoding";
 import { describe, expect, it } from "vitest";
@@ -105,5 +105,195 @@ describe("realtime write permissions", () => {
 
     await sendUpdate(pageId, owner, "owner-write");
     expect(await documentText(pageId)).toContain("owner-write");
+  });
+});
+
+async function openSocket(pageId: string, cookie: string, claimedUserId?: string) {
+  const res = claimedUserId
+    ? await SELF.fetch(`${BASE}/parties/page-room/${pageId}`, {
+        headers: { upgrade: "websocket", origin: BASE, cookie, "x-zedi-user": claimedUserId },
+      })
+    : await connect(pageId, cookie);
+  expect(res.status).toBe(101);
+  const socket = res.webSocket as WebSocket;
+  socket.accept();
+  return socket;
+}
+
+function sendText(socket: WebSocket, text: string) {
+  const doc = new Y.Doc();
+  const paragraph = new Y.XmlElement("paragraph");
+  paragraph.insert(0, [new Y.XmlText(text)]);
+  doc.getXmlFragment("default").insert(0, [paragraph]);
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, 0); // messageSync
+  syncProtocol.writeUpdate(encoder, Y.encodeStateAsUpdate(doc));
+  socket.send(encoding.toUint8Array(encoder));
+  doc.destroy();
+}
+
+/** Refreshes permissions on open connections. / 接続中の権限を再確認する。 */
+describe("realtime permission refresh", () => {
+  it("schedules an alarm, closes a revoked reader, and stops polling an empty room", async () => {
+    const owner = await signIn(uniqueEmail("refresh-owner"));
+    const { defaultNoteId, user } = await me(owner);
+    const pageId = await newPage(owner, "visibility refresh");
+    const reader = await signIn(uniqueEmail("refresh-reader"));
+    const stub = await getServerByName(env.PageRoom as DurableObjectNamespace<PageRoom>, pageId);
+    const alarm = () => runInDurableObject(stub, (_room, state) => state.storage.getAlarm());
+    const changeVisibility = (visibility: "private" | "public") =>
+      api(`/api/notes/${defaultNoteId}`, owner, { method: "PATCH", body: { visibility } });
+
+    expect((await changeVisibility("public")).status).toBe(204);
+    const ownerSocket = await openSocket(pageId, owner);
+    const readerSocket = await openSocket(pageId, reader, user.id);
+    const closed = new Promise<CloseEvent>((resolve) =>
+      readerSocket.addEventListener("close", resolve, { once: true }),
+    );
+    try {
+      expect(await alarm()).toEqual(expect.any(Number));
+      expect((await changeVisibility("private")).status).toBe(204);
+      expect(await runDurableObjectAlarm(stub)).toBe(true);
+      expect(await closed).toMatchObject({ code: 4403, reason: "access revoked" });
+      expect(ownerSocket.readyState).toBe(WebSocket.OPEN);
+      expect(await alarm()).toEqual(expect.any(Number));
+    } finally {
+      if (readerSocket.readyState === WebSocket.OPEN) readerSocket.close(1000);
+      ownerSocket.close(1000);
+    }
+
+    await expect
+      .poll(() => runInDurableObject(stub, (_room, state) => state.getWebSockets().length))
+      .toBe(0);
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    expect(await alarm()).toBeNull();
+  });
+
+  it("makes an existing editor connection read-only when its role changes to viewer", async () => {
+    const owner = await signIn(uniqueEmail("refresh-editor-owner"));
+    const { defaultNoteId } = await me(owner);
+    const pageId = await newPage(owner, "role refresh");
+    const email = uniqueEmail("refresh-editor");
+    const editor = await signIn(email);
+    const stub = await getServerByName(env.PageRoom as DurableObjectNamespace<PageRoom>, pageId);
+    const setMemberRole = (role: "editor" | "viewer") =>
+      api(`/api/notes/${defaultNoteId}/members`, owner, {
+        method: "POST",
+        body: { email, role },
+      });
+    const documentText = () =>
+      runInDurableObject(stub, (room) => room.document.getXmlFragment("default").toString());
+
+    expect((await setMemberRole("editor")).status).toBe(204);
+    const socket = await openSocket(pageId, editor);
+    try {
+      sendText(socket, "before-downgrade");
+      await expect.poll(documentText).toContain("before-downgrade");
+      expect((await setMemberRole("viewer")).status).toBe(204);
+      expect(await runDurableObjectAlarm(stub)).toBe(true);
+
+      sendText(socket, "after-downgrade");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(await documentText()).not.toContain("after-downgrade");
+      expect(socket.readyState).toBe(WebSocket.OPEN);
+    } finally {
+      socket.close(1000);
+    }
+  });
+});
+
+/** Revokes legacy sockets. / 旧形式の接続を失効させる。 */
+describe("legacy realtime connections", () => {
+  async function setLegacyState(stub: DurableObjectStub<PageRoom>) {
+    await runInDurableObject(stub, async (room, state) => {
+      const connections = [...room.getConnections<{ readOnly: boolean }>()];
+      expect(connections).toHaveLength(1);
+      connections[0]?.setState({ readOnly: false });
+      await state.storage.deleteAlarm();
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+  }
+
+  it.each(["resumeReauthorization", "onLoad"] as const)(
+    "resumes checking an existing connection with no user ID or alarm via %s",
+    async (resume) => {
+      const owner = await signIn(uniqueEmail("resume-owner"));
+      const pageId = await newPage(owner, "resume permission checks");
+      const stub = await getServerByName(env.PageRoom as DurableObjectNamespace<PageRoom>, pageId);
+      const socket = await openSocket(pageId, owner);
+      const closed = new Promise<CloseEvent>((resolve) =>
+        socket.addEventListener("close", resolve, { once: true }),
+      );
+      await setLegacyState(stub);
+      const currentSocket = await openSocket(pageId, owner);
+      try {
+        await runInDurableObject(stub, async (room, state) => {
+          await state.storage.deleteAlarm();
+          expect(await state.storage.getAlarm()).toBeNull();
+
+          await room[resume]();
+          expect([...room.getConnections()]).toHaveLength(1);
+          expect(await state.storage.getAlarm()).toEqual(expect.any(Number));
+        });
+        expect(await closed).toMatchObject({ code: 4403, reason: "access revoked" });
+        expect(currentSocket.readyState).toBe(WebSocket.OPEN);
+        expect(await runDurableObjectAlarm(stub)).toBe(true);
+      } finally {
+        if (socket.readyState === WebSocket.OPEN) socket.close(1000);
+        currentSocket.close(1000);
+      }
+    },
+  );
+
+  it("ignores writes from a legacy connection before any alarm runs", async () => {
+    const owner = await signIn(uniqueEmail("legacy-write-owner"));
+    const pageId = await newPage(owner, "legacy write permissions");
+    const stub = await getServerByName(env.PageRoom as DurableObjectNamespace<PageRoom>, pageId);
+    const socket = await openSocket(pageId, owner);
+    const documentText = () =>
+      runInDurableObject(stub, (room) => room.document.getXmlFragment("default").toString());
+
+    try {
+      sendText(socket, "before-legacy-state");
+      await expect.poll(documentText).toContain("before-legacy-state");
+      await setLegacyState(stub);
+      sendText(socket, "from-legacy-state");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(await documentText()).not.toContain("from-legacy-state");
+    } finally {
+      socket.close(1000);
+    }
+  });
+
+  it("closes the only legacy connection without scheduling an alarm", async () => {
+    const owner = await signIn(uniqueEmail("legacy-only-owner"));
+    const pageId = await newPage(owner, "legacy connection only");
+    const stub = await getServerByName(env.PageRoom as DurableObjectNamespace<PageRoom>, pageId);
+    const socket = await openSocket(pageId, owner);
+    const closed = new Promise<CloseEvent>((resolve) =>
+      socket.addEventListener("close", resolve, { once: true }),
+    );
+    try {
+      await setLegacyState(stub);
+      await runInDurableObject(stub, async (room, state) => {
+        await room.resumeReauthorization();
+        expect(await state.storage.getAlarm()).toBeNull();
+      });
+      expect(await closed).toMatchObject({ code: 4403, reason: "access revoked" });
+      expect(await runDurableObjectAlarm(stub)).toBe(false);
+    } finally {
+      if (socket.readyState === WebSocket.OPEN) socket.close(1000);
+    }
+  });
+
+  it("does not start permission checks when an empty room wakes", async () => {
+    const owner = await signIn(uniqueEmail("resume-empty-owner"));
+    const pageId = await newPage(owner, "empty room");
+    const stub = await getServerByName(env.PageRoom as DurableObjectNamespace<PageRoom>, pageId);
+    await runInDurableObject(stub, async (room, state) => {
+      await room.resumeReauthorization();
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+    expect(await runDurableObjectAlarm(stub)).toBe(false);
   });
 });

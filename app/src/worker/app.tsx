@@ -9,7 +9,7 @@ import { createSseStream, mockMarkdownTokens, mockTokens } from "./mockStream";
 import { secondFactorRoutes } from "./secondFactor/routes";
 import { currentSession } from "./secondFactor/session";
 import { canEdit, getNoteAccess, getPageAccess } from "./services/access";
-import { getDefaultNoteId, upsertMember } from "./services/notes";
+import { getDefaultNoteId, getNote, setNoteVisibility, upsertMember } from "./services/notes";
 import {
   createPage,
   listPages,
@@ -130,6 +130,24 @@ export function createApp({
     const defaultNoteId = await getDefaultNoteId(c.env.DB, user.id, cost);
     withCost(c, cost);
     return c.json({ user, defaultNoteId });
+  });
+
+  api.get("/notes/:noteId", async (c) => {
+    const note = await getNote(c.env.DB, c.get("user").id, c.req.param("noteId"));
+    return note ? c.json(note) : c.notFound();
+  });
+
+  api.patch("/notes/:noteId", async (c) => {
+    const userId = c.get("user").id;
+    const access = await getNoteAccess(c.env.DB, userId, c.req.param("noteId"));
+    if (!access) return c.notFound();
+    if (access.role !== "owner") return c.json({ error: "forbidden" }, 403);
+    const { visibility } = await readJsonObject(c);
+    if (visibility !== "private" && visibility !== "unlisted" && visibility !== "public") {
+      return c.json({ error: "invalid visibility" }, 400);
+    }
+    const updated = await setNoteVisibility(c.env.DB, userId, access.noteId, visibility);
+    return updated ? c.body(null, 204) : c.notFound();
   });
 
   api.get("/notes/:noteId/pages", async (c) => {

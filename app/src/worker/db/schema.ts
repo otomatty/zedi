@@ -96,6 +96,9 @@ export const notes = sqliteTable(
     isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
     pageCount: integer("page_count").notNull().default(0),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    visibility: text("visibility", { enum: ["private", "unlisted", "public"] })
+      .notNull()
+      .default("private"),
   },
   (t) => [
     uniqueIndex("notes_one_default_per_owner")

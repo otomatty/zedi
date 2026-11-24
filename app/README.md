@@ -10,15 +10,15 @@ Features of the current app (`src/`, `server/*` and `admin/` at the repository r
 
 One Cloudflare Worker serves everything (`wrangler.jsonc`). The front end and the API share an origin, so no CORS setup or third-party cookies are needed.
 
-| Path                     | Content                                                                                      | Technology                                                                                                                                                     |
-| ------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                      | Public page (no JS)                                                                          | Server-rendered with `hono/jsx` on the Worker (`src/worker/landing.tsx`)                                                                                       |
-| `/api/auth/*`            | Authentication                                                                               | Better Auth (`better-auth/minimal` + Drizzle adapter + D1). Google sign-in (enabled only when credentials are set); outside production, the test IdP as well   |
-| `/test-idp/authorize`    | The test IdP's sign-in page                                                                  | Forwarded to the test IdP Worker only when the `TEST_IDP` binding exists. Production has no binding, so it answers 404                                         |
-| `/api/*`                 | Page list/create/detail, note members, full-text search, mock AI streaming (text / Markdown) | Hono (`src/worker/app.tsx`) + D1. Every route requires a session, with per-note authorization                                                                  |
-| `/parties/page-room/:id` | Collaborative editing                                                                        | One Durable Object per page (`PageRoom`). Session and page access are checked on connect, viewers cannot write, and saves project the document text back to D1 |
-| `/sw.js`                 | Service worker (offline)                                                                     | Built from `src/client/sw/`; see "Offline (PWA)" below                                                                                                         |
-| everything else          | The app SPA                                                                                  | `hono/jsx/dom` (`src/client/`), served as Static Assets                                                                                                        |
+| Path                     | Content                                                                                                                                            | Technology                                                                                                                                                     |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                      | Public page (no JS)                                                                                                                                | Server-rendered with `hono/jsx` on the Worker (`src/worker/landing.tsx`)                                                                                       |
+| `/api/auth/*`            | Authentication                                                                                                                                     | Better Auth (`better-auth/minimal` + Drizzle adapter + D1). Google sign-in (enabled only when credentials are set); outside production, the test IdP as well   |
+| `/test-idp/authorize`    | The test IdP's sign-in page                                                                                                                        | Forwarded to the test IdP Worker only when the `TEST_IDP` binding exists. Production has no binding, so it answers 404                                         |
+| `/api/*`                 | Page list/create/detail, note visibility (GET and PATCH `/api/notes/:noteId`), note members, full-text search, mock AI streaming (text / Markdown) | Hono (`src/worker/app.tsx`) + D1. Every route requires a session, with per-note authorization                                                                  |
+| `/parties/page-room/:id` | Collaborative editing                                                                                                                              | One Durable Object per page (`PageRoom`). Session and page access are checked on connect, viewers cannot write, and saves project the document text back to D1 |
+| `/sw.js`                 | Service worker (offline)                                                                                                                           | Built from `src/client/sw/`; see "Offline (PWA)" below                                                                                                         |
+| everything else          | The app SPA                                                                                                                                        | `hono/jsx/dom` (`src/client/`), served as Static Assets                                                                                                        |
 
 ### Sign-in
 
@@ -55,7 +55,7 @@ A Google sign-in only opens the second step: every user needs a passkey or an au
 ### D1 schema (`migrations/`)
 
 - **Better Auth tables**: `user` / `session` / `account` / `verification` (`session.second_factor_at` is the app's own column)
-- **App tables**: `notes` (the sharing boundary), `note_members`, `pages`
+- **App tables**: `notes` (the sharing boundary, with `visibility` defaulting to `private`), `note_members`, `pages`
 - **Second factor**: `passkeys` (credential ID, public key, signature counter), `webauthn_challenges` (one per session and purpose), `totp_factors` (one encrypted secret per user and its last used step), `recovery_codes` (hashes), `second_factor_attempts`
 - **Listing**: keyset pagination on the `pages_note_recent (note_id, updated_at DESC, id DESC)` index; no `OFFSET`
 - **Counts**: `notes.page_count` is maintained by triggers, so no `COUNT(*)` scans
@@ -122,7 +122,7 @@ Spec for splitting web clips and PDF text into pages, based on the large-documen
 - Page list from D1 (100 rows per request + virtual scrolling) and page creation
 - `⌘K` full-text search across every note the user can access
 - Collaborative editor: WikiLinks (`[[` suggestions come from full-text search), `/` commands, `#tags`, remote carets
-- Note sharing (viewer / editor). Without access, both the API and the WebSocket answer 404, so page existence does not leak
+- Note sharing (viewer / editor). The owner can set visibility to `private` (default, owner and members only), `unlisted` (any signed-in user with the note or page URL), or `public` (any signed-in user). Every scope requires sign-in and a verified second factor. Users who gain access through visibility alone have viewer permissions. Search returns pages only from notes the user owns or is a member of. Without access, both the API and new WebSocket connections return 404. Every 30 seconds, the room rechecks connected users' access in D1, closes connections that have lost access, and updates read-only permissions when roles change. Changes can take up to 30 seconds to take effect. Closing open WebSockets when a session ends, such as on sign-out, is tracked in [#1176](https://github.com/otomatty/zedi/issues/1176).
 - Streaming AI output: three strategies for plain text and two for Markdown (`md-blocks` / `md-naive`)
 - Offline use as a PWA: cached lists and visited pages, editing and creating pages offline, sync on reconnect
 - A long-page warning in the editor and a splitter for long imported content (the import UI itself is not built)
@@ -241,4 +241,4 @@ Browser checks:
 - `bun run test:mutation:changed` runs only changed targets. Set `STRYKER_DIFF_BASE=main` to compare the branch with `main`.
 - `bun run mutation:report:summary` generates a Markdown summary of the results.
 
-Stryker uses the unit tests to evaluate mutants. The workerd integration tests cannot evaluate mutants in Stryker. The list in `scripts/mutation/targets.mjs` excludes files covered only by integration or browser smoke tests. The score is for review and does not fail the run.
+Stryker uses the unit tests to evaluate mutants. The workerd integration tests cannot evaluate mutants in Stryker. The `INTEGRATION_ONLY` list in `scripts/mutation/targets.mjs` excludes files covered only by integration or browser smoke tests. The `TYPE_ONLY` list in the same file excludes type-only files, which leave no runtime code and cause Stryker to fail when it finds no tests that load them. The score is for review and does not fail the run.

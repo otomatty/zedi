@@ -31,6 +31,10 @@ export const INTEGRATION_ONLY = [
   "src/worker/services/pages.ts",
 ];
 
+// Type-only files leave no runtime code. Exclude them because Stryker fails when it finds no tests that load them.
+// 実行時に何も残らない型だけのファイル。Stryker が読み込むテストを見つけられず失敗するので外す。
+export const TYPE_ONLY = ["src/shared/types.ts"];
+
 /**
  * Check whether an app-relative path is a mutation target.
  * app/ からの相対パスが Mutation の対象かを判定する。
@@ -43,7 +47,8 @@ export function isMutationTarget(appPath) {
     /\.tsx?$/.test(appPath) &&
     !/\.(?:test\.tsx?|d\.ts)$/.test(appPath) &&
     !appPath.startsWith("src/worker/integration/") &&
-    !INTEGRATION_ONLY.includes(appPath)
+    !INTEGRATION_ONLY.includes(appPath) &&
+    !TYPE_ONLY.includes(appPath)
   );
 }
 
