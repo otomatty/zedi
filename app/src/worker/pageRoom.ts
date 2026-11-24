@@ -74,9 +74,15 @@ export class PageRoom extends YServer {
    * 再認可の導入前から残っている接続のため、部屋が起きたときにも呼ぶ。
    */
   async resumeReauthorization(): Promise<void> {
-    if (!this.getConnections()[Symbol.iterator]().next().done) {
-      await this.scheduleReauthorization();
+    let hasCurrentConnection = false;
+    for (const connection of this.getConnections<ConnectionState>()) {
+      if (typeof connection.state?.userId === "string") {
+        hasCurrentConnection = true;
+      } else {
+        connection.close(4403, "access revoked");
+      }
     }
+    if (hasCurrentConnection) await this.scheduleReauthorization();
   }
 
   private async scheduleReauthorization(): Promise<void> {
@@ -86,9 +92,13 @@ export class PageRoom extends YServer {
     }
   }
 
-  /** Viewers receive updates but their document changes are ignored. */
+  /**
+   * Rejects writes without a verified user ID so legacy sockets cannot edit before reauthorization.
+   * 旧接続が権限の再確認前に編集できないよう、確認済みのユーザー ID がない接続は読み取り専用にする。
+   */
   isReadOnly(connection: Connection<ConnectionState>): boolean {
-    return connection.state?.readOnly ?? true;
+    const state = connection.state;
+    return typeof state?.userId !== "string" || (state.readOnly ?? true);
   }
 
   /** Restores the persisted document when the object starts (also after hibernation). */
