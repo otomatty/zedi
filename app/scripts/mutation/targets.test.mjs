@@ -8,6 +8,44 @@ import {
   selectSkippedIntegrationOnly,
 } from "./targets.mjs";
 
+function hasRuntimeCode(source) {
+  const runtimeDeclaration =
+    /^[ \t]*(?:export[ \t]+)?(?:async[ \t]+|abstract[ \t]+)?(?:const|let|var|function|class|enum)\b/m;
+  const runtimeExport = /^[ \t]*(?:export\b(?:[ \t]+default\b|[ \t]*[={*])|module\.exports\b)/m;
+  const commentsOrStrings =
+    /\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|`(?:\\[\s\S]|[^`\\])*`/g;
+  const code = source.replace(commentsOrStrings, (token) => token.replace(/[^\r\n]/g, "~"));
+  return runtimeDeclaration.test(code) || runtimeExport.test(code);
+}
+
+// Runtime code detection / 実行時コードの検出
+describe("hasRuntimeCode", () => {
+  it.each([
+    "export type X = string",
+    "export interface A {}",
+    'import type { A } from "./a"',
+    'export type { A } from "./a"',
+    'export type * from "./a"',
+    "// export const x = 1",
+    "/*\n  export const x = 1\n*/",
+    'type X = "export default {}"',
+  ])("allows %j", (source) => {
+    expect(hasRuntimeCode(source)).toBe(false);
+  });
+
+  it.each([
+    "export const x = 1",
+    "  export default {}",
+    "export = value",
+    "export { a }",
+    'export * from "./a"',
+    "module.exports = {}",
+    "enum E {}",
+  ])("rejects %j", (source) => {
+    expect(hasRuntimeCode(source)).toBe(true);
+  });
+});
+
 // Mutation target rules / Mutation の対象判定
 describe("isMutationTarget", () => {
   it.each(["src/client/lib/outbox.ts", "src/client/ui/SearchPalette.tsx"])(
@@ -111,13 +149,12 @@ describe("TYPE_ONLY", () => {
   });
 
   it("contains no runtime declarations", () => {
-    const runtimeDeclaration =
-      /^[ \t]*(?:export[ \t]+(?:default[ \t]+)?)?(?:async[ \t]+|abstract[ \t]+)?(?:const|let|var|function|class|enum)\b/m;
     for (const path of TYPE_ONLY) {
       const source = readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
-      expect(source, `Remove ${path} from TYPE_ONLY if it declares runtime code`).not.toMatch(
-        runtimeDeclaration,
-      );
+      expect(
+        hasRuntimeCode(source),
+        `Remove ${path} from TYPE_ONLY if it contains runtime code`,
+      ).toBe(false);
     }
   });
 });

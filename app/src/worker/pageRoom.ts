@@ -69,6 +69,16 @@ export class PageRoom extends YServer {
     }
   }
 
+  /**
+   * Also called when the room wakes for connections established before reauthorization existed.
+   * 再認可の導入前から残っている接続のため、部屋が起きたときにも呼ぶ。
+   */
+  async resumeReauthorization(): Promise<void> {
+    if (!this.getConnections()[Symbol.iterator]().next().done) {
+      await this.scheduleReauthorization();
+    }
+  }
+
   private async scheduleReauthorization(): Promise<void> {
     const storage = this.ctx.storage;
     if ((await storage.getAlarm()) === null) {
@@ -90,6 +100,7 @@ export class PageRoom extends YServer {
       .exec<{ state: ArrayBuffer }>("SELECT state FROM ydoc WHERE id = 1")
       .toArray()[0];
     if (row) Y.applyUpdate(this.document, new Uint8Array(row.state));
+    await this.resumeReauthorization();
   }
 
   /** Persists the merged state and updates the page's searchable text in D1 (debounced). */

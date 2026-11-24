@@ -200,4 +200,44 @@ describe("realtime permission refresh", () => {
       socket.close(1000);
     }
   });
+
+  it.each(["resumeReauthorization", "onLoad"] as const)(
+    "resumes checking an existing connection with no user ID or alarm via %s",
+    async (resume) => {
+      const owner = await signIn(uniqueEmail("resume-owner"));
+      const pageId = await newPage(owner, "resume permission checks");
+      const stub = await getServerByName(env.PageRoom as DurableObjectNamespace<PageRoom>, pageId);
+      const socket = await openSocket(pageId, owner);
+      const closed = new Promise<CloseEvent>((resolve) =>
+        socket.addEventListener("close", resolve, { once: true }),
+      );
+      try {
+        await runInDurableObject(stub, async (room, state) => {
+          const connections = [...room.getConnections<{ readOnly: boolean }>()];
+          expect(connections).toHaveLength(1);
+          connections[0]?.setState({ readOnly: false });
+          await state.storage.deleteAlarm();
+          expect(await state.storage.getAlarm()).toBeNull();
+
+          await room[resume]();
+          expect(await state.storage.getAlarm()).toEqual(expect.any(Number));
+        });
+        expect(await runDurableObjectAlarm(stub)).toBe(true);
+        expect(await closed).toMatchObject({ code: 4403, reason: "access revoked" });
+      } finally {
+        if (socket.readyState === WebSocket.OPEN) socket.close(1000);
+      }
+    },
+  );
+
+  it("does not start permission checks when an empty room wakes", async () => {
+    const owner = await signIn(uniqueEmail("resume-empty-owner"));
+    const pageId = await newPage(owner, "empty room");
+    const stub = await getServerByName(env.PageRoom as DurableObjectNamespace<PageRoom>, pageId);
+    await runInDurableObject(stub, async (room, state) => {
+      await room.resumeReauthorization();
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+    expect(await runDurableObjectAlarm(stub)).toBe(false);
+  });
 });
