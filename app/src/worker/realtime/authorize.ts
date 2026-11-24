@@ -6,9 +6,15 @@ import { getPageAccess } from "../services/access";
 export const ROLE_HEADER = "x-zedi-role";
 
 /**
+ * The Worker sets this user ID header. Client-supplied values are untrusted.
+ * Worker が付けるユーザー ID ヘッダー。クライアントからの値は信じない。
+ */
+export const USER_HEADER = "x-zedi-user";
+
+/**
  * Authorizes a WebSocket upgrade to a page room: 401 without a session, 403 before the second
  * factor, 404 without access (existence is not revealed). On success the request is forwarded
- * with the role header.
+ * with the role and user ID headers.
  * ページ部屋への WebSocket 接続を認可する。未ログインは 401、2 段階目の前は 403、権限なしは 404。
  */
 export async function authorizeRealtime(
@@ -23,5 +29,6 @@ export async function authorizeRealtime(
   if (!page) return new Response("Not found", { status: 404 });
   const forwarded = new Request(request);
   forwarded.headers.set(ROLE_HEADER, page.role);
+  forwarded.headers.set(USER_HEADER, current.user.id);
   return forwarded;
 }
