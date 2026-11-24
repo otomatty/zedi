@@ -5,6 +5,86 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.0.0 (2026-11-24)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### 🔧 Maintenance
+* chore(deps): bump @anthropic-ai/sdk from 0.104.2 to 0.106.0 in the minor-and-patch group by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1101
+* chore(deps-dev): bump @types/node from 25.9.4 to 26.0.1 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1103
+* chore(deps-dev): bump the minor-and-patch group in /server/hocuspocus with 2 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1099
+* chore(deps-dev): bump @types/node from 25.9.4 to 26.0.1 in /server/hocuspocus by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1100
+* chore(deps-dev): bump the minor-and-patch group in /server/api with 2 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1102
+* chore(deps-dev): bump @types/node from 25.9.4 to 26.0.1 in /server/api by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1104
+* chore(deps): bump tauri-apps/tauri-action from 0.6.2 to 1.0.0 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1108
+* chore(deps): bump @anthropic-ai/sdk from 0.106.0 to 0.110.0 in the minor-and-patch group by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1109
+* chore(deps-dev): bump the minor-and-patch group in /server/hocuspocus with 2 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1112
+* chore(deps-dev): bump the minor-and-patch group in /server/api with 2 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1114
+* chore(deps-dev): bump typescript from 6.0.3 to 7.0.2 in /server/hocuspocus by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1113
+* chore(deps-dev): bump @cloudflare/workers-types from 4.20260702.1 to 5.20260706.1 in /server/api by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1110
+* chore(deps-dev): bump typescript from 6.0.3 to 7.0.2 in /server/api by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1115
+* chore(deps): bump actions/setup-node from 6 to 7 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1124
+* chore(deps): bump the minor-and-patch group with 2 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1125
+* chore(deps): bump @hono/node-server from 1.19.14 to 2.0.11 in /server/mcp in the npm_and_yarn group across 1 directory by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1127
+* chore(deps): bump actions/checkout from 7.0.0 to 7.0.1 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1128
+* chore(deps): bump @anthropic-ai/sdk from 0.112.5 to 0.115.0 in the minor-and-patch group by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1130
+* chore(deps-dev): bump @testing-library/jest-dom from 6.10.0 to 7.0.0 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1131
+* chore(deps): bump @polar-sh/sdk from 0.48.1 to 0.49.0 in /server/api in the minor-and-patch group by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1129
+* chore(deps-dev): bump vitest from 4.1.10 to 5.1.0 in /app by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1185
+* chore(deps-dev): bump eslint-plugin-jsdoc from 63.0.0 to 65.4.2 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1170
+* chore(deps): bump @hookform/resolvers from 5.2.2 to 7.0.3 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1172
+* chore(deps): bump @anthropic-ai/sdk from 0.115.0 to 1.6.0 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1174
+* chore(deps): bump the minor-and-patch group in /app with 17 updates by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1190
+* chore(deps-dev): bump @stryker-mutator/core from 9.6.0 to 10.1.1 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1193
+* chore(deps-dev): bump @stryker-mutator/vitest-runner from 9.6.0 to 10.1.1 by @dependabot[bot] in https://github.com/otomatty/zedi/pull/1169
+### 📦 Other Changes
+* chore: sync main to develop by @github-actions[bot] in https://github.com/otomatty/zedi/pull/1081
+* feat(wikiCompose): emit [[wiki links]] in drafts and render preview as Markdown by @otomatty in https://github.com/otomatty/zedi/pull/1085
+* fix(notes): prevent settings tab strip from overflowing on mobile by @otomatty in https://github.com/otomatty/zedi/pull/1086
+* feat(storage): アニメーション PNG (APNG) を WebP 変換対象から除外する by @otomatty in https://github.com/otomatty/zedi/pull/1087
+* chore(deps): bump vitest, coverage-v8, and @anthropic-ai/sdk by @otomatty in https://github.com/otomatty/zedi/pull/1097
+* chore(ci): bump actions/checkout to v7.0.0 across all workflows by @otomatty in https://github.com/otomatty/zedi/pull/1098
+* feat(infra): Cloudflare 移行 Phase 0–2a（skill / R2 / Worker 骨格 / secrets チェックリスト）(#1088) by @otomatty in https://github.com/otomatty/zedi/pull/1106
+* chore: remove deprecated code and add security/test improvements by @otomatty in https://github.com/otomatty/zedi/pull/1107
+* Add SSRF protection to thumbnail image fetching with redirect validation by @otomatty in https://github.com/otomatty/zedi/pull/1111
+* Remove Wiki Compose feature (P2 split-screen article generation) by @otomatty in https://github.com/otomatty/zedi/pull/1116
+* feat: Replace Redis with KvStore abstraction for Workers/Node (#1093) by @otomatty in https://github.com/otomatty/zedi/pull/1118
+* chore(aidlc): add aidlc-workflows v2 for Cursor, Claude Code, and Codex by @otomatty in https://github.com/otomatty/zedi/pull/1119
+* feat(mcp): add Cloudflare Workers entry point and dev deploy workflow by @otomatty in https://github.com/otomatty/zedi/pull/1121
+* chore(api): add Worker secrets bulk-upload for R2 cutover (#1089) by @otomatty in https://github.com/otomatty/zedi/pull/1122
+* docs: consolidate SPECIFICATION_POLICY and DOCUMENTATION into AGENTS.md by @otomatty in https://github.com/otomatty/zedi/pull/1120
+* feat(api): REST API (server/api, Hono) を Cloudflare Workers ランタイム対応にする (#1091) by @otomatty in https://github.com/otomatty/zedi/pull/1123
+* feat(infra): serve frontend/admin via Workers Static Assets in dev (#1088 Phase 3) by @otomatty in https://github.com/otomatty/zedi/pull/1132
+* chore(ci): setup-node で最新パッチ版を取得する by @otomatty in https://github.com/otomatty/zedi/pull/1149
+* feat!: remove the Tauri desktop app and add the hono/jsx/dom rebuild PoC by @otomatty in https://github.com/otomatty/zedi/pull/1152
+* feat!: remove the old backend, its deploys, Terraform and the browser extension, and start the rebuilt app in app/ by @otomatty in https://github.com/otomatty/zedi/pull/1153
+* chore: remove AI-DLC and unused local tooling by @otomatty in https://github.com/otomatty/zedi/pull/1155
+* feat(app)!: sign in with Google or the test IdP, and drop magic links by @otomatty in https://github.com/otomatty/zedi/pull/1158
+* feat(app)!: require an authenticator app after Google sign-in by @otomatty in https://github.com/otomatty/zedi/pull/1160
+* feat(app): add passkeys as a second factor by @otomatty in https://github.com/otomatty/zedi/pull/1161
+* ci(deps): switch Dependabot to the bun ecosystem and cover app/ by @otomatty in https://github.com/otomatty/zedi/pull/1163
+* feat(app): manage second-factor methods behind a fresh second step by @otomatty in https://github.com/otomatty/zedi/pull/1162
+* docs(app): add the recovery procedure for users who lost every second factor by @otomatty in https://github.com/otomatty/zedi/pull/1177
+* chore: ignore the local graphify output by @otomatty in https://github.com/otomatty/zedi/pull/1181
+* chore(app): require return types on app module boundaries by @otomatty in https://github.com/otomatty/zedi/pull/1178
+* docs: publish the security contact address by @otomatty in https://github.com/otomatty/zedi/pull/1179
+* chore: pin nightly wretry.action and drop the unused branch script by @otomatty in https://github.com/otomatty/zedi/pull/1183
+* chore(deps): pin y-tiptap to 3.0.11, take the other app updates, and narrow Dependabot to the rebuild by @otomatty in https://github.com/otomatty/zedi/pull/1187
+* chore(deps): take the root minor-and-patch group and fix what it breaks by @otomatty in https://github.com/otomatty/zedi/pull/1189
+* chore(app): record the staging and production D1 bindings by @otomatty in https://github.com/otomatty/zedi/pull/1180
+* chore: merge develop into main to retire the develop branch by @otomatty in https://github.com/otomatty/zedi/pull/1196
+* ci: retire develop and add a manual deploy workflow for app/ by @otomatty in https://github.com/otomatty/zedi/pull/1198
+* fix(app): keep pages another tab queued when the outbox writes by @otomatty in https://github.com/otomatty/zedi/pull/1199
+* test(app): run mutation testing on app/ and drop the src/ setup by @otomatty in https://github.com/otomatty/zedi/pull/1200
+* test(app): check that the Drizzle schema matches the D1 migrations by @otomatty in https://github.com/otomatty/zedi/pull/1203
+* chore(app): keep custom domains in the Worker config by @otomatty in https://github.com/otomatty/zedi/pull/1202
+* ci: list unlabeled pull requests in the release notes by @otomatty in https://github.com/otomatty/zedi/pull/1204
+* feat(app): add note visibility (private, unlisted, public) by @otomatty in https://github.com/otomatty/zedi/pull/1211
+
+
+**Full Changelog**: https://github.com/otomatty/zedi/compare/zedi-v0.24.0...zedi-v1.0.0
+
 ## 0.24.0 (2026-06-14)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
