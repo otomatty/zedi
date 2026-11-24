@@ -1,13 +1,16 @@
-import type { NoteRole, PageDetail } from "../../shared/types";
+import type { NoteRole, NoteVisibility, PageDetail } from "../../shared/types";
 import { firstWithCost, type D1Cost } from "./cost";
 
-const ROLE_SQL = "CASE WHEN n.owner_id = ?1 THEN 'owner' ELSE m.role END";
+const ROLE_SQL = "CASE WHEN n.owner_id = ?1 THEN 'owner' ELSE COALESCE(m.role, 'viewer') END";
 const ACCESS_JOIN = "LEFT JOIN note_members m ON m.note_id = n.id AND m.user_id = ?1";
-const ACCESS_WHERE = "(n.owner_id = ?1 OR m.user_id IS NOT NULL)";
+const ACCESS_WHERE =
+  "(n.owner_id = ?1 OR m.user_id IS NOT NULL OR n.visibility IN ('unlisted', 'public'))";
 
 /** A user's access to a note, including the trigger-maintained page count. */
 export interface NoteAccess {
   noteId: string;
+  title: string;
+  visibility: NoteVisibility;
   role: NoteRole;
   pageCount: number;
 }
@@ -28,7 +31,7 @@ export function getNoteAccess(
   return firstWithCost<NoteAccess>(
     db
       .prepare(
-        `SELECT n.id AS noteId, n.page_count AS pageCount, ${ROLE_SQL} AS role
+        `SELECT n.id AS noteId, n.title, n.visibility, n.page_count AS pageCount, ${ROLE_SQL} AS role
        FROM notes n ${ACCESS_JOIN} WHERE n.id = ?2 AND ${ACCESS_WHERE}`,
       )
       .bind(userId, noteId),

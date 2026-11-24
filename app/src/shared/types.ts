@@ -1,6 +1,9 @@
 /** Role of a user within a note. */
 export type NoteRole = "owner" | "editor" | "viewer";
 
+/** Who can read a note. / ノートを閲覧できる範囲。 */
+export type NoteVisibility = "private" | "unlisted" | "public";
+
 /**
  * Page row returned by the list and search APIs.
  * 一覧・検索 API が返すページ行。

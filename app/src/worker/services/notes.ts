@@ -1,8 +1,49 @@
-import type { NoteRole } from "../../shared/types";
+import type { NoteRole, NoteVisibility } from "../../shared/types";
 
+import { getNoteAccess } from "./access";
 import { firstWithCost, type D1Cost } from "./cost";
 
 export type { NoteRole };
+
+/** Note details returned by the API. / API が返すノートの詳細。 */
+interface NoteDetail {
+  id: string;
+  title: string;
+  visibility: NoteVisibility;
+  role: NoteRole;
+}
+
+/**
+ * Returns the note details and the caller's role when they can read it.
+ * 閲覧できるノートの詳細と、リクエストしたユーザーの権限を返す。
+ */
+export async function getNote(
+  db: D1Database,
+  userId: string,
+  noteId: string,
+): Promise<NoteDetail | null> {
+  const access = await getNoteAccess(db, userId, noteId);
+  if (!access) return null;
+  const { title, visibility, role } = access;
+  return { id: access.noteId, title, visibility, role };
+}
+
+/**
+ * Updates visibility while the note still belongs to the caller.
+ * 呼び出し元がノートのオーナーである場合に公開範囲を更新する。
+ */
+export async function setNoteVisibility(
+  db: D1Database,
+  ownerId: string,
+  noteId: string,
+  visibility: NoteVisibility,
+): Promise<boolean> {
+  const updated = await db
+    .prepare("UPDATE notes SET visibility = ?1 WHERE id = ?2 AND owner_id = ?3 RETURNING id")
+    .bind(visibility, noteId, ownerId)
+    .first<{ id: string }>();
+  return updated !== null;
+}
 
 /**
  * Creates the user's default note; a partial unique index keeps it to one per user.
